@@ -215,10 +215,6 @@ export function ProcessSectionRow({
   const { t } = useTranslation('common')
   const [userExpanded, setUserExpanded] = useState<boolean | null>(null)
 
-  if (section.kind === 'subagent') {
-    return <SubagentGroup blocks={section.blocks} />
-  }
-
   const assistantBlocks =
     section.kind === 'output'
       ? section.blocks.filter(
@@ -230,7 +226,7 @@ export function ProcessSectionRow({
   const errorTone = processSectionErrorTone(section.blocks)
   const hasError = errorTone !== null
   const defaultExpanded =
-    (processing && hasError) ||
+    hasError ||
     sectionHasPendingApproval(section) ||
     (active && section.kind === 'reasoning') ||
     (processing && section.kind === 'execution' && sectionHasRequestUserInput(section))
@@ -250,6 +246,10 @@ export function ProcessSectionRow({
     immediate: active || section.kind === 'execution',
     root: viewportRef
   })
+
+  if (section.kind === 'subagent') {
+    return <SubagentGroup blocks={section.blocks} />
+  }
 
   if (section.kind === 'execution' && section.blocks.length === 1) {
     const [block] = section.blocks
@@ -384,8 +384,8 @@ function ProcessStackRows({
         const autoOpenPending = processBlockIsAutoOpenPending(block, processing) || isPendingApproval(block)
         const errorTone = processBlockErrorTone(block)
         const isError = errorTone !== null
-        // Tool-call errors stay collapsed (red header only); other error blocks still auto-open.
-        const defaultOpen = isError && block.kind !== 'tool'
+        // 错误默认展开，让失败详情（含工具错误）开箱即见；行仍可手动折叠。
+        const defaultOpen = isError
         const forceOpen = autoOpenPending || autoOpenRequestInput
         const userClosed = closedBlockIds.has(block.id)
         const userOpened = openBlockId === block.id
@@ -500,8 +500,8 @@ function ProcessEntryRow({
   const errorTone = processBlockErrorTone(block)
   const isError = errorTone !== null
   const forceOpen = isAutoOpenPending || isAssistantProcessText || isStreamingAssistant
-  // Tool-call errors stay collapsed (red header only); other error blocks still auto-open.
-  const defaultOpen = isError && block.kind !== 'tool'
+  // 错误默认展开，让失败详情（含工具错误）开箱即见；行仍可手动折叠。
+  const defaultOpen = isError
   const open =
     canExpand &&
     (forceOpen || (userOpen ?? defaultOpen))

@@ -7,7 +7,7 @@ import {
   type KeyboardShortcutBindingsV1,
   type KeyboardShortcutCommandId
 } from '@shared/keyboard-shortcuts'
-import kunLogo from '../../../asset/img/kun.png'
+import kunLogo from '../../../asset/img/claude360.png'
 import { useKeyboardShortcutSettings } from '../lib/keyboard-shortcut-settings'
 import { useChatStore } from '../store/chat-store'
 

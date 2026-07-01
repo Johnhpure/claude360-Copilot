@@ -13,13 +13,9 @@ import { ReviewPlanCard, ReviewSummaryCard, TurnChangeSummary, WorkMetaRow } fro
 import { ProcessSectionRow, groupProcessSections } from './message-timeline-process'
 import {
   AnimatedWorkLogo,
-  IKUN_WORK_LOGO_VARIANT_LABEL_KEYS,
   WORK_LOGO_SWIM_MODE_LABEL_KEYS,
-  useIkunWorkLogoVariant,
   useWorkLogoSwimMode
 } from './AnimatedWorkLogo'
-import type { UiPluginLabelKey } from '@shared/ui-plugin'
-import { useUiPluginWorkLabel } from '../../store/ui-plugin-store'
 import {
   groupTurns,
   isBackgroundShellNoticeBlock,
@@ -493,11 +489,9 @@ function MessageTurn({
   )
   const onlyCompactionProcess = processBlocks.length > 0 && workProcessBlocks.length === 0
   const hasProcessError = workProcessBlocks.some(processBlockHasError)
-  // Only force the work process open (and lock it open) while the turn is still
-  // running. Once the turn completes — even if a tool call failed mid-turn — the
-  // panel should auto-collapse like a normal completed turn and stay user-toggleable.
+  // 运行中遇错锁定展开；回合完成后若仍有错误，默认展开让失败可见，但用户可手动折叠。
   const forceExpandForError = isProcessing && hasProcessError
-  const workExpanded = forceExpandForError || (workExpandedOverride ?? isProcessing)
+  const workExpanded = forceExpandForError || (workExpandedOverride ?? (isProcessing || hasProcessError))
   const reviewBlocks = useMemo(
     () => turn.blocks.filter((block) => block.kind === 'review'),
     [turn.blocks]
@@ -660,29 +654,15 @@ function MessageTurn({
 }
 
 function LiveTurnProgressRow({ hasActiveGoal }: { hasActiveGoal: boolean }): ReactElement {
-  const { t, i18n } = useTranslation('common')
+  const { t } = useTranslation('common')
   const swimMode = useWorkLogoSwimMode(true)
-  const ikunVariant = useIkunWorkLogoVariant(true)
-  // iKun 模式是全局 html 属性;进行行每个回合重新挂载,挂载时读取即可
-  const [ikunModeOn] = useState(
-    () =>
-      typeof document !== 'undefined' &&
-      document.documentElement.getAttribute('data-ikun-mode') === 'on'
-  )
   const swimLabelKey = WORK_LOGO_SWIM_MODE_LABEL_KEYS[swimMode]
-  // UI 插件可声明自己的进行中文案(按泳姿键、按语言),未声明则用默认文案
-  const pluginLabel = useUiPluginWorkLabel(
-    swimLabelKey as UiPluginLabelKey,
-    i18n.language ?? 'zh'
-  )
-  const label = ikunModeOn
-    ? t(IKUN_WORK_LOGO_VARIANT_LABEL_KEYS[ikunVariant])
-    : pluginLabel ?? t(swimLabelKey)
+  const label = t(swimLabelKey)
 
   return (
     <div className={liveTurnProgressClass(hasActiveGoal)}>
       <span className="ds-work-logo-slot ds-work-logo-slot-sm mr-0.5">
-        <AnimatedWorkLogo active ikunVariant={ikunVariant} mode={swimMode} phase="trail" size="sm" />
+        <AnimatedWorkLogo active mode={swimMode} phase="trail" size="sm" />
       </span>
       <span className="ds-shiny-text">{label}</span>
     </div>

@@ -1,7 +1,8 @@
 import type { Dispatch, ReactElement, SetStateAction } from 'react'
-import { Archive, AudioLines, Bot, BrainCircuit, GitBranch, Bug, ChevronLeft, Globe, Keyboard, Mic, PencilLine, RefreshCw, ServerCog, Settings, Smartphone, Sparkles, TerminalSquare } from 'lucide-react'
+import { Archive, AudioLines, Bot, BrainCircuit, GitBranch, Bug, ChevronLeft, Globe, Keyboard, Mic, PencilLine, RefreshCw, ServerCog, Settings, Smartphone, TerminalSquare } from 'lucide-react'
+import { isPrimaryRouteVisible } from '../lib/feature-visibility'
 
-type SettingsCategory = 'general' | 'providers' | 'write' | 'mediaGeneration' | 'speechToText' | 'agents' | 'archives' | 'permissions' | 'worktree' | 'memory' | 'shortcuts' | 'easterEgg' | 'claw' | 'updates' | 'debug' | 'terminal'
+type SettingsCategory = 'general' | 'providers' | 'write' | 'mediaGeneration' | 'speechToText' | 'agents' | 'archives' | 'permissions' | 'worktree' | 'memory' | 'shortcuts' | 'claw' | 'updates' | 'debug' | 'terminal'
 
 export function SettingsSidebar({
   category,
@@ -129,30 +130,24 @@ export function SettingsSidebar({
         <button
           type="button"
           data-cursor-spotlight-target
-          className={catCls('easterEgg')}
-          onClick={() => setCategory('easterEgg')}
-        >
-          <Sparkles className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
-          {t('easterEgg')}
-        </button>
-        <button
-          type="button"
-          data-cursor-spotlight-target
           className={catCls('updates')}
           onClick={() => setCategory('updates')}
         >
           <RefreshCw className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
           {t('updates')}
         </button>
-        <button
-          type="button"
-          data-cursor-spotlight-target
-          className={catCls('claw')}
-          onClick={() => setCategory('claw')}
-        >
-          <Smartphone className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
-          {t('claw')}
-        </button>
+        {/* 隐藏≠删除:第一阶段不暴露手机连接(Claw)设置导航项,保留 claw 分类与其 lazy section。 */}
+        {isPrimaryRouteVisible('claw') ? (
+          <button
+            type="button"
+            data-cursor-spotlight-target
+            className={catCls('claw')}
+            onClick={() => setCategory('claw')}
+          >
+            <Smartphone className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
+            {t('claw')}
+          </button>
+        ) : null}
         <button
           type="button"
           data-cursor-spotlight-target
@@ -178,7 +173,7 @@ export function SettingsSidebar({
             <Settings className="h-4 w-4" strokeWidth={1.75} />
           </div>
           <div className="min-w-0 text-[12px] text-ds-muted">
-            <div className="truncate font-medium text-ds-ink">Kun</div>
+            <div className="truncate font-medium text-ds-ink">Claude360 Copilot</div>
             <div className="truncate">{t('settingsFooter')}</div>
           </div>
         </div>

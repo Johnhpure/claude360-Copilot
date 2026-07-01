@@ -1,0 +1,101 @@
+import {
+  buildClaude360ProviderProfiles,
+  isClaude360ImageModelId,
+  type Claude360GroupModelsInput
+} from '../../shared/app-settings-provider'
+import type { ModelProviderProfileV1 } from '../../shared/app-settings-types'
+import type { Claude360ModelCache, Claude360TokenRef } from '../../shared/app-settings-claude360'
+import type { Claude360TokenPurpose } from '../../shared/claude360'
+import { Claude360ApiError } from './claude360-api-client'
+import { CLAUDE360_CLI_TOKEN_REF, claude360ApiKeyRef, type Claude360SecretStore } from './claude360-secret-store'
+
+/**
+ * Claude360 分组/模型同步服务（plan-03 Task 2）。
+ * 按 `tool=codex|image|music` 拉分组（不硬编码分组名），按分组拉模型，
+ * 确保各分组 Key，生成只读 provider profiles 与模型缓存。
+ * 收口：profile 不携带明文 Key，只存 secret-store 引用（apiKeyRef）。
+ */
+
+export type Claude360ApiClientPort = {
+  get<T>(path: string, token?: string): Promise<T>
+}
+
+export type Claude360ModelServiceDeps = {
+  apiClient: Claude360ApiClientPort
+  secretStore: Claude360SecretStore
+  /**
+   * 确保某分组对应用途的 Key 存在于 secret-store，并返回其 tokenRef（含 tokenId）。
+   * 明文不经此出口，profile 只保存由 tokenId 派生的 secret 引用。
+   */
+  ensureGroupRef: (group: string, purpose: Claude360TokenPurpose) => Promise<Claude360TokenRef>
+}
+
+export type Claude360ModelSyncResult = {
+  modelCache: Claude360ModelCache
+  providerProfiles: ModelProviderProfileV1[]
+}
+
+type GroupsResponse = { groups?: { name?: string }[] }
+type ModelsResponse = { models?: { id?: string }[] }
+
+const TOOL_TO_PURPOSE: Record<string, Claude360TokenPurpose> = {
+  codex: 'text',
+  image: 'image',
+  music: 'music'
+}
+
+export class Claude360ModelService {
+  private readonly deps: Claude360ModelServiceDeps
+
+  constructor(deps: Claude360ModelServiceDeps) {
+    this.deps = deps
+  }
+
+  private async cliToken(): Promise<string> {
+    const token = await this.deps.secretStore.loadSecret(CLAUDE360_CLI_TOKEN_REF)
+    if (!token) throw new Claude360ApiError('未登录，请先登录 Claude360')
+    return token
+  }
+
+  async refreshGroupsAndModels(): Promise<Claude360ModelSyncResult> {
+    const token = await this.cliToken()
+
+    // 1) 按工具拉分组，记录每个分组首次出现的用途（codex→text / image / music）。
+    const purposeByGroup = new Map<string, Claude360TokenPurpose>()
+    for (const tool of ['codex', 'image', 'music'] as const) {
+      const resp = await this.deps.apiClient.get<GroupsResponse>(`/api/cli/groups?tool=${tool}`, token)
+      for (const g of resp.groups ?? []) {
+        const name = (g.name ?? '').trim()
+        if (!name || purposeByGroup.has(name)) continue
+        purposeByGroup.set(name, TOOL_TO_PURPOSE[tool])
+      }
+    }
+
+    // 2) 每个分组拉模型，标注图片模型。
+    const groupInputs: Claude360GroupModelsInput[] = []
+    const refsByGroup: Record<string, string> = {}
+    const allModels: string[] = []
+    for (const [group, purpose] of purposeByGroup) {
+      const resp = await this.deps.apiClient.get<ModelsResponse>(
+        `/api/cli/models?group=${encodeURIComponent(group)}`,
+        token
+      )
+      const models = (resp.models ?? [])
+        .map((m) => (m.id ?? '').trim())
+        .filter(Boolean)
+        .map((id) => ({ id, isImage: isClaude360ImageModelId(id) }))
+      groupInputs.push({ group, models })
+      for (const m of models) if (!allModels.includes(m.id)) allModels.push(m.id)
+      // 3) 确保该分组 Key 已加密存入 secret-store，profile 只记引用（不落明文）。
+      const ref = await this.deps.ensureGroupRef(group, purpose)
+      refsByGroup[group] = claude360ApiKeyRef(ref.tokenId)
+    }
+
+    const providerProfiles = buildClaude360ProviderProfiles(groupInputs, refsByGroup)
+    const modelCache: Claude360ModelCache = {
+      groups: [...purposeByGroup.keys()],
+      models: allModels
+    }
+    return { modelCache, providerProfiles }
+  }
+}

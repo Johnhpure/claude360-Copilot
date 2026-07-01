@@ -1,8 +1,8 @@
 {
-  "name": "kun-gui",
-  "productName": "Kun",
+  "name": "claude360-copilot",
+  "productName": "Claude360 Copilot",
   "version": "0.1.0",
-  "description": "Electron workbench for the Kun runtime (HTTP/SSE)",
+  "description": "Electron workbench for the Claude360 Copilot runtime (HTTP/SSE)",
   "main": "./out/main/index.js",
   "type": "module",
   "scripts": {
@@ -13,15 +13,15 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "dist": "npm run build && npx --yes electron-builder@26.8.1 --config electron-builder.config.cjs --publish never",
-    "dist:mac": "rm -f dist/Kun-*-mac-* dist/DeepSeek-GUI-*-mac-* dist/latest-mac.yml && npm run build && npm run dist:mac:x64:dmg && npm run dist:mac:x64:zip && npm run dist:mac:arm64:dmg && npm run dist:mac:arm64:zip && node ./scripts/generate-mac-latest.cjs dist",
-    "dist:mac:signed": "rm -f dist/Kun-*-mac-* dist/DeepSeek-GUI-*-mac-* dist/latest-mac.yml && MAC_SIGN=1 npm run dist:mac:x64 && MAC_SIGN=1 npm run dist:mac:arm64 && node ./scripts/generate-mac-latest.cjs dist",
+    "dist:mac": "rm -f dist/Claude360-Copilot-*-mac-* dist/Kun-*-mac-* dist/DeepSeek-GUI-*-mac-* dist/latest-mac.yml && npm run build && npm run dist:mac:x64:dmg && npm run dist:mac:x64:zip && npm run dist:mac:arm64:dmg && npm run dist:mac:arm64:zip && node ./scripts/generate-mac-latest.cjs dist",
+    "dist:mac:signed": "rm -f dist/Claude360-Copilot-*-mac-* dist/Kun-*-mac-* dist/DeepSeek-GUI-*-mac-* dist/latest-mac.yml && MAC_SIGN=1 npm run dist:mac:x64 && MAC_SIGN=1 npm run dist:mac:arm64 && node ./scripts/generate-mac-latest.cjs dist",
     "dist:mac:arm64": "npm run build && npm run dist:mac:arm64:dmg && npm run dist:mac:arm64:zip",
     "dist:mac:x64": "npm run build && npm run dist:mac:x64:dmg && npm run dist:mac:x64:zip",
     "dist:mac:arm64:dmg": "npx --yes electron-builder@26.8.1 --config electron-builder.config.cjs --publish never --mac dmg --arm64",
     "dist:mac:x64:dmg": "npx --yes electron-builder@26.8.1 --config electron-builder.config.cjs --publish never --mac dmg --x64",
     "dist:mac:arm64:zip": "node ./scripts/zip-mac-app.cjs arm64",
     "dist:mac:x64:zip": "node ./scripts/zip-mac-app.cjs x64",
-    "dist:win": "npm run dist -- --win nsis --x64",
+    "dist:win": "npm run dist -- --win zip --x64",
     "dist:linux": "npm run dist -- --linux AppImage --x64",
     "release:all": "bash ./scripts/release-mac.sh",
     "release:mac": "bash ./scripts/release-mac.sh",
@@ -105,11 +105,11 @@
     "vite": "^6.2.0",
     "vitest": "^4.1.7"
   },
-  "author": "Kun Contributors",
+  "author": "Claude360 Copilot Contributors",
   "license": "PolyForm-Noncommercial-1.0.0",
-  "homepage": "https://github.com/KunAgent/Kun",
+  "homepage": "https://github.com/Claude360/Copilot",
   "repository": {
     "type": "git",
-    "url": "https://github.com/KunAgent/Kun.git"
+    "url": "https://github.com/Claude360/Copilot.git"
   }
 }

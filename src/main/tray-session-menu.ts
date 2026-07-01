@@ -124,7 +124,7 @@ function traySessionLabels(locale: AppSettingsV1['locale']): {
         recent: '最近会话',
         more: '更多',
         newChat: '新建会话',
-        openApp: '打开 Kun',
+        openApp: '打开 Claude360 Copilot',
         quit: '退出'
       }
     : {
@@ -132,7 +132,7 @@ function traySessionLabels(locale: AppSettingsV1['locale']): {
         recent: 'Recent',
         more: 'More',
         newChat: 'New Chat',
-        openApp: 'Open Kun',
+        openApp: 'Open Claude360 Copilot',
         quit: 'Exit'
       }
 }

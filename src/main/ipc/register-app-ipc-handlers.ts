@@ -68,12 +68,24 @@ import {
   skillListPayloadSchema,
   skillSaveFilePayloadSchema,
   settingsPatchSchema,
+  claude360PasswordLoginPayloadSchema,
+  claude360PasswordLogin2FAPayloadSchema,
+  claude360DeviceCodePayloadSchema,
+  claude360EnsureTokenPayloadSchema,
+  claude360CreateTokenPayloadSchema,
+  claude360RevealTokenPayloadSchema,
+  claude360TopupWechatPayloadSchema,
+  claude360TopupOrderPayloadSchema,
+  claude360TokenStatsPayloadSchema,
+  claude360MusicSubmitPayloadSchema,
+  claude360MusicFetchPayloadSchema,
+  claude360CanvasGeneratePayloadSchema,
+  claude360CanvasEditPayloadSchema,
   streamIdSchema,
   workflowRunNodePayloadSchema,
   workflowTestNodePayloadSchema,
   workflowResolveApprovalPayloadSchema,
   workflowCodeCheckPayloadSchema,
-  uiPluginIdPayloadSchema,
   workspaceDirectoryCreatePayloadSchema,
   workspaceClipboardImageSavePayloadSchema,
   workspaceDirectoryTargetPayloadSchema,
@@ -113,6 +125,8 @@ import {
 } from '../agent-sdk-installer'
 import type { JsonSettingsStore } from '../settings-store'
 import { probeModelProvider } from '../provider-connection'
+import { isClaude360ProviderId } from '../../shared/app-settings-provider'
+import type { ModelProviderProfileV1 } from '../../shared/app-settings-types'
 import type { ClawRuntime } from '../claw-runtime'
 import type { ScheduleRuntime } from '../schedule-runtime'
 import { verifyTelegramBotToken } from '../telegram-runtime'
@@ -143,13 +157,12 @@ import {
   removeWorktree,
   syncWorktreeFromMain
 } from '../services/worktree-service'
-import {
-  installUiPluginFromDirectory,
-  listUiPlugins,
-  loadUiPluginFigures,
-  removeUiPlugin
-} from '../services/ui-plugin-service'
-import { ensureBundledUiPlugins } from '../ui-plugin-bundled'
+import { Claude360AuthService } from '../services/claude360-auth-service'
+import { Claude360TokenService } from '../services/claude360-token-service'
+import { Claude360ModelService } from '../services/claude360-model-service'
+import { Claude360BillingService } from '../services/claude360-billing-service'
+import { Claude360MusicService } from '../services/claude360-music-service'
+import { Claude360CanvasService } from '../services/claude360-canvas-service'
 import {
   createWorkspaceDirectory,
   createWorkspaceFile,
@@ -235,6 +248,12 @@ type RegisterAppIpcHandlersOptions = {
   loadGuiUpdaterModule: () => Promise<GuiUpdaterModule>
   resolveLogDirectory: () => string
   logError: (category: string, message: string, detail?: unknown) => void
+  claude360AuthService: Claude360AuthService
+  claude360TokenService: Claude360TokenService
+  claude360ModelService: Claude360ModelService
+  claude360BillingService: Claude360BillingService
+  claude360MusicService: Claude360MusicService
+  claude360CanvasService: Claude360CanvasService
 }
 
 function parseIpcPayload<T>(channel: string, schema: z.ZodType<T>, payload: unknown): T {
@@ -419,7 +438,13 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     readGuiUpdateState,
     loadGuiUpdaterModule,
     resolveLogDirectory,
-    logError
+    logError,
+    claude360AuthService,
+    claude360TokenService,
+    claude360ModelService,
+    claude360BillingService,
+    claude360MusicService,
+    claude360CanvasService
   } = options
   setLocalWhisperProgressEmitter((payload) => {
     getMainWindow()?.webContents.send('speech:local-whisper:progress', payload)
@@ -508,7 +533,25 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     }, 90)
   }
 
-  ipcMain.handle('settings:get', async () => store.load())
+  ipcMain.handle('settings:get', async () => {
+    // 下发 renderer 前，对 claude360 provider 的明文 apiKey 脱敏：其真 Key 只在
+    // main 侧经 apiKeyRef 解出。新 profile 本就 apiKey='' ；此处兼顾升级过渡期
+    // 仍残留明文的旧数据（纵深防御）。apiKeyRef 保留，供 UI 判断「已配置」。
+    const loaded = await store.load()
+    const providers = loaded.provider?.providers as ModelProviderProfileV1[] | undefined
+    if (!Array.isArray(providers) || !providers.some((p) => isClaude360ProviderId(p.id) && p.apiKey)) {
+      return loaded
+    }
+    return {
+      ...loaded,
+      provider: {
+        ...loaded.provider,
+        providers: providers.map((p) =>
+          isClaude360ProviderId(p.id) && p.apiKey ? { ...p, apiKey: '' } : p
+        )
+      }
+    }
+  })
   // Claude Pro/Max subscription login (compliant path: official CLI does the
   // OAuth; we only detect it / capture the setup-token).
   ipcMain.handle('claude-subscription:status', async () => claudeSubscriptionStatus())
@@ -551,6 +594,114 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       parseIpcPayload('settings:save-silent', settingsPatchSchema, partial) as AppSettingsPatch
     )
   )
+
+  // Claude360 账号/登录 IPC（plan-02 Task 5）。renderer 不接收任何明文凭据。
+  ipcMain.handle('claude360:session', async () => claude360AuthService.getSession())
+  ipcMain.handle('claude360:auth:start-device', async () => claude360AuthService.startDeviceAuth())
+  ipcMain.handle('claude360:auth:poll-device', async (_, payload: unknown) => {
+    const request = parseIpcPayload('claude360:auth:poll-device', claude360DeviceCodePayloadSchema, payload)
+    return claude360AuthService.pollDeviceAuth(request.deviceCode)
+  })
+  ipcMain.handle('claude360:auth:password-login', async (_, payload: unknown) => {
+    const request = parseIpcPayload('claude360:auth:password-login', claude360PasswordLoginPayloadSchema, payload)
+    return claude360AuthService.passwordLogin(request)
+  })
+  ipcMain.handle('claude360:auth:password-login-2fa', async (_, payload: unknown) => {
+    const request = parseIpcPayload('claude360:auth:password-login-2fa', claude360PasswordLogin2FAPayloadSchema, payload)
+    return claude360AuthService.passwordLogin2FA(request)
+  })
+  ipcMain.handle('claude360:auth:logout', async () => claude360AuthService.logout())
+  ipcMain.handle('claude360:sync-account', async () => claude360AuthService.syncAccount())
+
+  // Claude360 token / 模型 / 账单 IPC（plan-03 Task 4）
+  ipcMain.handle('claude360:tokens:list', async () => claude360TokenService.listTokens())
+  ipcMain.handle('claude360:tokens:ensure', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:tokens:ensure', claude360EnsureTokenPayloadSchema, payload)
+    return claude360TokenService.ensureGroupToken(req.group, req.purpose)
+  })
+  ipcMain.handle('claude360:tokens:create', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:tokens:create', claude360CreateTokenPayloadSchema, payload)
+    return claude360TokenService.createToken(req.group ?? '', req.name)
+  })
+  ipcMain.handle('claude360:tokens:reveal', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:tokens:reveal', claude360RevealTokenPayloadSchema, payload)
+    return { key: await claude360TokenService.revealToken(req.tokenId) }
+  })
+  ipcMain.handle('claude360:models:refresh', async () => {
+    const result = await claude360ModelService.refreshGroupsAndModels()
+    await applySettingsPatch({
+      provider: { providers: result.providerProfiles },
+      claude360: { modelCache: result.modelCache }
+    })
+    return { ok: true as const, modelCache: result.modelCache }
+  })
+  ipcMain.handle('claude360:models:list', async () => (await store.load()).claude360.modelCache)
+  ipcMain.handle('claude360:billing:me', async () => claude360BillingService.getMe())
+  ipcMain.handle('claude360:billing:topup-options', async () => claude360BillingService.getTopupOptions())
+  ipcMain.handle('claude360:billing:topup-wechat', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:billing:topup-wechat', claude360TopupWechatPayloadSchema, payload)
+    return claude360BillingService.createWechatTopup({ amount: req.amount, discountCode: req.discountCode })
+  })
+  ipcMain.handle('claude360:billing:topup-order', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:billing:topup-order', claude360TopupOrderPayloadSchema, payload)
+    return claude360BillingService.getTopupOrder(req.orderId)
+  })
+  ipcMain.handle('claude360:billing:token-stats', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:billing:token-stats', claude360TokenStatsPayloadSchema, payload)
+    return claude360BillingService.getTokenStats(req)
+  })
+
+  // Claude360 原生音乐工作台 IPC（plan-05 Task 3）。API Key 全程只在 main 使用。
+  // service 已把预期错误映射为 { ok:false }；handler 再兜住意外异常，避免把栈
+  // 抛到 renderer（可能含敏感上下文），统一返回可展示错误结果。
+  ipcMain.handle('claude360:music:submit', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:music:submit', claude360MusicSubmitPayloadSchema, payload)
+    try {
+      return await claude360MusicService.submitMusic(req)
+    } catch (error) {
+      logError('claude360-music', 'submitMusic failed', {
+        message: error instanceof Error ? error.message : String(error)
+      })
+      return { ok: false as const, message: '提交失败，请稍后重试' }
+    }
+  })
+  ipcMain.handle('claude360:music:fetch', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:music:fetch', claude360MusicFetchPayloadSchema, payload)
+    try {
+      return await claude360MusicService.fetchMusic(req.taskId)
+    } catch (error) {
+      logError('claude360-music', 'fetchMusic failed', {
+        message: error instanceof Error ? error.message : String(error)
+      })
+      return { ok: false as const, message: '查询失败，请稍后重试', retryable: true as const }
+    }
+  })
+
+  // Claude360 原生生图工作台 IPC（plan-06 Task 3）。API Key 全程只在 main 使用。
+  // service 已把预期错误映射为 { ok:false }；handler 再兜住意外异常，避免把栈
+  // 抛到 renderer（可能含敏感上下文），统一返回可展示错误结果。
+  ipcMain.handle('claude360:canvas:generate', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:canvas:generate', claude360CanvasGeneratePayloadSchema, payload)
+    try {
+      return await claude360CanvasService.generateImages(req)
+    } catch (error) {
+      logError('claude360-canvas', 'generateImages failed', {
+        message: error instanceof Error ? error.message : String(error)
+      })
+      return { ok: false as const, message: '生成失败，请稍后重试' }
+    }
+  })
+  ipcMain.handle('claude360:canvas:edit', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:canvas:edit', claude360CanvasEditPayloadSchema, payload)
+    try {
+      return await claude360CanvasService.editImage(req)
+    } catch (error) {
+      logError('claude360-canvas', 'editImage failed', {
+        message: error instanceof Error ? error.message : String(error)
+      })
+      return { ok: false as const, message: '编辑失败，请稍后重试' }
+    }
+  })
 
   ipcMain.handle('runtime:request', async (_, payload: unknown) => {
     const request = parseIpcPayload('runtime:request', runtimeRequestPayloadSchema, payload)
@@ -917,44 +1068,6 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         message: error instanceof Error ? error.message : String(error)
       }
     }
-  })
-
-  ipcMain.handle('ui-plugin:list', async () => {
-    const kunHomeDir = join(homedir(), '.kun')
-    await ensureBundledUiPlugins(kunHomeDir)
-    return { plugins: await listUiPlugins(kunHomeDir) }
-  })
-
-  ipcMain.handle('ui-plugin:install', async () => {
-    const mainWindow = getMainWindow()
-    const options: Electron.OpenDialogOptions = {
-      title: 'Select a UI plugin folder',
-      properties: ['openDirectory', 'dontAddToRecent']
-    }
-    const picked = mainWindow
-      ? await dialog.showOpenDialog(mainWindow, options)
-      : await dialog.showOpenDialog(options)
-    const sourceDir = picked.filePaths[0]
-    if (picked.canceled || !sourceDir) {
-      return { canceled: true as const }
-    }
-    const result = await installUiPluginFromDirectory(join(homedir(), '.kun'), sourceDir)
-    if (!result.ok) {
-      return { canceled: false as const, ok: false as const, errors: result.errors }
-    }
-    return { canceled: false as const, ok: true as const, plugin: result.plugin }
-  })
-
-  ipcMain.handle('ui-plugin:remove', async (_, payload: unknown) => {
-    const request = parseIpcPayload('ui-plugin:remove', uiPluginIdPayloadSchema, payload)
-    return { ok: await removeUiPlugin(join(homedir(), '.kun'), request.id) }
-  })
-
-  ipcMain.handle('ui-plugin:load', async (_, payload: unknown) => {
-    const request = parseIpcPayload('ui-plugin:load', uiPluginIdPayloadSchema, payload)
-    const kunHomeDir = join(homedir(), '.kun')
-    await ensureBundledUiPlugins(kunHomeDir)
-    return loadUiPluginFigures(kunHomeDir, request.id)
   })
 
   ipcMain.handle('kun:config:read', async () => {

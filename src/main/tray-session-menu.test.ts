@@ -23,7 +23,7 @@ describe('tray session menu', () => {
     })
 
     expect(menu.map((item) => item.label).filter(Boolean)).toEqual([
-      'Running', 'Fix tests', 'Recent', 'Review PR', 'New Chat', 'Open Kun', 'Exit'
+      'Running', 'Fix tests', 'Recent', 'Review PR', 'New Chat', 'Open Claude360 Copilot', 'Exit'
     ])
     expect(menu.find((item) => item.label === 'Fix tests')?.sublabel).toBe('Kun')
     expect(menu.find((item) => item.label === 'Review PR')?.sublabel).toBe('Docs')
@@ -49,7 +49,7 @@ describe('tray session menu', () => {
       'thread-4',
       '更多',
       '新建会话',
-      '打开 Kun',
+      '打开 Claude360 Copilot',
       '退出'
     ])
   })

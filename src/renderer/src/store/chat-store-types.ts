@@ -92,11 +92,10 @@ export type SettingsRouteSection =
   | 'skill'
   | 'mcp'
   | 'shortcuts'
-  | 'easterEgg'
   | 'claw'
   | 'updates'
   | 'terminal'
-export type AppRoute = 'chat' | 'write' | 'settings' | 'plugins' | 'claw' | 'schedule' | 'workflow'
+export type AppRoute = 'chat' | 'write' | 'settings' | 'plugins' | 'claw' | 'schedule' | 'workflow' | 'my' | 'music' | 'canvas'
 export type PluginHostRoute = 'chat' | 'claw'
 
 /**

@@ -87,6 +87,46 @@ export type KunUnexpectedExitInfo = {
 let onUnexpectedKunExit: ((info: KunUnexpectedExitInfo) => void) | null = null
 
 /**
+ * Resolves a provider's `apiKeyRef` (a secret-store reference such as
+ * `claude360:api-key:<tokenId>`) to its plaintext key. Injected by the main
+ * process at startup (see setClaude360KeyResolver). The kun runtime runs in a
+ * child process that cannot reach the encrypted secret store, so the plaintext
+ * MUST be resolved here (main side) before it is written into the child's
+ * config.json / env. Absent in tests / before wiring → refs stay unresolved and
+ * we fall back to any inline apiKey (legacy behavior).
+ */
+let claude360KeyResolver: ((ref: string) => Promise<string | null>) | null = null
+
+/** Inject the secret-store resolver used to hydrate provider `apiKeyRef` keys. */
+export function setClaude360KeyResolver(
+  resolver: ((ref: string) => Promise<string | null>) | null
+): void {
+  claude360KeyResolver = resolver
+}
+
+/**
+ * Resolve a provider profile's usable plaintext key: prefer resolving its
+ * `apiKeyRef` via the injected secret-store resolver; fall back to the inline
+ * `apiKey` (manually-entered providers, or legacy claude360 profiles that still
+ * carry plaintext before the next model refresh). Never throws — a failed
+ * resolve degrades to the inline value.
+ */
+async function resolveProfileApiKey(
+  profile: Pick<ModelProviderProfileV1, 'apiKey' | 'apiKeyRef'>
+): Promise<string> {
+  const ref = profile.apiKeyRef?.trim()
+  if (ref && claude360KeyResolver) {
+    try {
+      const resolved = (await claude360KeyResolver(ref))?.trim()
+      if (resolved) return resolved
+    } catch {
+      // fall through to inline apiKey
+    }
+  }
+  return profile.apiKey?.trim() ?? ''
+}
+
+/**
  * Called when a READY kun child exits without the GUI asking for it.
  * Startup failures are excluded: those are already reported to the
  * caller of startKunChild via the thrown error.
@@ -384,9 +424,15 @@ async function startKunChildOnce(
   // When the runtime's own (default) provider is the Claude subscription, tell
   // the runtime so its dispatch routes default-provider turns (thread.providerId
   // absent or equal to it) to the embedded SDK instead of the HTTP default.
-  const activeProviderKind = (getModelProviderSettings(settings).providers as ModelProviderProfileV1[]).find(
+  const activeProvider = (getModelProviderSettings(settings).providers as ModelProviderProfileV1[]).find(
     (provider) => provider.id?.trim() === getKunRuntimeSettings(settings).providerId.trim()
-  )?.kind
+  )
+  const activeProviderKind = activeProvider?.kind
+  // Resolve the runtime provider's key (main side). For claude360 providers the
+  // persisted apiKey is empty and the real key lives behind apiKeyRef; fall back
+  // to runtime.apiKey for legacy/manual providers that still carry it inline.
+  const runtimeApiKey =
+    (activeProvider ? await resolveProfileApiKey(activeProvider) : '') || runtime.apiKey
   // Point the runtime at the on-demand Claude Code binary (the ~222MB binary is
   // not bundled; it's downloaded into userData). Absent in dev when it's still
   // resolvable from kun/node_modules — the SDK auto-resolves it there.
@@ -394,7 +440,7 @@ async function startKunChildOnce(
   const childEnv: NodeJS.ProcessEnv = {
     ...process.env,
     KUN_RUNTIME_TOKEN: runtime.runtimeToken,
-    DEEPSEEK_API_KEY: runtime.apiKey || process.env.DEEPSEEK_API_KEY || '',
+    DEEPSEEK_API_KEY: runtimeApiKey || process.env.DEEPSEEK_API_KEY || '',
     ...(activeProviderKind === 'agent-sdk' ? { KUN_RUNTIME_PROVIDER_KIND: 'agent-sdk' } : {}),
     ...(claudeBinary ? { KUN_CLAUDE_BINARY: claudeBinary } : {})
   }
@@ -526,7 +572,7 @@ export async function syncGuiManagedKunConfig(
   // bridge) without restart. Empty when no GUI settings are reachable, in
   // which case the runtime stays single-provider.
   const providers = options?.scheduleMcp?.settings
-    ? providersConfigForRuntime(options.scheduleMcp.settings)
+    ? await providersConfigForRuntime(options.scheduleMcp.settings)
     : undefined
   const next = {
     serve: {
@@ -851,7 +897,9 @@ function modelConfigProfilesFromProviderProfiles(
  * default client handles it identically, so duplicate entries are
  * idempotent.
  */
-function providersConfigForRuntime(settings: AppSettingsV1): Record<string, Record<string, unknown>> {
+async function providersConfigForRuntime(
+  settings: AppSettingsV1
+): Promise<Record<string, Record<string, unknown>>> {
   const out: Record<string, Record<string, unknown>> = {}
   const runtimeProviderId = getKunRuntimeSettings(settings).providerId.trim()
   const proxyUrl = resolveModelProviderProxyUrl(settings)
@@ -867,8 +915,10 @@ function providersConfigForRuntime(settings: AppSettingsV1): Record<string, Reco
     // the embedded SDK via `serve.providers`, otherwise they fall back to the
     // HTTP default client and 401 on api.anthropic.com (invalid x-api-key).
     if (id === runtimeProviderId && !isAgentSdk) continue
+    // Resolve apiKeyRef → plaintext here (main side); the child process cannot.
+    const apiKey = await resolveProfileApiKey(provider)
     out[id] = {
-      apiKey: provider.apiKey?.trim() ?? '',
+      apiKey,
       ...(baseUrl ? { baseUrl } : {}),
       ...(provider.kind ? { kind: provider.kind } : {}),
       ...(provider.endpointFormat ? { endpointFormat: provider.endpointFormat } : {}),

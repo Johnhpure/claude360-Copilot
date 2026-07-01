@@ -39,6 +39,7 @@ import { normalizeScheduleSettings } from './app-settings-schedule'
 import { normalizeWorkflowSettings } from './app-settings-workflow'
 import { normalizeWriteSettings } from './app-settings-write'
 import { normalizeTerminalSettings, type TerminalSettingsPatchV1 } from './app-settings-terminal'
+import { normalizeClaude360Settings, type Claude360SettingsPatchV1 } from './app-settings-claude360'
 
 export function normalizeAppSettings(settings: AppSettingsV1): AppSettingsV1 {
   const migrated = shouldMigrateLegacySettings(settings)
@@ -56,6 +57,7 @@ export function normalizeAppSettings(settings: AppSettingsV1): AppSettingsV1 {
     workflow?: WorkflowSettingsPatchV1
     guiUpdate?: Partial<GuiUpdateConfigV1>
     terminal?: TerminalSettingsPatchV1
+    claude360?: Claude360SettingsPatchV1
   }
   const providerSettings = normalizeModelProviderSettings(maybeSettings.provider)
   const runtime = getKunRuntimeSettings(maybeSettings)
@@ -110,6 +112,7 @@ export function normalizeAppSettings(settings: AppSettingsV1): AppSettingsV1 {
     schedule: normalizeScheduleSettings(maybeSettings.schedule),
     workflow: normalizeWorkflowSettings(maybeSettings.workflow),
     terminal: normalizeTerminalSettings(maybeSettings.terminal),
+    claude360: normalizeClaude360Settings(maybeSettings.claude360),
     guiUpdate: {
       channel: normalizeGuiUpdateChannel(
         maybeSettings.guiUpdate?.channel ?? DEFAULT_GUI_UPDATE_CHANNEL

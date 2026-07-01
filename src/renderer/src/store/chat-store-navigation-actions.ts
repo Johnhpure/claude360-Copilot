@@ -30,7 +30,7 @@ import { workspaceLabelFromPath } from '../lib/workspace-label'
 import { isConversationWorkspacePath, isInternalTemporaryWorkspace, normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { resolveProjectWorkspacePath } from '../lib/worktree-project-path'
 import { readThreadWorktreeRegistry } from '../lib/thread-worktree-registry'
-import { buildClawRuntimePrompt, getActiveAgentApiKey } from '@shared/app-settings'
+import { buildClawRuntimePrompt } from '@shared/app-settings'
 import type { ChatState, ChatStoreGet, ChatStoreSet } from './chat-store-types'
 import {
   activeClawChannel,
@@ -374,7 +374,7 @@ export function createNavigationActions(
           preservedWorkspaceRoots: [workspaceRoot]
         })
         saveCodeWorkspaceRoots(codeWorkspaceRoots)
-        const needsInitialSetup = !getActiveAgentApiKey(settings).trim()
+        const needsInitialSetup = !settings.claude360?.loggedIn
         applyTheme(settings.theme)
         applyUiFontScale(settings.uiFontScale)
         applyChatContentMaxWidth(settings.chatContentMaxWidthPx)

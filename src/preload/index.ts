@@ -80,14 +80,31 @@ const api = {
     ipcRenderer.invoke('skill:import-github', { rootPath, url }),
   openSkillRoot: (rootPath) =>
     ipcRenderer.invoke('skill:open-root', rootPath),
-  listUiPlugins: () =>
-    ipcRenderer.invoke('ui-plugin:list'),
-  installUiPlugin: () =>
-    ipcRenderer.invoke('ui-plugin:install'),
-  removeUiPlugin: (id) =>
-    ipcRenderer.invoke('ui-plugin:remove', { id }),
-  loadUiPlugin: (id) =>
-    ipcRenderer.invoke('ui-plugin:load', { id }),
+  claude360Session: () => ipcRenderer.invoke('claude360:session'),
+  claude360StartDeviceAuth: () => ipcRenderer.invoke('claude360:auth:start-device'),
+  claude360PollDeviceAuth: (deviceCode) =>
+    ipcRenderer.invoke('claude360:auth:poll-device', { deviceCode }),
+  claude360PasswordLogin: (payload) =>
+    ipcRenderer.invoke('claude360:auth:password-login', payload),
+  claude360PasswordLogin2FA: (payload) =>
+    ipcRenderer.invoke('claude360:auth:password-login-2fa', payload),
+  claude360Logout: () => ipcRenderer.invoke('claude360:auth:logout'),
+  claude360SyncAccount: () => ipcRenderer.invoke('claude360:sync-account'),
+  claude360TokensList: () => ipcRenderer.invoke('claude360:tokens:list'),
+  claude360TokensEnsure: (payload) => ipcRenderer.invoke('claude360:tokens:ensure', payload),
+  claude360TokensCreate: (payload) => ipcRenderer.invoke('claude360:tokens:create', payload),
+  claude360TokensReveal: (payload) => ipcRenderer.invoke('claude360:tokens:reveal', payload),
+  claude360ModelsRefresh: () => ipcRenderer.invoke('claude360:models:refresh'),
+  claude360ModelsList: () => ipcRenderer.invoke('claude360:models:list'),
+  claude360BillingMe: () => ipcRenderer.invoke('claude360:billing:me'),
+  claude360BillingTopupOptions: () => ipcRenderer.invoke('claude360:billing:topup-options'),
+  claude360BillingTopupWechat: (payload) => ipcRenderer.invoke('claude360:billing:topup-wechat', payload),
+  claude360BillingTopupOrder: (payload) => ipcRenderer.invoke('claude360:billing:topup-order', payload),
+  claude360BillingTokenStats: (payload) => ipcRenderer.invoke('claude360:billing:token-stats', payload),
+  claude360MusicSubmit: (payload) => ipcRenderer.invoke('claude360:music:submit', payload),
+  claude360MusicFetch: (taskId) => ipcRenderer.invoke('claude360:music:fetch', { taskId }),
+  claude360CanvasGenerate: (payload) => ipcRenderer.invoke('claude360:canvas:generate', payload),
+  claude360CanvasEdit: (payload) => ipcRenderer.invoke('claude360:canvas:edit', payload),
   getKunConfigFile: () =>
     ipcRenderer.invoke('kun:config:read'),
   setKunConfigFile: (content) =>

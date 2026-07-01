@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CLAUDE360_IMAGE_SIZES } from '../../shared/claude360-canvas'
 import {
   KUN_APPROVAL_TEMPLATE,
   KUN_ATTACHMENT_CONTENT_TEMPLATE,
@@ -643,6 +644,143 @@ const terminalColorPatchSchema = z.object({
 const terminalSettingsPatchSchema = z.object({
   colors: terminalColorPatchSchema.optional()
 }).strict()
+
+const claude360TokenRefSchema = z.object({
+  tokenId: z.number().int(),
+  name: z.string().max(MAX_CHANNEL_TEXT_LENGTH),
+  group: z.string().max(128)
+}).strict()
+
+const claude360SettingsPatchSchema = z.object({
+  baseUrl: z.string().trim().max(MAX_URL_LENGTH).optional(),
+  loggedIn: z.boolean().optional(),
+  username: z.string().max(MAX_CHANNEL_TEXT_LENGTH).optional(),
+  displayName: z.string().max(MAX_CHANNEL_TEXT_LENGTH).optional(),
+  defaultGroup: z.string().max(128).optional(),
+  selectedTextGroup: z.string().max(128).optional(),
+  selectedImageGroup: z.string().max(128).optional(),
+  selectedMusicGroup: z.string().max(128).optional(),
+  cliTokenRef: z.string().max(256).optional(),
+  tokenRefs: z.record(z.string().max(128), claude360TokenRefSchema).optional(),
+  modelCache: z.object({
+    groups: z.array(z.string().max(128)).max(512).optional(),
+    models: z.array(z.string().max(256)).max(2_048).optional()
+  }).strict().optional(),
+  lastSyncAt: z.string().max(64).optional()
+}).strict()
+
+// Claude360 登录 IPC payload（plan-02 Task 5）
+export const claude360PasswordLoginPayloadSchema = z.object({
+  username: trimmedString(256),
+  password: z.string().min(1).max(1024)
+}).strict()
+
+export const claude360PasswordLogin2FAPayloadSchema = z.object({
+  challengeId: trimmedString(128),
+  code: trimmedString(64)
+}).strict()
+
+export const claude360DeviceCodePayloadSchema = z.object({
+  deviceCode: trimmedString(128)
+}).strict()
+
+// Claude360 token / 充值 / 用量 IPC payload（plan-03 Task 4）
+export const claude360EnsureTokenPayloadSchema = z.object({
+  group: trimmedString(128),
+  purpose: z.enum(['text', 'image', 'music'])
+}).strict()
+
+export const claude360CreateTokenPayloadSchema = z.object({
+  group: z.string().trim().max(128).optional(),
+  name: trimmedString(50)
+}).strict()
+
+export const claude360RevealTokenPayloadSchema = z.object({
+  tokenId: z.number().int().positive()
+}).strict()
+
+export const claude360TopupWechatPayloadSchema = z.object({
+  amount: z.number().positive(),
+  discountCode: z.string().trim().max(128).optional()
+}).strict()
+
+export const claude360TopupOrderPayloadSchema = z.object({
+  orderId: trimmedString(128)
+}).strict()
+
+export const claude360TokenStatsPayloadSchema = z.object({
+  startTimestamp: z.number().int().nonnegative().optional(),
+  endTimestamp: z.number().int().nonnegative().optional()
+}).strict()
+
+// Claude360 原生音乐工作台 IPC payload（plan-05 Task 3）。
+// 约束来自 music-web：prompt(=歌词/描述) 或 instrumental 至少满足其一；
+// custom_mode 显式布尔；style/title/negative_tags 长度有界（描述框 maxLength=500，
+// 这里给宽松上限；歌词较长按段落标记 4000）。
+const MAX_MUSIC_PROMPT = 4_000
+const MAX_MUSIC_STYLE = 500
+const MAX_MUSIC_TITLE = 200
+const MAX_MUSIC_TAGS = 500
+const MAX_MUSIC_PERSONA = 200
+
+export const claude360MusicSubmitPayloadSchema = z
+  .object({
+    prompt: z.string().max(MAX_MUSIC_PROMPT).optional().default(''),
+    model: trimmedString(64),
+    custom_mode: z.boolean().optional(),
+    instrumental: z.boolean().optional(),
+    title: z.string().trim().max(MAX_MUSIC_TITLE).optional(),
+    style: z.string().trim().max(MAX_MUSIC_STYLE).optional(),
+    vocal_gender: z.enum(['m', 'f']).optional(),
+    style_weight: z.number().min(0).max(1).optional(),
+    weirdness_constraint: z.number().min(0).max(1).optional(),
+    audio_weight: z.number().min(0).max(1).optional(),
+    negative_tags: z.string().trim().max(MAX_MUSIC_TAGS).optional(),
+    persona_id: z.string().trim().max(MAX_MUSIC_PERSONA).optional(),
+    persona_model: z.enum(['style_persona', 'voice_persona']).optional()
+  })
+  .strict()
+  // prompt(歌词/描述) 与 instrumental 至少满足其一，否则无内容可生成。
+  .refine((p) => p.prompt.trim().length > 0 || p.instrumental === true, {
+    message: 'prompt or instrumental is required'
+  })
+  // 自定义模式（custom_mode=true）需要 style（曲风），与 music-web validateForm 一致。
+  .refine((p) => p.custom_mode !== true || (p.style?.trim().length ?? 0) > 0, {
+    message: 'custom mode requires style'
+  })
+
+export const claude360MusicFetchPayloadSchema = z
+  .object({
+    taskId: trimmedString(256)
+  })
+  .strict()
+
+// Claude360 原生生图工作台 IPC payload（plan-06 Task 3）。
+// generate：prompt/model 必填，n∈[1,4]，size 在允许集合；
+// edit：image/prompt/model 必填，image 为 base64 或 dataURL 字符串（体量有界）。
+const MAX_CANVAS_PROMPT = 4_000
+// 编辑源图/蒙版为 base64 字符串，约 34MB 上限（服务端再按 25MB 解码字节兜底）。
+const MAX_CANVAS_IMAGE_CHARS = 34 * 1024 * 1024
+const claude360ImageSizeSchema = z.enum(CLAUDE360_IMAGE_SIZES)
+
+export const claude360CanvasGeneratePayloadSchema = z
+  .object({
+    model: trimmedString(MAX_MODEL_ID_LENGTH),
+    prompt: trimmedString(MAX_CANVAS_PROMPT),
+    size: claude360ImageSizeSchema.optional(),
+    n: z.number().int().min(1).max(4).optional()
+  })
+  .strict()
+
+export const claude360CanvasEditPayloadSchema = z
+  .object({
+    model: trimmedString(MAX_MODEL_ID_LENGTH),
+    prompt: trimmedString(MAX_CANVAS_PROMPT),
+    image: z.string().trim().min(1).max(MAX_CANVAS_IMAGE_CHARS),
+    mask: z.string().trim().min(1).max(MAX_CANVAS_IMAGE_CHARS).optional(),
+    size: claude360ImageSizeSchema.optional()
+  })
+  .strict()
 
 const clawSkillPatchSchema = z.object({
   defaultNames: z.array(trimmedString(128)).max(128).optional(),
@@ -1372,6 +1510,7 @@ const settingsPatchObjectSchema = z.object({
   schedule: scheduleSettingsPatchSchema.optional(),
   workflow: workflowSettingsPatchSchema.optional(),
   terminal: terminalSettingsPatchSchema.optional(),
+  claude360: claude360SettingsPatchSchema.optional(),
   guiUpdate: z.object({
     channel: z.enum(GUI_UPDATE_CHANNELS).optional()
   }).strict().optional(),
@@ -1827,12 +1966,6 @@ export const sseStartPayloadSchema = z
   .strict()
 
 export const streamIdSchema = trimmedString(MAX_ID_LENGTH)
-
-export const uiPluginIdPayloadSchema = z
-  .object({
-    id: z.string().trim().regex(/^[a-z0-9][a-z0-9-]{1,39}$/)
-  })
-  .strict()
 
 export const terminalSessionIdSchema = trimmedString(TERMINAL_MAX_SESSION_ID_LENGTH)
 

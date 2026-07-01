@@ -1,39 +1,28 @@
-import { readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
 import {
   getModelProviderSettings,
+  isClaude360ProviderId,
   isComposerChatModelId,
-  listModelProviderModelIds,
   listNonTextModelIds,
   modelProfileSupportsTextChat,
   modelProviderModelProfile,
   resolveKunRuntimeSettings,
   type AppSettingsV1
 } from '../shared/app-settings'
-import { DEFAULT_COMPOSER_MODEL_IDS } from '../shared/default-composer-models'
 import type { ModelProviderModelGroup } from '../shared/kun-gui-api'
 
 export type FetchUpstreamModelsResult =
   | { ok: true; modelIds: string[]; defaultModelId?: string; modelGroups?: ModelProviderModelGroup[] }
   | { ok: false; message: string }
 
-export function fallbackModelIds(): string[] {
-  return sortComposerModelIds(DEFAULT_COMPOSER_MODEL_IDS)
-}
-
 /**
- * Builds the model list the composer picker shows. Despite the historical name,
- * this intentionally mirrors only the models the user has explicitly added to
- * each provider (`provider.models`) — it does NOT query the provider's full
- * upstream `GET /v1/models` catalog.
+ * Builds the model list the composer picker shows. After the Claude360
+ * white-label convergence (plan-03), the ONLY model source is the set of
+ * auto-generated `claude360:*` provider profiles created on login; there is no
+ * DeepSeek/Kun default fallback and no upstream `GET /v1/models` catalog query.
  *
- * Pulling the whole catalog (issue #337) buried the few configured models under
- * hundreds of upstream ids (e.g. every OpenRouter / Aliyun model) and surfaced
- * ids that error when actually used. Custom-endpoint providers never triggered
- * it, which is why only preset providers were affected. Discover and add
- * upstream models deliberately via "从 API 拉取" (probeModelProvider) in
- * Settings instead.
+ * When the user is not logged in to Claude360 the picker returns an explicit
+ * error instead of silently offering default models — an unauthenticated
+ * client must not be able to pick a model.
  *
  * The second argument is kept for call-site compatibility; the upstream key is
  * no longer needed here.
@@ -42,63 +31,20 @@ export async function fetchUpstreamModelIds(
   settings: AppSettingsV1,
   _apiKey?: string
 ): Promise<FetchUpstreamModelsResult> {
-  const configuredModelIds = await readConfiguredKunModelIds(settings)
-  const configuredGroups = await readConfiguredModelGroups(settings)
-  const nonTextModelIds = listNonTextModelIds(settings)
-  const runtime = resolveKunRuntimeSettings(settings)
-  const runtimeModel = runtime.model.trim()
-  const defaultModelId = isComposerChatModelId(runtimeModel, nonTextModelIds) ? runtimeModel : ''
-  return modelListOrError(
-    configuredModelIds,
-    configuredGroups,
-    defaultModelId,
-    'Configured providers have no usable text models yet.'
-  )
-}
-
-export async function readConfiguredKunModelIds(settings: AppSettingsV1): Promise<string[]> {
-  const runtime = resolveKunRuntimeSettings(settings)
-  const configPath = join(expandHome(runtime.dataDir), 'config.json')
-  const nonTextModelIds = listNonTextModelIds(settings)
-  const ids = [runtime.model, ...listModelProviderModelIds(settings)].filter((id) =>
-    isComposerChatModelId(id, nonTextModelIds)
-  )
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(await readFile(configPath, 'utf8')) as unknown
-  } catch {
-    return mergeModelIds(ids)
+  if (!settings.claude360?.loggedIn) {
+    return { ok: false, message: 'Claude360 未登录，登录后即可选择模型。' }
   }
-  const root = objectValue(parsed)
-  const models = objectValue(root.models)
-  const contextCompaction = objectValue(root.contextCompaction)
-  return mergeModelIds([
-    ...ids,
-    ...modelIdsFromProfiles(objectValue(contextCompaction.modelProfiles), nonTextModelIds),
-    ...modelIdsFromProfiles(objectValue(models.profiles), nonTextModelIds)
-  ])
-}
-
-function modelListOrError(
-  ids: readonly string[],
-  groups: readonly ModelProviderModelGroup[],
-  defaultModelId: string,
-  message: string
-): FetchUpstreamModelsResult {
-  return hasCustomModelId(ids)
-    ? { ok: true, modelIds: mergeModelIds(ids), defaultModelId, modelGroups: mergeModelGroups(groups) }
-    : { ok: false, message }
-}
-
-async function readConfiguredModelGroups(settings: AppSettingsV1): Promise<ModelProviderModelGroup[]> {
-  const groups: ModelProviderModelGroup[] = []
   const nonTextModelIds = listNonTextModelIds(settings)
+  const groups: ModelProviderModelGroup[] = []
+  const textModelIds: string[] = []
   for (const provider of getModelProviderSettings(settings).providers) {
+    if (!isClaude360ProviderId(provider.id)) continue
     const modelIds = provider.models.filter((id) =>
       isComposerChatModelId(id, nonTextModelIds)
       && modelProfileSupportsTextChat(modelProviderModelProfile(provider, id))
     )
     if (modelIds.length === 0) continue
+    for (const id of modelIds) textModelIds.push(id)
     groups.push({
       providerId: provider.id,
       label: provider.name,
@@ -106,7 +52,27 @@ async function readConfiguredModelGroups(settings: AppSettingsV1): Promise<Model
       modelProfiles: provider.modelProfiles
     })
   }
-  return mergeModelGroups(groups)
+  if (textModelIds.length === 0) {
+    return { ok: false, message: 'Claude360 暂无可用文本模型，请在“我的”页刷新模型。' }
+  }
+  const modelIds = sortComposerModelIds(textModelIds)
+  const defaultModelId = resolveClaude360DefaultModelId(settings, modelIds)
+  return { ok: true, modelIds, defaultModelId, modelGroups: mergeModelGroups(groups) }
+}
+
+/**
+ * Prefers the runtime-configured (recommended) model, then the first cached
+ * model that is a usable text model, then the first available text model.
+ */
+function resolveClaude360DefaultModelId(settings: AppSettingsV1, textModelIds: readonly string[]): string {
+  const known = new Set(textModelIds)
+  const runtimeModel = resolveKunRuntimeSettings(settings).model.trim()
+  if (runtimeModel && known.has(runtimeModel)) return runtimeModel
+  for (const cached of settings.claude360?.modelCache?.models ?? []) {
+    const trimmed = cached.trim()
+    if (trimmed && known.has(trimmed)) return trimmed
+  }
+  return textModelIds[0] ?? ''
 }
 
 function mergeModelGroups(groups: readonly ModelProviderModelGroup[]): ModelProviderModelGroup[] {
@@ -132,38 +98,6 @@ function mergeModelGroups(groups: readonly ModelProviderModelGroup[]): ModelProv
   return [...byProvider.values()].filter((group) => group.modelIds.length > 0)
 }
 
-function modelIdsFromProfiles(
-  profiles: Record<string, unknown>,
-  nonTextModelIds: readonly string[] = []
-): string[] {
-  const ids: string[] = []
-  for (const [modelId, rawProfile] of Object.entries(profiles)) {
-    const trimmed = modelId.trim()
-    if (trimmed && isComposerChatModelId(trimmed, nonTextModelIds)) ids.push(trimmed)
-    const aliases = objectValue(rawProfile).aliases
-    if (Array.isArray(aliases)) {
-      for (const alias of aliases) {
-        if (typeof alias !== 'string') continue
-        const trimmedAlias = alias.trim()
-        if (trimmedAlias && isComposerChatModelId(trimmedAlias, nonTextModelIds)) ids.push(trimmedAlias)
-      }
-    }
-  }
-  return ids
-}
-
-function mergeModelIds(ids: readonly string[]): string[] {
-  return sortComposerModelIds([...DEFAULT_COMPOSER_MODEL_IDS, ...ids])
-}
-
-function hasCustomModelId(ids: readonly string[]): boolean {
-  const defaults = new Set<string>(DEFAULT_COMPOSER_MODEL_IDS)
-  return ids.some((id) => {
-    const trimmed = id.trim()
-    return trimmed !== '' && !defaults.has(trimmed as typeof DEFAULT_COMPOSER_MODEL_IDS[number])
-  })
-}
-
 function sortComposerModelIds(ids: readonly string[]): string[] {
   const ordered = new Set<string>()
   for (const id of ids) {
@@ -171,12 +105,4 @@ function sortComposerModelIds(ids: readonly string[]): string[] {
     if (trimmed && trimmed !== 'auto') ordered.add(trimmed)
   }
   return [...ordered].sort((a, b) => a.localeCompare(b))
-}
-
-function expandHome(path: string): string {
-  return path.startsWith('~') ? path.replace(/^~(?=$|[\\/])/, homedir()) : path
-}
-
-function objectValue(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 }

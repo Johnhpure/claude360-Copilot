@@ -84,9 +84,6 @@ const MemorySettingsSection = lazy(() =>
 const KeyboardShortcutsSettingsSection = lazy(() =>
   import('./settings-section-shortcuts').then((module) => ({ default: module.KeyboardShortcutsSettingsSection }))
 )
-const EasterEggSettingsSection = lazy(() =>
-  import('./settings-section-easter-egg').then((module) => ({ default: module.EasterEggSettingsSection }))
-)
 const ClawSettingsSection = lazy(() =>
   import('./settings-section-claw').then((module) => ({ default: module.ClawSettingsSection }))
 )
@@ -122,7 +119,7 @@ function SettingsSectionFallback(): ReactElement {
   )
 }
 
-type SettingsCategory = 'general' | 'providers' | 'write' | 'mediaGeneration' | 'speechToText' | 'agents' | 'archives' | 'permissions' | 'worktree' | 'memory' | 'shortcuts' | 'easterEgg' | 'claw' | 'updates' | 'debug' | 'terminal'
+type SettingsCategory = 'general' | 'providers' | 'write' | 'mediaGeneration' | 'speechToText' | 'agents' | 'archives' | 'permissions' | 'worktree' | 'memory' | 'shortcuts' | 'claw' | 'updates' | 'debug' | 'terminal'
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 type SettingsPatch = AppSettingsPatch
 type InlineNotice = {
@@ -371,10 +368,6 @@ export function SettingsView(): ReactElement {
       setCategory('shortcuts')
       return
     }
-    if (settingsSection === 'easterEgg') {
-      setCategory('easterEgg')
-      return
-    }
     if (settingsSection === 'updates') {
       setCategory('updates')
       return
@@ -398,7 +391,6 @@ export function SettingsView(): ReactElement {
       settingsSection === 'archives' ||
       settingsSection === 'claw' ||
       settingsSection === 'shortcuts' ||
-      settingsSection === 'easterEgg' ||
       settingsSection === 'updates' ||
       settingsSection === 'terminal' ||
       category !== 'agents'
@@ -407,7 +399,7 @@ export function SettingsView(): ReactElement {
     }
     if (!agentsSectionReady) return
     const refs: Record<
-      Exclude<SettingsRouteSection, 'general' | 'providers' | 'write' | 'imageGeneration' | 'mediaGeneration' | 'speechToText' | 'archives' | 'claw' | 'shortcuts' | 'easterEgg' | 'updates' | 'terminal'>,
+      Exclude<SettingsRouteSection, 'general' | 'providers' | 'write' | 'imageGeneration' | 'mediaGeneration' | 'speechToText' | 'archives' | 'claw' | 'shortcuts' | 'updates' | 'terminal'>,
       HTMLDivElement | null
     > = {
       agents: agentsSectionRef.current,
@@ -812,6 +804,10 @@ export function SettingsView(): ReactElement {
         setRoute('plugins')
         return
       }
+      if (settingsReturnRoute === 'my') {
+        setRoute('my')
+        return
+      }
       await openCode()
     })()
   }
@@ -1170,7 +1166,6 @@ export function SettingsView(): ReactElement {
             {category === 'worktree' ? <WorktreeSettingsSection ctx={settingsSectionContext} /> : null}
             {category === 'memory' ? <MemorySettingsSection ctx={settingsSectionContext} /> : null}
             {category === 'shortcuts' ? <KeyboardShortcutsSettingsSection ctx={settingsSectionContext} /> : null}
-            {category === 'easterEgg' ? <EasterEggSettingsSection ctx={settingsSectionContext} /> : null}
             {category === 'claw' ? <ClawSettingsSection ctx={settingsSectionContext} /> : null}
             {category === 'updates' ? <UpdatesSettingsSection ctx={settingsSectionContext} /> : null}
             {category === 'terminal' ? <TerminalSettingsSection ctx={settingsSectionContext} /> : null}

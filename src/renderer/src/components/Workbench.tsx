@@ -42,7 +42,6 @@ import {
 import { Sidebar } from './chat/Sidebar'
 import { WorkbenchTopBar, type RightPanelMode } from './chat/WorkbenchTopBar'
 import { SubagentReturnBar } from './chat/message-timeline-empty'
-import { IkunCameoLayer, KunCelebrationLayer } from './chat/AnimatedWorkLogo'
 import {
   FloatingComposer,
   type ComposerExecutionSettings,
@@ -94,7 +93,6 @@ import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useKeyboardShortcutSettings } from '../lib/keyboard-shortcut-settings'
 import { collectComposerChangeSummary } from '../lib/composer-change-summary'
 import { formatWorkspacePickerError } from '../lib/format-workspace-picker-error'
-import { useUiModeCameosEnabled, useUiPluginStore } from '../store/ui-plugin-store'
 import { readFocusModePreference, writeFocusModePreference } from '../lib/focus-mode'
 import {
   buildComposerFileContextPrompt,
@@ -139,6 +137,15 @@ const ScheduleTasksView = lazy(() =>
 )
 const WorkflowView = lazy(() =>
   import('./workflow/WorkflowView').then((module) => ({ default: module.WorkflowView }))
+)
+const MyPage = lazy(() =>
+  import('./my/MyPage').then((module) => ({ default: module.MyPage }))
+)
+const MusicWorkbench = lazy(() =>
+  import('./music/MusicWorkbench').then((module) => ({ default: module.MusicWorkbench }))
+)
+const CanvasWorkbench = lazy(() =>
+  import('./canvas/CanvasWorkbench').then((module) => ({ default: module.CanvasWorkbench }))
 )
 const SubagentDetailPanel = lazy(() =>
   import('./subagents/SubagentDetailPanel').then((module) => ({ default: module.SubagentDetailPanel }))
@@ -534,8 +541,6 @@ export function Workbench(): ReactElement {
   const [connectPhoneSidebarOpen, setConnectPhoneSidebarOpen] = useState(false)
   const [fileTreeSidePanelOpen, setFileTreeSidePanelOpen] = useState(false)
   const [openFilePreviewTargets, setOpenFilePreviewTargets] = useState<WorkspaceFileTarget[]>([])
-  const initUiPlugins = useUiPluginStore((s) => s.initUiPlugins)
-  const uiModeCameosEnabled = useUiModeCameosEnabled()
   const [focusModeEnabled, setFocusModeEnabled] = useState(readFocusModePreference)
   const [runtimeLogPath, setRuntimeLogPath] = useState('')
   const [planPanelOverlayPreferred, setPlanPanelOverlayPreferred] = useState(false)
@@ -831,11 +836,6 @@ export function Workbench(): ReactElement {
       cancelled = true
     }
   }, [])
-
-  useEffect(() => {
-    // 形象工坊:读取偏好、应用 DOM 属性/token,并在插件模式下加载图集
-    void initUiPlugins()
-  }, [initUiPlugins])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -2420,7 +2420,7 @@ export function Workbench(): ReactElement {
                 onInterrupt={(options) => void interrupt(options)}
                 onRetryConnection={() => void probeRuntime('user', { restart: true })}
                 onOpenSettings={() => openSettings('agents')}
-                onConfigureProviders={() => openSettings('providers')}
+                onConfigureProviders={() => setRoute('my')}
                 onNewConversation={startNewWriteAssistantConversation}
                 onPickWorkspace={() => void pickWriteAssistantWorkspace()}
                 onCollapse={closeRightPanel}
@@ -2459,7 +2459,7 @@ export function Workbench(): ReactElement {
                 onInterrupt={(options) => void interrupt(options)}
                 onRetryConnection={() => void probeRuntime('user', { restart: true })}
                 onOpenSettings={() => openSettings('agents')}
-                onConfigureProviders={() => openSettings('providers')}
+                onConfigureProviders={() => setRoute('my')}
                 onApplyFramework={applySddFramework}
                 onNewConversation={() => {
                   setInput('')
@@ -2611,6 +2611,12 @@ export function Workbench(): ReactElement {
               onOpenRequirementDraft={(draft) => void openSddRequirementDraftFromHistory(draft)}
               onOpenSettings={(section) => openSettings(section)}
               onOpenPlugins={openPluginsView}
+              onOpenMy={() => setRoute('my')}
+              myActive={route === 'my'}
+              onOpenCanvas={() => setRoute('canvas')}
+              onOpenMusic={() => setRoute('music')}
+              canvasActive={route === 'canvas'}
+              musicActive={route === 'music'}
               onToggleTheme={toggleTheme}
               focusModeEnabled={focusModeEnabled}
               onFocusModeChange={updateFocusMode}
@@ -2658,6 +2664,32 @@ export function Workbench(): ReactElement {
               leftSidebarCollapsed={leftSidebarCollapsed}
               onToggleLeftSidebar={toggleLeftSidebar}
               onOpenThread={openThread}
+            />
+          </Suspense>
+        ) : route === 'my' ? (
+          <Suspense fallback={<div className="h-full bg-ds-main" />}>
+            <MyPage
+              leftSidebarCollapsed={leftSidebarCollapsed}
+              onToggleLeftSidebar={toggleLeftSidebar}
+              onBack={() => setRoute('chat')}
+            />
+          </Suspense>
+        ) : route === 'music' ? (
+          <Suspense fallback={<div className="h-full bg-ds-main" />}>
+            <MusicWorkbench
+              leftSidebarCollapsed={leftSidebarCollapsed}
+              onToggleLeftSidebar={toggleLeftSidebar}
+              onOpenMy={() => setRoute('my')}
+            />
+          </Suspense>
+        ) : route === 'canvas' ? (
+          // 生图(canvas)工作台由 plan-06 交付：懒加载 CanvasWorkbench，与 music/my 同款。
+          // 不误进旧 infinite-canvas iframe。修复 / 充值入口经 onOpenMy 跳「我的」页。
+          <Suspense fallback={<div className="h-full bg-ds-main" />}>
+            <CanvasWorkbench
+              leftSidebarCollapsed={leftSidebarCollapsed}
+              onToggleLeftSidebar={toggleLeftSidebar}
+              onOpenMy={() => setRoute('my')}
             />
           </Suspense>
         ) : route === 'write' ? (
@@ -2765,8 +2797,6 @@ export function Workbench(): ReactElement {
                   }
                 />
               </Suspense>
-              {uiModeCameosEnabled && !focusModeEnabled ? <IkunCameoLayer /> : null}
-              {!focusModeEnabled ? <KunCelebrationLayer active={busy} suppressed={Boolean(error)} /> : null}
             </div>
             <div className="ds-no-drag relative flex shrink-0 justify-center px-2 pb-3 pt-0 sm:px-4 md:px-6 lg:px-8">
               {activeThreadRelation === 'side' && activeThreadParentId ? (
@@ -2818,7 +2848,7 @@ export function Workbench(): ReactElement {
                 onComposerReasoningEffortChange={
                   route === 'chat' || route === 'claw' ? setComposerReasoningEffort : undefined
                 }
-                onConfigureProviders={() => openSettings('providers')}
+                onConfigureProviders={() => setRoute('my')}
                 onSend={handleSend}
                 attachments={composerAttachments}
                 attachmentUploadEnabled={attachmentUploadEnabled}

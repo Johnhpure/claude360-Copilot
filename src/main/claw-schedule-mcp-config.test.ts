@@ -23,6 +23,7 @@ import {
   defaultWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
+  defaultClaude360Settings,
   type AppSettingsV1
 } from '../shared/app-settings'
 
@@ -61,6 +62,7 @@ function createSettings(patch: Partial<AppSettingsV1['schedule']['internal']> = 
     },
     workflow: defaultWorkflowSettings(),
     terminal: defaultTerminalSettings(),
+    claude360: defaultClaude360Settings(),
     guiUpdate: {
       channel: 'stable'
     },

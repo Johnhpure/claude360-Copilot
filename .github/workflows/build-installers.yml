@@ -1,0 +1,163 @@
+# 按需打包安装包（Mac arm64+x64 / Windows x64）
+#
+# 与既有 release.yml（PR 合并触发、签名 + R2 + GitHub Release 的重型发布流水线）
+# 不同：本工作流是「手动触发、只产出安装包 artifact」的轻量构建，用于在 Linux
+# 本机无法产出 macOS 包时，借 GitHub 的 macOS/Windows runner 云端打包。
+#
+# - 触发：Actions 页面手动 Run workflow（workflow_dispatch）。
+# - 产物：作为 workflow artifacts 上传，构建完在 run 页面下载，保留 14 天。
+# - macOS 默认「无签名」（ad-hoc）：可安装，但首次打开需在「系统设置 → 隐私与
+#   安全性」放行（或右键→打开）。若已配置 Apple 签名 secret，设 mac_sign=true 走签名。
+# - 各平台原生模块（node-pty / better-sqlite3 / @computer-use/nut-js）在对应
+#   runner 上原生编译，无跨平台交叉编译问题。
+
+name: Build Installers
+
+on:
+  # 手动触发：Actions 页面 Run workflow。
+  workflow_dispatch:
+    inputs:
+      mac_sign:
+        description: '对 macOS 包做 Developer ID 签名+公证（需已配置 Apple secret）'
+        type: boolean
+        default: false
+  # tag 触发：推送 v* 标签（如 v0.2.0）即云端产出三平台安装包，无需手动 Run。
+  # 产物版本号取自标签（去掉前导 v），须为合法 semver。
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-installers-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ── macOS：一次产出 arm64 + x64 的 dmg/zip ─────────────────────────────
+  build-macos:
+    name: Build macOS (arm64 + x64)
+    runs-on: macos-latest
+    env:
+      # 无签名构建：关闭 electron-builder 的钥匙串签名身份自动发现，避免误签/告警。
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # tag 触发时，用标签名（去掉前导 v）作为发布版本号，供 electron-builder 命名。
+      - name: Resolve version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: echo "KUN_APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      # 可选签名：仅当手动勾选 mac_sign 且仓库配好 Apple secret 时启用。
+      - name: Decode Apple signing credentials
+        if: ${{ inputs.mac_sign }}
+        env:
+          MAC_CODESIGN_P12_BASE64: ${{ secrets.MAC_CODESIGN_P12_BASE64 }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          for name in MAC_CODESIGN_P12_BASE64 CSC_KEY_PASSWORD APPLE_API_KEY_BASE64 APPLE_API_KEY_ID APPLE_API_ISSUER; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required secret: ${name} (mac_sign 需要完整 Apple 凭据)"
+              exit 1
+            fi
+          done
+          cert_path="${RUNNER_TEMP}/developer-id.p12"
+          key_path="${RUNNER_TEMP}/AuthKey_${APPLE_API_KEY_ID}.p8"
+          export CERT_PATH="${cert_path}" KEY_PATH="${key_path}"
+          node <<'NODE'
+          const fs = require('node:fs')
+          fs.writeFileSync(process.env.CERT_PATH, Buffer.from(process.env.MAC_CODESIGN_P12_BASE64, 'base64'))
+          fs.writeFileSync(process.env.KEY_PATH, Buffer.from(process.env.APPLE_API_KEY_BASE64, 'base64'))
+          NODE
+          {
+            echo "CSC_LINK=${cert_path}"
+            echo "CSC_KEY_PASSWORD=${CSC_KEY_PASSWORD}"
+            echo "APPLE_API_KEY=${key_path}"
+            echo "APPLE_API_KEY_ID=${APPLE_API_KEY_ID}"
+            echo "APPLE_API_ISSUER=${APPLE_API_ISSUER}"
+            echo "MAC_SIGN=1"
+          } >> "${GITHUB_ENV}"
+
+      - name: Build macOS packages (signed)
+        if: ${{ inputs.mac_sign }}
+        run: npm run dist:mac:signed
+
+      - name: Build macOS packages (unsigned)
+        if: ${{ !inputs.mac_sign }}
+        run: npm run dist:mac
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Claude360-Copilot-macOS
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/Claude360-Copilot-*-mac-arm64.dmg
+            dist/Claude360-Copilot-*-mac-x64.dmg
+            dist/Claude360-Copilot-*-mac-arm64.zip
+            dist/Claude360-Copilot-*-mac-x64.zip
+
+  # ── Windows x64：NSIS 安装包 ───────────────────────────────────────────
+  build-windows:
+    name: Build Windows (x64)
+    runs-on: windows-latest
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install dependencies
+        run: npm ci
+
+      # tag 触发时，用标签名（去掉前导 v）作为发布版本号，供 electron-builder 命名。
+      - name: Resolve version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: echo "KUN_APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build Windows installer (x64)
+        run: npm run dist:win
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Claude360-Copilot-Windows-x64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/Claude360-Copilot-*-win-x64.zip

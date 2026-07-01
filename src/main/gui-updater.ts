@@ -633,13 +633,15 @@ export async function showPostUpdateReleaseNotes(): Promise<void> {
   const isZh = locale === 'zh'
   const options: MessageBoxOptions = {
     type: 'info',
-    title: isZh ? 'Kun 已更新' : 'Kun updated',
-    message: isZh ? `已更新到 Kun ${currentVersion}` : `Kun has been updated to ${currentVersion}`,
+    title: isZh ? 'Claude360 Copilot 已更新' : 'Claude360 Copilot updated',
+    message: isZh
+      ? `已更新到 Claude360 Copilot ${currentVersion}`
+      : `Claude360 Copilot has been updated to ${currentVersion}`,
     detail:
       pendingUpdate?.releaseNotes ??
       (isZh
-        ? '此版本的完整更新内容可在 Kun 更新日志中查看。'
-        : 'See the Kun changelog for the complete release notes.'),
+        ? '此版本的完整更新内容可在 Claude360 Copilot 更新日志中查看。'
+        : 'See the Claude360 Copilot changelog for the complete release notes.'),
     buttons: isZh ? ['查看更新日志', '稍后'] : ['View changelog', 'Later'],
     defaultId: 0,
     cancelId: 1,

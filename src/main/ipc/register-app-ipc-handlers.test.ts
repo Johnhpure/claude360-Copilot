@@ -12,6 +12,7 @@ import {
   defaultWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
+  defaultClaude360Settings,
   type AppSettingsPatch,
   type AppSettingsV1
 } from '../../shared/app-settings'
@@ -54,6 +55,7 @@ function settings(): AppSettingsV1 {
     schedule: defaultScheduleSettings(),
     workflow: defaultWorkflowSettings(),
     terminal: defaultTerminalSettings(),
+    claude360: defaultClaude360Settings(),
     guiUpdate: { channel: 'stable' },
     codePromptPrefix: '',
     disabledSkillIds: []
@@ -85,6 +87,39 @@ function registerOptions(overrides: Partial<Parameters<typeof import('./register
     loadGuiUpdaterModule: vi.fn() as never,
     resolveLogDirectory: () => '/tmp/logs',
     logError: vi.fn(),
+    claude360AuthService: {
+      getSession: vi.fn(async () => ({ loggedIn: false, username: '', displayName: '', baseUrl: 'https://claude360.xyz' })),
+      startDeviceAuth: vi.fn(),
+      pollDeviceAuth: vi.fn(),
+      passwordLogin: vi.fn(),
+      passwordLogin2FA: vi.fn(),
+      logout: vi.fn(),
+      syncAccount: vi.fn()
+    } as never,
+    claude360TokenService: {
+      listTokens: vi.fn(async () => []),
+      ensureGroupToken: vi.fn(),
+      createToken: vi.fn(),
+      revealToken: vi.fn(async () => 'sk-x')
+    } as never,
+    claude360ModelService: {
+      refreshGroupsAndModels: vi.fn(async () => ({ modelCache: { groups: [], models: [] }, providerProfiles: [] }))
+    } as never,
+    claude360BillingService: {
+      getMe: vi.fn(),
+      getTopupOptions: vi.fn(),
+      createWechatTopup: vi.fn(),
+      getTopupOrder: vi.fn(),
+      getTokenStats: vi.fn()
+    } as never,
+    claude360MusicService: {
+      submitMusic: vi.fn(async () => ({ ok: true, taskId: 'T-1' })),
+      fetchMusic: vi.fn(async () => ({ ok: true, task: { taskId: 'T-1', status: 'success', songs: [] } }))
+    } as never,
+    claude360CanvasService: {
+      generateImages: vi.fn(async () => ({ ok: true, images: [] })),
+      editImage: vi.fn(async () => ({ ok: true, images: [] }))
+    } as never,
     ...overrides
   }
 }
@@ -485,5 +520,264 @@ describe('registerAppIpcHandlers', () => {
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('claude360 auth IPC handlers', () => {
+  beforeEach(() => {
+    handlers.clear()
+  })
+
+  function authServiceMock(overrides: Record<string, unknown> = {}) {
+    return {
+      getSession: vi.fn(),
+      startDeviceAuth: vi.fn(),
+      pollDeviceAuth: vi.fn(),
+      passwordLogin: vi.fn(),
+      passwordLogin2FA: vi.fn(),
+      logout: vi.fn(),
+      syncAccount: vi.fn(),
+      ...overrides
+    } as never
+  }
+
+  it('routes claude360:session to the auth service', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const getSession = vi.fn(async () => ({
+      loggedIn: true,
+      username: 'demo',
+      displayName: 'Demo',
+      baseUrl: 'https://claude360.xyz'
+    }))
+    registerAppIpcHandlers(registerOptions({ claude360AuthService: authServiceMock({ getSession }) }))
+    const handler = handlers.get('claude360:session')
+    expect(await handler?.({})).toMatchObject({ loggedIn: true, username: 'demo' })
+    expect(getSession).toHaveBeenCalled()
+  })
+
+  it('validates the password login payload and forwards valid input', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const passwordLogin = vi.fn(async () => ({ ok: false, message: 'x' }))
+    registerAppIpcHandlers(registerOptions({ claude360AuthService: authServiceMock({ passwordLogin }) }))
+    const handler = handlers.get('claude360:auth:password-login')
+    await expect(handler?.({}, { username: 'demo' })).rejects.toThrow(/Invalid payload/)
+    expect(passwordLogin).not.toHaveBeenCalled()
+    await handler?.({}, { username: 'demo', password: 'pw' })
+    expect(passwordLogin).toHaveBeenCalledWith({ username: 'demo', password: 'pw' })
+  })
+
+  it('rejects an empty device code on poll', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const pollDeviceAuth = vi.fn()
+    registerAppIpcHandlers(registerOptions({ claude360AuthService: authServiceMock({ pollDeviceAuth }) }))
+    const handler = handlers.get('claude360:auth:poll-device')
+    await expect(handler?.({}, { deviceCode: '' })).rejects.toThrow(/Invalid payload/)
+    expect(pollDeviceAuth).not.toHaveBeenCalled()
+  })
+})
+
+describe('claude360 token/model/billing IPC handlers', () => {
+  beforeEach(() => {
+    handlers.clear()
+  })
+
+  it('validates create-token payload and forwards to the token service', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const createToken = vi.fn(async () => ({ tokenId: 1, name: 'x', group: 'auto' }))
+    registerAppIpcHandlers(
+      registerOptions({
+        claude360TokenService: { listTokens: vi.fn(), ensureGroupToken: vi.fn(), createToken, revealToken: vi.fn() } as never
+      })
+    )
+    const handler = handlers.get('claude360:tokens:create')
+    await expect(handler?.({}, { name: '' })).rejects.toThrow(/Invalid payload/) // 空名非法
+    expect(createToken).not.toHaveBeenCalled()
+    await handler?.({}, { name: 'My Key', group: 'auto' })
+    expect(createToken).toHaveBeenCalledWith('auto', 'My Key')
+  })
+
+  it('rejects a non-positive token id on reveal', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const revealToken = vi.fn(async () => 'sk-x')
+    registerAppIpcHandlers(
+      registerOptions({
+        claude360TokenService: { listTokens: vi.fn(), ensureGroupToken: vi.fn(), createToken: vi.fn(), revealToken } as never
+      })
+    )
+    const handler = handlers.get('claude360:tokens:reveal')
+    await expect(handler?.({}, { tokenId: 0 })).rejects.toThrow(/Invalid payload/)
+    expect(revealToken).not.toHaveBeenCalled()
+  })
+
+  it('models:refresh persists provider profiles and model cache', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const applySettingsPatch = vi.fn(async () => settings())
+    const refreshGroupsAndModels = vi.fn(async () => ({
+      modelCache: { groups: ['auto'], models: ['m1'] },
+      providerProfiles: [{ id: 'claude360:auto' }]
+    }))
+    registerAppIpcHandlers(
+      registerOptions({
+        applySettingsPatch,
+        claude360ModelService: { refreshGroupsAndModels } as never
+      })
+    )
+    const handler = handlers.get('claude360:models:refresh')
+    const result = await handler?.({})
+    expect(refreshGroupsAndModels).toHaveBeenCalled()
+    expect(applySettingsPatch).toHaveBeenCalledWith({
+      provider: { providers: [{ id: 'claude360:auto' }] },
+      claude360: { modelCache: { groups: ['auto'], models: ['m1'] } }
+    })
+    expect(result).toMatchObject({ ok: true })
+  })
+
+  it('forwards token stats payload to the billing service', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const getTokenStats = vi.fn(async () => [])
+    registerAppIpcHandlers(
+      registerOptions({
+        claude360BillingService: { getMe: vi.fn(), getTopupOptions: vi.fn(), createWechatTopup: vi.fn(), getTopupOrder: vi.fn(), getTokenStats } as never
+      })
+    )
+    const handler = handlers.get('claude360:billing:token-stats')
+    await handler?.({}, { startTimestamp: 100, endTimestamp: 200 })
+    expect(getTokenStats).toHaveBeenCalledWith({ startTimestamp: 100, endTimestamp: 200 })
+  })
+})
+
+describe('claude360 music IPC handlers', () => {
+  beforeEach(() => {
+    handlers.clear()
+  })
+
+  function musicServiceMock(overrides: Record<string, unknown> = {}) {
+    return {
+      submitMusic: vi.fn(async () => ({ ok: true, taskId: 'T-1' })),
+      fetchMusic: vi.fn(async () => ({ ok: true, task: { taskId: 'T-1', status: 'success', songs: [] } })),
+      ...overrides
+    } as never
+  }
+
+  it('validates the submit payload and forwards to submitMusic', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const submitMusic = vi.fn(async () => ({ ok: true, taskId: 'T-9' }))
+    registerAppIpcHandlers(registerOptions({ claude360MusicService: musicServiceMock({ submitMusic }) }))
+    const handler = handlers.get('claude360:music:submit')
+    expect(handler).toBeTypeOf('function')
+    // 无 prompt 且非 instrumental → 非法，拦在 handler 边界。
+    await expect(handler?.({}, { model: 'V5_5', custom_mode: false })).rejects.toThrow(/Invalid payload/)
+    expect(submitMusic).not.toHaveBeenCalled()
+    // 合法请求转发。
+    await expect(handler?.({}, { prompt: '轻快的舞曲', model: 'V5_5', custom_mode: false })).resolves.toMatchObject({
+      ok: true,
+      taskId: 'T-9'
+    })
+    expect(submitMusic).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: '轻快的舞曲', model: 'V5_5' })
+    )
+  })
+
+  it('validates the fetch payload and forwards to fetchMusic', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const fetchMusic = vi.fn(async () => ({ ok: true, task: { taskId: 'T-9', status: 'success', songs: [] } }))
+    registerAppIpcHandlers(registerOptions({ claude360MusicService: musicServiceMock({ fetchMusic }) }))
+    const handler = handlers.get('claude360:music:fetch')
+    await expect(handler?.({}, { taskId: '' })).rejects.toThrow(/Invalid payload/)
+    expect(fetchMusic).not.toHaveBeenCalled()
+    await handler?.({}, { taskId: 'T-9' })
+    expect(fetchMusic).toHaveBeenCalledWith('T-9')
+  })
+
+  it('converts unexpected service errors into a unified error result on submit', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const submitMusic = vi.fn(async () => {
+      throw new Error('boom')
+    })
+    registerAppIpcHandlers(registerOptions({ claude360MusicService: musicServiceMock({ submitMusic }) }))
+    const handler = handlers.get('claude360:music:submit')
+    await expect(
+      handler?.({}, { prompt: 'x', model: 'V5_5', custom_mode: false })
+    ).resolves.toMatchObject({ ok: false })
+  })
+
+  it('converts unexpected service errors into a unified error result on fetch', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const fetchMusic = vi.fn(async () => {
+      throw new Error('boom')
+    })
+    registerAppIpcHandlers(registerOptions({ claude360MusicService: musicServiceMock({ fetchMusic }) }))
+    const handler = handlers.get('claude360:music:fetch')
+    await expect(handler?.({}, { taskId: 'T-9' })).resolves.toMatchObject({ ok: false })
+  })
+})
+
+describe('claude360 canvas IPC handlers', () => {
+  beforeEach(() => {
+    handlers.clear()
+  })
+
+  function canvasServiceMock(overrides: Record<string, unknown> = {}) {
+    return {
+      generateImages: vi.fn(async () => ({ ok: true, images: [] })),
+      editImage: vi.fn(async () => ({ ok: true, images: [] })),
+      ...overrides
+    } as never
+  }
+
+  it('validates the generate payload and forwards to generateImages', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const generateImages = vi.fn(async () => ({ ok: true, images: [{ id: 'i1', source: 'url', url: 'https://cdn/a.png', mimeType: 'image/png', prompt: 'p', model: 'm', createdAt: 'now' }] }))
+    registerAppIpcHandlers(registerOptions({ claude360CanvasService: canvasServiceMock({ generateImages }) }))
+    const handler = handlers.get('claude360:canvas:generate')
+    expect(handler).toBeTypeOf('function')
+    // 无 prompt → 非法，拦在 handler 边界。
+    await expect(handler?.({}, { model: 'gpt-image-1' })).rejects.toThrow(/Invalid payload/)
+    expect(generateImages).not.toHaveBeenCalled()
+    // 合法请求转发。
+    await expect(
+      handler?.({}, { model: 'gpt-image-1', prompt: '一只柯基', size: '1024x1024', n: 2 })
+    ).resolves.toMatchObject({ ok: true })
+    expect(generateImages).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'gpt-image-1', prompt: '一只柯基', size: '1024x1024', n: 2 })
+    )
+  })
+
+  it('validates the edit payload and forwards to editImage', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const editImage = vi.fn(async () => ({ ok: true, images: [] }))
+    registerAppIpcHandlers(registerOptions({ claude360CanvasService: canvasServiceMock({ editImage }) }))
+    const handler = handlers.get('claude360:canvas:edit')
+    // 缺 image → 非法。
+    await expect(handler?.({}, { model: 'm', prompt: 'x' })).rejects.toThrow(/Invalid payload/)
+    expect(editImage).not.toHaveBeenCalled()
+    await handler?.({}, { model: 'm', prompt: '把帽子改成红色', image: 'data:image/png;base64,QUJD' })
+    expect(editImage).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'm', prompt: '把帽子改成红色', image: 'data:image/png;base64,QUJD' })
+    )
+  })
+
+  it('converts unexpected service errors into a unified error result on generate', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const generateImages = vi.fn(async () => {
+      throw new Error('boom')
+    })
+    registerAppIpcHandlers(registerOptions({ claude360CanvasService: canvasServiceMock({ generateImages }) }))
+    const handler = handlers.get('claude360:canvas:generate')
+    await expect(
+      handler?.({}, { model: 'm', prompt: 'x' })
+    ).resolves.toMatchObject({ ok: false })
+  })
+
+  it('converts unexpected service errors into a unified error result on edit', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const editImage = vi.fn(async () => {
+      throw new Error('boom')
+    })
+    registerAppIpcHandlers(registerOptions({ claude360CanvasService: canvasServiceMock({ editImage }) }))
+    const handler = handlers.get('claude360:canvas:edit')
+    await expect(
+      handler?.({}, { model: 'm', prompt: 'x', image: 'QUJD' })
+    ).resolves.toMatchObject({ ok: false })
   })
 })

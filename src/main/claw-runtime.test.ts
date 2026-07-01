@@ -11,6 +11,7 @@ import {
   defaultWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
+  defaultClaude360Settings,
   type AppSettingsV1,
   type ClawImChannelV1,
   type ClawImConversationV1,
@@ -66,6 +67,7 @@ function buildSettings(): AppSettingsV1 {
       ]
     },
     terminal: defaultTerminalSettings(),
+    claude360: defaultClaude360Settings(),
     guiUpdate: { channel: 'stable' },
     codePromptPrefix: '',
     disabledSkillIds: []

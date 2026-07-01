@@ -71,6 +71,11 @@ import {
   type ProviderModelImportResult
 } from './provider-model-import-dialog'
 
+// Claude360 二开:普通用户不再手动配置自定义供应商。供应商 profile 由「我的」页
+// (route==='my')登录后按套餐下发,这里仅做只读展示并引导去「我的」页管理。
+// 注意:仅隐藏 UI 入口,底层 provider profile 解析/handler/类型全部保留,避免破坏 runtime。
+const SHOW_MANUAL_PROVIDER_CONFIG = false
+
 const MODEL_ENDPOINT_FORMAT_LABEL_KEYS: Record<ModelEndpointFormat, string> = {
   chat_completions: 'modelEndpointChatCompletions',
   responses: 'modelEndpointResponses',
@@ -1186,6 +1191,7 @@ export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }):
               ) : (
                 <div className="grid gap-2">{displayProviders.map(renderProviderButton)}</div>
               )}
+              {SHOW_MANUAL_PROVIDER_CONFIG ? (
               <div ref={addMenuRef} className="relative">
                 <button
                   type="button"
@@ -1227,6 +1233,11 @@ export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }):
                   </div>
                 ) : null}
               </div>
+              ) : (
+                <div className="rounded-xl border border-ds-border-muted bg-ds-main/35 px-3 py-2.5 text-[12px] leading-5 text-ds-muted">
+                  {t('modelProviderManagedNotice')}
+                </div>
+              )}
             </div>
             {activeProvider ? (
               <div className="grid content-start gap-3 rounded-xl border border-ds-border-muted bg-ds-main/35 p-4">
@@ -1242,6 +1253,7 @@ export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }):
                       </span>
                     ) : null}
                   </div>
+                  {SHOW_MANUAL_PROVIDER_CONFIG ? (
                   <button
                     type="button"
                     disabled={probeBusy}
@@ -1253,9 +1265,11 @@ export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }):
                       : <PlugZap className="h-3.5 w-3.5" strokeWidth={1.9} />}
                     {t('modelProviderTestConnection')}
                   </button>
+                  ) : null}
                 </div>
                 {probeNotice ? <InlineNoticeView notice={probeNotice} /> : null}
                 <DetailSection title={t('modelProviderSectionBasics')}>
+                  {SHOW_MANUAL_PROVIDER_CONFIG ? (
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className={fieldLabelClass}>
                       {t('modelProviderName')}
@@ -1290,7 +1304,25 @@ export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }):
                       </span>
                     </label>
                   </div>
+                  ) : (
+                    // 只读展示:名称 + ID,不提供编辑入口。
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className={fieldLabelClass}>
+                        {t('modelProviderName')}
+                        <span className="rounded-xl border border-ds-border-muted bg-ds-card px-3 py-2 text-[14px] font-normal text-ds-ink">
+                          {activeProvider.name.trim() || activeProvider.id}
+                        </span>
+                      </div>
+                      <div className={fieldLabelClass}>
+                        {t('modelProviderId')}
+                        <span className="rounded-xl border border-ds-border-muted bg-ds-card px-3 py-2 font-mono text-[13px] font-normal text-ds-faint">
+                          {activeProvider.id}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </DetailSection>
+                {SHOW_MANUAL_PROVIDER_CONFIG ? (
                 <DetailSection title={t('modelProviderSectionConnection')}>
                   {isAgentSdkProvider(activeProvider) ? (
                     <ClaudeSubscriptionSection
@@ -1391,9 +1423,11 @@ export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }):
                     </>
                   )}
                 </DetailSection>
+                ) : null}
                 <DetailSection
                   title={`${t('modelProviderModels')} · ${providerModelCount(activeProvider)}`}
                   action={
+                    SHOW_MANUAL_PROVIDER_CONFIG ? (
                     <button
                       type="button"
                       disabled={probeBusy}
@@ -1405,8 +1439,10 @@ export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }):
                         : <Download className="h-3 w-3" strokeWidth={1.9} />}
                       {t('modelProviderFetchModels')}
                     </button>
+                    ) : undefined
                   }
                 >
+                  {SHOW_MANUAL_PROVIDER_CONFIG ? (
                   <ProviderModelsManager
                     key={activeProvider.id}
                     provider={activeProvider}
@@ -1414,7 +1450,26 @@ export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }):
                     selectControlClass={selectControlClass}
                     onChange={(next) => patchProviderProfile(activeProvider, () => next)}
                   />
+                  ) : (
+                    // 只读展示:供应商可用模型列表,不提供增删改。
+                    providerModelCount(activeProvider) > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {providerModelListEntries(activeProvider).map((entry) => (
+                          <span
+                            key={`${entry.kind}:${entry.modelId}`}
+                            className="inline-flex max-w-full items-center rounded-full border border-ds-border-muted bg-ds-main/60 px-2.5 py-0.5 font-mono text-[12px] text-ds-ink"
+                          >
+                            <span className="truncate">{entry.modelId}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[12px] leading-5 text-ds-faint">{t('modelProviderManagedNotice')}</p>
+                    )
+                  )}
                 </DetailSection>
+                {SHOW_MANUAL_PROVIDER_CONFIG ? (
+                <>
                 <DetailSection
                   title={t('modelProviderImageCapability')}
                   action={
@@ -1731,7 +1786,9 @@ export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }):
                     </div>
                   ) : null}
                 </DetailSection>
-                {isDraftActive ? (
+                </>
+                ) : null}
+                {SHOW_MANUAL_PROVIDER_CONFIG && isDraftActive ? (
                   <DetailSection title={t('modelProviderDraftSection')}>
                     <div className="flex flex-wrap items-center gap-3">
                       <button
@@ -1756,7 +1813,7 @@ export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }):
                       </span>
                     </div>
                   </DetailSection>
-                ) : activeProvider.id !== DEFAULT_MODEL_PROVIDER_ID ? (
+                ) : SHOW_MANUAL_PROVIDER_CONFIG && activeProvider.id !== DEFAULT_MODEL_PROVIDER_ID ? (
                   <DetailSection title={t('modelProviderSectionDanger')}>
                     <div className="flex flex-wrap items-center gap-3">
                       <button
@@ -1799,7 +1856,7 @@ export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }):
         }
       />
     </SettingsCard>
-    {pendingImport && pendingImportProvider ? (
+    {SHOW_MANUAL_PROVIDER_CONFIG && pendingImport && pendingImportProvider ? (
       <ProviderModelImportDialog
         provider={pendingImportProvider}
         fetchedModelIds={pendingImport.modelIds}

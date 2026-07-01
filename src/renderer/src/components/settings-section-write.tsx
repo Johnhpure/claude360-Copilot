@@ -17,6 +17,7 @@ import {
   defaultWriteAgentPresets,
   defaultWriteSelectionAssistSettings,
   defaultWriteTypography,
+  isComposerChatModelId,
   resolveWriteInlineCompletionProviderId,
   type WriteAgentPresetV1,
   type WriteFontPreset,
@@ -93,7 +94,13 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
     providerSettings.providers.find((item: { id: string }) => item.id === DEFAULT_MODEL_PROVIDER_ID) ??
     providerSettings.providers[0]
   const writeInlineProviderInherited = form.write.inlineCompletion.inheritProvider !== false
-  const writeInlineProviderModels = effectiveWriteProvider?.models ?? []
+  // Claude360 收口：写作补全模型选项来自登录后的 Claude360 模型缓存（仅文本模型）；
+  // 未登录或缓存为空时回退到当前生效 provider 的模型列表，不再暴露自定义 provider。
+  const claude360TextModels: string[] = (form.claude360?.loggedIn ? form.claude360.modelCache?.models ?? [] : [])
+    .map((model: string) => model.trim())
+    .filter((model: string) => model && isComposerChatModelId(model))
+  const writeInlineProviderModels =
+    claude360TextModels.length > 0 ? claude360TextModels : effectiveWriteProvider?.models ?? []
   const writeInlineModelOptions = writeInlineCompletionModelOptions(writeInlineProviderModels)
   // 「默认」选项要展示继承链真正会选中的模型,而不是当前覆盖值:
   // 显式指定供应商时取其首个模型,否则跟随 AI 助手当前模型。
@@ -258,38 +265,6 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                       checked={form.write.inlineCompletion.enabled}
                       onChange={(enabled) => update({ write: { inlineCompletion: { enabled } } })}
                     />
-                  }
-                />
-                <SettingRow
-                  title={t('writeInlineCompletionProvider')}
-                  description={t('writeInlineCompletionProviderDesc')}
-                  control={
-                    <div className="w-full min-w-0 md:max-w-md">
-                      <select
-                        className={selectControlClass}
-                        value={writeInlineProviderInherited ? '' : form.write.inlineCompletion.providerId}
-                        onChange={(e) => {
-                          const providerId = e.target.value
-                          update({
-                            write: {
-                              inlineCompletion: {
-                                inheritProvider: !providerId,
-                                providerId
-                              }
-                            }
-                          })
-                        }}
-                      >
-                        <option value="">
-                          {t('writeInlineCompletionProviderInherit', {
-                            value: effectiveWriteProvider?.name ?? t('modelProviderDefault')
-                          })}
-                        </option>
-                        {providerSettings.providers.map((item: { id: string; name: string }) => (
-                          <option key={item.id} value={item.id}>{item.name}</option>
-                        ))}
-                      </select>
-                    </div>
                   }
                 />
                 <SettingRow

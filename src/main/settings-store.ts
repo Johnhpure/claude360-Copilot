@@ -27,6 +27,8 @@ import {
   mergeWriteSettings,
   defaultTerminalSettings,
   mergeTerminalSettings,
+  defaultClaude360Settings,
+  mergeClaude360Settings,
   DEFAULT_CHAT_CONTENT_MAX_WIDTH_PX,
   DEFAULT_UI_FONT_SCALE,
   normalizeAppBehaviorSettings,
@@ -255,7 +257,8 @@ const defaultSettings = (): AppSettingsV1 => ({
   claw: defaultClawSettings(),
   schedule: defaultScheduleSettings(),
   workflow: defaultWorkflowSettings(),
-  terminal: defaultTerminalSettings()
+  terminal: defaultTerminalSettings(),
+  claude360: defaultClaude360Settings()
 })
 
 function buildMergedSettings(parsed: Partial<AppSettingsV1>): AppSettingsV1 {
@@ -281,6 +284,7 @@ function buildMergedSettings(parsed: Partial<AppSettingsV1>): AppSettingsV1 {
     schedule: mergeScheduleSettings(defaults.schedule, migrated.schedule),
     workflow: mergeWorkflowSettings(defaults.workflow, migrated.workflow),
     terminal: mergeTerminalSettings(defaults.terminal, migrated.terminal),
+    claude360: mergeClaude360Settings(defaults.claude360, migrated.claude360),
     guiUpdate: { ...defaults.guiUpdate, ...migrated.guiUpdate },
     codePromptPrefix: typeof migrated.codePromptPrefix === 'string' ? migrated.codePromptPrefix : '',
     disabledSkillIds: normalizeDisabledSkillIds(migrated.disabledSkillIds)
@@ -478,6 +482,7 @@ export class JsonSettingsStore {
       schedule: mergeScheduleSettings(cur.schedule, partial.schedule),
       workflow: mergeWorkflowSettings(cur.workflow, partial.workflow),
       terminal: mergeTerminalSettings(cur.terminal, partial.terminal),
+      claude360: mergeClaude360Settings(cur.claude360, partial.claude360),
       guiUpdate: { ...cur.guiUpdate, ...(partial.guiUpdate ?? {}) }
     })
     await this.save(next)

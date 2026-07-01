@@ -553,7 +553,7 @@ export async function exportWriteDocument(
     } else if (payload.format === 'docx') {
       const docx = await htmlToDocx(html, null, {
         title,
-        creator: 'Kun',
+        creator: 'Claude360 Copilot',
         keywords: ['markdown', 'export'],
         description: `Exported from ${basename(sourcePath)}`,
         font: 'Arial',

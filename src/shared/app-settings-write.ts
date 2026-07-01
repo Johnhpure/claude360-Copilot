@@ -34,7 +34,7 @@ import {
   type WriteTypographySettingsV1
 } from './app-settings-types'
 import { getActiveAgentApiKey, getKunRuntimeSettings } from './app-settings-kun'
-import { getModelProviderProfile, resolveModelProviderBaseUrl } from './app-settings-provider'
+import { getModelProviderProfile, isClaude360ProviderId, resolveModelProviderBaseUrl } from './app-settings-provider'
 import { compactStrings } from './app-settings-normalizers'
 
 export const WRITE_QUICK_ACTION_BUILTIN_IDS = [
@@ -403,8 +403,11 @@ export function resolveWriteInlineCompletionEndpointFormat(settings: AppSettings
 
 export function resolveWriteInlineCompletionProviderId(settings: AppSettingsV1): string {
   const inlineCompletion = getNormalizedWriteInlineCompletionSettings(settings)
-  if (!inlineCompletion.inheritProvider && inlineCompletion.providerId.trim()) {
-    return inlineCompletion.providerId.trim()
+  // Claude360 收口：写作补全只接受自动生成的 `claude360:*` provider profile。
+  // 历史自定义 provider 的显式选择被忽略，回退到运行时（登录后即 claude360）provider。
+  const explicit = inlineCompletion.providerId.trim()
+  if (!inlineCompletion.inheritProvider && isClaude360ProviderId(explicit)) {
+    return explicit
   }
   return getKunRuntimeSettings(settings).providerId?.trim() || DEFAULT_MODEL_PROVIDER_ID
 }

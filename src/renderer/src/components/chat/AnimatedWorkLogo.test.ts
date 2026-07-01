@@ -1,27 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { resolveUiPluginFigure } from '@shared/ui-plugin'
-import { useUiPluginStore } from '../../store/ui-plugin-store'
 import {
   AnimatedWorkLogo,
-  IKUN_CAMEO_DURATIONS_MS,
-  IKUN_CAMEO_TYPES,
-  IkunCameo,
-  IKUN_WORK_LOGO_VARIANTS,
-  IKUN_WORK_LOGO_VARIANT_LABEL_KEYS,
-  KUN_CELEBRATION_DURATIONS_MS,
-  KUN_CELEBRATION_VARIANTS,
-  KunCelebration,
   KunStateFigure,
-  SidebarMascot,
-  UI_PLUGIN_CAMEO_SLOTS,
-  UI_PLUGIN_CELEBRATION_SLOTS,
-  UI_PLUGIN_STATE_SLOTS,
   WORK_LOGO_SWIM_MODES,
-  WORK_LOGO_SWIM_MODE_LABEL_KEYS,
-  pickIkunCameo,
-  pickKunCelebration
+  WORK_LOGO_SWIM_MODE_LABEL_KEYS
 } from './AnimatedWorkLogo'
 import { WorkMetaRow } from './message-timeline-cards'
 
@@ -61,10 +45,10 @@ describe('AnimatedWorkLogo', () => {
     expect(html).toContain('ds-work-logo-track')
     expect(html).toContain('ds-work-logo-body')
     expect(html).toContain('ds-work-logo-image')
-    expect(html).toContain('ds-ikun-logo')
-    expect(html).toContain('ds-ikun-figure')
-    expect(html).toMatch(/ds-ikun-logo-(dribble|run|boba)/)
     expect(html).toMatch(/ds-work-logo-mode-(propel|sprint|dive|surf)/)
+    // 形象工坊已移除:工作 logo 不应再含 iKun 变体 DOM
+    expect(html).not.toContain('ds-ikun-logo')
+    expect(html).not.toContain('ds-ikun-figure')
   })
 
   it('renders the state figures with their kind classes', () => {
@@ -72,42 +56,10 @@ describe('AnimatedWorkLogo', () => {
       const html = renderToStaticMarkup(createElement(KunStateFigure, { kind }))
       expect(html).toContain(`ds-kun-state-${kind}`)
       expect(html).toContain('ds-kun-state-figure')
-      expect(html).toContain('ds-ikun-state-figure')
-    }
-  })
-
-  describe('UI plugin slot fallback chains', () => {
-    const figures = {
-      swim: 'data:image/png;base64,SWIM',
-      greet: 'data:image/png;base64,GREET'
-    }
-
-    it('every surface chain ends at swim so partial skins always resolve', () => {
-      const chains = [
-        ...Object.values(UI_PLUGIN_STATE_SLOTS),
-        ...Object.values(UI_PLUGIN_CAMEO_SLOTS),
-        ...Object.values(UI_PLUGIN_CELEBRATION_SLOTS)
-      ]
-      for (const chain of chains) {
-        expect(chain[chain.length - 1]).toBe('swim')
-      }
-    })
-
-    it('resolves missing slots through the chains', () => {
-      expect(resolveUiPluginFigure(figures, UI_PLUGIN_STATE_SLOTS.greet)).toBe(figures.greet)
-      // sleep 槽位缺失 → 回退链最终落到 swim
-      expect(resolveUiPluginFigure(figures, UI_PLUGIN_STATE_SLOTS.sleep)).toBe(figures.swim)
-      expect(resolveUiPluginFigure(figures, UI_PLUGIN_CAMEO_SLOTS.dash)).toBe(figures.swim)
-      expect(resolveUiPluginFigure(figures, UI_PLUGIN_CELEBRATION_SLOTS.cheer)).toBe(figures.greet)
-      expect(resolveUiPluginFigure(null, UI_PLUGIN_STATE_SLOTS.greet)).toBeNull()
-    })
-
-    it('keeps default art when no plugin is active', () => {
-      expect(useUiPluginStore.getState().activeRuntime).toBeNull()
-      const html = renderToStaticMarkup(createElement(KunStateFigure, { kind: 'greet' }))
+      // 不再渲染第二张 iKun 形象
+      expect(html).not.toContain('ds-ikun-state-figure')
       expect(html).not.toContain('data:image')
-      expect(html).toContain('ds-kun-state-figure')
-    })
+    }
   })
 
   it('pins the swim mode when one is provided', () => {
@@ -118,84 +70,15 @@ describe('AnimatedWorkLogo', () => {
     expect(html).toContain('ds-work-logo-mode-dive')
   })
 
-  it('pins the ikun variant when one is provided', () => {
-    const html = renderToStaticMarkup(
-      createElement(AnimatedWorkLogo, { active: true, ikunVariant: 'boba' })
-    )
-
-    expect(html).toContain('ds-ikun-logo-boba')
-  })
-
-  it('renders the sidebar mascot with a state figure', () => {
-    const html = renderToStaticMarkup(createElement(SidebarMascot))
-
-    expect(html).toContain('ds-sidebar-mascot')
-    expect(html).toMatch(/ds-kun-state-(sit|greet|sleep)/)
-  })
-
-  it('renders every ikun cameo type with side classes', () => {
-    for (const type of ['dash', 'peek', 'boba', 'nap'] as const) {
-      const html = renderToStaticMarkup(createElement(IkunCameo, { cameo: { type, side: 'left' } }))
-      expect(html).toContain(`ds-ikun-cameo-${type}`)
-      expect(html).toContain('is-left')
-      expect(html).toContain('ds-ikun-cameo-figure')
-    }
-
-    const chaseHtml = renderToStaticMarkup(
-      createElement(IkunCameo, { cameo: { type: 'chase', side: 'right' } })
-    )
-    expect(chaseHtml.match(/ds-ikun-cameo-dash/g)?.length).toBe(2)
-    expect(chaseHtml).toContain('is-second')
-  })
-
-  it('renders every celebration variant with dual figures and confetti', () => {
-    for (const variant of KUN_CELEBRATION_VARIANTS) {
-      const html = renderToStaticMarkup(createElement(KunCelebration, { variant }))
-      expect(html).toContain(`ds-kun-celebration-${variant}`)
-      expect(html).toContain('is-kun')
-      expect(html).toContain('is-ikun')
-      expect(html).toContain('ds-kun-confetti')
-      expect(html.match(/<i><\/i>/g)?.length).toBe(10)
-      expect(KUN_CELEBRATION_DURATIONS_MS[variant]).toBeGreaterThan(0)
-    }
-  })
-
-  it('picks valid celebration variants with increasing ids', () => {
-    const first = pickKunCelebration()
-    const second = pickKunCelebration()
-
-    expect(KUN_CELEBRATION_VARIANTS).toContain(first.variant)
-    expect(second.id).toBeGreaterThan(first.id)
-  })
-
-  it('picks valid cameo specs with increasing ids and complete durations', () => {
-    const first = pickIkunCameo()
-    const second = pickIkunCameo()
-
-    expect(IKUN_CAMEO_TYPES).toContain(first.type)
-    expect(['left', 'right']).toContain(first.side)
-    expect(second.id).toBeGreaterThan(first.id)
-
-    for (const type of IKUN_CAMEO_TYPES) {
-      expect(IKUN_CAMEO_DURATIONS_MS[type]).toBeGreaterThan(0)
-    }
-  })
-
-  it('maps every swim mode and ikun variant to a status label key in both locales', async () => {
+  it('maps every swim mode to a status label key present in both locales', async () => {
     const nodeFs = 'node:fs/promises'
     const { readFile } = await import(/* @vite-ignore */ nodeFs)
     const zh = JSON.parse(await readFile(new URL('../../locales/zh/common.json', import.meta.url), 'utf8'))
     const en = JSON.parse(await readFile(new URL('../../locales/en/common.json', import.meta.url), 'utf8'))
 
+    expect([...WORK_LOGO_SWIM_MODES]).toEqual(['propel', 'sprint', 'dive', 'surf'])
     for (const swimMode of WORK_LOGO_SWIM_MODES) {
       const labelKey = WORK_LOGO_SWIM_MODE_LABEL_KEYS[swimMode]
-      expect(labelKey).toBeTruthy()
-      expect(zh[labelKey]).toBeTruthy()
-      expect(en[labelKey]).toBeTruthy()
-    }
-
-    for (const variant of IKUN_WORK_LOGO_VARIANTS) {
-      const labelKey = IKUN_WORK_LOGO_VARIANT_LABEL_KEYS[variant]
       expect(labelKey).toBeTruthy()
       expect(zh[labelKey]).toBeTruthy()
       expect(en[labelKey]).toBeTruthy()
@@ -247,7 +130,7 @@ describe('AnimatedWorkLogo', () => {
     expect(html).not.toContain('ds-work-logo-slot')
   })
 
-  it('keeps the swim animation layers wired in CSS', async () => {
+  it('keeps the swim animation layers wired in CSS and drops avatar-workshop styles', async () => {
     const nodeFs = 'node:fs/promises'
     const { readFile } = await import(/* @vite-ignore */ nodeFs)
     const baseShellCss = await readFile(new URL('../../styles/base-shell.css', import.meta.url), 'utf8')
@@ -268,10 +151,7 @@ describe('AnimatedWorkLogo', () => {
       expect(baseShellCss).toContain(`ds-work-logo-${layer}`)
     }
 
-    expect(baseShellCss).toContain('.ds-work-logo.is-active .ds-work-logo-body::after')
     expect(baseShellCss).toContain('@keyframes ds-work-logo-waterline')
-    expect(baseShellCss).not.toContain('ds-work-logo-tail')
-    expect(baseShellCss).not.toContain('transform: translateZ(0) scaleX(-1)')
     expect(baseShellCss).toContain('.ds-work-logo.ds-work-logo-mode-sprint')
     expect(baseShellCss).toContain('.ds-work-logo.ds-work-logo-mode-dive')
     expect(baseShellCss).toContain('.ds-work-logo.ds-work-logo-mode-surf')
@@ -284,32 +164,18 @@ describe('AnimatedWorkLogo', () => {
     expect(baseShellCss).toContain('@keyframes ds-kun-sit-sway')
     expect(baseShellCss).toContain('.ds-work-logo:hover')
     expect(baseShellCss).toContain('.ds-kun-state:hover')
-    expect(baseShellCss).toContain("[data-ikun-mode='on'] .ds-work-logo .ds-ikun-logo")
-    expect(baseShellCss).toContain("[data-ikun-mode='on'] {")
-    expect(baseShellCss).toContain("[data-theme='dark'][data-ikun-mode='on'],")
-    expect(baseShellCss).toContain("[data-theme='dark'][data-ikun-mode='on'] .ds-workbench-shell")
-    expect(baseShellCss).toContain('@keyframes ds-ikun-dribble')
-    expect(baseShellCss).toContain('@keyframes ds-ikun-run')
-    expect(baseShellCss).toContain('@keyframes ds-ikun-boba')
-    expect(baseShellCss).toContain('.ds-ikun-cameo-layer')
-    expect(baseShellCss).toContain('@keyframes ds-ikun-cameo-cross')
-    expect(baseShellCss).toContain('@keyframes ds-ikun-cameo-peek')
-    expect(baseShellCss).toContain('@keyframes ds-ikun-cameo-rise')
-    expect(baseShellCss).toContain('@keyframes ds-ikun-cameo-doze')
-    expect(baseShellCss).toContain('.ds-kun-celebration-layer')
-    expect(baseShellCss).toContain('@keyframes ds-kun-celebrate-cheer')
-    expect(baseShellCss).toContain('@keyframes ds-kun-celebrate-lap')
-    expect(baseShellCss).toContain('@keyframes ds-kun-celebrate-toast')
-    expect(baseShellCss).toContain('@keyframes ds-kun-confetti-burst')
-    expect(baseShellCss).toContain('@media (prefers-reduced-motion: reduce)')
-    expect(baseShellCss).toContain("[data-focus-mode='on'] .ds-ikun-cameo-layer")
-    expect(baseShellCss).toContain("[data-focus-mode='on'] .ds-kun-celebration-layer")
-    expect(baseShellCss).toContain("[data-focus-mode='on'] .ds-kun-state")
     expect(baseShellCss).toContain("[data-focus-mode='on'] .ds-work-logo")
-    expect(baseShellCss).toContain("[data-focus-mode='on'] .ds-work-logo-slot:has(.ds-work-logo)")
     expect(baseShellCss).toContain('display: none !important;')
-    expect(baseShellCss).not.toContain("[data-focus-mode='on'] .ds-shiny-text")
-    expect(baseShellCss).not.toContain("[data-focus-mode='on'] .ds-runtime-wake-shell::before")
+
+    // 形象工坊 CSS 痕迹必须清零
+    expect(baseShellCss).not.toContain("data-ikun-mode")
+    expect(baseShellCss).not.toContain('data-retroma-mode')
+    expect(baseShellCss).not.toContain('ds-ikun')
+    expect(baseShellCss).not.toContain('ds-kun-celebration')
+    expect(baseShellCss).not.toContain('ds-kun-celebrate')
+    expect(baseShellCss).not.toContain('ds-kun-confetti')
+    expect(baseShellCss).not.toContain('ds-sidebar-mascot')
+    expect(baseShellCss).not.toContain('ds-ikun-cameo')
   })
 
   it('keeps generated Kun PNG icon dimensions stable for packaging', async () => {
@@ -324,14 +190,6 @@ describe('AnimatedWorkLogo', () => {
     expect(pngDimensions(trayIcon)).toEqual({ width: 954, height: 994 })
   })
 
-  it('ships the iKun figure asset used by ikun mode', async () => {
-    const nodeFs = 'node:fs/promises'
-    const { readFile } = await import(/* @vite-ignore */ nodeFs)
-    const ikunFigure = await readFile(new URL('../../../../asset/img/ikun.png', import.meta.url))
-
-    expect(pngDimensions(ikunFigure)).toEqual({ width: 512, height: 512 })
-  })
-
   it('ships the Kun state figure assets', async () => {
     const nodeFs = 'node:fs/promises'
     const { readFile } = await import(/* @vite-ignore */ nodeFs)
@@ -340,23 +198,6 @@ describe('AnimatedWorkLogo', () => {
       kun_sleep: { width: 512, height: 390 },
       kun_surf: { width: 512, height: 479 },
       kun_sit: { width: 512, height: 493 }
-    }
-
-    for (const [name, dimensions] of Object.entries(expected)) {
-      const figure = await readFile(new URL(`../../../../asset/img/${name}.png`, import.meta.url))
-      expect(pngDimensions(figure)).toEqual(dimensions)
-    }
-  })
-
-  it('ships the iKun state and variant figure assets', async () => {
-    const nodeFs = 'node:fs/promises'
-    const { readFile } = await import(/* @vite-ignore */ nodeFs)
-    const expected: Record<string, { width: number; height: number }> = {
-      ikun_sleep: { width: 455, height: 512 },
-      ikun_boba: { width: 422, height: 512 },
-      ikun_run: { width: 378, height: 512 },
-      ikun_wave: { width: 435, height: 512 },
-      ikun_stand: { width: 368, height: 512 }
     }
 
     for (const [name, dimensions] of Object.entries(expected)) {

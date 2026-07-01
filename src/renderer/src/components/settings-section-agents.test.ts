@@ -38,6 +38,7 @@ const labels: Record<string, string> = {
   modelProviderPresetBadge: 'Preset',
   modelProviderCustomBadge: 'Custom',
   modelProviderDangerHint: 'Danger hint',
+  modelProviderManagedNotice: 'Manage providers on the My page',
   modelProviderIdLocked: 'Provider ID locked',
   modelProviderRemove: 'Remove provider',
   modelProviderName: 'Provider name',
@@ -475,7 +476,9 @@ describe('AgentsSettingsSection Kun diagnostics smoke', () => {
     }))
   })
 
-  it('renders custom model provider id as editable', () => {
+  it('hides manual provider config entries and shows read-only providers', () => {
+    // Task 7:普通用户不再看到自定义供应商的手动配置入口(新增/导入/Base URL/API Key)。
+    // 底层解析代码保留,这里只断言 UI 入口已隐藏,并保留供应商只读展示。
     const provider = defaultModelProviderSettings()
     const customProvider = {
       id: 'custom-provider-2',
@@ -499,50 +502,26 @@ describe('AgentsSettingsSection Kun diagnostics smoke', () => {
         }
       }
     }))
-    const providerIdInput = html.match(/<input[^>]+value="custom-provider-2"[^>]*>/)?.[0]
 
-    expect(providerIdInput).toBeTruthy()
-    expect(providerIdInput).not.toContain('readOnly')
-    expect(providerIdInput).not.toContain('readonly')
-    expect(html).toContain('Endpoint format')
-    expect(html).toContain('<option value="messages" selected="">/v1/messages (anthropic)</option>')
-    expect(html).toContain('<option value="custom_endpoint">Custom full endpoint</option>')
-    expect(html).toContain('Enter provider API key')
-    expect(html).not.toContain('Inherit API key')
-    expect(html).toContain('Add provider')
-    expect(html).toContain('Test connection')
-    expect(html).toContain('Fetch from API')
-    expect(html).toContain('Danger zone')
-    expect(html).toContain('In use')
-    expect(html).toContain('No API key')
+    // 新增供应商、导入(拉取)模型、API Key/Base URL/端点格式、删除等手动入口全部隐藏。
+    expect(html).not.toContain('Add provider')
+    expect(html).not.toContain('Custom provider…')
+    expect(html).not.toContain('Fetch from API')
+    expect(html).not.toContain('Test connection')
+    expect(html).not.toContain('Endpoint format')
+    expect(html).not.toContain('Enter provider API key')
+    expect(html).not.toContain('Provider base URL')
+    expect(html).not.toContain('Danger zone')
+    expect(html).not.toContain('Remove provider')
+    // 不再渲染可编辑的供应商 ID / Base URL 输入框。
+    expect(html).not.toMatch(/<input[^>]+value="custom-provider-2"[^>]*>/)
+    expect(html).not.toMatch(/<input[^>]+value="https:\/\/api\.example\.com\/v1"[^>]*>/)
+    // 供应商仍以只读方式展示,并引导用户去「我的」页管理。
+    expect(html).toContain('Custom Provider')
+    expect(html).toContain('Manage providers on the My page')
   })
 
-  it('locks preset and default provider ids and shows the danger zone only for removable providers', () => {
-    const provider = defaultModelProviderSettings()
-    const xiaomi = getModelProviderPreset('xiaomi')
-    expect(xiaomi).not.toBeNull()
-    const html = renderToStaticMarkup(createElement(ProvidersSettingsSection, {
-      ctx: {
-        ...baseCtx(),
-        provider: {
-          ...provider,
-          providers: [...provider.providers, modelProviderPresetProfile(xiaomi!)]
-        },
-        kun: {
-          ...defaultKunRuntimeSettings(),
-          providerId: 'xiaomi'
-        }
-      }
-    }))
-    const providerIdInput = html.match(/<input[^>]+value="xiaomi"[^>]*>/)?.[0]
-
-    expect(providerIdInput).toBeTruthy()
-    expect(providerIdInput?.toLowerCase()).toContain('readonly')
-    expect(html).toContain('Provider ID locked')
-    expect(html).toContain('Danger zone')
-  })
-
-  it('hides the danger zone for the default provider', () => {
+  it('shows the managed notice for the default provider without manual config', () => {
     const html = renderToStaticMarkup(createElement(ProvidersSettingsSection, {
       ctx: {
         ...baseCtx(),
@@ -552,7 +531,9 @@ describe('AgentsSettingsSection Kun diagnostics smoke', () => {
     }))
 
     expect(html).not.toContain('Danger zone')
-    expect(html).toContain('Test connection')
+    expect(html).not.toContain('Test connection')
+    expect(html).not.toContain('Add provider')
+    expect(html).toContain('Manage providers on the My page')
   })
 
   it('keeps advanced agent controls behind collapsed disclosures', () => {

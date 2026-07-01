@@ -10,6 +10,7 @@ import {
   defaultWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
+  defaultClaude360Settings,
   type AppSettingsV1
 } from '../../shared/app-settings'
 import { runtimeRequestViaHost } from './kun-adapter'
@@ -42,6 +43,7 @@ function settingsForPort(port: number): AppSettingsV1 {
     schedule: defaultScheduleSettings(),
     workflow: defaultWorkflowSettings(),
     terminal: defaultTerminalSettings(),
+    claude360: defaultClaude360Settings(),
     guiUpdate: { channel: 'stable' },
     codePromptPrefix: '',
     disabledSkillIds: []

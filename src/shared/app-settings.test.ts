@@ -32,6 +32,7 @@ import {
   isKunRuntimeInsecure,
   migrateLegacyAppSettings,
   normalizeAppSettings,
+  defaultClaude360Settings,
   normalizeChatContentMaxWidth,
   parseClawUserPromptForDisplay,
   inferModelEndpointFormatFromUrl,
@@ -70,6 +71,7 @@ function settings(): AppSettingsV1 {
     schedule: defaultScheduleSettings(),
     workflow: defaultWorkflowSettings(),
     terminal: defaultTerminalSettings(),
+    claude360: defaultClaude360Settings(),
     guiUpdate: { channel: 'stable' },
     codePromptPrefix: '',
     disabledSkillIds: []
@@ -1295,6 +1297,62 @@ describe('write inline completion runtime config', () => {
     expect(resolveWriteInlineCompletionApiKey(state)).toBe('general-key')
     expect(resolveWriteInlineCompletionBaseUrl(state)).toBe('https://general.example/v1')
     expect(resolveWriteInlineCompletionModel(state)).toBe('deepseek-chat')
+  })
+
+  it('ignores an explicitly selected non-Claude360 custom provider (Claude360 convergence)', () => {
+    const state = settings()
+    // The runtime provider is the post-login Claude360 profile carrying the key.
+    state.provider.providers = [
+      ...state.provider.providers,
+      {
+        id: 'claude360:auto',
+        name: 'auto',
+        apiKey: 'sk-runtime-provider',
+        baseUrl: 'https://claude360.xyz',
+        endpointFormat: 'chat_completions',
+        models: ['claude-sonnet-4-6'],
+        modelProfiles: {}
+      },
+      // A leftover custom provider explicitly chosen for write completion.
+      {
+        id: 'legacy-custom',
+        name: 'Legacy Custom',
+        apiKey: 'sk-legacy',
+        baseUrl: 'https://legacy.example/v1',
+        endpointFormat: 'chat_completions',
+        models: ['legacy-model'],
+        modelProfiles: {}
+      }
+    ]
+    state.agents.kun.providerId = 'claude360:auto'
+    state.write.inlineCompletion.inheritProvider = false
+    state.write.inlineCompletion.providerId = 'legacy-custom'
+
+    // The custom provider selection is ignored; resolution falls back to the
+    // runtime Claude360 provider instead of leaking 'sk-legacy'.
+    expect(resolveWriteInlineCompletionApiKey(state)).not.toBe('sk-legacy')
+    expect(resolveWriteInlineCompletionApiKey(state)).toBe('sk-runtime-provider')
+  })
+
+  it('honors an explicitly selected claude360:* provider profile', () => {
+    const state = settings()
+    state.provider.providers = [
+      ...state.provider.providers,
+      {
+        id: 'claude360:vip',
+        name: 'vip',
+        apiKey: 'sk-vip',
+        baseUrl: 'https://claude360.xyz',
+        endpointFormat: 'chat_completions',
+        models: ['claude-sonnet-4-6'],
+        modelProfiles: {}
+      }
+    ]
+    state.agents.kun.apiKey = 'sk-runtime'
+    state.write.inlineCompletion.inheritProvider = false
+    state.write.inlineCompletion.providerId = 'claude360:vip'
+
+    expect(resolveWriteInlineCompletionApiKey(state)).toBe('sk-vip')
   })
 
   it('treats legacy flash defaults without an inherit flag as inherited', () => {

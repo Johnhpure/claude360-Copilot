@@ -5,6 +5,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  safeStorage,
   Notification,
   powerSaveBlocker,
   Tray,
@@ -18,13 +19,13 @@ import {
   JsonSettingsStore,
   devServerHintUrl
 } from './settings-store'
-import kunLogoPng from '../asset/img/kun.png?url'
-import kunMacLogoPng from '../asset/img/kun_mac.png?url'
-import kunTrayPng from '../asset/img/kun_tray.png?url'
+import claude360LogoPng from '../asset/img/claude360.png?url'
+import claude360MacLogoPng from '../asset/img/claude360_mac.png?url'
+import claude360TrayPng from '../asset/img/claude360_tray.png?url'
 import { createAppIcon, pickTrayIcon, prepareTrayIcon } from './app-icon'
 import { buildTrayMenuTemplate, parseTrayThreads, type TrayThreadSummary } from './tray-session-menu'
 import { configureLinuxWaylandImeSwitches } from './app-command-line'
-import { configureAppIdentity } from './app-identity'
+import { configureAppIdentity, AUTO_IMPORT_LEGACY_DATA, APP_PRODUCT_NAME } from './app-identity'
 import { shouldStartHidden, syncLoginItemSettings } from './desktop-behavior'
 import { resolveLogDirectory, resolvePreloadPath } from './main-paths'
 import { runLegacyKunDataMigration } from './legacy-data-migration'
@@ -41,6 +42,8 @@ import {
   mergeScheduleSettings,
   mergeWriteSettings,
   mergeTerminalSettings,
+  mergeClaude360Settings,
+  DEFAULT_CLAUDE360_BASE_URL,
   MIN_KUN_LOCAL_PORT,
   normalizeAppSettings,
   normalizeAppBehaviorSettings,
@@ -53,6 +56,14 @@ import {
   type AppSettingsV1,
   type WindowCloseAction
 } from '../shared/app-settings'
+import { Claude360ApiClient } from './services/claude360-api-client'
+import { Claude360AuthService } from './services/claude360-auth-service'
+import { Claude360TokenService } from './services/claude360-token-service'
+import { Claude360ModelService } from './services/claude360-model-service'
+import { Claude360BillingService } from './services/claude360-billing-service'
+import { Claude360MusicService } from './services/claude360-music-service'
+import { Claude360CanvasService } from './services/claude360-canvas-service'
+import { createClaude360SecretStore, claude360ApiKeyRef } from './services/claude360-secret-store'
 import { parseRuntimeErrorBody, runtimeErrorToError, type RuntimeErrorCode } from '../shared/runtime-error'
 import type { GuiUpdateState } from '../shared/gui-update'
 import type { TrayActionPayload } from '../shared/kun-gui-api'
@@ -68,6 +79,7 @@ import {
 import { waitForRuntimeTurnsIdle } from './runtime/managed-runtime-idle'
 import {
   resolveKunDataDir,
+  setClaude360KeyResolver,
   setKunUnexpectedExitHandler,
   waitForKunStartupSettled,
   type KunUnexpectedExitInfo
@@ -186,23 +198,35 @@ if (runningClawScheduleMcpServer && process.platform === 'darwin') {
 // whenReady 副作用污染。
 configureAppIdentity()
 
-// 紧跟在身份设置之后、requestSingleInstanceLock() 之前做旧数据迁移:
-// 单实例锁文件就放在 userData 里,必须先把目录定下来。rename 失败
-// (典型场景:老版本还在运行)时退回旧目录,功能不受影响,下次再迁。
-const legacyMigration = runLegacyKunDataMigration({
-  userDataPath: app.getPath('userData'),
-  homeDir: homedir(),
-  log: (message, detail) => console.warn(`[kun-gui] ${message}`, detail ?? '')
-})
-if (legacyMigration.userData.usedLegacyFallback) {
-  app.setPath('userData', legacyMigration.userData.userDataPath)
+// 数据目录策略:Claude360 Copilot 换了全新 appId,被视为全新应用,userData 目录
+// 由 productName 派生成全新目录。第一阶段默认不自动导入旧 Kun / DeepSeek GUI 数据
+// (AUTO_IMPORT_LEGACY_DATA=false):既不搬旧目录,也不清理旧目录,旧数据原地保留,
+// 后续如需可显式触发。runLegacyKunDataMigration 函数完整保留(隐藏≠删除),仅默认
+// 关闭启动期自动触发。
+//
+// 迁移必须发生在 requestSingleInstanceLock() 之前:单实例锁文件放在 userData 里,
+// 得先把目录定下来。rename 失败(典型场景:老版本还在运行)时退回旧目录,下次再迁。
+if (AUTO_IMPORT_LEGACY_DATA) {
+  const legacyMigration = runLegacyKunDataMigration({
+    userDataPath: app.getPath('userData'),
+    homeDir: homedir(),
+    log: (message, detail) => console.warn(`[kun-gui] ${message}`, detail ?? '')
+  })
+  if (legacyMigration.userData.usedLegacyFallback) {
+    app.setPath('userData', legacyMigration.userData.userDataPath)
+  }
+  traceStartup('legacy data migration checked', {
+    userDataPath: legacyMigration.userData.userDataPath,
+    migratedUserData: legacyMigration.userData.migrated,
+    usedLegacyFallback: legacyMigration.userData.usedLegacyFallback,
+    settingsRewritten: legacyMigration.settingsRewritten
+  })
+} else {
+  traceStartup('legacy data migration skipped (fresh app policy)', {
+    userDataPath: app.getPath('userData'),
+    autoImportLegacyData: AUTO_IMPORT_LEGACY_DATA
+  })
 }
-traceStartup('legacy data migration checked', {
-  userDataPath: legacyMigration.userData.userDataPath,
-  migratedUserData: legacyMigration.userData.migrated,
-  usedLegacyFallback: legacyMigration.userData.usedLegacyFallback,
-  settingsRewritten: legacyMigration.settingsRewritten
-})
 
 configureLinuxWaylandImeSwitches()
 
@@ -374,9 +398,9 @@ function installDevPreviewWebviewGuards(): void {
 }
 
 
-const appIconSource = process.platform === 'win32' ? kunMacLogoPng : kunLogoPng
+const appIconSource = process.platform === 'win32' ? claude360MacLogoPng : claude360LogoPng
 const appIcon = createAppIcon(appIconSource)
-const trayIcon = createAppIcon(kunTrayPng)
+const trayIcon = createAppIcon(claude360TrayPng)
 traceStartup('app icon loaded', { source: appIconSource.startsWith('data:') ? 'data-url' : 'path' })
 const gotSingleInstanceLock = runningClawScheduleMcpServer || app.requestSingleInstanceLock()
 traceStartup('single instance lock checked', {
@@ -539,7 +563,7 @@ function syncTray(settings: AppSettingsV1): void {
     tray.on('right-click', showTrayMenu)
   }
 
-  tray.setToolTip('Kun')
+  tray.setToolTip(APP_PRODUCT_NAME)
   trayMenu = createTrayMenu(settings, [])
   tray.setContextMenu(null)
 }
@@ -625,7 +649,7 @@ async function showTurnCompleteNotification(
     return { ok: true, shown: false, reason: 'unsupported' }
   }
 
-  const title = normalizeNotificationText(payload.title, 'Kun', 80)
+  const title = normalizeNotificationText(payload.title, APP_PRODUCT_NAME, 80)
   const body = normalizeNotificationText(payload.body, 'Conversation complete.', 180)
 
   try {
@@ -1559,7 +1583,7 @@ app.whenReady().then(async () => {
   traceStartup('install webview guards:done')
 
   if (process.platform === 'darwin') {
-    const macDockIcon = createAppIcon(kunMacLogoPng)
+    const macDockIcon = createAppIcon(claude360MacLogoPng)
     app.dock.setIcon(macDockIcon.isEmpty() ? appIcon : macDockIcon)
   }
 
@@ -1649,6 +1673,7 @@ app.whenReady().then(async () => {
       schedule: mergeScheduleSettings(prev.schedule, partial.schedule),
       workflow: mergeWorkflowSettings(prev.workflow, partial.workflow),
       terminal: mergeTerminalSettings(prev.terminal, partial.terminal),
+      claude360: mergeClaude360Settings(prev.claude360, partial.claude360),
       guiUpdate: { ...prev.guiUpdate, ...(partial.guiUpdate ?? {}) }
     })
     if (prev.log.enabled !== next.log.enabled || prev.log.retentionDays !== next.log.retentionDays) {
@@ -1692,6 +1717,62 @@ app.whenReady().then(async () => {
     return store.patch(partial)
   }
 
+  // Claude360 服务层（plan-02/03）。共享 apiClient + 加密 secret store + settings 端口。
+  // baseUrl 默认指向 claude360.xyz；第一阶段无修改入口（供应商配置隐藏）。
+  const claude360ApiClient = new Claude360ApiClient({ baseUrl: DEFAULT_CLAUDE360_BASE_URL })
+  const claude360SecretStore = createClaude360SecretStore({
+    filePath: join(app.getPath('userData'), 'claude360-secrets.json'),
+    safeStorage
+  })
+  // 让 kun 运行时（子进程，拿不到 secretStore）能在 spawn/写子进程 config 前，
+  // 把 provider.apiKeyRef 解出真 Key 注入运行时。明文只在 main 侧解析，绝不落 settings。
+  setClaude360KeyResolver((ref) => claude360SecretStore.loadSecret(ref))
+  const readClaude360Settings = async (): Promise<Awaited<ReturnType<typeof store.load>>['claude360']> =>
+    (await store.load()).claude360
+  const writeClaude360Settings = async (patch: Parameters<typeof mergeClaude360Settings>[1]): Promise<void> => {
+    await store.patch({ claude360: patch })
+  }
+  const claude360AuthService = new Claude360AuthService({
+    apiClient: claude360ApiClient,
+    secretStore: claude360SecretStore,
+    readClaude360: readClaude360Settings,
+    writeClaude360: writeClaude360Settings
+  })
+  const claude360TokenService = new Claude360TokenService({
+    apiClient: claude360ApiClient,
+    secretStore: claude360SecretStore,
+    readClaude360: readClaude360Settings,
+    writeClaude360: writeClaude360Settings
+  })
+  const claude360BillingService = new Claude360BillingService({
+    apiClient: claude360ApiClient,
+    secretStore: claude360SecretStore
+  })
+  const claude360ModelService = new Claude360ModelService({
+    apiClient: claude360ApiClient,
+    secretStore: claude360SecretStore,
+    ensureGroupRef: async (group, purpose) =>
+      claude360TokenService.ensureGroupToken(group, purpose)
+  })
+  const claude360MusicService = new Claude360MusicService({
+    apiClient: claude360ApiClient,
+    secretStore: claude360SecretStore,
+    readClaude360: readClaude360Settings,
+    ensureGroupKey: async (group, purpose) => {
+      const ref = await claude360TokenService.ensureGroupToken(group, purpose)
+      return (await claude360SecretStore.loadSecret(claude360ApiKeyRef(ref.tokenId))) ?? ''
+    }
+  })
+  const claude360CanvasService = new Claude360CanvasService({
+    apiClient: claude360ApiClient,
+    secretStore: claude360SecretStore,
+    readClaude360: readClaude360Settings,
+    ensureGroupKey: async (group, purpose) => {
+      const ref = await claude360TokenService.ensureGroupToken(group, purpose)
+      return (await claude360SecretStore.loadSecret(claude360ApiKeyRef(ref.tokenId))) ?? ''
+    }
+  })
+
   registerAppIpcHandlers({
     store,
     getMainWindow: () => mainWindow,
@@ -1723,7 +1804,13 @@ app.whenReady().then(async () => {
     readGuiUpdateState,
     loadGuiUpdaterModule,
     resolveLogDirectory: () => resolveLogDirectory(app),
-    logError
+    logError,
+    claude360AuthService,
+    claude360TokenService,
+    claude360ModelService,
+    claude360BillingService,
+    claude360MusicService,
+    claude360CanvasService
   })
 
   void loadGuiUpdaterModule().catch((error) => {
@@ -1770,7 +1857,7 @@ app.whenReady().then(async () => {
 }).catch((error) => {
   const message = error instanceof Error ? error.message : String(error)
   console.error('[kun-gui] startup failed:', error)
-  dialog.showErrorBox('Kun failed to start', message)
+  dialog.showErrorBox(`${APP_PRODUCT_NAME} failed to start`, message)
   app.quit()
 })
 }

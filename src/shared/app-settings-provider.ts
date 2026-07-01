@@ -50,6 +50,7 @@ import {
   type VideoGenerationProtocol
 } from './app-settings-types'
 import { normalizeModelEndpointFormat, type ModelEndpointFormat } from '../../kun/src/contracts/model-endpoint-format.js'
+import { DEFAULT_CLAUDE360_BASE_URL } from './app-settings-claude360'
 import { getKunRuntimeSettings } from './app-settings-kun'
 import { normalizeDeepseekBaseUrl } from './app-settings-normalizers'
 import { DEFAULT_COMPOSER_MODEL_IDS } from './default-composer-models'
@@ -905,6 +906,9 @@ function normalizeModelProviderProfile(
     id,
     name,
     apiKey: typeof input?.apiKey === 'string' ? input.apiKey.trim() : '',
+    ...(typeof input?.apiKeyRef === 'string' && input.apiKeyRef.trim()
+      ? { apiKeyRef: input.apiKeyRef.trim() }
+      : {}),
     baseUrl,
     endpointFormat: normalizeModelEndpointFormat(input?.endpointFormat),
     ...(input?.kind === 'agent-sdk' ? { kind: 'agent-sdk' as const } : {}),
@@ -1272,4 +1276,75 @@ export function normalizeProxyUrl(value: unknown): string {
 
 function normalizeModelKey(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : ''
+}
+
+// ── Claude360 provider profile 生成（plan-03 Task 2）──
+// 由 Claude360 分组+模型自动生成只读 provider profile（用户不可手动编辑）。
+// profile.id 用稳定格式 `claude360:<group>`；baseUrl 固定中转站；OpenAI 兼容 chat。
+export type Claude360GroupModelsInput = {
+  group: string
+  models: { id: string; isImage?: boolean; supportsToolCalling?: boolean }[]
+}
+
+export function isClaude360ImageModelId(id: string): boolean {
+  return IMAGE_GENERATION_MODEL_PATTERN.test(id)
+}
+
+// Claude360 自动生成 provider profile 的 id 前缀。构造时用稳定格式
+// `claude360:<group>`；但 settings 归一化会把冒号替换为连字符（见
+// normalizeModelProviderId），存盘后变为 `claude360-<group>`。因此收口判定需同时
+// 兼容两种分隔符，才能在归一化前后都正确识别 Claude360 自动 profile。
+export const CLAUDE360_PROVIDER_ID_PREFIX = 'claude360:'
+
+export function isClaude360ProviderId(id: string | undefined | null): boolean {
+  if (typeof id !== 'string') return false
+  const normalized = id.trim().toLowerCase()
+  return normalized.startsWith('claude360:') || normalized.startsWith('claude360-')
+}
+
+export function buildClaude360ProviderProfiles(
+  groups: Claude360GroupModelsInput[],
+  refsByGroup: Record<string, string>
+): ModelProviderProfileV1[] {
+  return groups.map((group) => {
+    const imageModelIds: string[] = []
+    const modelProfiles: Record<string, ModelProviderModelProfileV1> = {}
+    for (const m of group.models) {
+      if (m.isImage) {
+        imageModelIds.push(m.id)
+        modelProfiles[m.id] = {
+          inputModalities: ['text', 'image'],
+          outputModalities: ['image'],
+          supportsToolCalling: false,
+          messageParts: ['text', 'image_url', 'input_image']
+        }
+      } else {
+        modelProfiles[m.id] = {
+          ...DEFAULT_TEXT_MODEL_PROFILE,
+          supportsToolCalling: m.supportsToolCalling ?? true
+        }
+      }
+    }
+    // 明文 Key 绝不落 profile：改存 secret-store 引用（apiKeyRef），apiKey 置空。
+    // main 进程在 spawn/写子进程 config 前用 apiKeyRef 解出真 Key 注入运行时。
+    const apiKeyRef = refsByGroup[group.group]?.trim() ?? ''
+    const profile: ModelProviderProfileV1 = {
+      id: `claude360:${group.group}`,
+      name: group.group,
+      apiKey: '',
+      ...(apiKeyRef ? { apiKeyRef } : {}),
+      baseUrl: DEFAULT_CLAUDE360_BASE_URL,
+      endpointFormat: 'chat_completions',
+      models: group.models.map((m) => m.id),
+      modelProfiles
+    }
+    if (imageModelIds.length > 0) {
+      profile.image = {
+        protocol: 'openai-images',
+        baseUrl: DEFAULT_CLAUDE360_BASE_URL,
+        models: imageModelIds
+      }
+    }
+    return profile
+  })
 }

@@ -14,6 +14,7 @@ import {
   defaultWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
+  defaultClaude360Settings,
   type AppSettingsV1
 } from '../shared/app-settings'
 import { KunConfigSchema } from '../../kun/src/config/kun-config.js'
@@ -55,6 +56,7 @@ function createSettings(binaryPath: string): AppSettingsV1 {
     schedule: defaultScheduleSettings(),
     workflow: defaultWorkflowSettings(),
     terminal: defaultTerminalSettings(),
+    claude360: defaultClaude360Settings(),
     guiUpdate: { channel: 'stable' },
     codePromptPrefix: '',
     disabledSkillIds: []
@@ -575,6 +577,49 @@ describe('syncGuiManagedKunConfig', () => {
       timeoutMs: 900000,
       pollIntervalMs: 10000
     })
+  })
+
+  it('hydrates a claude360 provider apiKeyRef into the child config key (main-side), keeping settings keyless', async () => {
+    if (!tempRoot) throw new Error('temp root not initialized')
+    const configPath = join(tempRoot, 'config.json')
+    const module = await import('./kun-process')
+
+    // 注入 secret-store 解析器：apiKeyRef → 明文。settings 里 apiKey 为空。
+    module.setClaude360KeyResolver(async (ref) =>
+      ref === 'claude360:api-key:9' ? 'sk-resolved-secret' : null
+    )
+    try {
+      const settings = createSettings('/tmp/kun-bin')
+      const base = settings.provider
+      settings.provider = {
+        ...base,
+        providers: [
+          ...base.providers,
+          {
+            id: 'claude360:auto',
+            name: 'auto',
+            apiKey: '', // 明文不落 settings
+            apiKeyRef: 'claude360:api-key:9',
+            baseUrl: 'https://claude360.xyz',
+            endpointFormat: 'chat_completions',
+            models: ['claude-sonnet-4-6'],
+            modelProfiles: {}
+          }
+        ]
+      }
+      await module.syncGuiManagedKunConfig(tempRoot, defaultKunRuntimeSettings(), {
+        scheduleMcp: {
+          settings,
+          launch: { appPath: tempRoot, execPath: process.execPath, isPackaged: false }
+        }
+      })
+
+      const parsed = JSON.parse(readFileSync(configPath, 'utf8')) as any
+      // provider id 归一化 : → -；子进程 config 拿到的是解出的明文（main 侧解析）。
+      expect(parsed.serve.providers['claude360-auto'].apiKey).toBe('sk-resolved-secret')
+    } finally {
+      module.setClaude360KeyResolver(null)
+    }
   })
 
   it('exports per-model max output tokens into Kun model profiles', async () => {

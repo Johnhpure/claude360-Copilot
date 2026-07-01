@@ -193,6 +193,14 @@ export type ModelProviderProfileV1 = {
   id: string
   name: string
   apiKey: string
+  /**
+   * Optional secret-store reference (e.g. `claude360:api-key:<tokenId>`) that
+   * resolves to the plaintext key at runtime in the main process. When set, the
+   * persisted `apiKey` is kept empty so the plaintext never lands in settings.json
+   * nor is sent to the renderer via `settings:get`. Absent for manually-entered
+   * providers, which keep their key inline in `apiKey` (unchanged behavior).
+   */
+  apiKeyRef?: string
   baseUrl: string
   endpointFormat: ModelEndpointFormat
   /**
@@ -1756,6 +1764,39 @@ export type TerminalSettingsPatchV1 = {
   colors?: Partial<TerminalColorSettingsV1>
 }
 
+// ── Claude360 中转站账号设置（plan-02）。敏感凭据(cli_token / API Key 明文)
+// 绝不进入 settings;此处仅保存展示态、分组选择与 secret store 引用键。
+export type Claude360TokenRef = {
+  tokenId: number
+  name: string
+  group: string
+}
+
+export type Claude360ModelCache = {
+  groups: string[]
+  models: string[]
+}
+
+export type Claude360SettingsV1 = {
+  baseUrl: string
+  loggedIn: boolean
+  username: string
+  displayName: string
+  defaultGroup: string
+  selectedTextGroup: string
+  selectedImageGroup: string
+  selectedMusicGroup: string
+  cliTokenRef: string
+  tokenRefs: Record<string, Claude360TokenRef>
+  modelCache: Claude360ModelCache
+  lastSyncAt: string
+}
+
+export type Claude360SettingsPatchV1 = Partial<Omit<Claude360SettingsV1, 'tokenRefs' | 'modelCache'>> & {
+  tokenRefs?: Record<string, Claude360TokenRef>
+  modelCache?: Partial<Claude360ModelCache>
+}
+
 export type AppSettingsV1 = {
   version: 1
   locale: 'en' | 'zh'
@@ -1780,13 +1821,14 @@ export type AppSettingsV1 = {
   workflow: WorkflowSettingsV1
   guiUpdate: GuiUpdateConfigV1
   terminal: TerminalSettingsV1
+  claude360: Claude360SettingsV1
   codePromptPrefix: string
   /** User-disabled skill IDs. Disabled skills are hidden from command surfaces. */
   disabledSkillIds: string[]
 }
 
 export type AppSettingsPatch = Partial<
-  Omit<AppSettingsV1, 'provider' | 'agents' | 'log' | 'checkpointCleanup' | 'notifications' | 'appBehavior' | 'keyboardShortcuts' | 'write' | 'claw' | 'schedule' | 'workflow' | 'guiUpdate' | 'terminal'>
+  Omit<AppSettingsV1, 'provider' | 'agents' | 'log' | 'checkpointCleanup' | 'notifications' | 'appBehavior' | 'keyboardShortcuts' | 'write' | 'claw' | 'schedule' | 'workflow' | 'guiUpdate' | 'terminal' | 'claude360'>
 > & {
   provider?: ModelProviderSettingsPatchV1
   agents?: KunSettingsEnvelopePatchV1
@@ -1801,4 +1843,5 @@ export type AppSettingsPatch = Partial<
   workflow?: WorkflowSettingsPatchV1
   guiUpdate?: Partial<GuiUpdateConfigV1>
   terminal?: TerminalSettingsPatchV1
+  claude360?: Claude360SettingsPatchV1
 }

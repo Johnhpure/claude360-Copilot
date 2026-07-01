@@ -93,14 +93,13 @@ if (releaseArtifactVersion && !artifactVersionPattern.test(releaseArtifactVersio
 }
 
 module.exports = {
-  // appId 永远保持旧值,即使品牌已改名 Kun:
-  //  - macOS 端 Squirrel.Mac 校验更新包签名时锚定 bundle identifier,
-  //    换了 id 老版本会拒绝安装新版本;
-  //  - Windows 端 NSIS 以 appId 派生卸载 GUID,换了 id 升级安装不会
-  //    卸载旧版本,用户会装出两份应用;
-  //  - macOS TCC 权限、通知授权也都挂在这个 id 上。
-  appId: 'com.xingyuzhong.deepseekgui',
-  productName: 'Kun',
+  // appId 已按 Claude360 决策换成全新 id(xyz.claude360.copilot):
+  //  - 用户已明确决定将 Claude360 Copilot 视为一个全新应用,不再要求从旧
+  //    Kun / DeepSeek GUI 版本平滑升级,因此无需继续锚定旧 bundle id;
+  //  - 系统会把它当作新应用:macOS 的 Squirrel.Mac 更新、TCC 权限、通知授权,
+  //    以及 Windows NSIS 卸载 GUID 都基于这个新 id 独立管理。
+  appId: 'xyz.claude360.copilot',
+  productName: 'Claude360 Copilot',
   asar: true,
   asarUnpack: [
     '**/kun/dist/**/*',
@@ -147,7 +146,7 @@ module.exports = {
       filter: ['**/*']
     }
   ],
-  artifactName: `Kun-${artifactVersion}-\${os}-\${arch}.\${ext}`,
+  artifactName: `Claude360-Copilot-${artifactVersion}-\${os}-\${arch}.\${ext}`,
   publish: [
     {
       provider: 'generic',
@@ -170,10 +169,11 @@ module.exports = {
     entitlementsInherit: 'build/entitlements.mac.inherit.plist',
     extendInfo: {
       // 语音输入：渲染进程通过 getUserMedia 录音做语音转文字。
-      NSMicrophoneUsageDescription: 'Kun uses the microphone for voice-to-text input.'
+      NSMicrophoneUsageDescription: 'Claude360 Copilot uses the microphone for voice-to-text input.'
     },
     // macOS 不会自动套圆角遮罩,图标文件本身需要是「圆角方块 + 透明边距」
-    icon: './src/asset/img/kun_mac.png',
+    // 当前 claude360_mac.png 为旧 kun_mac.png 的占位副本,待替换真实设计资源。
+    icon: './src/asset/img/claude360_mac.png',
     // arm64 (Apple Silicon) + x64 (Intel). On M 系列 Mac 本地打包会各出一组 dmg/zip。
     target: [
       { target: 'dmg', arch: ['arm64', 'x64'] },
@@ -188,9 +188,14 @@ module.exports = {
     // desktop/start-menu/taskbar shortcuts do not show a hard square edge.
     // Ship a multi-size .ico (16/24/32/48/64/72/96/128/256) so Explorer and
     // the desktop render crisp icons at small sizes (#222). Regenerate with:
-    // npx --yes png2icons src/asset/img/kun_mac.png build/icon -icowe -bc
-    icon: './build/icon.ico',
-    target: [{ target: 'nsis', arch: ['x64'] }]
+    // npx --yes png2icons src/asset/img/claude360_mac.png build/icon-claude360 -icowe -bc
+    // 当前 icon-claude360.ico 为旧 icon.ico 的占位副本,待替换真实设计资源。
+    icon: './build/icon-claude360.ico',
+    // x64：仅 zip 便携包（免安装，解压即用；不打 nsis 安装包）。在 Windows/CI 上
+    // 产出；Linux 本机因 node-pty 无法交叉编译，打不出（与 exe/zip 无关）。
+    target: [
+      { target: 'zip', arch: ['x64'] }
+    ]
   },
   nsis: {
     oneClick: false,
@@ -202,13 +207,14 @@ module.exports = {
     // 明确创建快捷方式；always 在覆盖安装时也会重建（即使用户曾删掉桌面图标）
     createDesktopShortcut: 'always',
     createStartMenuShortcut: true,
-    shortcutName: 'Kun',
-    uninstallDisplayName: 'Kun',
+    shortcutName: 'Claude360 Copilot',
+    uninstallDisplayName: 'Claude360 Copilot',
     deleteAppDataOnUninstall: false
   },
   linux: {
     category: 'Development',
-    icon: './src/asset/img/kun.png',
+    // 占位:claude360.png 为旧 kun.png 的副本,待替换真实设计资源。
+    icon: './src/asset/img/claude360.png',
     target: [{ target: 'AppImage', arch: ['x64'] }]
   },
   extraMetadata: {

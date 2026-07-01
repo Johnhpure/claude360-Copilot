@@ -18,6 +18,7 @@ import {
   defaultScheduleSettings,
   defaultWorkflowSettings,
   defaultTerminalSettings,
+  defaultClaude360Settings,
   defaultWriteSettings,
   listMusicGenerationProviderProfiles,
   listSpeechToTextProviderProfiles,
@@ -79,6 +80,7 @@ function settings(): AppSettingsV1 {
     schedule: defaultScheduleSettings(),
     workflow: defaultWorkflowSettings(),
     terminal: defaultTerminalSettings(),
+    claude360: defaultClaude360Settings(),
     guiUpdate: { channel: 'stable' },
     codePromptPrefix: '',
     disabledSkillIds: []
@@ -1218,5 +1220,38 @@ describe('provider presets', () => {
     })
     expect(resolved.modelProfiles['minimax-m3'].endpointFormat).toBe('messages')
     expect(resolved.modelProfiles['glm-5.1'].endpointFormat).toBeUndefined()
+  })
+})
+
+describe('buildClaude360ProviderProfiles', () => {
+  it('maps groups to claude360:<group> profiles with capabilities', async () => {
+    const { buildClaude360ProviderProfiles } = await import('./app-settings-provider')
+    const profiles = buildClaude360ProviderProfiles(
+      [
+        { group: 'auto', models: [{ id: 'claude-sonnet-4-6' }] },
+        { group: 'image-group', models: [{ id: 'gemini-2.5-flash-image', isImage: true }] }
+      ],
+      { auto: 'claude360:api-key:1', 'image-group': 'claude360:api-key:2' }
+    )
+    const auto = profiles.find((p) => p.id === 'claude360:auto')!
+    expect(auto.baseUrl).toBe('https://claude360.xyz')
+    expect(auto.endpointFormat).toBe('chat_completions')
+    // 明文不落 profile：apiKey 为空，改存 secret-store 引用。
+    expect(auto.apiKey).toBe('')
+    expect(auto.apiKeyRef).toBe('claude360:api-key:1')
+    expect(auto.models).toEqual(['claude-sonnet-4-6'])
+    expect(auto.modelProfiles['claude-sonnet-4-6'].supportsToolCalling).toBe(true)
+    expect(auto.image).toBeUndefined()
+
+    const image = profiles.find((p) => p.id === 'claude360:image-group')!
+    expect(image.image).toMatchObject({ protocol: 'openai-images', models: ['gemini-2.5-flash-image'] })
+    expect(image.modelProfiles['gemini-2.5-flash-image'].outputModalities).toEqual(['image'])
+  })
+
+  it('leaves apiKey and apiKeyRef empty when no ref provided for a group', async () => {
+    const { buildClaude360ProviderProfiles } = await import('./app-settings-provider')
+    const profiles = buildClaude360ProviderProfiles([{ group: 'vip', models: [{ id: 'm1' }] }], {})
+    expect(profiles[0].apiKey).toBe('')
+    expect(profiles[0].apiKeyRef).toBeUndefined()
   })
 })

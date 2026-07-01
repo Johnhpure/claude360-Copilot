@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  claude360MusicSubmitPayloadSchema,
+  claude360MusicFetchPayloadSchema,
+  claude360CanvasGeneratePayloadSchema,
+  claude360CanvasEditPayloadSchema,
   clawImInstallPollPayloadSchema,
   clawTaskFromTextPayloadSchema,
   isSafeOpenExternalUrl,
@@ -764,3 +768,155 @@ describe('app-ipc-schemas', () => {
     expect(payload.content).toBe('# Draft')
   })
 })
+
+describe('claude360 music IPC schemas', () => {
+  it('accepts a simple-mode submit with a prompt', () => {
+    const payload = claude360MusicSubmitPayloadSchema.parse({
+      prompt: '轻快的电子舞曲',
+      model: 'V5_5',
+      custom_mode: false
+    })
+    expect(payload.prompt).toBe('轻快的电子舞曲')
+    expect(payload.model).toBe('V5_5')
+  })
+
+  it('accepts an instrumental submit with no prompt', () => {
+    const payload = claude360MusicSubmitPayloadSchema.parse({
+      model: 'V5_5',
+      instrumental: true,
+      custom_mode: true,
+      style: '钢琴, 抒情'
+    })
+    expect(payload.instrumental).toBe(true)
+    expect(payload.prompt).toBe('')
+  })
+
+  it('rejects a submit that has neither prompt nor instrumental', () => {
+    expect(() =>
+      claude360MusicSubmitPayloadSchema.parse({ model: 'V5_5', custom_mode: false })
+    ).toThrow()
+  })
+
+  it('rejects custom mode without a style', () => {
+    expect(() =>
+      claude360MusicSubmitPayloadSchema.parse({
+        prompt: '[Verse] 歌词一行',
+        model: 'V5_5',
+        custom_mode: true
+      })
+    ).toThrow()
+  })
+
+  it('rejects out-of-range style_weight', () => {
+    expect(() =>
+      claude360MusicSubmitPayloadSchema.parse({
+        prompt: 'x',
+        model: 'V5_5',
+        style_weight: 2
+      })
+    ).toThrow()
+  })
+
+  it('rejects an over-long style', () => {
+    expect(() =>
+      claude360MusicSubmitPayloadSchema.parse({
+        prompt: 'x',
+        model: 'V5_5',
+        custom_mode: true,
+        style: 'a'.repeat(501)
+      })
+    ).toThrow()
+  })
+
+  it('rejects unknown fields (strict)', () => {
+    expect(() =>
+      claude360MusicSubmitPayloadSchema.parse({ prompt: 'x', model: 'V5_5', foo: 1 })
+    ).toThrow()
+  })
+
+  it('accepts a non-empty fetch taskId and rejects an empty one', () => {
+    expect(claude360MusicFetchPayloadSchema.parse({ taskId: 'T-9' }).taskId).toBe('T-9')
+    expect(() => claude360MusicFetchPayloadSchema.parse({ taskId: '' })).toThrow()
+    expect(() => claude360MusicFetchPayloadSchema.parse({ taskId: '   ' })).toThrow()
+  })
+})
+
+describe('claude360 canvas IPC schemas', () => {
+  it('accepts a minimal generate payload', () => {
+    const payload = claude360CanvasGeneratePayloadSchema.parse({
+      model: 'gpt-image-1',
+      prompt: '一只柯基'
+    })
+    expect(payload.model).toBe('gpt-image-1')
+    expect(payload.prompt).toBe('一只柯基')
+  })
+
+  it('accepts generate with valid size and n', () => {
+    const payload = claude360CanvasGeneratePayloadSchema.parse({
+      model: 'gpt-image-1',
+      prompt: 'x',
+      size: '1536x1024',
+      n: 4
+    })
+    expect(payload.size).toBe('1536x1024')
+    expect(payload.n).toBe(4)
+  })
+
+  it('rejects generate without prompt', () => {
+    expect(() =>
+      claude360CanvasGeneratePayloadSchema.parse({ model: 'gpt-image-1', prompt: '' })
+    ).toThrow()
+  })
+
+  it('rejects generate without model', () => {
+    expect(() =>
+      claude360CanvasGeneratePayloadSchema.parse({ model: '', prompt: 'x' })
+    ).toThrow()
+  })
+
+  it('rejects generate with n out of range (0 or 5)', () => {
+    expect(() =>
+      claude360CanvasGeneratePayloadSchema.parse({ model: 'm', prompt: 'x', n: 0 })
+    ).toThrow()
+    expect(() =>
+      claude360CanvasGeneratePayloadSchema.parse({ model: 'm', prompt: 'x', n: 5 })
+    ).toThrow()
+  })
+
+  it('rejects generate with a size outside the allowed set', () => {
+    expect(() =>
+      claude360CanvasGeneratePayloadSchema.parse({ model: 'm', prompt: 'x', size: '512x512' })
+    ).toThrow()
+  })
+
+  it('rejects generate with unknown fields (strict)', () => {
+    expect(() =>
+      claude360CanvasGeneratePayloadSchema.parse({ model: 'm', prompt: 'x', foo: 1 })
+    ).toThrow()
+  })
+
+  it('accepts an edit payload with image/prompt/model', () => {
+    const payload = claude360CanvasEditPayloadSchema.parse({
+      model: 'gpt-image-1',
+      prompt: '把帽子改成红色',
+      image: 'data:image/png;base64,QUJD'
+    })
+    expect(payload.image).toBe('data:image/png;base64,QUJD')
+  })
+
+  it('rejects an edit payload with an empty image', () => {
+    expect(() =>
+      claude360CanvasEditPayloadSchema.parse({ model: 'm', prompt: 'x', image: '' })
+    ).toThrow()
+  })
+
+  it('rejects an edit payload without prompt or model', () => {
+    expect(() =>
+      claude360CanvasEditPayloadSchema.parse({ model: '', prompt: 'x', image: 'QUJD' })
+    ).toThrow()
+    expect(() =>
+      claude360CanvasEditPayloadSchema.parse({ model: 'm', prompt: '', image: 'QUJD' })
+    ).toThrow()
+  })
+})
+

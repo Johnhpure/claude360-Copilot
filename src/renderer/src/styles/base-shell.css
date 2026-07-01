@@ -234,280 +234,11 @@
 }
 
 /* iKun 专属配色:小鸡黄 #facc15 / 篮球橙 #d8730d / 金黄 #f2b13d / 暖炭外套 #16110d / 奶油晨练场底色 */
-[data-ikun-mode='on'] {
-  --bg-app: #faf3e4;
-  --bg-sidebar: #f5edd9;
-  --bg-canvas: #fdf9ef;
-  --surface-1: rgba(255, 253, 246, 0.9);
-  --surface-2: rgba(255, 254, 250, 0.98);
-  --surface-3: #fffdf7;
-  --border-soft: rgba(122, 82, 21, 0.14);
-  --border-strong: rgba(122, 82, 21, 0.22);
-  --text-primary: #43321c;
-  --text-secondary: #75603f;
-  --text-tertiary: #a18a64;
-  --text-placeholder: #b09a76;
-
-  --ds-surface-subtle: #f7f0dd;
-  --ds-surface-hover: rgba(216, 115, 13, 0.07);
-  --ds-border-muted: rgba(122, 82, 21, 0.09);
-  --ds-bubble-user: rgba(250, 204, 21, 0.2);
-  --ds-bubble-user-fg: #43321c;
-  --ds-accent: #d8730d;
-  --ds-accent-soft: rgba(216, 115, 13, 0.15);
-  --ds-warning-soft: rgba(216, 115, 13, 0.16);
-  --ds-shadow-shell: 0 12px 30px rgba(96, 64, 18, 0.08);
-  --ds-shadow-panel: 0 16px 44px rgba(96, 64, 18, 0.06);
-  --ds-shadow-composer: 0 18px 46px rgba(96, 64, 18, 0.1),
-    0 5px 16px rgba(96, 64, 18, 0.06);
-  --ds-stage-gradient: linear-gradient(180deg, #fdf9ef 0%, #fffdf7 100%);
-  --ds-topbar-bg:
-    linear-gradient(180deg, rgba(255, 252, 244, 0.82) 0%, rgba(255, 252, 244, 0.58) 58%, rgba(255, 252, 244, 0.3) 100%);
-  --ds-topbar-shadow:
-    0 16px 42px rgba(96, 64, 18, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.66);
-  --ds-sidebar-gradient:
-    linear-gradient(180deg, rgba(252, 246, 233, 0.98) 0%, rgba(246, 237, 216, 0.98) 100%);
-  --ds-sidebar-haze:
-    radial-gradient(circle at 62% -14%, rgba(250, 204, 21, 0.2), transparent 38%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0) 30%);
-  --ds-sidebar-border: rgba(209, 158, 64, 0.32);
-  --ds-sidebar-row-hover: rgba(216, 161, 62, 0.12);
-  --ds-sidebar-row-active: rgba(248, 232, 196, 0.9);
-  --ds-sidebar-row-ring: rgba(209, 158, 64, 0.26);
-  --ds-sidebar-field-bg: rgba(252, 246, 233, 0.82);
-  --ds-sidebar-field-focus: rgba(255, 253, 247, 0.94);
-  --ds-sidebar-divider: rgba(209, 158, 64, 0.26);
-  --ds-card-soft: rgba(255, 253, 246, 0.8);
-  --ds-card-strong: rgba(255, 254, 249, 0.96);
-  --ds-card-muted: rgba(251, 245, 231, 0.86);
-  --ds-card-ghost: rgba(255, 253, 246, 0.58);
-  --ds-card-hover: rgba(255, 254, 250, 0.98);
-  --ds-chip-bg: rgba(255, 253, 246, 0.9);
-  --ds-chip-muted-bg: rgba(251, 246, 234, 0.88);
-  --ds-chip-hover: rgba(255, 254, 250, 0.98);
-  --ds-chip-border: rgba(122, 82, 21, 0.14);
-  --ds-chip-active:
-    linear-gradient(180deg, rgba(253, 240, 205, 0.98), rgba(249, 228, 173, 0.94));
-  --ds-kbd-bg: rgba(255, 253, 246, 0.88);
-  --ds-code-bg: rgba(251, 246, 233, 0.96);
-  --ds-inline-code-bg: rgba(249, 242, 226, 0.92);
-  --ds-inline-code-hover-bg: rgba(247, 233, 203, 0.98);
-  --ds-pre-bg: rgba(252, 247, 235, 0.96);
-  --ds-code-block-bg: #f6ecd7;
-  --ds-table-head-bg: rgba(250, 244, 229, 0.96);
-  --ds-scrollbar-thumb: rgba(117, 96, 63, 0.24);
-  --ds-scrollbar-thumb-hover: rgba(117, 96, 63, 0.34);
-  --ds-selection: rgba(216, 115, 13, 0.2);
-  --ds-shadow-card-soft: 0 10px 28px rgba(96, 64, 18, 0.06);
-  --ds-shadow-card-strong: 0 14px 36px rgba(96, 64, 18, 0.09);
-  --ds-shadow-chip: inset 0 1px 0 rgba(255, 255, 255, 0.78);
-}
-
-[data-ikun-mode='on'] body::before {
-  background: linear-gradient(180deg, #fcf7ea 0%, #f6eedb 100%);
-}
-
-[data-ikun-mode='on'] body::after {
-  background:
-    radial-gradient(circle at 78% -10%, rgba(250, 204, 21, 0.2), transparent 40%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 22%),
-    linear-gradient(120deg, rgba(244, 197, 95, 0.2), transparent 34%, rgba(255, 252, 243, 0.14) 74%, transparent);
-  opacity: 0.8;
-}
 
 /* Retroma 羊皮纸浅色主题(仅浅色生效):底色 #faf9f6 / 卡片 #f5f4ef / 主色青 #0f7887 / 点缀紫红 #6e3a66 / 边框 #d8d4c8。
    :not([data-theme='dark']) 守卫确保暗色模式下回退 Kun 默认暗色。 */
-[data-retroma-mode='on']:not([data-theme='dark']) {
-  --bg-app: #faf9f6;
-  --bg-sidebar: #f5f4ef;
-  --bg-canvas: #faf9f6;
-  --surface-1: rgba(245, 244, 239, 0.9);
-  --surface-2: rgba(238, 237, 229, 0.98);
-  --surface-3: #eeede5;
-  --border-soft: rgba(90, 74, 58, 0.14);
-  --border-strong: rgba(90, 74, 58, 0.22);
-  --text-primary: #1d011d;
-  --text-secondary: #6e6060;
-  --text-tertiary: #8a7e72;
-  --text-placeholder: #b8b0a8;
-
-  --ds-surface-subtle: #eeede5;
-  --ds-surface-hover: rgba(15, 120, 135, 0.07);
-  --ds-border-muted: rgba(90, 74, 58, 0.09);
-  --ds-bubble-user: rgba(110, 58, 102, 0.12);
-  --ds-bubble-user-fg: #6e3a66;
-  --ds-accent: #0f7887;
-  --ds-accent-soft: rgba(15, 120, 135, 0.15);
-  --ds-success: #737f16;
-  --ds-success-soft: rgba(115, 127, 22, 0.14);
-  --ds-danger: #b03030;
-  --ds-danger-soft: rgba(176, 48, 48, 0.14);
-  --ds-warning-soft: rgba(176, 122, 16, 0.16);
-  --ds-diff-added: #737f16;
-  --ds-diff-added-soft: rgba(115, 127, 22, 0.1);
-  --ds-diff-removed: #b03030;
-  --ds-diff-removed-soft: rgba(176, 48, 48, 0.1);
-  --ds-skill: #6e3a66;
-  --ds-skill-soft: rgba(110, 58, 102, 0.13);
-  --ds-selection: rgba(110, 58, 102, 0.2);
-  --ds-shadow-shell: 0 12px 30px rgba(90, 74, 58, 0.08);
-  --ds-shadow-panel: 0 16px 44px rgba(90, 74, 58, 0.06);
-  --ds-shadow-composer: 0 18px 46px rgba(90, 74, 58, 0.1),
-    0 5px 16px rgba(90, 74, 58, 0.06);
-  --ds-stage-gradient: linear-gradient(180deg, #faf9f6 0%, #ffffff 100%);
-  --ds-topbar-bg:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 58%, rgba(255, 255, 255, 0.3) 100%);
-  --ds-topbar-shadow:
-    0 16px 42px rgba(90, 74, 58, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.64);
-  --ds-sidebar-gradient:
-    linear-gradient(180deg, rgba(250, 249, 246, 0.98) 0%, rgba(245, 244, 239, 0.98) 100%);
-  --ds-sidebar-haze:
-    radial-gradient(circle at 62% -14%, rgba(15, 120, 135, 0.12), transparent 38%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0) 30%);
-  --ds-sidebar-border: rgba(216, 212, 200, 0.6);
-  --ds-sidebar-row-hover: rgba(238, 236, 228, 0.7);
-  --ds-sidebar-row-active: rgba(224, 222, 212, 0.9);
-  --ds-sidebar-row-ring: rgba(110, 58, 102, 0.26);
-  --ds-sidebar-field-bg: rgba(245, 244, 239, 0.82);
-  --ds-sidebar-field-focus: rgba(250, 249, 246, 0.94);
-  --ds-sidebar-divider: rgba(216, 212, 200, 0.45);
-  --ds-card-soft: rgba(250, 249, 246, 0.8);
-  --ds-card-strong: rgba(255, 255, 255, 0.96);
-  --ds-card-muted: rgba(238, 237, 229, 0.86);
-  --ds-card-ghost: rgba(250, 249, 246, 0.58);
-  --ds-card-hover: rgba(255, 255, 255, 0.98);
-  --ds-chip-bg: rgba(243, 238, 226, 0.9);
-  --ds-chip-muted-bg: rgba(238, 236, 228, 0.88);
-  --ds-chip-hover: rgba(255, 255, 255, 0.98);
-  --ds-chip-border: rgba(90, 74, 58, 0.14);
-  --ds-chip-active:
-    linear-gradient(180deg, rgba(243, 238, 226, 0.98), rgba(215, 204, 183, 0.94));
-  --ds-kbd-bg: rgba(245, 244, 239, 0.88);
-  --ds-code-bg: rgba(238, 237, 229, 0.96);
-  --ds-inline-code-bg: rgba(238, 236, 228, 0.92);
-  --ds-inline-code-hover-bg: rgba(235, 233, 223, 0.98);
-  --ds-pre-bg: rgba(238, 237, 229, 0.96);
-  --ds-code-block-bg: #eeede5;
-  --ds-table-head-bg: rgba(238, 237, 229, 0.96);
-  --ds-scrollbar-thumb: rgba(90, 74, 58, 0.22);
-  --ds-scrollbar-thumb-hover: rgba(90, 74, 58, 0.32);
-  --ds-shadow-card-soft: 0 10px 28px rgba(90, 74, 58, 0.06);
-  --ds-shadow-card-strong: 0 14px 36px rgba(90, 74, 58, 0.09);
-  --ds-shadow-chip: inset 0 1px 0 rgba(255, 255, 255, 0.78);
-}
-
-[data-retroma-mode='on']:not([data-theme='dark']) body::before {
-  background: linear-gradient(180deg, #faf9f6 0%, #f5f4ef 100%);
-}
-
-[data-retroma-mode='on']:not([data-theme='dark']) body::after {
-  background:
-    radial-gradient(circle at 78% -10%, rgba(15, 120, 135, 0.1), transparent 40%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 22%),
-    linear-gradient(120deg, rgba(110, 58, 102, 0.06), transparent 34%, rgba(255, 252, 243, 0.14) 74%, transparent);
-  opacity: 0.7;
-}
 
 /* iKun 夜场球馆:暖炭底 + 金黄高亮,同时覆盖全局 dark 与 workbench-shell 两层 token */
-[data-theme='dark'][data-ikun-mode='on'],
-[data-theme='dark'][data-ikun-mode='on'] .ds-workbench-shell {
-  --bg-app: #16110d;
-  --bg-sidebar: #1a1410;
-  --bg-canvas: #201913;
-  --surface-1: rgba(34, 27, 20, 0.92);
-  --surface-2: #271f17;
-  --surface-3: #2f261c;
-  --border-soft: rgba(238, 198, 128, 0.14);
-  --border-strong: rgba(238, 198, 128, 0.22);
-  --text-primary: #f9f3e5;
-  --text-secondary: #d9c9ab;
-  --text-tertiary: #ad9978;
-  --text-placeholder: #998666;
-
-  --ds-surface-subtle: #271f17;
-  --ds-surface-hover: rgba(238, 198, 128, 0.1);
-  --ds-border-muted: rgba(238, 198, 128, 0.1);
-  --ds-bubble-user: rgba(250, 204, 21, 0.12);
-  --ds-bubble-user-fg: #f9f3e5;
-  --ds-accent: #f2b13d;
-  --ds-accent-soft: rgba(242, 177, 61, 0.18);
-  --ds-warning-soft: rgba(242, 177, 61, 0.18);
-  --ds-shadow-shell: 0 38px 96px rgba(12, 7, 2, 0.55);
-  --ds-shadow-panel: 0 22px 58px rgba(12, 7, 2, 0.35);
-  --ds-shadow-composer: 0 28px 78px rgba(12, 7, 2, 0.45),
-    0 0 0 1px rgba(238, 198, 128, 0.07);
-  --ds-stage-gradient:
-    linear-gradient(180deg, #2a2014 0%, #201913 48%, #16110d 100%);
-  --ds-topbar-bg:
-    linear-gradient(180deg, rgba(39, 31, 23, 0.86) 0%, rgba(32, 25, 19, 0.7) 58%, rgba(22, 17, 13, 0.42) 100%);
-  --ds-topbar-shadow:
-    0 18px 44px rgba(12, 7, 2, 0.24),
-    inset 0 1px 0 rgba(238, 198, 128, 0.08);
-  --ds-sidebar-gradient:
-    linear-gradient(180deg, rgba(36, 28, 21, 0.96) 0%, rgba(29, 23, 17, 0.94) 48%, rgba(21, 16, 12, 0.96) 100%);
-  --ds-sidebar-haze:
-    radial-gradient(circle at 58% -12%, rgba(242, 177, 61, 0.13), transparent 36%),
-    linear-gradient(180deg, rgba(238, 198, 128, 0.05), rgba(238, 198, 128, 0) 28%);
-  --ds-sidebar-border: rgba(238, 198, 128, 0.12);
-  --ds-sidebar-shadow:
-    0 24px 64px rgba(12, 7, 2, 0.42),
-    0 4px 18px rgba(12, 7, 2, 0.28);
-  --ds-sidebar-row-hover: rgba(238, 198, 128, 0.09);
-  --ds-sidebar-row-active: rgba(238, 198, 128, 0.13);
-  --ds-sidebar-row-ring: rgba(238, 198, 128, 0.1);
-  --ds-sidebar-field-bg: rgba(238, 198, 128, 0.06);
-  --ds-sidebar-field-focus: rgba(238, 198, 128, 0.1);
-  --ds-sidebar-divider: rgba(238, 198, 128, 0.12);
-  --ds-card-soft:
-    linear-gradient(180deg, rgba(39, 31, 23, 0.94), rgba(31, 24, 18, 0.9));
-  --ds-card-strong:
-    linear-gradient(180deg, rgba(47, 38, 28, 0.98), rgba(35, 27, 20, 0.96));
-  --ds-card-muted: rgba(39, 31, 23, 0.86);
-  --ds-card-ghost: rgba(22, 17, 13, 0.72);
-  --ds-card-hover:
-    linear-gradient(180deg, rgba(57, 46, 33, 0.98), rgba(42, 33, 24, 0.96));
-  --ds-chip-bg: rgba(39, 31, 23, 0.94);
-  --ds-chip-muted-bg: #271f17;
-  --ds-chip-hover: rgba(51, 41, 30, 0.98);
-  --ds-chip-border: rgba(238, 198, 128, 0.13);
-  --ds-chip-active:
-    linear-gradient(180deg, rgba(242, 177, 61, 0.2), rgba(242, 177, 61, 0.11));
-  --ds-kbd-bg: rgba(39, 31, 23, 0.94);
-  --ds-code-bg: #271f17;
-  --ds-inline-code-bg: rgba(238, 198, 128, 0.09);
-  --ds-inline-code-hover-bg: rgba(242, 177, 61, 0.2);
-  --ds-pre-bg: #1e1812;
-  --ds-code-block-bg: #15110d;
-  --ds-table-head-bg: rgba(39, 31, 23, 0.94);
-  --ds-scrollbar-thumb: rgba(214, 188, 142, 0.28);
-  --ds-scrollbar-thumb-hover: rgba(233, 208, 162, 0.38);
-  --ds-selection: rgba(242, 177, 61, 0.26);
-  --ds-shadow-card-soft: 0 16px 42px rgba(12, 7, 2, 0.22);
-  --ds-shadow-card-strong: 0 22px 56px rgba(12, 7, 2, 0.3);
-  --ds-shadow-chip: inset 0 1px 0 rgba(238, 198, 128, 0.06);
-}
-
-[data-theme='dark'][data-ikun-mode='on'] .ds-composer-shell::before {
-  background: linear-gradient(180deg, rgba(238, 198, 128, 0.05), transparent 42%);
-}
-
-[data-theme='dark'][data-ikun-mode='on'] .ds-composer-shell::after {
-  border-color: rgba(238, 198, 128, 0.11);
-}
-
-[data-theme='dark'][data-ikun-mode='on'] body::before {
-  background: linear-gradient(180deg, #16110d 0%, #201913 100%);
-}
-
-[data-theme='dark'][data-ikun-mode='on'] body::after {
-  background:
-    radial-gradient(circle at 76% -12%, rgba(242, 177, 61, 0.11), transparent 38%),
-    linear-gradient(180deg, rgba(238, 198, 128, 0.05), transparent 24%),
-    linear-gradient(120deg, rgba(238, 198, 128, 0.04), transparent 35%, rgba(238, 198, 128, 0.025) 72%, transparent);
-  opacity: 0.85;
-}
 
 html,
 body,
@@ -533,6 +264,36 @@ summary,
 [role='button'],
 [contenteditable='true'] {
   -webkit-app-region: no-drag;
+}
+
+/*
+ * 全局键盘焦点环兜底（WCAG 2.4.7）。用 :where() 保持 0 特异性，任何组件级
+ * focus-visible:ring / focus:ring 类都能覆盖它；仅在键盘导航（:focus-visible）
+ * 时出现，鼠标点击不显示。覆盖新增工作台等此前缺焦点样式的交互元素。
+ */
+:where(
+  a[href],
+  button,
+  input,
+  select,
+  textarea,
+  summary,
+  [role='button'],
+  [role='tab'],
+  [role='switch'],
+  [role='radio'],
+  [tabindex]:not([tabindex='-1'])
+):focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
+  border-radius: var(--ds-focus-radius, 8px);
+}
+
+/* 结果图/深色背景上的浮层按钮：改用白色焦点环 + 描边确保任意底色可见。 */
+:where([data-focus-ring='on-media']):focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.45);
 }
 
 html {
@@ -1783,117 +1544,7 @@ pre {
   user-select: none;
 }
 
-.ds-ikun-logo {
-  position: absolute;
-  inset: -1px;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  opacity: 0;
-  pointer-events: none;
-  transform: translate3d(0, 0.5px, 0) scale(0.94);
-  transform-origin: center;
-  visibility: hidden;
-}
-
-.ds-work-logo-md .ds-ikun-logo {
-  inset: -2px;
-}
-
-.ds-ikun-logo-shadow {
-  position: absolute;
-  right: 8%;
-  bottom: -1px;
-  left: 10%;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(249, 115, 22, 0.24);
-  filter: blur(2px);
-  opacity: 0.62;
-  transform: scaleX(0.76);
-}
-
-.ds-ikun-figure {
-  display: block;
-  grid-area: 1 / 1;
-  height: 17px;
-  width: 17px;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 4px rgba(249, 115, 22, 0.28));
-  backface-visibility: hidden;
-  transform-origin: 50% 100%;
-  pointer-events: none;
-  user-select: none;
-}
-
 /* 奔跑前倾绕脚底转,喝奶茶绕屁股慢摇 */
-.ds-ikun-logo-run .ds-ikun-figure {
-  transform-origin: 50% 92%;
-}
-
-.ds-ikun-logo-boba .ds-ikun-figure {
-  transform-origin: 50% 82%;
-}
-
-.ds-work-logo-sm .ds-ikun-figure {
-  height: 15px;
-  width: 15px;
-}
-
-.ds-work-logo-md .ds-ikun-figure {
-  height: 18px;
-  width: 18px;
-}
-
-[data-ikun-mode='on'] .ds-work-logo {
-  --work-logo-shadow-color: rgba(249, 115, 22, 0.22);
-  --work-logo-glow: rgba(249, 115, 22, 0.26);
-  --work-logo-echo-glow: rgba(245, 158, 11, 0.18);
-}
-
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-current,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-gust,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-swell,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-wave,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-breaker,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-ripple,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-wake,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-foam,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-crest,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-splash,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-spray,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-bubbles,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-echo,
-[data-ikun-mode='on'] .ds-work-logo .ds-work-logo-track {
-  animation: none !important;
-  opacity: 0 !important;
-  visibility: hidden;
-}
-
-[data-ikun-mode='on'] .ds-work-logo .ds-ikun-logo {
-  opacity: 1;
-  visibility: visible;
-}
-
-[data-ikun-mode='on'] .ds-work-logo.is-active .ds-ikun-logo {
-  animation: ds-ikun-logo-bounce var(--work-logo-duration) ease-in-out infinite;
-}
-
-[data-ikun-mode='on'] .ds-work-logo.is-active .ds-ikun-logo-dribble .ds-ikun-figure {
-  animation: ds-ikun-dribble var(--work-logo-duration) cubic-bezier(0.34, 0, 0.36, 1) infinite;
-}
-
-[data-ikun-mode='on'] .ds-work-logo.is-active .ds-ikun-logo-run .ds-ikun-figure {
-  animation: ds-ikun-run calc(var(--work-logo-duration) * 0.42) cubic-bezier(0.4, 0, 0.3, 1) infinite;
-}
-
-[data-ikun-mode='on'] .ds-work-logo.is-active .ds-ikun-logo-run .ds-ikun-logo-shadow {
-  animation: ds-ikun-shadow-drift var(--work-logo-duration) cubic-bezier(0.42, 0, 0.2, 1) infinite;
-}
-
-[data-ikun-mode='on'] .ds-work-logo.is-active .ds-ikun-logo-boba .ds-ikun-figure {
-  animation: ds-ikun-boba calc(var(--work-logo-duration) * 0.9) ease-in-out infinite;
-}
 
 .ds-work-logo.is-active .ds-work-logo-current {
   animation: ds-work-logo-current var(--work-logo-duration) ease-in-out infinite;
@@ -1998,91 +1649,9 @@ pre {
   will-change: opacity, transform;
 }
 
-@keyframes ds-ikun-logo-bounce {
-  0%,
-  100% {
-    transform: translate3d(0, 0.5px, 0) scale(0.94);
-  }
-
-  36% {
-    transform: translate3d(-1.3px, -2px, 0) scale(1);
-  }
-
-  64% {
-    transform: translate3d(1.2px, 0.2px, 0) scale(0.97);
-  }
-}
-
-@keyframes ds-ikun-dribble {
-  0%,
-  100% {
-    transform: translate3d(0, 0.8px, 0) scale(1.08, 0.9);
-  }
-
-  16% {
-    transform: translate3d(0, -0.6px, 0) scale(0.97, 1.05);
-  }
-
-  42% {
-    transform: translate3d(0, -2.6px, 0) scale(0.99, 1.02) rotate(-3deg);
-  }
-
-  68% {
-    transform: translate3d(0, -1px, 0) scale(0.98, 1.03) rotate(2deg);
-  }
-
-  88% {
-    transform: translate3d(0, 0.6px, 0) scale(1.02, 0.99);
-  }
-}
-
 /* 快攻:小碎步颠跑,前倾,落地压缩 */
-@keyframes ds-ikun-run {
-  0%,
-  100% {
-    transform: translate3d(-0.6px, 0.4px, 0) rotate(-4deg) scale(1.04, 0.95);
-  }
-  28% {
-    transform: translate3d(0.2px, -2.4px, 0) rotate(-7deg) scale(0.97, 1.05);
-  }
-  52% {
-    transform: translate3d(0.8px, -0.6px, 0) rotate(-3deg) scale(1.01, 1);
-  }
-  76% {
-    transform: translate3d(0.2px, -1.8px, 0) rotate(-6deg) scale(0.98, 1.03);
-  }
-}
-
-@keyframes ds-ikun-shadow-drift {
-  0%,
-  100% {
-    transform: translateX(-1.4px) scaleX(0.72);
-  }
-
-  48% {
-    transform: translateX(1.5px) scaleX(0.62);
-  }
-}
 
 /* 喝奶茶:惬意慢摇,中途仰头嘬一口 */
-@keyframes ds-ikun-boba {
-  0%,
-  100% {
-    transform: rotate(-3deg) translate3d(-0.4px, 0.2px, 0);
-  }
-  30% {
-    transform: rotate(2.4deg) translate3d(0.4px, 0, 0);
-  }
-  52% {
-    transform: rotate(-1deg) translate3d(0, -0.8px, 0) scale(1.02, 1.03);
-  }
-  64% {
-    transform: rotate(-4.6deg) translate3d(-0.3px, -1px, 0) scale(1.03, 1.04);
-  }
-  82% {
-    transform: rotate(1.6deg) translate3d(0.3px, 0.1px, 0);
-  }
-}
 
 @keyframes ds-shiny-text {
   to {
@@ -2606,9 +2175,6 @@ pre {
   .ds-work-logo-track,
   .ds-work-logo-body,
   .ds-work-logo-image,
-  .ds-ikun-logo,
-  .ds-ikun-logo-shadow,
-  .ds-ikun-figure,
   .sdd-draft-shell,
   .sdd-draft-topbar,
   .sdd-editor-card,
@@ -2649,9 +2215,6 @@ pre {
   .ds-work-logo-track,
   .ds-work-logo-body,
   .ds-work-logo-image,
-  .ds-ikun-logo,
-  .ds-ikun-logo-shadow,
-  .ds-ikun-figure,
   .sdd-draft-topbar,
   .sdd-editor-card,
   .sdd-status-pill,
@@ -4058,87 +3621,11 @@ pre {
 }
 
 /* iKun 模式下静态场景换成 iKun 形象,姿态语义沿用:greet 蹦跳 / sleep 打盹 / sit 慢摇 */
-.ds-kun-state .ds-ikun-state-figure {
-  position: absolute;
-  inset: 0;
-  display: block;
-  height: 100%;
-  width: 100%;
-  object-fit: contain;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  user-select: none;
-}
-
-[data-ikun-mode='on'] .ds-kun-state .ds-kun-state-figure {
-  animation: none;
-  opacity: 0;
-  visibility: hidden;
-}
-
-[data-ikun-mode='on'] .ds-kun-state .ds-ikun-state-figure {
-  opacity: 1;
-  visibility: visible;
-  filter: drop-shadow(0 3px 6px rgba(216, 115, 13, 0.24));
-}
-
-[data-ikun-mode='on'] .ds-kun-state-greet .ds-ikun-state-figure {
-  animation: ds-ikun-state-hop 2.6s ease-in-out infinite;
-  transform-origin: 50% 100%;
-}
-
-[data-ikun-mode='on'] .ds-kun-state-sleep .ds-ikun-state-figure {
-  animation: ds-ikun-state-doze 3.6s ease-in-out infinite;
-  transform-origin: 50% 100%;
-}
-
-[data-ikun-mode='on'] .ds-kun-state-sit .ds-ikun-state-figure {
-  animation: ds-ikun-state-sway 4.2s ease-in-out infinite;
-  transform-origin: 50% 86%;
-}
 
 /* 蹦一下打招呼,歇半拍再蹦 */
-@keyframes ds-ikun-state-hop {
-  0%,
-  48%,
-  100% {
-    transform: translateY(0) scale(1, 1);
-  }
-  10% {
-    transform: translateY(0.6px) scale(1.05, 0.94);
-  }
-  22% {
-    transform: translateY(-3.2px) scale(0.98, 1.04) rotate(-3deg);
-  }
-  34% {
-    transform: translateY(0) scale(1.01, 0.99) rotate(2deg);
-  }
-}
-
-@keyframes ds-ikun-state-doze {
-  0%,
-  100% {
-    transform: rotate(-2deg) scale(1, 1);
-  }
-  50% {
-    transform: rotate(-3.4deg) scale(1.02, 1.05) translateY(-0.4px);
-  }
-}
-
-@keyframes ds-ikun-state-sway {
-  0%,
-  100% {
-    transform: rotate(-2deg);
-  }
-  50% {
-    transform: rotate(2deg);
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
-  .ds-kun-state .ds-kun-state-figure,
-  .ds-kun-state .ds-ikun-state-figure {
+  .ds-kun-state .ds-kun-state-figure{
     animation: none;
   }
 
@@ -4155,497 +3642,30 @@ pre {
 }
 
 /* 侧边栏角落吉祥物:换姿态时弹性入场 */
-.ds-sidebar-mascot {
-  height: 46px;
-  width: 56px;
-  opacity: 0.92;
-  animation: ds-kun-mascot-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes ds-kun-mascot-pop {
-  0% {
-    opacity: 0;
-    transform: translateY(5px) scale(0.7);
-  }
-  100% {
-    opacity: 0.92;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ds-sidebar-mascot {
-    animation: none;
-  }
-}
 
 /* ---------- iKun 出没:主会话两侧不定时冒出的坤鸡彩蛋(指针穿透) ---------- */
 
-.ds-ikun-cameo-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.ds-ikun-cameo {
-  position: absolute;
-  opacity: 0;
-  line-height: 0;
-  will-change: transform, opacity;
-}
-
-.ds-ikun-cameo-flip {
-  display: block;
-  height: 100%;
-}
-
-.ds-ikun-cameo .ds-ikun-cameo-figure {
-  display: block;
-  height: 100%;
-  width: auto;
-  object-fit: contain;
-  filter: drop-shadow(0 4px 10px rgba(249, 115, 22, 0.18));
-  pointer-events: none;
-  user-select: none;
-}
-
 /* 快攻横穿:沿底边跑过整个会话区;素材朝左,向右跑时整体镜像 */
-.ds-ikun-cameo-dash {
-  right: -90px;
-  bottom: 4px;
-  height: 52px;
-  --cameo-cross: calc(-100vw - 220px);
-  animation: ds-ikun-cameo-cross 5.2s linear forwards;
-}
-
-.ds-ikun-cameo-dash.is-left {
-  right: auto;
-  left: -90px;
-  --cameo-cross: calc(100vw + 220px);
-}
-
-.ds-ikun-cameo-dash.is-left .ds-ikun-cameo-flip {
-  transform: scaleX(-1);
-}
-
-.ds-ikun-cameo-dash .ds-ikun-cameo-figure {
-  animation: ds-ikun-cameo-gallop 0.42s ease-in-out infinite;
-  transform-origin: 50% 92%;
-}
 
 /* 对穿组合:第二只小一号,晚一拍从对面跑来 */
-.ds-ikun-cameo-dash.is-second {
-  bottom: 2px;
-  height: 40px;
-  animation-delay: 1.2s;
-}
 
 /* 探头偷看:从侧边探出半个身子挥手 */
-.ds-ikun-cameo-peek {
-  bottom: 22%;
-  left: -36px;
-  height: 64px;
-  --cameo-peek-shift: 32px;
-  animation: ds-ikun-cameo-peek 6.2s ease-in-out forwards;
-}
-
-.ds-ikun-cameo-peek.is-right {
-  right: -36px;
-  left: auto;
-  --cameo-peek-shift: -32px;
-}
-
-.ds-ikun-cameo-peek.is-right .ds-ikun-cameo-flip {
-  transform: scaleX(-1);
-}
-
-.ds-ikun-cameo-peek .ds-ikun-cameo-figure {
-  animation: ds-ikun-cameo-wiggle 1.3s ease-in-out infinite;
-  transform-origin: 50% 88%;
-}
 
 /* 奶茶歇脚:角落升起来坐一会儿 */
-.ds-ikun-cameo-boba {
-  bottom: 6px;
-  height: 64px;
-  animation: ds-ikun-cameo-rise 7.2s ease-in-out forwards;
-}
-
-.ds-ikun-cameo-boba.is-left {
-  left: 16px;
-}
-
-.ds-ikun-cameo-boba.is-right {
-  right: 16px;
-}
-
-.ds-ikun-cameo-boba .ds-ikun-cameo-figure {
-  animation: ds-ikun-cameo-sip 2.2s ease-in-out infinite;
-  transform-origin: 50% 90%;
-}
 
 /* 打盹:角落淡入睡一觉再溜走 */
-.ds-ikun-cameo-nap {
-  bottom: 6px;
-  height: 58px;
-  animation: ds-ikun-cameo-doze 8.2s ease-in-out forwards;
-}
-
-.ds-ikun-cameo-nap.is-left {
-  left: 18px;
-}
-
-.ds-ikun-cameo-nap.is-right {
-  right: 18px;
-}
-
-.ds-ikun-cameo-nap .ds-ikun-cameo-figure {
-  animation: ds-ikun-cameo-breathe 3s ease-in-out infinite;
-  transform-origin: 50% 100%;
-}
-
-@keyframes ds-ikun-cameo-cross {
-  0% {
-    opacity: 0;
-    transform: translateX(0);
-  }
-  5%,
-  92% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(var(--cameo-cross));
-  }
-}
-
-@keyframes ds-ikun-cameo-gallop {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-3deg) scale(1.03, 0.96);
-  }
-  45% {
-    transform: translateY(-7px) rotate(-6deg) scale(0.97, 1.05);
-  }
-}
-
-@keyframes ds-ikun-cameo-peek {
-  0% {
-    opacity: 0;
-    transform: translateX(0) rotate(9deg);
-  }
-  12%,
-  82% {
-    opacity: 1;
-    transform: translateX(var(--cameo-peek-shift)) rotate(0deg);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(0) rotate(10deg);
-  }
-}
-
-@keyframes ds-ikun-cameo-wiggle {
-  0%,
-  100% {
-    transform: rotate(-4deg);
-  }
-  50% {
-    transform: rotate(5deg);
-  }
-}
-
-@keyframes ds-ikun-cameo-rise {
-  0% {
-    opacity: 0;
-    transform: translateY(115%);
-  }
-  10%,
-  88% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(115%);
-  }
-}
-
-@keyframes ds-ikun-cameo-sip {
-  0%,
-  100% {
-    transform: rotate(-2deg);
-  }
-  40% {
-    transform: rotate(2.2deg);
-  }
-  62% {
-    transform: rotate(-3.4deg) translateY(-1.5px);
-  }
-}
-
-@keyframes ds-ikun-cameo-doze {
-  0% {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  10%,
-  86% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
-
-@keyframes ds-ikun-cameo-breathe {
-  0%,
-  100% {
-    transform: scale(1, 1);
-  }
-  50% {
-    transform: scale(1.02, 1.05);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ds-ikun-cameo,
-  .ds-ikun-cameo .ds-ikun-cameo-figure {
-    animation: none;
-    opacity: 0;
-  }
-}
 
 /* ---------- 任务完成庆祝:回合结束随机来一段(双形象,iKun 模式自动换坤鸡) ---------- */
 
-.ds-kun-celebration-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.ds-kun-celebration {
-  position: absolute;
-  opacity: 0;
-  line-height: 0;
-  will-change: transform, opacity;
-}
-
-.ds-kun-celebration-figure-wrap {
-  position: relative;
-  display: block;
-  height: 100%;
-}
-
-.ds-kun-celebration-figure {
-  display: block;
-  height: 100%;
-  width: auto;
-  object-fit: contain;
-  filter: drop-shadow(0 6px 14px rgba(59, 130, 216, 0.22));
-  pointer-events: none;
-  user-select: none;
-}
-
-.ds-kun-celebration-figure.is-ikun {
-  display: none;
-  filter: drop-shadow(0 6px 14px rgba(249, 115, 22, 0.22));
-}
-
-[data-ikun-mode='on'] .ds-kun-celebration-figure.is-kun {
-  display: none;
-}
-
-[data-ikun-mode='on'] .ds-kun-celebration-figure.is-ikun {
-  display: block;
-}
-
 /* 跃起欢呼:底部中央蹦出来,双跳挥手 */
-.ds-kun-celebration-cheer {
-  bottom: 10px;
-  left: 50%;
-  height: 84px;
-  animation: ds-kun-celebrate-cheer 3.2s ease-in-out forwards;
-}
 
 /* 胜利冲浪 / 快攻冲刺:贴底横穿,彩屑一路跟着 */
-.ds-kun-celebration-lap {
-  right: -110px;
-  bottom: 6px;
-  height: 62px;
-  animation: ds-kun-celebrate-lap 3.6s linear forwards;
-}
-
-.ds-kun-celebration-lap .ds-kun-celebration-figure {
-  animation: ds-ikun-cameo-gallop 0.5s ease-in-out infinite;
-  transform-origin: 50% 92%;
-}
 
 /* 举杯庆功:右下角升起,举着贝壳/奶茶碰两下杯 */
-.ds-kun-celebration-toast {
-  right: 18px;
-  bottom: 8px;
-  height: 74px;
-  transform-origin: 50% 100%;
-  animation: ds-kun-celebrate-toast 3.4s ease-in-out forwards;
-}
-
-@keyframes ds-kun-celebrate-cheer {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, 100%);
-  }
-  14% {
-    opacity: 1;
-    transform: translate(-50%, -16%);
-  }
-  26% {
-    transform: translate(-50%, 4%);
-  }
-  38% {
-    transform: translate(-50%, -12%);
-  }
-  50%,
-  84% {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, 104%);
-  }
-}
-
-@keyframes ds-kun-celebrate-lap {
-  0% {
-    opacity: 0;
-    transform: translateX(0);
-  }
-  6%,
-  92% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(calc(-100vw - 260px));
-  }
-}
-
-@keyframes ds-kun-celebrate-toast {
-  0% {
-    opacity: 0;
-    transform: translateY(112%) rotate(0deg);
-  }
-  12% {
-    opacity: 1;
-    transform: translateY(0) rotate(0deg);
-  }
-  26% {
-    transform: translateY(-4px) rotate(-6deg);
-  }
-  38% {
-    transform: translateY(0) rotate(0deg);
-  }
-  52% {
-    transform: translateY(-4px) rotate(-6deg);
-  }
-  66%,
-  86% {
-    opacity: 1;
-    transform: translateY(0) rotate(0deg);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(112%) rotate(2deg);
-  }
-}
 
 /* 彩屑:吉祥物色板,向上炸开后飘散 */
-.ds-kun-confetti {
-  position: absolute;
-  top: 6%;
-  left: 50%;
-  width: 0;
-  height: 0;
-}
-
-.ds-kun-confetti i {
-  position: absolute;
-  width: 6px;
-  height: 9px;
-  border-radius: 2px;
-  opacity: 0;
-  animation: ds-kun-confetti-burst 1.6s ease-out forwards;
-  animation-delay: 0.4s;
-}
-
-.ds-kun-confetti i:nth-child(5n + 1) { background: #6ca2dd; }
-.ds-kun-confetti i:nth-child(5n + 2) { background: #f47464; }
-.ds-kun-confetti i:nth-child(5n + 3) { background: #f0c46e; }
-.ds-kun-confetti i:nth-child(5n + 4) { background: #85c1f1; }
-.ds-kun-confetti i:nth-child(5n + 5) { background: #fff2db; }
-
-.ds-kun-confetti i:nth-child(1) { --cx: -64px; --cy: -58px; --cr: -190deg; }
-.ds-kun-confetti i:nth-child(2) { --cx: -42px; --cy: -86px; --cr: 160deg; }
-.ds-kun-confetti i:nth-child(3) { --cx: -20px; --cy: -64px; --cr: -120deg; animation-delay: 0.5s; }
-.ds-kun-confetti i:nth-child(4) { --cx: -8px; --cy: -96px; --cr: 200deg; }
-.ds-kun-confetti i:nth-child(5) { --cx: 10px; --cy: -70px; --cr: -160deg; animation-delay: 0.48s; }
-.ds-kun-confetti i:nth-child(6) { --cx: 24px; --cy: -92px; --cr: 140deg; }
-.ds-kun-confetti i:nth-child(7) { --cx: 40px; --cy: -60px; --cr: -210deg; animation-delay: 0.52s; }
-.ds-kun-confetti i:nth-child(8) { --cx: 58px; --cy: -84px; --cr: 180deg; }
-.ds-kun-confetti i:nth-child(9) { --cx: 72px; --cy: -52px; --cr: -140deg; animation-delay: 0.46s; }
-.ds-kun-confetti i:nth-child(10) { --cx: 0px; --cy: -110px; --cr: 220deg; animation-delay: 0.56s; }
-
-@keyframes ds-kun-confetti-burst {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) rotate(0deg) scale(0.5);
-  }
-  14% {
-    opacity: 1;
-  }
-  70% {
-    opacity: 0.9;
-  }
-  100% {
-    opacity: 0;
-    transform: translate(var(--cx), var(--cy)) rotate(var(--cr)) scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ds-kun-celebration,
-  .ds-kun-celebration .ds-kun-celebration-figure,
-  .ds-kun-confetti i {
-    animation: none;
-    opacity: 0;
-  }
-}
 
 /* iKun 模式开关上的坤鸡立绘:关闭时蹲灰度,打开点亮 */
-.ds-ikun-toggle-figure {
-  height: 16px;
-  width: 16px;
-  object-fit: contain;
-  filter: grayscale(1);
-  opacity: 0.6;
-  transition:
-    filter 0.25s ease,
-    opacity 0.25s ease,
-    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.ds-ikun-toggle-figure.is-on {
-  filter: none;
-  opacity: 1;
-  transform: scale(1.12);
-}
 
 [data-theme='dark'] .ds-runtime-wake-shell {
   background:
@@ -4668,68 +3688,6 @@ pre {
 }
 
 /* iKun 模式:hero 舞台的蓝绿点缀改为篮球橙 + 金黄 */
-[data-ikun-mode='on'] .ds-runtime-wake-shell {
-  background:
-    linear-gradient(180deg, rgba(255, 253, 246, 0.96), rgba(252, 246, 233, 0.9)),
-    linear-gradient(120deg, rgba(216, 115, 13, 0.08), transparent 42%, rgba(250, 204, 21, 0.12));
-  box-shadow:
-    0 24px 70px rgba(96, 64, 18, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85);
-}
-
-[data-ikun-mode='on'] .ds-runtime-wake-shell::before {
-  background: linear-gradient(
-    112deg,
-    transparent 0%,
-    transparent 34%,
-    rgba(216, 115, 13, 0.16) 45%,
-    rgba(242, 177, 61, 0.15) 53%,
-    transparent 66%,
-    transparent 100%
-  );
-}
-
-[data-ikun-mode='on'] .ds-runtime-wake-shell::after {
-  background-image:
-    linear-gradient(rgba(216, 115, 13, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(242, 177, 61, 0.1) 1px, transparent 1px);
-}
-
-[data-ikun-mode='on'] .ds-runtime-wake-core {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--ds-bg-canvas) 98%, transparent), color-mix(in srgb, var(--ds-bg-canvas) 84%, var(--ds-accent))),
-    linear-gradient(135deg, rgba(216, 115, 13, 0.18), rgba(250, 204, 21, 0.16));
-  box-shadow:
-    0 18px 46px rgba(216, 115, 13, 0.14),
-    0 8px 22px rgba(242, 177, 61, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78);
-}
-
-[data-ikun-mode='on'] .ds-runtime-wake-ring::before {
-  background: conic-gradient(
-    from 0deg,
-    transparent 0 25%,
-    rgba(216, 115, 13, 0.58) 36%,
-    rgba(242, 177, 61, 0.55) 52%,
-    transparent 68% 100%
-  );
-}
-
-[data-theme='dark'][data-ikun-mode='on'] .ds-runtime-wake-shell {
-  background:
-    linear-gradient(180deg, rgba(39, 31, 23, 0.94), rgba(30, 24, 18, 0.9)),
-    linear-gradient(120deg, rgba(242, 177, 61, 0.12), transparent 42%, rgba(250, 204, 21, 0.08));
-  box-shadow:
-    0 24px 70px rgba(12, 7, 2, 0.36),
-    inset 0 1px 0 rgba(238, 198, 128, 0.08);
-}
-
-[data-theme='dark'][data-ikun-mode='on'] .ds-runtime-wake-core {
-  box-shadow:
-    0 20px 54px rgba(242, 177, 61, 0.18),
-    0 8px 24px rgba(250, 204, 21, 0.1),
-    inset 0 1px 0 rgba(238, 198, 128, 0.09);
-}
 
 @keyframes ds-runtime-wake-sweep {
   0% {
@@ -4960,13 +3918,11 @@ pre {
   }
 }
 
-/* Focus mode removes decorative Kun / iKun mascots without hiding essential loading indicators. */
-[data-focus-mode='on'] .ds-ikun-cameo-layer,
-[data-focus-mode='on'] .ds-kun-celebration-layer,
+/* Focus mode removes decorative work figures without hiding essential loading indicators. */
+
 [data-focus-mode='on'] .ds-kun-state,
 [data-focus-mode='on'] .ds-runtime-wake-zzz,
 [data-focus-mode='on'] .ds-work-logo,
-[data-focus-mode='on'] .ds-work-logo-slot:has(.ds-work-logo),
-[data-focus-mode='on'] .ds-ikun-toggle-figure {
+[data-focus-mode='on'] .ds-work-logo-slot:has(.ds-work-logo){
   display: none !important;
 }

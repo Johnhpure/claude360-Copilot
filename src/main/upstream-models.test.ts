@@ -1,9 +1,6 @@
-import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { tmpdir } from 'node:os'
-import { mkdtempSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  buildClaude360ProviderProfiles,
   defaultClawSettings,
   defaultKeyboardShortcuts,
   defaultKunRuntimeSettings,
@@ -12,39 +9,43 @@ import {
   defaultWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
+  defaultClaude360Settings,
   type AppSettingsV1
 } from '../shared/app-settings'
-import { fetchUpstreamModelIds, readConfiguredKunModelIds } from './upstream-models'
+import { fetchUpstreamModelIds } from './upstream-models'
 
-function settings(dataDir: string, model = 'settings-model'): AppSettingsV1 {
+// Claude360 收口后，composer 模型列表只来自登录后自动生成的 `claude360:*`
+// provider profile 与 modelCache，不再回落到 Kun/DeepSeek 默认模型。
+function settings(options: { loggedIn?: boolean; runtimeModel?: string } = {}): AppSettingsV1 {
   const provider = defaultModelProviderSettings()
+  const claude360Providers = buildClaude360ProviderProfiles(
+    [
+      {
+        group: 'auto',
+        models: [
+          { id: 'claude-sonnet-4-6', supportsToolCalling: true },
+          { id: 'gpt-5-codex', supportsToolCalling: true }
+        ]
+      },
+      {
+        group: 'image-group',
+        models: [{ id: 'gpt-image-1', isImage: true }]
+      }
+    ],
+    { auto: 'sk-auto', 'image-group': 'sk-image' }
+  )
   return {
     version: 1,
     locale: 'en',
     theme: 'system',
     uiFontScale: 0.82,
     chatContentMaxWidthPx: 896,
-    provider: {
-      ...provider,
-      providers: [
-        ...provider.providers,
-        {
-          id: 'custom-provider',
-          name: 'Custom Provider',
-          apiKey: 'sk-custom',
-          baseUrl: 'https://custom.example/v1',
-          endpointFormat: 'responses',
-          models: ['custom-provider-model'],
-          modelProfiles: {}
-        }
-      ]
-    },
+    provider: { ...provider, providers: claude360Providers },
     agents: {
       kun: {
         ...defaultKunRuntimeSettings(),
-        dataDir,
-        model,
-        providerId: 'custom-provider'
+        model: options.runtimeModel ?? 'claude-sonnet-4-6',
+        providerId: 'claude360:auto'
       }
     },
     workspaceRoot: '/tmp/workspace',
@@ -59,194 +60,76 @@ function settings(dataDir: string, model = 'settings-model'): AppSettingsV1 {
     schedule: defaultScheduleSettings(),
     workflow: defaultWorkflowSettings(),
     terminal: defaultTerminalSettings(),
+    claude360: {
+      ...defaultClaude360Settings(),
+      loggedIn: options.loggedIn ?? true,
+      username: 'alice',
+      displayName: 'Alice',
+      modelCache: {
+        groups: ['auto', 'image-group'],
+        models: ['claude-sonnet-4-6', 'gpt-5-codex', 'gpt-image-1']
+      }
+    },
     guiUpdate: { channel: 'stable' },
     codePromptPrefix: '',
     disabledSkillIds: []
   }
 }
 
-describe('upstream model picker list', () => {
-  it('includes Kun config model profiles, aliases, and the configured agent model', async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), 'deepseek-gui-models-'))
-    await mkdir(dataDir, { recursive: true })
-    await writeFile(
-      join(dataDir, 'config.json'),
-      JSON.stringify({
-        contextCompaction: {
-          modelProfiles: {
-            'legacy-model': {}
-          }
-        },
-        models: {
-          profiles: {
-            'custom-model': {
-              aliases: ['vendor/custom-model']
-            }
-          }
-        }
-      }),
-      'utf8'
-    )
+describe('upstream model picker list (Claude360 source)', () => {
+  it('returns Claude360 groups and text models when logged in', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      const result = await fetchUpstreamModelIds(settings(), '')
 
-    const ids = await readConfiguredKunModelIds(settings(dataDir))
+      expect(result).toMatchObject({ ok: true })
+      if (result.ok) {
+        // Text models from the claude360 groups are present...
+        expect(result.modelIds).toContain('claude-sonnet-4-6')
+        expect(result.modelIds).toContain('gpt-5-codex')
+        // ...image-output models never enter the text composer picker...
+        expect(result.modelIds).not.toContain('gpt-image-1')
+        // ...and there is no DeepSeek/Kun default fallback.
+        expect(result.modelIds).not.toContain('deepseek-v4-pro')
+        expect(result.modelIds).not.toContain('deepseek-v4-flash')
+        expect(result.modelIds).not.toContain('auto')
 
-    expect(ids).toEqual(expect.arrayContaining([
-      'deepseek-v4-pro',
-      'deepseek-v4-flash',
-      'settings-model',
-      'legacy-model',
-      'custom-model',
-      'vendor/custom-model'
-    ]))
-    expect(ids).not.toContain('auto')
+        const autoGroup = result.modelGroups?.find((group) => group.providerId === 'claude360-auto')
+        expect(autoGroup?.label).toBe('auto')
+        expect(autoGroup?.modelIds).toEqual(expect.arrayContaining(['claude-sonnet-4-6', 'gpt-5-codex']))
+        expect(autoGroup?.modelIds).not.toContain('gpt-image-1')
+        // The image-only group has no text models, so it is not offered.
+        expect(result.modelGroups?.some((group) => group.providerId === 'claude360-image-group')).toBe(false)
+      }
+      // The picker never queries the upstream /v1/models catalog.
+      expect(fetchMock).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
-  it('falls back to configured model ids when upstream cannot be queried', async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), 'deepseek-gui-models-'))
-    await mkdir(dataDir, { recursive: true })
-    await writeFile(
-      join(dataDir, 'config.json'),
-      JSON.stringify({
-        models: {
-          profiles: {
-            'deepseek-v4-flash': {
-              aliases: ['deepseek-chat', 'deepseek-reasoner']
-            }
-          }
-        }
-      }),
-      'utf8'
-    )
-    const result = await fetchUpstreamModelIds(settings(dataDir, 'local-only-model'), '')
-
+  it('uses the runtime model as defaultModelId when it is a known Claude360 text model', async () => {
+    const result = await fetchUpstreamModelIds(settings({ runtimeModel: 'gpt-5-codex' }), '')
     expect(result).toMatchObject({ ok: true })
     if (result.ok) {
-      expect(result.modelIds).toContain('local-only-model')
-      expect(result.modelIds).toContain('custom-provider-model')
-      expect(result.modelIds).toContain('deepseek-chat')
-      expect(result.modelIds).not.toContain('auto')
-      expect(result.defaultModelId).toBe('local-only-model')
-      expect(result.modelGroups).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          providerId: 'custom-provider',
-          label: 'Custom Provider',
-          modelIds: expect.arrayContaining(['custom-provider-model'])
-        }),
-        expect.objectContaining({
-          providerId: 'deepseek',
-          label: 'DeepSeek',
-          modelIds: expect.arrayContaining(['deepseek-v4-flash'])
-        })
-      ]))
-      const deepseekGroup = result.modelGroups?.find((group) => group.providerId === 'deepseek')
-      expect(deepseekGroup?.modelIds).not.toContain('deepseek-chat')
-      expect(deepseekGroup?.modelIds).not.toContain('deepseek-reasoner')
+      expect(result.defaultModelId).toBe('gpt-5-codex')
     }
   })
 
-  it('never queries the upstream /v1/models catalog for the composer picker (issue #337)', async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), 'deepseek-gui-models-'))
-    await mkdir(dataDir, { recursive: true })
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify({
-        data: [{ id: 'upstream-only-model' }, { id: 'another-upstream-model' }]
-      })
-    })
-    vi.stubGlobal('fetch', fetchMock)
-
-    try {
-      const result = await fetchUpstreamModelIds(settings(dataDir), 'sk-custom')
-
-      expect(result).toMatchObject({ ok: true })
-      if (result.ok) {
-        // The configured provider models are present...
-        expect(result.modelIds).toContain('custom-provider-model')
-        // ...but the upstream catalog is never pulled in, so a preset
-        // provider's full model list no longer floods the picker.
-        expect(result.modelIds).not.toContain('upstream-only-model')
-        expect(result.modelIds).not.toContain('another-upstream-model')
-        expect(result.modelIds).not.toContain('auto')
-        const customGroup = result.modelGroups?.find((group) => group.providerId === 'custom-provider')
-        expect(customGroup?.modelIds).toEqual(['custom-provider-model'])
-      }
-      expect(fetchMock).not.toHaveBeenCalled()
-    } finally {
-      vi.unstubAllGlobals()
+  it('falls back to the first cached text model when the runtime model is unknown', async () => {
+    const result = await fetchUpstreamModelIds(settings({ runtimeModel: 'no-such-model' }), '')
+    expect(result).toMatchObject({ ok: true })
+    if (result.ok) {
+      expect(result.defaultModelId).toBe('claude-sonnet-4-6')
     }
   })
 
-  it('uses configured model ids without fetching models for custom full endpoint providers', async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), 'deepseek-gui-models-'))
-    await mkdir(dataDir, { recursive: true })
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
-    const customSettings = settings(dataDir, 'custom-provider-model')
-    customSettings.provider.providers = customSettings.provider.providers.map((provider) =>
-      provider.id === 'custom-provider'
-        ? { ...provider, baseUrl: 'https://gateway.example/custom-path', endpointFormat: 'custom_endpoint' }
-        : provider
-    )
-
-    try {
-      const result = await fetchUpstreamModelIds(customSettings, 'sk-custom')
-
-      expect(result).toMatchObject({ ok: true })
-      if (result.ok) {
-        expect(result.modelIds).toContain('custom-provider-model')
-        expect(result.defaultModelId).toBe('custom-provider-model')
-      }
-      expect(fetchMock).not.toHaveBeenCalled()
-    } finally {
-      vi.unstubAllGlobals()
-    }
-  })
-
-  it('excludes configured non-text (image-output) models from the composer picker', async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), 'deepseek-gui-models-'))
-    await mkdir(dataDir, { recursive: true })
-    const base = settings(dataDir)
-    const imageCapableSettings: AppSettingsV1 = {
-      ...base,
-      provider: {
-        ...base.provider,
-        providers: base.provider.providers.map((provider) =>
-          provider.id === 'custom-provider'
-            ? {
-                ...provider,
-                models: [...provider.models, 'banana-canvas'],
-                modelProfiles: {
-                  'banana-canvas': {
-                    inputModalities: ['text'],
-                    outputModalities: ['image'],
-                    supportsToolCalling: false,
-                    messageParts: ['text']
-                  }
-                }
-              }
-            : provider
-        )
-      }
-    }
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
-
-    try {
-      const result = await fetchUpstreamModelIds(imageCapableSettings, 'sk-custom')
-
-      expect(result).toMatchObject({ ok: true })
-      if (result.ok) {
-        const customGroup = result.modelGroups?.find((group) => group.providerId === 'custom-provider')
-        expect(customGroup?.modelIds).toContain('custom-provider-model')
-        // An image-output model added to a provider stays out of the text
-        // composer picker, whether in the flat list or the provider submenu.
-        expect(customGroup?.modelIds).not.toContain('banana-canvas')
-        expect(result.modelIds).not.toContain('banana-canvas')
-      }
-      expect(fetchMock).not.toHaveBeenCalled()
-    } finally {
-      vi.unstubAllGlobals()
+  it('returns an explicit error and no fallback models when Claude360 is not logged in', async () => {
+    const result = await fetchUpstreamModelIds(settings({ loggedIn: false }), '')
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toBeTruthy()
     }
   })
 })

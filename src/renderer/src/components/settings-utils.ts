@@ -15,6 +15,8 @@ import {
   mergeWorkflowSettings,
   mergeWriteSettings,
   mergeTerminalSettings,
+  mergeClaude360Settings,
+  normalizeClaude360Settings,
   normalizeAppBehaviorSettings,
   normalizeClawSettings,
   normalizeCheckpointCleanupSettings,
@@ -85,6 +87,7 @@ export function mergeSettings(current: AppSettingsV1, patch: SettingsPatch): App
     schedule: mergeScheduleSettings(safeCurrent.schedule, patch.schedule),
     workflow: mergeWorkflowSettings(safeCurrent.workflow, patch.workflow),
     terminal: mergeTerminalSettings(safeCurrent.terminal, patch.terminal),
+    claude360: mergeClaude360Settings(safeCurrent.claude360, patch.claude360),
     guiUpdate: {
       ...safeCurrent.guiUpdate,
       ...(patch.guiUpdate ?? {})
@@ -132,6 +135,7 @@ export function coerceRendererSettings(settings: AppSettingsV1): AppSettingsV1 {
     schedule: normalizeScheduleSettings(raw.schedule),
     workflow: normalizeWorkflowSettings(raw.workflow),
     terminal: normalizeTerminalSettings(raw.terminal),
+    claude360: normalizeClaude360Settings(settings.claude360),
     guiUpdate: {
       channel: normalizeGuiUpdateChannel(raw.guiUpdate?.channel ?? DEFAULT_GUI_UPDATE_CHANNEL)
     },

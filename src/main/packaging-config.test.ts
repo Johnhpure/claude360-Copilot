@@ -95,7 +95,28 @@ afterEach(() => {
   }
 })
 
-describe('electron-builder Kun packaging', () => {
+describe('electron-builder Claude360 Copilot packaging', () => {
+  it('uses the Claude360 Copilot brand identity across builder config', () => {
+    // 品牌基础断言:productName / appId / 产物名 / NSIS 快捷方式与卸载名。
+    // appId 已按 Claude360 决策换新(视为新应用),不再沿用旧 deepseekgui id。
+    expect(builderConfig.productName).toBe('Claude360 Copilot')
+    expect(builderConfig.appId).toBe('xyz.claude360.copilot')
+    expect(builderConfig.artifactName.startsWith('Claude360-Copilot-')).toBe(true)
+    expect(builderConfig.nsis.shortcutName).toBe('Claude360 Copilot')
+    expect(builderConfig.nsis.uninstallDisplayName).toBe('Claude360 Copilot')
+    // macOS 麦克风等 usage 文案不应再出现旧品牌 Kun。
+    const micUsage = builderConfig.mac.extendInfo.NSMicrophoneUsageDescription
+    expect(micUsage).not.toMatch(/Kun/)
+    expect(micUsage).toMatch(/Claude360 Copilot/)
+  })
+
+  it('points every platform icon at the Claude360 assets', () => {
+    // 图标引用改指向 claude360 命名资源(当前为占位副本,待后续替换真实设计)。
+    expect(builderConfig.win.icon).toBe('./build/icon-claude360.ico')
+    expect(builderConfig.mac.icon).toBe('./src/asset/img/claude360_mac.png')
+    expect(builderConfig.linux.icon).toBe('./src/asset/img/claude360.png')
+  })
+
   it('includes Kun runtime dependencies in the packaged app', () => {
     expect(builderConfig.files).toEqual(expect.arrayContaining([
       'kun/dist/**/*',
@@ -153,12 +174,12 @@ describe('electron-builder Kun packaging', () => {
     })
   })
 
-  it('uses the rounded Kun icon for Windows installers and shortcuts', () => {
+  it('uses the rounded Claude360 icon for Windows installers and shortcuts', () => {
     // Windows ships a multi-size .ico (16/24/32/48/64/72/96/128/256) generated
-    // from the rounded kun_mac.png so Explorer/desktop render crisp small icons
-    // instead of downscaling a single 1024px PNG (#222). The .ico still carries
-    // the rounded Kun artwork — it is derived from kun_mac.png.
-    expect(builderConfig.win.icon).toBe('./build/icon.ico')
+    // from the rounded claude360_mac.png so Explorer/desktop render crisp small
+    // icons instead of downscaling a single 1024px PNG (#222). 当前为占位副本,
+    // 待后续替换真实设计资源。
+    expect(builderConfig.win.icon).toBe('./build/icon-claude360.ico')
   })
 
   it('uses a process-tree shutdown guard for Windows overwrite installs', () => {

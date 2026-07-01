@@ -5,16 +5,20 @@ import {
   Clock3,
   FileQuestion,
   Focus,
+  Image,
   LayoutGrid,
   Moon,
+  Music,
   Plus,
   Settings,
   Smartphone,
   Sun,
+  User,
   Workflow
 } from 'lucide-react'
 import type { NormalizedThread } from '../../agent/types'
 import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
+import { isPrimaryRouteVisible } from '../../lib/feature-visibility'
 import type { SddDraft } from '../../sdd/sdd-draft-store'
 import type {
   ClawImChannelV1,
@@ -24,7 +28,6 @@ import {
 } from './SidebarClaw'
 import type { ClawImDialogMode } from './SidebarClawDialogHelpers'
 import { ClawAddImDialog } from './SidebarClawDialog'
-import { SidebarMascot } from './AnimatedWorkLogo'
 import { ConnectPhoneSidebarPanel } from './ConnectPhoneView'
 import { SidebarProjectsSection } from './SidebarProjectsSection'
 import { SidebarConversationsSection } from './SidebarConversationsSection'
@@ -57,6 +60,12 @@ type Props = {
   onOpenRequirementDraft: (draft: SddDraft) => void
   onOpenSettings: (section?: SettingsRouteSection) => void
   onOpenPlugins: () => void
+  onOpenMy: () => void
+  myActive: boolean
+  onOpenCanvas: () => void
+  onOpenMusic: () => void
+  canvasActive: boolean
+  musicActive: boolean
   onToggleTheme: () => void
   focusModeEnabled: boolean
   onFocusModeChange: (enabled: boolean) => void
@@ -90,6 +99,12 @@ export function Sidebar({
   onOpenRequirementDraft,
   onOpenSettings,
   onOpenPlugins,
+  onOpenMy,
+  myActive,
+  onOpenCanvas,
+  onOpenMusic,
+  canvasActive,
+  musicActive,
   onToggleTheme,
   focusModeEnabled,
   onFocusModeChange,
@@ -141,11 +156,6 @@ export function Sidebar({
       footer={
         <div className="space-y-1">
           <div className="flex min-h-[42px] items-center justify-center gap-2.5 pb-1">
-            {!focusModeEnabled ? (
-              <span className="flex h-[46px] w-[56px] shrink-0 items-center justify-center">
-                <SidebarMascot />
-              </span>
-            ) : null}
             <FocusModeToggle
               enabled={focusModeEnabled}
               onToggle={() => onFocusModeChange(!focusModeEnabled)}
@@ -155,11 +165,21 @@ export function Sidebar({
               ariaLabel={t('focusModeToggleLabel')}
             />
           </div>
+          {/* 隐藏≠删除:第一阶段不暴露连接手机(Claw)入口,保留 onToggleConnectPhone 与相关 props/handler。 */}
+          {isPrimaryRouteVisible('claw') ? (
+            <SidebarCommandRow
+              icon={<Smartphone className="h-4 w-4" strokeWidth={1.75} />}
+              label={t('claw')}
+              onClick={onToggleConnectPhone}
+              active={connectPhoneSidebarOpen}
+              variant="footer"
+            />
+          ) : null}
           <SidebarCommandRow
-            icon={<Smartphone className="h-4 w-4" strokeWidth={1.75} />}
-            label={t('claw')}
-            onClick={onToggleConnectPhone}
-            active={connectPhoneSidebarOpen}
+            icon={<User className="h-4 w-4" strokeWidth={1.75} />}
+            label={t('myPage')}
+            onClick={onOpenMy}
+            active={myActive}
             variant="footer"
           />
           <div className="flex items-center gap-1">
@@ -213,24 +233,49 @@ export function Sidebar({
             />
           </>
         ) : null}
-        <SidebarCommandRow
-          icon={<LayoutGrid className="h-4 w-4" strokeWidth={1.75} />}
-          label={t('plugins')}
-          onClick={onOpenPlugins}
-          active={pluginsActive}
-        />
-        <SidebarCommandRow
-          icon={<Clock3 className="h-4 w-4" strokeWidth={1.75} />}
-          label={t('schedule')}
-          onClick={onScheduleOpen}
-          active={activeView === 'schedule'}
-        />
-        <SidebarCommandRow
-          icon={<Workflow className="h-4 w-4" strokeWidth={1.75} />}
-          label={t('workflow')}
-          onClick={onWorkflowOpen}
-          active={activeView === 'workflow'}
-        />
+        {/* 第一阶段新增可见入口:生图(Canvas)/音乐(Music)。 */}
+        {isPrimaryRouteVisible('canvas') ? (
+          <SidebarCommandRow
+            icon={<Image className="h-4 w-4" strokeWidth={1.75} />}
+            label={t('canvas')}
+            onClick={onOpenCanvas}
+            active={canvasActive}
+          />
+        ) : null}
+        {isPrimaryRouteVisible('music') ? (
+          <SidebarCommandRow
+            icon={<Music className="h-4 w-4" strokeWidth={1.75} />}
+            label={t('music')}
+            onClick={onOpenMusic}
+            active={musicActive}
+          />
+        ) : null}
+        {/* 隐藏≠删除:第一阶段不暴露插件/定时任务/Workflow 入口,
+            但保留 onOpenPlugins/onScheduleOpen/onWorkflowOpen 等 handler 与 props。 */}
+        {isPrimaryRouteVisible('plugins') ? (
+          <SidebarCommandRow
+            icon={<LayoutGrid className="h-4 w-4" strokeWidth={1.75} />}
+            label={t('plugins')}
+            onClick={onOpenPlugins}
+            active={pluginsActive}
+          />
+        ) : null}
+        {isPrimaryRouteVisible('schedule') ? (
+          <SidebarCommandRow
+            icon={<Clock3 className="h-4 w-4" strokeWidth={1.75} />}
+            label={t('schedule')}
+            onClick={onScheduleOpen}
+            active={activeView === 'schedule'}
+          />
+        ) : null}
+        {isPrimaryRouteVisible('workflow') ? (
+          <SidebarCommandRow
+            icon={<Workflow className="h-4 w-4" strokeWidth={1.75} />}
+            label={t('workflow')}
+            onClick={onWorkflowOpen}
+            active={activeView === 'workflow'}
+          />
+        ) : null}
       </div>
 
       <div className="ds-no-drag mx-1 my-1" />

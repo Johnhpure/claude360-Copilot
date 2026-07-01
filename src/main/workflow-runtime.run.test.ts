@@ -8,6 +8,7 @@ import {
   defaultWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
+  defaultClaude360Settings,
   mergeWorkflowSettings,
   normalizeWorkflow,
   normalizeWorkflowSettings,
@@ -62,6 +63,7 @@ function settingsWithWorkflows(workflows: WorkflowV1[], modules: WorkflowCustomM
     schedule: defaultScheduleSettings(),
     workflow: normalizeWorkflowSettings({ enabled: true, workflows, modules }),
     terminal: defaultTerminalSettings(),
+    claude360: defaultClaude360Settings(),
     guiUpdate: { channel: 'stable' },
     codePromptPrefix: '',
     disabledSkillIds: []

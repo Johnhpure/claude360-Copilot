@@ -11,6 +11,7 @@ import {
   defaultWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
+  defaultClaude360Settings,
   type AppSettingsV1
 } from '../../shared/app-settings'
 import type { WriteInlineCompletionRequest } from '../../shared/write-inline-completion'
@@ -60,6 +61,7 @@ function createSettings(patch: Partial<AppSettingsV1['write']['inlineCompletion'
     schedule: defaultScheduleSettings(),
     workflow: defaultWorkflowSettings(),
     terminal: defaultTerminalSettings(),
+    claude360: defaultClaude360Settings(),
     guiUpdate: {
       channel: 'stable'
     },

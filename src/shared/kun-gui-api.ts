@@ -17,6 +17,37 @@ import type {
   WorkflowRuntimeStatus
 } from './app-settings'
 import type { EditorListResult, EditorOpenResult, OpenEditorPathOptions } from './editor'
+import type {
+  Claude360DeviceAuthPollResult,
+  Claude360DeviceAuthStartResult,
+  Claude360LoginResult,
+  Claude360LogoutResult,
+  Claude360Me,
+  Claude360PasswordLogin2FAPayload,
+  Claude360PasswordLoginPayload,
+  Claude360SessionResult,
+  Claude360SyncResult,
+  Claude360TokenListItem,
+  Claude360TokenPurpose,
+  Claude360TokenStat,
+  Claude360TopupOptions,
+  Claude360TopupOrder,
+  Claude360TopupOrderStatus
+} from './claude360'
+import type {
+  Claude360ModelCache,
+  Claude360TokenRef
+} from './app-settings-claude360'
+import type {
+  Claude360MusicFetchResult,
+  Claude360MusicSubmitPayload,
+  Claude360MusicSubmitResult
+} from './claude360-music'
+import type {
+  Claude360ImageEditPayload,
+  Claude360ImageGeneratePayload,
+  Claude360ImageResult
+} from './claude360-canvas'
 import type { GitBranchesResult, GitBranchWorktreesResult, GitWorktreeCheckoutResult } from './git-branches'
 import type { GitCheckpointCreateResult, GitCheckpointRestoreResult } from './git-checkpoint'
 import type {
@@ -84,11 +115,6 @@ import type {
   LocalWhisperModelProgress,
   LocalWhisperModelStatus
 } from './local-whisper'
-import type {
-  UiPluginListItem,
-  UiPluginManifestV1,
-  UiPluginRuntimeFigures
-} from './ui-plugin'
 import type {
   WriteRetrievalRequest,
   WriteRetrievalResult
@@ -172,14 +198,6 @@ export type SkillRootListItem = {
 export type SkillRootListResult =
   | { ok: true; roots: SkillRootListItem[] }
   | { ok: false; message: string }
-export type UiPluginListIpcResult = { plugins: UiPluginListItem[] }
-export type UiPluginInstallIpcResult =
-  | { canceled: true }
-  | { canceled: false; ok: true; plugin: UiPluginListItem }
-  | { canceled: false; ok: false; errors: string[] }
-export type UiPluginLoadIpcResult =
-  | { ok: true; manifest: UiPluginManifestV1; figures: UiPluginRuntimeFigures }
-  | { ok: false; error: string }
 export type DeepseekConfigFileResult = { path: string; content: string; exists: boolean }
 export type DeepseekConfigSaveResult = { ok: true; path: string }
 export type TurnCompleteNotificationPayload = {
@@ -372,10 +390,32 @@ export type KunGuiApi = {
   ) => Promise<SkillSaveResult>
   importSkillsFromGitHub: (rootPath: string, url: string) => Promise<SkillGithubImportResult>
   openSkillRoot: (rootPath: string) => Promise<PathOpenResult>
-  listUiPlugins: () => Promise<UiPluginListIpcResult>
-  installUiPlugin: () => Promise<UiPluginInstallIpcResult>
-  removeUiPlugin: (id: string) => Promise<{ ok: boolean }>
-  loadUiPlugin: (id: string) => Promise<UiPluginLoadIpcResult>
+  claude360Session: () => Promise<Claude360SessionResult>
+  claude360StartDeviceAuth: () => Promise<Claude360DeviceAuthStartResult>
+  claude360PollDeviceAuth: (deviceCode: string) => Promise<Claude360DeviceAuthPollResult>
+  claude360PasswordLogin: (payload: Claude360PasswordLoginPayload) => Promise<Claude360LoginResult>
+  claude360PasswordLogin2FA: (payload: Claude360PasswordLogin2FAPayload) => Promise<Claude360LoginResult>
+  claude360Logout: () => Promise<Claude360LogoutResult>
+  claude360SyncAccount: () => Promise<Claude360SyncResult>
+  claude360TokensList: () => Promise<Claude360TokenListItem[]>
+  claude360TokensEnsure: (payload: { group: string; purpose: Claude360TokenPurpose }) => Promise<Claude360TokenRef>
+  claude360TokensCreate: (payload: { group?: string; name: string }) => Promise<Claude360TokenRef>
+  claude360TokensReveal: (payload: { tokenId: number }) => Promise<{ key: string }>
+  claude360ModelsRefresh: () => Promise<{ ok: true; modelCache: Claude360ModelCache }>
+  claude360ModelsList: () => Promise<Claude360ModelCache>
+  claude360BillingMe: () => Promise<Claude360Me>
+  claude360BillingTopupOptions: () => Promise<Claude360TopupOptions>
+  claude360BillingTopupWechat: (payload: { amount: number; discountCode?: string }) => Promise<Claude360TopupOrder>
+  claude360BillingTopupOrder: (payload: { orderId: string }) => Promise<Claude360TopupOrderStatus>
+  claude360BillingTokenStats: (payload: { startTimestamp?: number; endTimestamp?: number }) => Promise<Claude360TokenStat[]>
+  /** 提交音乐生成任务（main 用 music 分组 Key 调 /suno/submit/music；不下发 Key）。 */
+  claude360MusicSubmit: (payload: Claude360MusicSubmitPayload) => Promise<Claude360MusicSubmitResult>
+  /** 查询音乐任务状态（main 调 /suno/fetch；taskId 非空）。 */
+  claude360MusicFetch: (taskId: string) => Promise<Claude360MusicFetchResult>
+  /** 文本生图（main 用 image 分组 Key 调 /v1/images/generations；不下发 Key）。 */
+  claude360CanvasGenerate: (payload: Claude360ImageGeneratePayload) => Promise<Claude360ImageResult>
+  /** 单图编辑（main 用 image 分组 Key 走 multipart 调 /v1/images/edits；不下发 Key）。 */
+  claude360CanvasEdit: (payload: Claude360ImageEditPayload) => Promise<Claude360ImageResult>
   getKunConfigFile: () => Promise<DeepseekConfigFileResult>
   setKunConfigFile: (content: string) => Promise<DeepseekConfigSaveResult>
   openKunConfigDir: () => Promise<PathOpenResult>

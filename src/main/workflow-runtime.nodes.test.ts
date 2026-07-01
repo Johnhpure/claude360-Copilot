@@ -25,6 +25,7 @@ import {
   defaultScheduleSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
+  defaultClaude360Settings,
   mergeWorkflowSettings,
   normalizeWorkflow,
   normalizeWorkflowSettings,
@@ -121,6 +122,7 @@ function buildSettings(
     schedule: defaultScheduleSettings(),
     workflow: normalizeWorkflowSettings({ enabled: true, workflows, modules }),
     terminal: defaultTerminalSettings(),
+    claude360: defaultClaude360Settings(),
     guiUpdate: { channel: 'stable' },
     codePromptPrefix: '',
     disabledSkillIds: []

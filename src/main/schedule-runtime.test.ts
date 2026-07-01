@@ -8,6 +8,7 @@ import {
   defaultWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
+  defaultClaude360Settings,
   mergeScheduleSettings,
   type AppSettingsPatch,
   type AppSettingsV1,
@@ -108,6 +109,7 @@ function settingsWith(
     }),
     workflow: defaultWorkflowSettings(),
     terminal: defaultTerminalSettings(),
+    claude360: defaultClaude360Settings(),
     guiUpdate: { channel: 'stable' },
     codePromptPrefix: '',
     disabledSkillIds: []

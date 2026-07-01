@@ -113,7 +113,8 @@ describe('ArchivedThreadsSettingsSection', () => {
     expect(agentsIndex).toBeGreaterThanOrEqual(0)
     expect(permissionsIndex).toBe(-1)
     expect(archivesIndex).toBeGreaterThan(agentsIndex)
-    expect(html.match(/data-cursor-spotlight-target/g)?.length).toBe(16)
+    // plan-04 Task7:隐藏手机连接(Claw)导航项后,可点击导航目标少一个(15→14)。
+    expect(html.match(/data-cursor-spotlight-target/g)?.length).toBe(14)
   })
 
   it('keeps settings tabs scrollable without pushing the footer away', () => {
@@ -127,7 +128,8 @@ describe('ArchivedThreadsSettingsSection', () => {
     expect(html).toContain('flex h-full min-h-0 w-[248px]')
     expect(html).toContain('flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain')
     expect(html).toContain('ds-no-drag shrink-0 border-t border-ds-border p-3')
-    expect(html).toContain('Kun')
+    // plan-04 Task8:设置页页脚品牌名改为 Claude360 Copilot。
+    expect(html).toContain('Claude360 Copilot')
     expect(html).toContain('Settings')
   })
 })

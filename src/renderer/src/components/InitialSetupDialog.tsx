@@ -1,165 +1,21 @@
-import { type ReactElement, useEffect, useRef, useState } from 'react'
+import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  DEFAULT_MODEL_PROVIDER_ID,
-  KUN_TOOL_PERMISSION_MODES,
-  kunToolPermissionModeSettings,
-  normalizeAppSettings,
-  type AppSettingsPatch,
-  type AppSettingsV1,
-  type KunToolPermissionMode,
-  type ModelProviderPreset
-} from '@shared/app-settings'
-import {
-  buildInitialSetupSettings,
-  INITIAL_SETUP_PROVIDER_PRESETS,
-  initialSetupAutoWirePlan,
-  initialSetupDrafts,
-  initialSetupProfileId,
-  initialSetupSelection,
-  type InitialSetupDrafts,
-  type InitialSetupSelection
-} from './initial-setup-save'
-import { rendererRuntimeClient } from '../agent/runtime-client'
 import type { RuntimeConnectionStatus } from '../agent/types'
-import { applyTheme } from '../lib/apply-theme'
-import { emitRendererSettingsChanged } from '../lib/keyboard-shortcut-settings'
 import { useChatStore } from '../store/chat-store'
 import type { InitialSetupMode } from '../store/chat-store-types'
-import {
-  Eye,
-  EyeOff,
-  ExternalLink,
-  FolderPen,
-  Hand,
-  Image as ImageIcon,
-  LockKeyholeOpen,
-  MessageCircle,
-  Mic,
-  ShieldQuestion,
-  Sparkles,
-  Sun,
-  Moon,
-  Monitor,
-  X
-} from 'lucide-react'
+import { ExternalLink, Loader2, LogIn, QrCode, X } from 'lucide-react'
 
-type ThemePref = AppSettingsV1['theme']
-type SetupFormPatch = AppSettingsPatch
 type InitialSetupCompletionState = {
   runtimeConnection: RuntimeConnectionStatus
   error: string | null
-}
-
-const themeOptions: { value: ThemePref; icon: typeof Sun; labelKey: string }[] = [
-  { value: 'system', icon: Monitor, labelKey: 'themeSystem' },
-  { value: 'light', icon: Sun, labelKey: 'themeLight' },
-  { value: 'dark', icon: Moon, labelKey: 'themeDark' }
-]
-const DEEPSEEK_USAGE_URL = 'https://platform.deepseek.com/usage'
-
-type PermissionOption = {
-  value: KunToolPermissionMode
-  labelKey: string
-  descriptionKey: string
-  Icon: typeof Hand
-  iconClass: string
-}
-
-const PERMISSION_OPTIONS: PermissionOption[] = KUN_TOOL_PERMISSION_MODES.map((value) => {
-  switch (value) {
-    case 'always-ask':
-      return {
-        value,
-        labelKey: 'toolPermissionAlwaysAsk',
-        descriptionKey: 'toolPermissionAlwaysAskDesc',
-        Icon: Hand,
-        iconClass: 'border-sky-400/30 bg-sky-500/10 text-sky-700 dark:text-sky-200'
-      }
-    case 'read-only':
-      return {
-        value,
-        labelKey: 'toolPermissionReadOnly',
-        descriptionKey: 'toolPermissionReadOnlyDesc',
-        Icon: Eye,
-        iconClass: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
-      }
-    case 'sensitive-ask':
-      return {
-        value,
-        labelKey: 'toolPermissionSensitiveAsk',
-        descriptionKey: 'toolPermissionSensitiveAskDesc',
-        Icon: ShieldQuestion,
-        iconClass: 'border-amber-400/35 bg-amber-500/10 text-amber-700 dark:text-amber-200'
-      }
-    case 'workspace-write':
-      return {
-        value,
-        labelKey: 'toolPermissionWorkspaceWrite',
-        descriptionKey: 'toolPermissionWorkspaceWriteDesc',
-        Icon: FolderPen,
-        iconClass: 'border-indigo-400/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-200'
-      }
-    case 'bypass':
-      return {
-        value,
-        labelKey: 'toolPermissionBypass',
-        descriptionKey: 'toolPermissionBypassDesc',
-        Icon: LockKeyholeOpen,
-        iconClass: 'border-orange-400/35 bg-orange-500/10 text-orange-700 dark:text-orange-200'
-      }
-  }
-})
-
-type SetupProviderCard = {
-  presetId: string
-  name: string
-  descKey: string
-  capability: 'speech' | 'image' | null
-  preset: ModelProviderPreset | null
-}
-
-const PROVIDER_CARDS: SetupProviderCard[] = [
-  {
-    presetId: DEFAULT_MODEL_PROVIDER_ID,
-    name: 'DeepSeek',
-    descKey: 'firstRunProviderDeepseekDesc',
-    capability: null,
-    preset: null
-  },
-  ...INITIAL_SETUP_PROVIDER_PRESETS.map((preset) => ({
-    presetId: preset.id,
-    name: preset.name,
-    descKey: preset.id === 'xiaomi' ? 'firstRunProviderXiaomiDesc' : 'firstRunProviderMinimaxDesc',
-    capability: preset.speech ? ('speech' as const) : preset.image ? ('image' as const) : null,
-    preset
-  }))
-]
-
-function keyHintKey(card: SetupProviderCard, mode: InitialSetupSelection['mode']): string {
-  if (card.presetId === DEFAULT_MODEL_PROVIDER_ID) return 'firstRunBuyApiHint'
-  const suffix = mode === 'token-plan' ? 'TokenPlan' : 'Api'
-  return card.presetId === 'xiaomi' ? `firstRunKeyHintXiaomi${suffix}` : `firstRunKeyHintMinimax${suffix}`
-}
-
-function keyPageUrl(card: SetupProviderCard, mode: InitialSetupSelection['mode']): string {
-  if (!card.preset) return DEEPSEEK_USAGE_URL
-  if (mode === 'token-plan' && card.preset.tokenPlan) return card.preset.tokenPlan.apiKeyUrl
-  return card.preset.apiKeyUrl
-}
-
-function keyPlaceholder(card: SetupProviderCard, mode: InitialSetupSelection['mode']): string {
-  if (mode === 'token-plan') {
-    const prefix = card.preset?.tokenPlan?.keyPrefix
-    return prefix ? `${prefix}...` : 'API Key'
-  }
-  return card.presetId === 'minimax' ? 'API Key' : 'sk-...'
 }
 
 export function canCloseInitialSetup(mode: InitialSetupMode): boolean {
   return mode === 'preview'
 }
 
+// 保留：登录/设置完成后的运行时就绪收尾（与登录方式无关）。
+// preview 模式后台探测即可关闭；required 模式需运行时就绪才进入 Code。
 export async function completeInitialSetupAfterSave(input: {
   mode: InitialSetupMode
   reloadUiSettings: () => Promise<void>
@@ -188,511 +44,287 @@ export async function completeInitialSetupAfterSave(input: {
   return true
 }
 
+type LoginTab = 'password' | 'device'
+type DeviceStatus = 'idle' | 'pending' | 'expired' | 'denied'
+
 export function InitialSetupDialog(): ReactElement {
   const { t } = useTranslation('settings')
   const initialSetupMode = useChatStore((s) => s.initialSetupMode)
   const closeInitialSetup = useChatStore((s) => s.closeInitialSetup)
-  const applyI18n = useChatStore((s) => s.applyI18nFromSettings)
   const reloadUiSettings = useChatStore((s) => s.reloadUiSettings)
   const probeRuntime = useChatStore((s) => s.probeRuntime)
-  const openCode = useChatStore((s) => s.openCode)
 
-  const [form, setForm] = useState<AppSettingsV1 | null>(null)
-  const [drafts, setDrafts] = useState<InitialSetupDrafts | null>(null)
-  const [selection, setSelection] = useState<InitialSetupSelection>({
-    presetId: DEFAULT_MODEL_PROVIDER_ID,
-    mode: 'api',
-    permissionMode: 'read-only'
-  })
-  const [showApiKey, setShowApiKey] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [tab, setTab] = useState<LoginTab>('password')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [needs2fa, setNeeds2fa] = useState(false)
+  const [challengeId, setChallengeId] = useState('')
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const formRef = useRef<AppSettingsV1 | null>(null)
-  const isPreview = initialSetupMode === 'preview'
+  const [device, setDevice] = useState<{ userCode: string; verificationUrl: string; deviceCode: string } | null>(null)
+  const [deviceStatus, setDeviceStatus] = useState<DeviceStatus>('idle')
+  const pollTimer = useRef<number | null>(null)
+
   const closeAllowed = canCloseInitialSetup(initialSetupMode)
 
-  const setCurrentForm = (next: AppSettingsV1 | null): void => {
-    formRef.current = next
-    setForm(next)
-  }
-
-  useEffect(() => {
-    let cancelled = false
-    void rendererRuntimeClient
-      .getSettings({ forceRefresh: true })
-      .then((s) => {
-        if (cancelled) return
-        setCurrentForm(s)
-        setDrafts(initialSetupDrafts(s))
-        setSelection(initialSetupSelection(s))
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
-      })
-    return () => { cancelled = true }
+  const stopPolling = useCallback((): void => {
+    if (pollTimer.current !== null) {
+      window.clearTimeout(pollTimer.current)
+      pollTimer.current = null
+    }
   }, [])
 
-  const updateForm = (patch: SetupFormPatch) => {
-    const current = formRef.current
-    if (!current) return
-    const next = normalizeAppSettings({
-      ...current,
-      ...patch
-    } as AppSettingsV1)
-    setCurrentForm(next)
-  }
+  useEffect(() => () => stopPolling(), [stopPolling])
 
-  const handleThemeChange = (theme: ThemePref) => {
-    if (!formRef.current) return
-    updateForm({ theme })
-    applyTheme(theme)
-  }
-
-  const handleClose = () => {
-    if (!closeAllowed) return
-    setError(null)
-    closeInitialSetup()
-    void reloadUiSettings()
-  }
-
-  const handleOpenKeyPage = (url: string) => {
-    if (typeof window.kunGui?.openExternal !== 'function') return
-    void window.kunGui.openExternal(url).catch(() => undefined)
-  }
-
-  const selectedCard = PROVIDER_CARDS.find((card) => card.presetId === selection.presetId) ?? PROVIDER_CARDS[0]
-  const selectedProfileId = initialSetupProfileId(selection)
-  const selectedDraft = drafts?.[selectedProfileId] ?? { apiKey: '', baseUrl: '' }
-
-  const updateSelectedDraft = (patch: Partial<typeof selectedDraft>): void => {
-    setDrafts((current) => current
-      ? { ...current, [selectedProfileId]: { ...current[selectedProfileId], ...patch } }
-      : current)
-  }
-
-  const selectCard = (presetId: string): void => {
-    setError(null)
-    setSelection((current) => (current.presetId === presetId ? current : { ...current, presetId, mode: 'api' }))
-  }
-
-  const selectMode = (mode: InitialSetupSelection['mode']): void => {
-    setError(null)
-    setSelection((current) => ({ ...current, mode }))
-  }
-
-  const selectPermissionMode = (permissionMode: KunToolPermissionMode): void => {
-    setError(null)
-    setSelection((current) => ({ ...current, permissionMode }))
-    const current = formRef.current
-    if (!current) return
-    updateForm({
-      agents: {
-        ...current.agents,
-        kun: {
-          ...current.agents.kun,
-          ...kunToolPermissionModeSettings(permissionMode)
-        }
-      }
-    } as SetupFormPatch)
-  }
-
-  const cardFilled = (card: SetupProviderCard): boolean => {
-    if (!drafts) return false
-    if (drafts[card.presetId]?.apiKey.trim()) return true
-    if (!card.preset?.tokenPlan) return false
-    return Boolean(drafts[initialSetupProfileId({ presetId: card.presetId, mode: 'token-plan' })]?.apiKey.trim())
-  }
-
-  const handleSave = async () => {
-    const current = formRef.current
-    if (!current || !drafts) return
-    if (!selectedDraft.apiKey.trim()) {
-      setError(t('firstRunApiKeyValidation', { provider: selectedCard.name }))
-      return
-    }
-    setSaving(true)
-    setError(null)
+  // 登录成功收尾：同步账号 → 刷新 UI → 关闭弹窗 → 后台探测运行时。
+  const finishLogin = useCallback(async (): Promise<void> => {
+    stopPolling()
     try {
-      const next = await rendererRuntimeClient.setSettings(
-        buildInitialSetupSettings(current, drafts, selection)
-      )
-      setCurrentForm(next)
-      setDrafts(initialSetupDrafts(next))
-      emitRendererSettingsChanged(next)
-      await applyI18n(next.locale)
-      await completeInitialSetupAfterSave({
-        mode: initialSetupMode,
-        reloadUiSettings,
-        probeRuntime,
-        openCode,
-        closeInitialSetup,
-        getState: useChatStore.getState,
-        setDialogError: setError,
-        fallbackRuntimeError: t('common:runtimeFetchFailed')
-      })
+      await window.kunGui.claude360SyncAccount()
+    } catch {
+      // 同步失败不阻断登录关闭；展示态稍后可在「我的」页刷新。
+    }
+    await reloadUiSettings()
+    closeInitialSetup()
+    void probeRuntime('background')
+  }, [stopPolling, reloadUiSettings, closeInitialSetup, probeRuntime])
+
+  const handlePasswordLogin = async (): Promise<void> => {
+    if (busy) return
+    setError(null)
+    setBusy(true)
+    try {
+      const result = needs2fa
+        ? await window.kunGui.claude360PasswordLogin2FA({ challengeId, code: code.trim() })
+        : await window.kunGui.claude360PasswordLogin({ username: username.trim(), password })
+      if (!result.ok) {
+        setError(result.message)
+        return
+      }
+      if (result.require2fa) {
+        setNeeds2fa(true)
+        setChallengeId(result.challengeId)
+        return
+      }
+      await finishLogin()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
-      setSaving(false)
+      setBusy(false)
     }
   }
 
-  if (!form || !drafts) {
-    return (
-      <div className="ds-no-drag fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-md dark:bg-black/70">
-        <div className="rounded-xl border border-ds-border bg-ds-card/95 px-5 py-4 text-sm text-ds-muted shadow-panel backdrop-blur-xl">
-          {t('loading')}
-        </div>
-      </div>
-    )
-  }
-
-  const selectedTheme = form.theme
-  const tokenPlan = selectedCard.preset?.tokenPlan ?? null
-  const showTokenPlanMode = Boolean(tokenPlan)
-  const regions = selection.mode === 'token-plan' ? tokenPlan?.regions ?? [] : []
-  const wire = initialSetupAutoWirePlan(form, drafts)
-  const wireNote = (() => {
-    if (!selectedCard.capability) return null
-    const wiredProfileId = selectedCard.capability === 'speech' ? wire.speechProviderId : wire.imageProviderId
-    if (wiredProfileId && wiredProfileId === selectedProfileId) {
-      return {
-        tone: 'success' as const,
-        text: t(selectedCard.capability === 'speech' ? 'firstRunAutoWireSpeech' : 'firstRunAutoWireImage')
-      }
-    }
-    if (selection.mode === 'token-plan' && selectedDraft.apiKey.trim()) {
-      const planServesCapability = selectedCard.capability === 'speech'
-        ? Boolean(tokenPlan?.speech)
-        : selectedCard.capability === 'image' && Boolean(tokenPlan?.image)
-      if (!planServesCapability) {
-        return {
-          tone: 'warning' as const,
-          text: t(selectedCard.capability === 'speech' ? 'firstRunTokenPlanNoSpeech' : 'firstRunTokenPlanNoImage')
+  const pollOnce = useCallback(
+    async (deviceCode: string, intervalMs: number): Promise<void> => {
+      try {
+        const r = await window.kunGui.claude360PollDeviceAuth(deviceCode)
+        if (!r.ok) {
+          setError(r.message)
+          setDeviceStatus('idle')
+          return
         }
+        if (r.status === 'approved') {
+          await finishLogin()
+          return
+        }
+        if (r.status === 'pending') {
+          setDeviceStatus('pending')
+          pollTimer.current = window.setTimeout(() => void pollOnce(deviceCode, intervalMs), intervalMs)
+          return
+        }
+        setDeviceStatus(r.status === 'denied' ? 'denied' : 'expired')
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+        setDeviceStatus('idle')
       }
-    }
-    return null
-  })()
+    },
+    [finishLogin]
+  )
 
-  const choiceButtonClass = (active: boolean): string =>
-    [
-      'flex min-h-10 min-w-0 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-all duration-200 sm:min-h-11 sm:px-4',
-      active
-        ? 'border-[#1388ff] bg-[#1388ff]/[0.07] text-[#1377df] shadow-[0_0_0_1px_rgba(19,136,255,0.12),0_8px_18px_rgba(19,136,255,0.07)] dark:border-[#3aa0ff] dark:bg-[#3aa0ff]/[0.12] dark:text-[#88c8ff]'
-        : 'border-slate-300/80 bg-white/72 text-slate-600 hover:border-slate-400/80 hover:bg-white dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300 dark:hover:border-white/16 dark:hover:bg-white/[0.055]'
-    ].join(' ')
-  const cardButtonClass = (active: boolean): string =>
-    [
-      'flex min-w-0 flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-all duration-200',
-      active
-        ? 'border-[#1388ff] bg-[#1388ff]/[0.07] shadow-[0_0_0_1px_rgba(19,136,255,0.12),0_8px_18px_rgba(19,136,255,0.07)] dark:border-[#3aa0ff] dark:bg-[#3aa0ff]/[0.12]'
-        : 'border-slate-300/80 bg-white/72 hover:border-slate-400/80 hover:bg-white dark:border-white/10 dark:bg-white/[0.035] dark:hover:border-white/16 dark:hover:bg-white/[0.055]'
-    ].join(' ')
-  const fieldClass =
-    'w-full rounded-xl border border-slate-300/75 bg-white/88 px-4 py-3 text-[15px] text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] outline-none transition focus:border-[#1388ff]/70 focus:ring-2 focus:ring-[#1388ff]/15 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100 dark:shadow-none dark:focus:border-[#3aa0ff]/70 dark:focus:ring-[#3aa0ff]/15 dark:placeholder:text-slate-500'
-  const labelClass = 'text-sm font-semibold text-slate-700 dark:text-slate-200'
+  const startDeviceAuth = async (): Promise<void> => {
+    if (busy) return
+    setError(null)
+    setBusy(true)
+    stopPolling()
+    try {
+      const r = await window.kunGui.claude360StartDeviceAuth()
+      if (!r.ok) {
+        setError(r.message)
+        return
+      }
+      setDevice({ userCode: r.userCode, verificationUrl: r.verificationUrl, deviceCode: r.deviceCode })
+      setDeviceStatus('pending')
+      if (typeof window.kunGui?.openExternal === 'function') {
+        void window.kunGui.openExternal(r.verificationUrl).catch(() => undefined)
+      }
+      const intervalMs = Math.max(2, r.interval || 3) * 1000
+      pollTimer.current = window.setTimeout(() => void pollOnce(r.deviceCode, intervalMs), intervalMs)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleClose = (): void => {
+    if (!closeAllowed) return
+    stopPolling()
+    setError(null)
+    closeInitialSetup()
+  }
+
+  const inputClass =
+    'w-full rounded-lg border border-ds-border bg-ds-card px-3 py-2 text-sm text-ds-strong outline-none focus:border-sky-400'
+  const tabClass = (active: boolean): string =>
+    `flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
+      active ? 'bg-sky-500/15 text-sky-700 dark:text-sky-200' : 'text-ds-muted hover:bg-ds-hover'
+    }`
+
   return (
     <div className="ds-no-drag fixed inset-0 z-50 overflow-y-auto bg-[#eef2fb]/45 p-3 backdrop-blur-[18px] dark:bg-black/62 dark:backdrop-blur-[22px] sm:p-6">
-      <div className="flex min-h-full items-center justify-center">
-        <section
+      <div className="grid min-h-full place-items-center">
+        <div
           role="dialog"
           aria-modal="true"
-          aria-labelledby="initial-setup-title"
-          className="flex h-[calc(100dvh-24px)] max-h-[calc(100dvh-24px)] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl border border-white/75 bg-[rgba(255,255,255,0.94)] text-slate-900 shadow-[0_28px_86px_rgba(88,105,136,0.22)] backdrop-blur-2xl dark:border-white/10 dark:bg-[rgba(18,21,28,0.96)] dark:text-white dark:shadow-[0_28px_92px_rgba(0,0,0,0.55)] sm:h-auto sm:max-h-[calc(100dvh-48px)]"
+          aria-label={t('claude360LoginTitle')}
+          className="flex w-full max-w-[460px] flex-col gap-4 rounded-2xl border border-white/75 bg-[rgba(255,255,255,0.96)] p-6 text-slate-900 shadow-[0_28px_86px_rgba(88,105,136,0.22)] backdrop-blur-2xl dark:border-white/10 dark:bg-[rgba(18,21,28,0.97)] dark:text-white"
         >
-        <div className="shrink-0 border-b border-slate-200/72 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,253,0.9))] px-5 py-4 dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(27,31,40,0.98),rgba(19,22,29,0.96))] sm:px-7 sm:py-6">
           <div className="flex items-start justify-between gap-3">
-            <div className="inline-flex min-w-0 items-center gap-2 rounded-lg border border-[#1388ff]/22 bg-[#1388ff]/[0.06] px-3 py-1.5 text-[12.5px] font-semibold text-[#1377df] dark:border-[#3aa0ff]/22 dark:bg-[#3aa0ff]/[0.12] dark:text-[#88c8ff]">
-              <Sparkles className="h-3.5 w-3.5" strokeWidth={1.9} />
-              <span className="min-w-0 truncate">{t(isPreview ? 'firstRunPreviewBadge' : 'firstRunBadge')}</span>
+            <div>
+              <h2 className="text-lg font-semibold">{t('claude360LoginTitle')}</h2>
+              <p className="mt-1 text-sm text-ds-muted">{t('claude360LoginSubtitle')}</p>
             </div>
             {closeAllowed ? (
               <button
                 type="button"
+                aria-label={t('close')}
                 onClick={handleClose}
-                aria-label={t('firstRunClose')}
-                title={t('firstRunClose')}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-300/80 bg-white/72 text-slate-500 transition hover:border-slate-400 hover:text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400 dark:hover:border-white/18 dark:hover:text-slate-200"
+                className="rounded-md p-1 text-ds-faint transition hover:bg-ds-hover hover:text-ds-muted"
               >
-                <X className="h-[18px] w-[18px]" strokeWidth={1.8} />
+                <X className="h-4 w-4" />
               </button>
             ) : null}
           </div>
-          <h1 id="initial-setup-title" className="mt-3 text-xl font-semibold leading-tight text-slate-900 dark:text-white sm:mt-4 sm:text-[22px]">
-            {t('firstRunTitle')}
-          </h1>
-          <p className="mt-2.5 text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-[15px]">
-            {t('firstRunSubtitle')}
-          </p>
-        </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:space-y-5 sm:px-7 sm:py-6">
-          <div className="space-y-2.5 sm:space-y-3.5">
-            <label className={labelClass}>
-              {t('theme')}
-            </label>
-            <div className="grid grid-cols-1 gap-2 sm:gap-2.5 sm:grid-cols-3">
-              {themeOptions.map(({ value, icon: Icon, labelKey }) => {
-                const isActive = selectedTheme === value
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => handleThemeChange(value)}
-                    className={choiceButtonClass(isActive)}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="min-w-0 text-center leading-tight">{t(labelKey)}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-2.5 sm:space-y-3.5">
-            <label className={labelClass}>
-              {t('language')}
-            </label>
-            <div className="grid grid-cols-1 gap-2 sm:gap-2.5 min-[440px]:grid-cols-2">
-              {(['en', 'zh'] as const).map((lang) => {
-                const isActive = form.locale === lang
-                return (
-                  <button
-                    key={lang}
-                    type="button"
-                    onClick={() => {
-                      updateForm({ locale: lang })
-                      void applyI18n(lang)
-                    }}
-                    className={choiceButtonClass(isActive)}
-                  >
-                    <span className="min-w-0 text-center leading-tight">{lang === 'en' ? 'English' : '简体中文'}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-2.5 sm:space-y-3.5">
-            <label className={labelClass}>
-              {t('firstRunProviderLabel')}
-            </label>
-            <div className="grid grid-cols-1 gap-2 sm:gap-2.5 min-[440px]:grid-cols-3">
-              {PROVIDER_CARDS.map((card) => {
-                const isActive = selection.presetId === card.presetId
-                const filled = cardFilled(card)
-                return (
-                  <button
-                    key={card.presetId}
-                    type="button"
-                    onClick={() => selectCard(card.presetId)}
-                    className={cardButtonClass(isActive)}
-                  >
-                    <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                      {card.name}
-                      <span
-                        aria-hidden="true"
-                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${filled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-white/20'}`}
-                      />
-                    </span>
-                    <span className="text-[12px] leading-tight text-slate-500 dark:text-slate-400">
-                      {t(card.descKey)}
-                    </span>
-                    {card.capability ? (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                        {card.capability === 'speech'
-                          ? <Mic className="h-3 w-3" strokeWidth={2} />
-                          : <ImageIcon className="h-3 w-3" strokeWidth={2} />}
-                        {t(card.capability === 'speech' ? 'firstRunCapabilitySpeech' : 'firstRunCapabilityImage')}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
-                        <MessageCircle className="h-3 w-3" strokeWidth={2} />
-                        {t('firstRunCapabilityChat')}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {showTokenPlanMode && (
-            <div className="space-y-2.5 sm:space-y-3.5">
-              <label className={labelClass}>
-                {t('firstRunModeLabel')}
-              </label>
-              <div className="grid grid-cols-1 gap-2 sm:gap-2.5 min-[440px]:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => selectMode('api')}
-                  className={choiceButtonClass(selection.mode === 'api')}
-                >
-                  <span className="min-w-0 text-center leading-tight">{t('firstRunModeApi')}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectMode('token-plan')}
-                  className={choiceButtonClass(selection.mode === 'token-plan')}
-                >
-                  <span className="min-w-0 text-center leading-tight">{t('firstRunModeTokenPlan')}</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2.5 sm:space-y-3.5">
-            <label className={labelClass}>
-              {t('firstRunPermissionLabel')}
-            </label>
-            <div className="grid grid-cols-1 gap-2 sm:gap-2.5 min-[520px]:grid-cols-2">
-              {PERMISSION_OPTIONS.map((option) => {
-                const isActive = selection.permissionMode === option.value
-                const Icon = option.Icon
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => selectPermissionMode(option.value)}
-                    className={cardButtonClass(isActive)}
-                  >
-                    <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                      <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${option.iconClass}`}>
-                        <Icon className="h-3.5 w-3.5" strokeWidth={1.9} />
-                      </span>
-                      <span className="min-w-0 truncate">{t(option.labelKey)}</span>
-                    </span>
-                    <span className="text-[12px] leading-5 text-slate-500 dark:text-slate-400">
-                      {t(option.descriptionKey)}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-            <div className="rounded-xl border border-orange-300/60 bg-orange-50/80 px-4 py-3 text-[12.5px] leading-5 text-orange-800 dark:border-orange-800/60 dark:bg-orange-950/30 dark:text-orange-200">
-              {t('firstRunPermissionFullAccessRisk')}
-            </div>
-          </div>
-
-          {regions.length > 0 && (
-            <div className="space-y-2.5 sm:space-y-3.5">
-              <label className={labelClass}>
-                {t('firstRunRegionLabel')}
-              </label>
-              <div className="grid grid-cols-1 gap-2 sm:gap-2.5 min-[440px]:grid-cols-3">
-                {regions.map((region) => (
-                  <button
-                    key={region.id}
-                    type="button"
-                    onClick={() => updateSelectedDraft({ baseUrl: region.baseUrl })}
-                    className={choiceButtonClass(selectedDraft.baseUrl.trim() === region.baseUrl)}
-                  >
-                    <span className="min-w-0 text-center leading-tight">
-                      {t(`firstRunRegion_${region.id}`)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2.5 sm:space-y-3.5">
-            <label className={labelClass}>
-              {t('firstRunApiKeyLabel', { provider: selectedCard.name })}
-            </label>
-            <div className="relative">
-              <input
-                type={showApiKey ? 'text' : 'password'}
-                value={selectedDraft.apiKey}
-                onChange={(e) => updateSelectedDraft({ apiKey: e.target.value })}
-                placeholder={keyPlaceholder(selectedCard, selection.mode)}
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                className={`${fieldClass} pr-12 font-mono placeholder:font-sans`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowApiKey((v) => !v)}
-                className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-white/[0.06] dark:hover:text-slate-300"
-              >
-                {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            <div className="grid gap-3 rounded-xl border border-slate-200/80 bg-slate-50/75 px-4 py-3 text-[13px] text-slate-500 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-400 min-[560px]:grid-cols-[1fr_auto] min-[560px]:items-center">
-              <p className="min-w-0 leading-6">
-                {t(keyHintKey(selectedCard, selection.mode))}
-              </p>
-              <button
-                type="button"
-                onClick={() => handleOpenKeyPage(keyPageUrl(selectedCard, selection.mode))}
-                className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[#1388ff]/24 bg-[#1388ff]/[0.06] px-3 py-1.5 text-[12.5px] font-semibold text-[#1377df] transition hover:bg-[#1388ff]/[0.1] dark:border-[#3aa0ff]/22 dark:bg-[#3aa0ff]/[0.12] dark:text-[#88c8ff] dark:hover:bg-[#3aa0ff]/[0.18]"
-              >
-                <span className="min-w-0 text-center leading-tight">{t('firstRunGetKeyAction')}</span>
-                <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.9} />
-              </button>
-            </div>
-            {wireNote && (
-              <div
-                className={
-                  wireNote.tone === 'success'
-                    ? 'rounded-xl border border-emerald-300/60 bg-emerald-50/80 px-4 py-2.5 text-[12.5px] leading-5 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-300'
-                    : 'rounded-xl border border-amber-300/60 bg-amber-50/80 px-4 py-2.5 text-[12.5px] leading-5 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300'
-                }
-              >
-                {wireNote.text}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2.5 sm:space-y-3.5">
-            <label className={labelClass}>
-              {t('baseUrl')}
-            </label>
-            <input
-              type="text"
-              value={selectedDraft.baseUrl}
-              onChange={(e) => updateSelectedDraft({ baseUrl: e.target.value })}
-              placeholder="https://"
-              className={fieldClass}
-            />
-          </div>
-        </div>
-
-        <div className="shrink-0 space-y-3 border-t border-slate-200/72 bg-white/70 px-5 pb-4 pt-3.5 dark:border-white/10 dark:bg-white/[0.025] sm:space-y-4 sm:px-7 sm:pb-6 sm:pt-4">
-          {error && (
-            <div className="rounded-xl border border-red-500/18 bg-red-500/[0.08] px-4 py-3 text-[13px] text-red-700 dark:border-red-500/20 dark:bg-red-500/[0.12] dark:text-red-200">
-              {error}
-            </div>
-          )}
-
-          <div className={closeAllowed ? 'flex flex-col-reverse gap-3 sm:grid sm:grid-cols-[0.85fr_1fr]' : 'grid gap-3'}>
-            {closeAllowed ? (
-              <button
-                type="button"
-                onClick={handleClose}
-                className="min-h-11 rounded-xl border border-slate-300/80 bg-white/75 px-4 py-2 text-[15px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-white dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:border-white/16 dark:hover:bg-white/[0.06]"
-              >
-                {t('firstRunClose')}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              disabled={saving}
-              onClick={handleSave}
-              className="min-h-11 rounded-xl bg-[linear-gradient(180deg,#2392ff_0%,#0e7df0_100%)] px-4 py-2 text-[15px] font-semibold text-white shadow-[0_14px_30px_rgba(19,136,255,0.22)] transition hover:opacity-95 disabled:opacity-50 dark:bg-[linear-gradient(180deg,#2c9dff_0%,#1584f6_100%)] dark:shadow-[0_14px_30px_rgba(21,132,246,0.2)]"
-            >
-              {saving ? t('firstRunSaving') : t('firstRunSave')}
+          <div className="flex gap-1 rounded-xl bg-ds-hover/40 p-1">
+            <button type="button" className={tabClass(tab === 'password')} onClick={() => setTab('password')}>
+              {t('claude360LoginTabPassword')}
+            </button>
+            <button type="button" className={tabClass(tab === 'device')} onClick={() => setTab('device')}>
+              {t('claude360LoginTabDevice')}
             </button>
           </div>
 
-          <p className="text-center text-[12.5px] leading-6 text-slate-400 dark:text-slate-500">
-            {t(isPreview ? 'firstRunPreviewHint' : 'firstRunChangeLater')}
-          </p>
+          {tab === 'password' ? (
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void handlePasswordLogin()
+              }}
+            >
+              {!needs2fa ? (
+                <>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-ds-muted">{t('claude360LoginUsername')}</span>
+                    <input
+                      className={inputClass}
+                      value={username}
+                      autoFocus
+                      onChange={(e) => setUsername(e.target.value)}
+                      autoComplete="username"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-ds-muted">{t('claude360LoginPassword')}</span>
+                    <input
+                      className={inputClass}
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="current-password"
+                    />
+                  </label>
+                </>
+              ) : (
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-ds-muted">{t('claude360Login2faCode')}</span>
+                  <input
+                    className={inputClass}
+                    value={code}
+                    autoFocus
+                    inputMode="numeric"
+                    onChange={(e) => setCode(e.target.value)}
+                  />
+                </label>
+              )}
+              <button
+                type="submit"
+                disabled={busy}
+                className="mt-1 inline-flex items-center justify-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:opacity-60"
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+                {needs2fa ? t('claude360Login2faSubmit') : t('claude360LoginSubmit')}
+              </button>
+            </form>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {device ? (
+                <div className="rounded-xl border border-ds-border bg-ds-card p-4 text-center">
+                  <p className="text-sm text-ds-muted">{t('claude360LoginUserCodeLabel')}</p>
+                  <p className="mt-1 select-all font-mono text-2xl font-bold tracking-widest">{device.userCode}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window.kunGui?.openExternal === 'function') {
+                        void window.kunGui.openExternal(device.verificationUrl).catch(() => undefined)
+                      }
+                    }}
+                    className="mt-3 inline-flex items-center justify-center gap-1.5 text-sm text-sky-600 hover:underline dark:text-sky-300"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    {t('claude360LoginOpenBrowser')}
+                  </button>
+                  <p className="mt-3 text-xs text-ds-faint">
+                    {deviceStatus === 'pending'
+                      ? t('claude360LoginDevicePending')
+                      : deviceStatus === 'expired'
+                        ? t('claude360LoginDeviceExpired')
+                        : deviceStatus === 'denied'
+                          ? t('claude360LoginDeviceDenied')
+                          : t('claude360LoginDeviceHint')}
+                  </p>
+                  {deviceStatus === 'expired' || deviceStatus === 'denied' ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void startDeviceAuth()}
+                      className="mt-2 text-sm text-sky-600 hover:underline disabled:opacity-60 dark:text-sky-300"
+                    >
+                      {t('claude360LoginDeviceRetry')}
+                    </button>
+                  ) : null}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void startDeviceAuth()}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:opacity-60"
+                >
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+                  {t('claude360LoginDeviceStart')}
+                </button>
+              )}
+              <p className="text-xs text-ds-faint">{t('claude360LoginDeviceHint')}</p>
+            </div>
+          )}
+
+          {error ? (
+            <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-600 dark:text-rose-300">{error}</p>
+          ) : null}
         </div>
-        </section>
       </div>
     </div>
   )

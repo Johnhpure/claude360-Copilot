@@ -287,8 +287,8 @@ describe('showPostUpdateReleaseNotes', () => {
     expect(showMessageBox).toHaveBeenCalledTimes(1)
     expect(showMessageBox).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: 'Kun 已更新',
-        message: '已更新到 Kun 0.2.0',
+        title: 'Claude360 Copilot 已更新',
+        message: '已更新到 Claude360 Copilot 0.2.0',
         detail: '修复更新流程并改进启动体验。',
         buttons: ['查看更新日志', '稍后']
       })
