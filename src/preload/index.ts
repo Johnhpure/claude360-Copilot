@@ -94,6 +94,9 @@ const api = {
   claude360TokensEnsure: (payload) => ipcRenderer.invoke('claude360:tokens:ensure', payload),
   claude360TokensCreate: (payload) => ipcRenderer.invoke('claude360:tokens:create', payload),
   claude360TokensReveal: (payload) => ipcRenderer.invoke('claude360:tokens:reveal', payload),
+  claude360TokensDelete: (payload) => ipcRenderer.invoke('claude360:tokens:delete', payload),
+  claude360GroupsList: () => ipcRenderer.invoke('claude360:groups:list'),
+  claude360ModelsByGroup: (payload) => ipcRenderer.invoke('claude360:models:by-group', payload),
   claude360ModelsRefresh: () => ipcRenderer.invoke('claude360:models:refresh'),
   claude360ModelsList: () => ipcRenderer.invoke('claude360:models:list'),
   claude360BillingMe: () => ipcRenderer.invoke('claude360:billing:me'),
@@ -264,6 +267,32 @@ const api = {
     ) => handler(payload)
     ipcRenderer.on('runtime:sse-error', wrapped)
     return () => ipcRenderer.removeListener('runtime:sse-error', wrapped)
+  },
+  claude360ChatStreamStart: (payload) => ipcRenderer.invoke('claude360:chat:stream-start', payload),
+  claude360ChatStreamStop: (streamId) => ipcRenderer.invoke('claude360:chat:stream-stop', streamId),
+  onClaude360ChatDelta: (handler) => {
+    const wrapped = (
+      _: Electron.IpcRendererEvent,
+      payload: Parameters<typeof handler>[0]
+    ) => handler(payload)
+    ipcRenderer.on('claude360:chat:delta', wrapped)
+    return () => ipcRenderer.removeListener('claude360:chat:delta', wrapped)
+  },
+  onClaude360ChatEnd: (handler) => {
+    const wrapped = (
+      _: Electron.IpcRendererEvent,
+      payload: Parameters<typeof handler>[0]
+    ) => handler(payload)
+    ipcRenderer.on('claude360:chat:end', wrapped)
+    return () => ipcRenderer.removeListener('claude360:chat:end', wrapped)
+  },
+  onClaude360ChatError: (handler) => {
+    const wrapped = (
+      _: Electron.IpcRendererEvent,
+      payload: Parameters<typeof handler>[0]
+    ) => handler(payload)
+    ipcRenderer.on('claude360:chat:error', wrapped)
+    return () => ipcRenderer.removeListener('claude360:chat:error', wrapped)
   },
   onClawChannelActivity: (handler) => {
     const wrapped = (

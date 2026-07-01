@@ -519,7 +519,7 @@ describe('FloatingComposer model controls', () => {
       })
     )
 
-    expect(html).toContain('Set up provider')
+    expect(html).toContain('Set up group')
     expect(html).toContain('aria-haspopup="menu"')
     expect(html).not.toContain('disabled=""')
   })
@@ -538,7 +538,7 @@ describe('FloatingComposer model controls', () => {
       })
     )
 
-    expect(html).toContain('Set up provider')
+    expect(html).toContain('Set up group')
     expect(html).not.toContain('deepseek-v4-pro')
   })
 })

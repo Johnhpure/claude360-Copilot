@@ -21,7 +21,6 @@ import {
 import { CanvasToolbar } from './CanvasToolbar'
 import { ImagePromptPanel } from './ImagePromptPanel'
 import { ImageResultGrid } from './ImageResultGrid'
-import { ImageEditorPanel } from './ImageEditorPanel'
 import { ImageHistoryPanel } from './ImageHistoryPanel'
 
 type Props = {
@@ -45,6 +44,11 @@ export function CanvasWorkbench({
   const model = useStore(useCanvasStore, (s) => s.model)
   const size = useStore(useCanvasStore, (s) => s.size)
   const n = useStore(useCanvasStore, (s) => s.n)
+  const aspectPreset = useStore(useCanvasStore, (s) => s.aspectPreset)
+  const resolution = useStore(useCanvasStore, (s) => s.resolution)
+  const quality = useStore(useCanvasStore, (s) => s.quality)
+  const outputFormat = useStore(useCanvasStore, (s) => s.outputFormat)
+  const referenceImage = useStore(useCanvasStore, (s) => s.referenceImage)
   const generating = useStore(useCanvasStore, (s) => s.generating)
   const editing = useStore(useCanvasStore, (s) => s.editing)
   const error = useStore(useCanvasStore, (s) => s.error)
@@ -53,7 +57,11 @@ export function CanvasWorkbench({
   const activeImageId = useStore(useCanvasStore, (s) => s.activeImageId)
   const setPrompt = useStore(useCanvasStore, (s) => s.setPrompt)
   const setModel = useStore(useCanvasStore, (s) => s.setModel)
-  const setSize = useStore(useCanvasStore, (s) => s.setSize)
+  const setAspectPreset = useStore(useCanvasStore, (s) => s.setAspectPreset)
+  const setResolution = useStore(useCanvasStore, (s) => s.setResolution)
+  const setQuality = useStore(useCanvasStore, (s) => s.setQuality)
+  const setOutputFormat = useStore(useCanvasStore, (s) => s.setOutputFormat)
+  const setReferenceImage = useStore(useCanvasStore, (s) => s.setReferenceImage)
   const setN = useStore(useCanvasStore, (s) => s.setN)
   const beginGenerate = useStore(useCanvasStore, (s) => s.beginGenerate)
   const generateSuccess = useStore(useCanvasStore, (s) => s.generateSuccess)
@@ -66,10 +74,8 @@ export function CanvasWorkbench({
   const [access, setAccess] = useState<CanvasAccess | null>(null)
   const [lowBalance, setLowBalance] = useState(false)
   const [imageModels, setImageModels] = useState<string[]>([])
-  const [editPrompt, setEditPrompt] = useState('')
   // 复制结果的一次性反馈（成功「已复制」/ 失败提示），短暂展示后自动消失。
   const [copyNotice, setCopyNotice] = useState<string | null>(null)
-  const [sourceDataUrl, setSourceDataUrl] = useState('')
 
   const api = (): CanvasWorkbenchApi | null =>
     typeof window !== 'undefined' && window.kunGui
@@ -124,18 +130,33 @@ export function CanvasWorkbench({
     }).catch(() => undefined)
   }, [applyModelsFromCache])
 
+  // 统一提交：有参考图 → 走 editImage(不带 mask)；否则文本生图(带 quality/output_format)。
   const handleGenerate = useCallback(async (): Promise<void> => {
     const kun = api()
-    if (!kun || generating) return
+    if (!kun) return
+    const s = useCanvasStore.getState()
+    if (s.referenceImage) {
+      if (s.editing) return
+      await submitEdit(kun, { beginEdit, editSuccess, editFailure }, {
+        model: s.model,
+        prompt: s.prompt,
+        image: s.referenceImage,
+        size: s.size
+      })
+      return
+    }
+    if (s.generating) return
     await submitGenerate(kun, { beginGenerate, generateSuccess, generateFailure }, {
-      model: useCanvasStore.getState().model,
-      prompt: useCanvasStore.getState().prompt,
-      size: useCanvasStore.getState().size,
-      n: useCanvasStore.getState().n
+      model: s.model,
+      prompt: s.prompt,
+      size: s.size,
+      n: s.n,
+      quality: s.quality,
+      output_format: s.outputFormat
     })
-  }, [beginGenerate, generateFailure, generateSuccess, generating])
+  }, [beginEdit, editFailure, editSuccess, beginGenerate, generateFailure, generateSuccess])
 
-  const handlePickFile = useCallback((file: File): void => {
+  const handlePickReference = useCallback((file: File): void => {
     void fileToDataUrl(file, (f) =>
       new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
@@ -143,19 +164,8 @@ export function CanvasWorkbench({
         reader.onerror = () => reject(reader.error ?? new Error('read failed'))
         reader.readAsDataURL(f)
       })
-    ).then((dataUrl) => setSourceDataUrl(dataUrl)).catch(() => undefined)
-  }, [])
-
-  const handleEdit = useCallback(async (): Promise<void> => {
-    const kun = api()
-    if (!kun || editing || !sourceDataUrl) return
-    await submitEdit(kun, { beginEdit, editSuccess, editFailure }, {
-      model: useCanvasStore.getState().model,
-      prompt: editPrompt,
-      image: sourceDataUrl,
-      size: useCanvasStore.getState().size
-    })
-  }, [beginEdit, editFailure, editPrompt, editSuccess, editing, sourceDataUrl])
+    ).then((dataUrl) => setReferenceImage(dataUrl || null)).catch(() => undefined)
+  }, [setReferenceImage])
 
   const handleCopy = useCallback((image: Claude360CanvasImage): void => {
     void copyImage(image, {
@@ -189,7 +199,6 @@ export function CanvasWorkbench({
     () => (leftSidebarCollapsed ? 'ds-window-controls-collapsed-titlebar-inset' : ''),
     [leftSidebarCollapsed]
   )
-  const hasModels = imageModels.length > 0
 
   return (
     <div className="ds-drag flex h-full min-h-0 flex-col bg-ds-main" data-testid="canvas-workbench">
@@ -229,26 +238,26 @@ export function CanvasWorkbench({
               <ImagePromptPanel
                 prompt={prompt}
                 model={model}
+                aspectPreset={aspectPreset}
+                resolution={resolution}
+                quality={quality}
+                outputFormat={outputFormat}
                 size={size}
                 n={n}
+                referenceImage={referenceImage}
                 imageModels={imageModels}
-                generating={generating}
+                generating={generating || editing}
                 onChangePrompt={setPrompt}
                 onChangeModel={setModel}
-                onChangeSize={setSize}
+                onChangeAspect={setAspectPreset}
+                onChangeResolution={setResolution}
+                onChangeQuality={setQuality}
+                onChangeOutputFormat={setOutputFormat}
                 onChangeCount={setN}
+                onPickReference={handlePickReference}
+                onClearReference={() => setReferenceImage(null)}
                 onSubmit={() => void handleGenerate()}
                 onRefreshModels={refreshModels}
-                t={t}
-              />
-              <ImageEditorPanel
-                editPrompt={editPrompt}
-                sourceDataUrl={sourceDataUrl}
-                editing={editing}
-                hasModels={hasModels}
-                onChangePrompt={setEditPrompt}
-                onPickFile={handlePickFile}
-                onSubmit={() => void handleEdit()}
                 t={t}
               />
             </div>

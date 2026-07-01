@@ -6,8 +6,6 @@ import { MyTokenGroupsTable } from './MyTokenGroupsTable'
 
 const labels: Record<string, string> = {
   myApiKeys: 'API Key groups',
-  myCreateKey: 'Create key',
-  myCreatingKey: 'Creating…',
   myNoApiKeys: 'No API keys yet.',
   myKeyName: 'Name',
   myKeyGroup: 'Group',
@@ -41,10 +39,8 @@ function render(props: Partial<Parameters<typeof MyTokenGroupsTable>[0]> = {}): 
     createElement(MyTokenGroupsTable, {
       tokens: [token()],
       revealed: {},
-      creating: false,
       onReveal: () => undefined,
       onCopy: () => undefined,
-      onCreate: () => undefined,
       t,
       ...props
     })
@@ -74,10 +70,8 @@ describe('MyTokenGroupsTable', () => {
     const dialog = MyTokenGroupsTable({
       tokens: [token({ id: 42 })],
       revealed: {},
-      creating: false,
       onReveal,
       onCopy: () => undefined,
-      onCreate: () => undefined,
       t
     })
     // Walk the element tree to find the reveal button and fire its onClick.
@@ -92,33 +86,14 @@ describe('MyTokenGroupsTable', () => {
     const dialog = MyTokenGroupsTable({
       tokens: [token({ id: 7 })],
       revealed: { 7: 'sk-plain-7' },
-      creating: false,
       onReveal: () => undefined,
       onCopy,
-      onCreate: () => undefined,
       t
     })
     const copyClick = findClickByAriaLabel(dialog, 'Copy')
     expect(copyClick).toBeTypeOf('function')
     copyClick?.()
     expect(onCopy).toHaveBeenCalledWith(7, 'sk-plain-7')
-  })
-
-  it('exposes a create button that calls onCreate', () => {
-    const onCreate = vi.fn()
-    const dialog = MyTokenGroupsTable({
-      tokens: [],
-      revealed: {},
-      creating: false,
-      onReveal: () => undefined,
-      onCopy: () => undefined,
-      onCreate,
-      t
-    })
-    const createClick = findClickByText(dialog, 'Create key')
-    expect(createClick).toBeTypeOf('function')
-    createClick?.()
-    expect(onCreate).toHaveBeenCalledTimes(1)
   })
 
   it('renders an empty state when there are no keys', () => {
@@ -156,31 +131,6 @@ function findClickByAriaLabel(root: unknown, label: string): (() => void) | unde
     if (!found && el.props?.['aria-label'] === label && typeof el.props.onClick === 'function') {
       found = el.props.onClick
     }
-  })
-  return found
-}
-
-function collectText(node: unknown, out: string[]): void {
-  if (node == null) return
-  if (typeof node === 'string' || typeof node === 'number') {
-    out.push(String(node))
-    return
-  }
-  if (Array.isArray(node)) {
-    node.forEach((child) => collectText(child, out))
-    return
-  }
-  const el = node as AnyElement
-  if (el.props) collectText(el.props.children, out)
-}
-
-function findClickByText(root: unknown, text: string): (() => void) | undefined {
-  let found: (() => void) | undefined
-  eachChild(root, (el) => {
-    if (found || typeof el.props?.onClick !== 'function') return
-    const out: string[] = []
-    collectText(el.props.children, out)
-    if (out.join('').includes(text)) found = el.props.onClick
   })
   return found
 }

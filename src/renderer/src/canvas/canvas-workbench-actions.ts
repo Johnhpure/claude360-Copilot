@@ -80,7 +80,9 @@ export async function submitGenerate(
       model: payload.model,
       prompt: payload.prompt,
       ...(payload.size ? { size: payload.size } : {}),
-      ...(payload.n ? { n: payload.n } : {})
+      ...(payload.n ? { n: payload.n } : {}),
+      ...(payload.quality ? { quality: payload.quality } : {}),
+      ...(payload.output_format ? { output_format: payload.output_format } : {})
     })
     if (result.ok) {
       store.generateSuccess(result.images)

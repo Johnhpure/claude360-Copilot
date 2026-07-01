@@ -41,7 +41,13 @@ export type Claude360ModelSyncResult = {
   groupsByPurpose: Record<Claude360TokenPurpose, Claude360ToolGroupInfo[]>
 }
 
-type GroupItem = { name?: string; recommended?: boolean }
+type GroupItem = {
+  name?: string
+  display_name?: string
+  recommended?: boolean
+  ratio?: number | null
+  desc?: string
+}
 type ModelsResponse = { models?: { id?: string }[] }
 
 const TOOL_TO_PURPOSE: Record<string, Claude360TokenPurpose> = {
@@ -72,11 +78,12 @@ export class Claude360ModelService {
     return token
   }
 
-  async refreshGroupsAndModels(): Promise<Claude360ModelSyncResult> {
-    const token = await this.cliToken()
-
-    // 1) 按工具拉分组：记录每个分组首次出现的用途（codex→text / image / music），
-    //    并保留每个用途完整的分组清单（含 recommended），供上层选择默认分组。
+  private async fetchGroupsByPurpose(token: string): Promise<{
+    groupsByPurpose: Record<Claude360TokenPurpose, Claude360ToolGroupInfo[]>
+    purposeByGroup: Map<string, Claude360TokenPurpose>
+  }> {
+    // 按工具拉分组：记录每个分组首次出现的用途（codex→text / image / music），
+    // 保留完整清单（含 recommended/ratio/desc），供选默认分组与「分组及Key」页展示。
     const groupsByPurpose: Record<Claude360TokenPurpose, Claude360ToolGroupInfo[]> = {
       text: [],
       image: [],
@@ -91,10 +98,49 @@ export class Claude360ModelService {
         const name = (g.name ?? '').trim()
         if (!name || seen.has(name)) continue
         seen.add(name)
-        groupsByPurpose[purpose].push({ name, recommended: g.recommended === true })
+        groupsByPurpose[purpose].push({
+          name,
+          recommended: g.recommended === true,
+          ratio: typeof g.ratio === 'number' ? g.ratio : null,
+          desc: typeof g.desc === 'string' ? g.desc : undefined
+        })
         if (!purposeByGroup.has(name)) purposeByGroup.set(name, purpose)
       }
     }
+    return { groupsByPurpose, purposeByGroup }
+  }
+
+  /** 纯拉分组清单（含倍率/描述/推荐），无副作用（不 ensure Key、不写 settings）。供「分组及Key」页。 */
+  async listGroups(): Promise<Record<Claude360TokenPurpose, Claude360ToolGroupInfo[]>> {
+    const token = await this.cliToken()
+    const { groupsByPurpose } = await this.fetchGroupsByPurpose(token)
+    return groupsByPurpose
+  }
+
+  /** 按分组拉可用模型 id（去重）。供「分组及Key」页详情懒加载。 */
+  async listModelsByGroup(group: string): Promise<string[]> {
+    const token = await this.cliToken()
+    const resp = await this.deps.apiClient.get<ModelsResponse>(
+      `/api/cli/models?group=${encodeURIComponent(group)}`,
+      token
+    )
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const m of resp.models ?? []) {
+      const id = (m.id ?? '').trim()
+      if (id && !seen.has(id)) {
+        seen.add(id)
+        out.push(id)
+      }
+    }
+    return out
+  }
+
+  async refreshGroupsAndModels(): Promise<Claude360ModelSyncResult> {
+    const token = await this.cliToken()
+
+    // 1) 拉分组（含 recommended/ratio/desc）。
+    const { groupsByPurpose, purposeByGroup } = await this.fetchGroupsByPurpose(token)
 
     // 2) 每个分组拉模型，标注图片模型。
     const groupInputs: Claude360GroupModelsInput[] = []

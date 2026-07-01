@@ -289,6 +289,16 @@ export type LegacySessionImportResult =
 export type SseEventPayload = { streamId: string; events: unknown[] }
 export type SseEndPayload = { streamId: string }
 export type SseErrorPayload = { streamId: string; status?: number; message?: string }
+// —— Claude360 通用文本流式 chat（AI 写词助手）——
+export type Claude360ChatStreamStartPayload = {
+  model: string
+  system: string
+  user: string
+  streamId?: string
+}
+export type Claude360ChatDeltaPayload = { streamId: string; delta: string }
+export type Claude360ChatEndPayload = { streamId: string }
+export type Claude360ChatErrorPayload = { streamId: string; message?: string }
 export type TrayActionPayload =
   | { type: 'new-chat' }
   | { type: 'open-thread'; threadId: string }
@@ -401,6 +411,11 @@ export type KunGuiApi = {
   claude360TokensEnsure: (payload: { group: string; purpose: Claude360TokenPurpose }) => Promise<Claude360TokenRef>
   claude360TokensCreate: (payload: { group?: string; name: string }) => Promise<Claude360TokenRef>
   claude360TokensReveal: (payload: { tokenId: number }) => Promise<{ key: string }>
+  claude360TokensDelete: (payload: { tokenId: number }) => Promise<{ ok: true }>
+  claude360GroupsList: () => Promise<
+    Record<Claude360TokenPurpose, { name: string; recommended: boolean; ratio?: number | null; desc?: string }[]>
+  >
+  claude360ModelsByGroup: (payload: { group: string }) => Promise<{ models: string[] }>
   claude360ModelsRefresh: () => Promise<{ ok: true; modelCache: Claude360ModelCache }>
   claude360ModelsList: () => Promise<Claude360ModelCache>
   claude360BillingMe: () => Promise<Claude360Me>
@@ -543,6 +558,13 @@ export type KunGuiApi = {
   onSseEvent: (handler: (payload: SseEventPayload) => void) => () => void
   onSseEnd: (handler: (payload: SseEndPayload) => void) => () => void
   onSseError: (handler: (payload: SseErrorPayload) => void) => () => void
+  claude360ChatStreamStart: (
+    payload: Claude360ChatStreamStartPayload
+  ) => Promise<{ streamId: string }>
+  claude360ChatStreamStop: (streamId: string) => Promise<boolean>
+  onClaude360ChatDelta: (handler: (payload: Claude360ChatDeltaPayload) => void) => () => void
+  onClaude360ChatEnd: (handler: (payload: Claude360ChatEndPayload) => void) => () => void
+  onClaude360ChatError: (handler: (payload: Claude360ChatErrorPayload) => void) => () => void
   onClawChannelActivity: (handler: (payload: ClawChannelActivityPayload) => void) => () => void
   onTrayAction: (handler: (payload: TrayActionPayload) => void) => () => void
   onRuntimeStatus: (handler: (payload: KunRuntimeStatusPayload) => void) => () => void

@@ -24,6 +24,7 @@ import { CLAUDE360_CLI_TOKEN_REF, claude360ApiKeyRef, type Claude360SecretStore 
 export type Claude360ApiClientPort = {
   get<T>(path: string, token?: string): Promise<T>
   post<T>(path: string, body?: unknown, token?: string): Promise<T>
+  delete<T>(path: string, token?: string): Promise<T>
 }
 
 export type Claude360TokenServiceDeps = {
@@ -100,6 +101,17 @@ export class Claude360TokenService {
     return resp.key
   }
 
+  /**
+   * 删除指定 API Key：后端删除 + 清掉本地明文缓存。
+   * tokenRefs 里指向该 tokenId 的悬空条目不在此单独删除（浅合并无法删键），
+   * 由 ensureGroupToken 的自愈重建覆盖（reveal 失败→重建，同 scopedKey 覆盖）。
+   */
+  async deleteToken(tokenId: number): Promise<void> {
+    const token = await this.cliToken()
+    await this.deps.apiClient.delete(`/api/cli/tokens/${tokenId}`, token)
+    await this.deps.secretStore.deleteSecret(claude360ApiKeyRef(tokenId))
+  }
+
   /** 确保某用途有可用的分组 Key：已存且 secret 可读则复用；secret 缺失则 reveal；都没有则创建。 */
   async ensureGroupToken(group: string, purpose: Claude360TokenPurpose): Promise<Claude360TokenRef> {
     // in-flight 去重：同一 group|purpose 并发调用共用同一 Promise，避免重复建 token。
@@ -126,13 +138,21 @@ export class Claude360TokenService {
     const existing = scoped ?? (legacy && legacy.group === group ? legacy : undefined)
     if (existing) {
       const secret = await this.deps.secretStore.loadSecret(claude360ApiKeyRef(existing.tokenId))
-      if (!secret) {
+      if (secret) {
+        // 固化/迁移到 group-scoped key（legacy 命中或首次写入时补齐）。
+        await this.deps.writeClaude360({ tokenRefs: { [scopedKey]: existing } })
+        return existing
+      }
+      // secret 缺失：尝试 reveal 补回；若 token 已被删除（reveal 失败），丢弃悬空 ref，
+      // 落到下方重建流程，避免删 Key 后该分组永远 ensure 失败。
+      try {
         const revealed = await this.revealToken(existing.tokenId)
         await this.deps.secretStore.saveSecret(claude360ApiKeyRef(existing.tokenId), revealed)
+        await this.deps.writeClaude360({ tokenRefs: { [scopedKey]: existing } })
+        return existing
+      } catch {
+        // 悬空 ref：继续走下方重建（scopedKey 将被新 ref 覆盖）。
       }
-      // 固化/迁移到 group-scoped key（legacy 命中或首次写入时补齐）。
-      await this.deps.writeClaude360({ tokenRefs: { [scopedKey]: existing } })
-      return existing
     }
 
     const tokens = await this.listTokens()

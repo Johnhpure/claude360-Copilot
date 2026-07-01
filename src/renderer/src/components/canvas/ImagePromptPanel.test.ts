@@ -1,7 +1,5 @@
-// ImagePromptPanel 静态渲染测试（plan-06 Task 5+7）。
+// ImagePromptPanel 静态渲染测试（生图重构：宽高比图标网格 + 分辨率 + 质量 + 输出格式 + 参考图）。
 // node 环境、renderToStaticMarkup + 注入 props/mock t。
-// 覆盖：是工具型面板（prompt/模型/尺寸/张数/生成按钮）、image 模型下拉、
-// 无 image 模型显示空态 + 刷新按钮（Task7）、生成态禁用。
 import { describe, it, expect } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -15,29 +13,45 @@ function t(key: string, opts?: Record<string, unknown>): string {
 const base = {
   prompt: '',
   model: 'flux-pro',
-  size: '1024x1024' as const,
+  aspectPreset: 'square',
+  resolution: '2K' as const,
+  quality: 'auto' as const,
+  outputFormat: 'png' as const,
+  size: '2048x2048',
   n: 1,
+  referenceImage: null,
   imageModels: ['flux-pro', 'dall-e-3'],
   generating: false,
   onChangePrompt: () => undefined,
   onChangeModel: () => undefined,
-  onChangeSize: () => undefined,
+  onChangeAspect: () => undefined,
+  onChangeResolution: () => undefined,
+  onChangeQuality: () => undefined,
+  onChangeOutputFormat: () => undefined,
   onChangeCount: () => undefined,
+  onPickReference: () => undefined,
+  onClearReference: () => undefined,
   onSubmit: () => undefined,
   onRefreshModels: () => undefined,
   t
 }
 
 describe('ImagePromptPanel · 工具型面板', () => {
-  it('渲染 prompt 输入 / 模型选择 / 尺寸 / 张数 / 生成按钮', () => {
+  it('渲染 prompt / 模型 / 宽高比网格 / 分辨率 / 张数 / 质量 / 输出格式 / 生成按钮', () => {
     const html = renderToStaticMarkup(createElement(ImagePromptPanel, base))
     expect(html).toContain('image-prompt-panel')
     expect(html).toContain('image-prompt-input')
     expect(html).toContain('image-model-select')
-    expect(html).toContain('image-size-select')
+    expect(html).toContain('image-aspect-square')
+    expect(html).toContain('image-aspect-widescreen')
+    expect(html).toContain('image-resolution-2K')
     expect(html).toContain('image-count-select')
+    expect(html).toContain('image-quality-auto')
+    expect(html).toContain('image-output-format-select')
     expect(html).toContain('image-generate-button')
     expect(html).toContain('canvasGenerate')
+    // 尺寸预览显示派生像素
+    expect(html).toContain('2048')
     // 断言不出现独立登录 / API Key 配置字样
     expect(html.toLowerCase()).not.toContain('api key')
     expect(html.toLowerCase()).not.toContain('apikey')
@@ -50,7 +64,28 @@ describe('ImagePromptPanel · 工具型面板', () => {
     expect(html).not.toContain('gpt-image-2')
   })
 
-  it('无 image 模型时显示空态 + 刷新按钮，生成按钮禁用（Task7）', () => {
+  it('宽高比网格覆盖 10 档预设，含常见比例标签', () => {
+    const html = renderToStaticMarkup(createElement(ImagePromptPanel, base))
+    expect(html).toContain('1:1')
+    expect(html).toContain('16:9')
+    expect(html).toContain('9:16')
+    expect(html).toContain('21:9')
+    expect(html).toContain('image-aspect-exclusive')
+  })
+
+  it('无参考图时显示上传入口；有参考图时显示预览 + 移除', () => {
+    const empty = renderToStaticMarkup(createElement(ImagePromptPanel, base))
+    expect(empty).toContain('image-reference-input')
+    expect(empty).toContain('canvasReferenceUpload')
+    const withRef = renderToStaticMarkup(
+      createElement(ImagePromptPanel, { ...base, referenceImage: 'data:image/png;base64,AAA' })
+    )
+    expect(withRef).toContain('image-reference-preview')
+    expect(withRef).toContain('canvasReferenceRemove')
+    expect(withRef).not.toContain('image-reference-input')
+  })
+
+  it('无 image 模型时显示空态 + 刷新按钮，生成按钮禁用', () => {
     const html = renderToStaticMarkup(
       createElement(ImagePromptPanel, { ...base, imageModels: [], model: '' })
     )
@@ -65,11 +100,5 @@ describe('ImagePromptPanel · 工具型面板', () => {
     const html = renderToStaticMarkup(createElement(ImagePromptPanel, { ...base, generating: true }))
     expect(html).toContain('canvasGenerating')
     expect(html).toContain('disabled')
-  })
-
-  it('尺寸下拉包含 auto 等允许集合', () => {
-    const html = renderToStaticMarkup(createElement(ImagePromptPanel, base))
-    expect(html).toContain('1024x1024')
-    expect(html).toContain('auto')
   })
 })

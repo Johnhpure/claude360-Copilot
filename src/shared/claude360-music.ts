@@ -12,24 +12,23 @@ export type Claude360SunoModel = 'V4' | 'V4_5' | 'V4_5PLUS' | 'V4_5ALL' | 'V5' |
 export type Claude360VocalGender = '' | 'm' | 'f'
 export type Claude360PersonaModel = '' | 'style_persona' | 'voice_persona'
 
-// —— 创作模式（简单 / 标准共享底层字段）——
-export type Claude360MusicCreateMode = 'simple' | 'standard'
+// —— 创作模式（一句话 / 标准共享底层字段）——
+export type Claude360MusicCreateMode = 'oneshot' | 'standard'
 
 // —— 创作面板统一表单模型（迁移自 music-web CreateForm）——
 export interface Claude360MusicCreateForm {
   mode: Claude360MusicCreateMode
-  description: string // 简单模式：歌曲描述
+  description: string // 一句话模式：歌曲描述
   customMode: boolean // 标准模式：自定义模式开关
   instrumental: boolean
   model: Claude360SunoModel
   title: string
   style: string // 曲风
-  lyrics: string // 简单模式选填歌词 / 标准模式歌词(=prompt)
+  lyrics: string // 标准模式歌词(=prompt)
   negativeTags: string
   vocalGender: Claude360VocalGender
   styleWeight: number // 0–1
   weirdness: number // 0–1
-  audioWeight: number // 0–1
   personaId: string
   personaModel: Claude360PersonaModel
 }
@@ -46,7 +45,6 @@ export interface Claude360MusicSubmitPayload {
   vocal_gender?: 'm' | 'f'
   style_weight?: number
   weirdness_constraint?: number
-  audio_weight?: number
   negative_tags?: string
   persona_id?: string
   persona_model?: string

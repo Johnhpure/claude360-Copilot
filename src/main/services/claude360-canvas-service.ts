@@ -166,6 +166,8 @@ export class Claude360CanvasService {
       n: input.n ?? 1
     }
     if (input.size) body.size = input.size
+    if (input.quality) body.quality = input.quality
+    if (input.output_format) body.output_format = input.output_format
 
     let env: Claude360ImagesRawEnvelope
     try {

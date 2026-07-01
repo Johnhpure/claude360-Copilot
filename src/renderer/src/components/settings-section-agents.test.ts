@@ -516,9 +516,8 @@ describe('AgentsSettingsSection Kun diagnostics smoke', () => {
     // 不再渲染可编辑的供应商 ID / Base URL 输入框。
     expect(html).not.toMatch(/<input[^>]+value="custom-provider-2"[^>]*>/)
     expect(html).not.toMatch(/<input[^>]+value="https:\/\/api\.example\.com\/v1"[^>]*>/)
-    // 供应商仍以只读方式展示,并引导用户去「我的」页管理。
-    expect(html).toContain('Custom Provider')
-    expect(html).toContain('Manage providers on the My page')
+    // 二开：普通用户（SHOW_MANUAL_PROVIDER_CONFIG=false）看到的是「分组及 Key」页
+    // （GroupsKeysSection），不再有手动供应商配置入口，也不再是旧的只读 provider 列表。
   })
 
   it('shows the managed notice for the default provider without manual config', () => {
@@ -533,7 +532,6 @@ describe('AgentsSettingsSection Kun diagnostics smoke', () => {
     expect(html).not.toContain('Danger zone')
     expect(html).not.toContain('Test connection')
     expect(html).not.toContain('Add provider')
-    expect(html).toContain('Manage providers on the My page')
   })
 
   it('keeps advanced agent controls behind collapsed disclosures', () => {

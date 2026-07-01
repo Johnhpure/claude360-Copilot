@@ -85,11 +85,11 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
     const service = new Claude360ModelService({
       apiClient: fakeApi({
         '/api/cli/groups?tool=codex': () => [
-          { name: 'auto', recommended: false },
-          { name: 'vip', recommended: true }
+          { name: 'auto', recommended: false, ratio: 1, desc: '自动' },
+          { name: 'vip', recommended: true, ratio: 0.8, desc: '高速通道' }
         ],
-        '/api/cli/groups?tool=image': () => [{ name: 'image-group', recommended: true }],
-        '/api/cli/groups?tool=music': () => [{ name: 'music-group', recommended: false }],
+        '/api/cli/groups?tool=image': () => [{ name: 'image-group', recommended: true, ratio: 2, desc: '图像' }],
+        '/api/cli/groups?tool=music': () => [{ name: 'music-group', recommended: false, ratio: 1.2 }],
         '/api/cli/models?group=auto': () => ({ models: [{ id: 'gpt-5.1-codex-max' }] }),
         '/api/cli/models?group=vip': () => ({ models: [{ id: 'gpt-5.1-codex-max' }] }),
         '/api/cli/models?group=image-group': () => ({ models: [{ id: 'gemini-2.5-flash-image' }] }),
@@ -102,11 +102,14 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
     const result = await service.refreshGroupsAndModels()
 
     expect(result.groupsByPurpose.text).toEqual([
-      { name: 'auto', recommended: false },
-      { name: 'vip', recommended: true }
+      { name: 'auto', recommended: false, ratio: 1, desc: '自动' },
+      { name: 'vip', recommended: true, ratio: 0.8, desc: '高速通道' }
     ])
-    expect(result.groupsByPurpose.image).toEqual([{ name: 'image-group', recommended: true }])
-    expect(result.groupsByPurpose.music).toEqual([{ name: 'music-group', recommended: false }])
+    expect(result.groupsByPurpose.image).toEqual([
+      { name: 'image-group', recommended: true, ratio: 2, desc: '图像' }
+    ])
+    // music-group 未提供 desc → 解析为 undefined（toEqual 忽略）；ratio 保留。
+    expect(result.groupsByPurpose.music).toEqual([{ name: 'music-group', recommended: false, ratio: 1.2 }])
     expect(result.providerProfiles.map((p) => p.id).sort()).toEqual([
       'claude360:auto',
       'claude360:image-group',
@@ -122,5 +125,48 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
       ensureGroupRef: async (group, purpose) => ({ tokenId: 1, name: purpose, group })
     })
     await expect(service.refreshGroupsAndModels()).rejects.toThrow(/未登录/)
+  })
+})
+
+describe('Claude360ModelService.listGroups / listModelsByGroup', () => {
+  it('lists groups with ratio/desc and has no side effects (never ensures keys)', async () => {
+    let ensureCalls = 0
+    const service = new Claude360ModelService({
+      apiClient: fakeApi({
+        '/api/cli/groups?tool=codex': () => [{ name: 'auto', recommended: true, ratio: 1, desc: '自动分组' }],
+        '/api/cli/groups?tool=image': () => [],
+        '/api/cli/groups?tool=music': () => []
+      }),
+      secretStore: fakeSecretStore(),
+      ensureGroupRef: async (group, purpose) => {
+        ensureCalls++
+        return { tokenId: 1, name: purpose, group }
+      }
+    })
+    const groups = await service.listGroups()
+    expect(groups.text).toEqual([{ name: 'auto', recommended: true, ratio: 1, desc: '自动分组' }])
+    expect(groups.image).toEqual([])
+    // 纯拉取：绝不触发建 Key（无副作用）。
+    expect(ensureCalls).toBe(0)
+  })
+
+  it('lists models for a group and dedups ids', async () => {
+    const service = new Claude360ModelService({
+      apiClient: fakeApi({
+        '/api/cli/models?group=vip': () => ({ models: [{ id: 'a' }, { id: 'a' }, { id: 'b' }, { id: '' }] })
+      }),
+      secretStore: fakeSecretStore(),
+      ensureGroupRef: async (group, purpose) => ({ tokenId: 1, name: purpose, group })
+    })
+    expect(await service.listModelsByGroup('vip')).toEqual(['a', 'b'])
+  })
+
+  it('throws when not logged in (listGroups)', async () => {
+    const service = new Claude360ModelService({
+      apiClient: fakeApi({}),
+      secretStore: fakeSecretStore({}),
+      ensureGroupRef: async (group, purpose) => ({ tokenId: 1, name: purpose, group })
+    })
+    await expect(service.listGroups()).rejects.toThrow(/未登录/)
   })
 })

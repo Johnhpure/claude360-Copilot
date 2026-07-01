@@ -1302,8 +1302,16 @@ export function isClaude360ProviderId(id: string | undefined | null): boolean {
   return normalized.startsWith('claude360:') || normalized.startsWith('claude360-')
 }
 
-/** 后端 `/api/cli/groups` 返回的单个分组的精简形态（选择分组时只需名称与推荐位）。 */
-export type Claude360ToolGroupInfo = { name: string; recommended: boolean }
+/**
+ * 后端 `/api/cli/groups` 返回的单个分组形态。name/recommended 用于选默认分组；
+ * ratio(分组倍率)/desc(分组描述) 供「分组及Key」页展示（后端已返回，此前被丢弃）。
+ */
+export type Claude360ToolGroupInfo = {
+  name: string
+  recommended: boolean
+  ratio?: number | null
+  desc?: string
+}
 
 /**
  * 依据后端某工具（text/image/music）的分组清单，为对应 selected group 选一个合理值：

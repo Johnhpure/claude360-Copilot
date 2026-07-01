@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>生图工作台 — UI 重构示意图 v2</title>
+<style>
+  :root {
+    --bg-app:#f3f5fc; --card:rgba(255,255,255,0.9); --card-strong:#ffffff;
+    --main:#eaf0f9; --border:rgba(20,47,95,0.13); --border-muted:rgba(20,47,95,0.085);
+    --ink:#233659; --muted:#54678c; --faint:#8492b1;
+    --accent:#3b82d8; --accent-soft:rgba(59,130,216,0.15);
+    --success:#128a4a; --success-soft:rgba(17,185,129,0.14);
+    --danger:#d6493f; --danger-soft:rgba(244,116,100,0.14); --danger-border:rgba(214,73,63,0.3);
+    --new:#8b5cf6; --new-soft:rgba(139,92,246,0.14);
+    --shadow:0 12px 30px rgba(20,47,95,0.08); --hover:rgba(59,110,187,0.065);
+  }
+  [data-theme="dark"] {
+    --bg-app:#0f1422; --card:rgba(22,29,47,0.92); --card-strong:#1b2338;
+    --main:#161d2f; --border:rgba(151,192,235,0.13); --border-muted:rgba(151,192,235,0.08);
+    --ink:#f0f5fc; --muted:#bdc9de; --faint:#8593b1;
+    --accent:#5b9bec; --accent-soft:rgba(91,155,236,0.18);
+    --success:#3ecf8e; --success-soft:rgba(62,207,142,0.16);
+    --danger:#f47464; --danger-soft:rgba(244,116,100,0.16); --danger-border:rgba(244,116,100,0.4);
+    --new:#a78bfa; --new-soft:rgba(167,139,250,0.2);
+    --shadow:0 16px 40px rgba(0,0,0,0.4); --hover:rgba(120,170,235,0.08);
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg-app); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased; padding:24px; min-height:100vh;
+  }
+  .demo-note { max-width:1180px; margin:0 auto 14px; font-size:12px; color:var(--faint);
+    display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .note-legend { display:flex; align-items:center; gap:12px; }
+  .badge-new { display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700;
+    color:var(--new); background:var(--new-soft); border-radius:999px; padding:1px 7px; letter-spacing:.3px; vertical-align:middle; }
+  .theme-toggle { display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+    border:1px solid var(--border); background:var(--card); color:var(--muted);
+    border-radius:999px; padding:5px 12px; font-size:12px; font-weight:500; transition:all .18s ease; }
+  .theme-toggle:hover { background:var(--card-strong); color:var(--ink); }
+  .theme-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  .panel { max-width:1180px; margin:0 auto; background:var(--card);
+    border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; backdrop-filter:blur(8px); }
+  .panel-head { padding:16px 22px; border-bottom:1px solid var(--border-muted);
+    display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  .panel-title { display:flex; align-items:center; gap:10px; }
+  .panel-title .ic { width:34px; height:34px; border-radius:10px; background:var(--accent-soft);
+    color:var(--accent); display:grid; place-items:center; }
+  .panel-title h1 { margin:0; font-size:16px; font-weight:600; letter-spacing:.2px; }
+  .panel-title p { margin:2px 0 0; font-size:12px; color:var(--faint); }
+
+  .btn { display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;
+    border-radius:999px; font-size:12.5px; font-weight:500; padding:7px 14px;
+    border:1px solid var(--border); background:var(--card-strong); color:var(--muted); transition:all .18s ease; }
+  .btn:hover { background:var(--hover); color:var(--ink); }
+  .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  .body { display:grid; grid-template-columns:400px 1fr; min-height:600px; }
+  .form-col { border-right:1px solid var(--border-muted); padding:16px; overflow-y:auto; max-height:760px; }
+  .result-col { padding:18px 20px; overflow-y:auto; max-height:760px; background:var(--main); }
+
+  .card { border:1px solid var(--border); border-radius:16px; background:var(--card-strong); padding:16px; margin-bottom:14px; }
+
+  .field { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+  .field:last-child { margin-bottom:0; }
+  .field > label, .field-label { font-size:12.5px; color:var(--muted); font-weight:500;
+    display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .req { color:var(--danger); }
+  select, input[type=text], textarea {
+    width:100%; border:1px solid var(--border); background:var(--main); color:var(--ink);
+    border-radius:10px; padding:8px 10px; font-size:12.5px; font-family:inherit; }
+  select:focus-visible, input:focus-visible, textarea:focus-visible { outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent); }
+  textarea { resize:vertical; min-height:84px; }
+
+  /* 参考图上传（可选） */
+  .ref-drop { border:1.5px dashed var(--border); border-radius:12px; background:var(--main);
+    padding:13px; display:flex; align-items:center; gap:10px; cursor:pointer; transition:all .16s ease; }
+  .ref-drop:hover { border-color:var(--accent); background:var(--accent-soft); }
+  .ref-drop .di { width:38px; height:38px; border-radius:9px; background:var(--card-strong); display:grid; place-items:center; color:var(--muted); flex:none; }
+  .ref-drop .dt { font-size:12.5px; font-weight:600; color:var(--ink); }
+  .ref-drop .ds { font-size:11px; color:var(--faint); }
+  .ref-preview { display:flex; align-items:center; gap:11px; border:1px solid var(--border); border-radius:12px; background:var(--main); padding:9px 11px; }
+  .ref-preview .rp-thumb { width:46px; height:46px; border-radius:8px; object-fit:cover; flex:none; border:1px solid var(--border); }
+  .ref-preview .rp-main { flex:1; min-width:0; }
+  .ref-preview .rp-name { font-size:12.5px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ref-preview .rp-sub { font-size:11px; color:var(--faint); }
+  .ref-remove { display:grid; place-items:center; width:30px; height:30px; cursor:pointer; flex:none;
+    border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--muted); transition:all .16s ease; }
+  .ref-remove:hover { background:var(--danger-soft); color:var(--danger); border-color:var(--danger-border); }
+  .ref-remove:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+
+  /* 宽高比图标网格（严格参考 infinite-canvas 预设） */
+  .ratio-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:7px; }
+  .ratio-btn { display:flex; flex-direction:column; align-items:center; gap:5px; padding:9px 4px 7px;
+    border:1px solid var(--border); border-radius:11px; background:var(--main); color:var(--muted);
+    cursor:pointer; transition:all .16s ease; font-family:inherit; }
+  .ratio-btn:hover { border-color:var(--accent); background:var(--accent-soft); color:var(--ink); }
+  .ratio-btn[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); color:var(--accent);
+    box-shadow:0 0 0 1px var(--accent) inset; }
+  .ratio-btn:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .ratio-shape-box { height:26px; display:grid; place-items:center; }
+  .ratio-shape { border:1.6px solid currentColor; border-radius:3px; }
+  .ratio-label { font-size:11px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .ratio-name { font-size:9px; color:var(--faint); line-height:1; }
+  .size-preview { margin-top:9px; font-size:11px; color:var(--faint); text-align:center;
+    font-variant-numeric:tabular-nums; }
+  .size-preview b { color:var(--muted); font-weight:600; }
+
+  /* mini segmented（分辨率 / 质量） */
+  .mini-seg { display:inline-flex; width:100%; background:var(--main); border:1px solid var(--border-muted);
+    border-radius:10px; padding:3px; gap:2px; }
+  .mini-seg button { flex:1; border:0; background:transparent; color:var(--muted); cursor:pointer;
+    padding:7px 8px; border-radius:8px; font-size:12px; font-weight:500; transition:all .16s; font-family:inherit; }
+  .mini-seg button:hover { color:var(--ink); }
+  .mini-seg button[aria-selected="true"] { background:var(--card-strong); color:var(--ink);
+    box-shadow:0 1px 3px rgba(20,47,95,.1); font-weight:600; }
+  .mini-seg button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+
+  .adv { border:1px solid var(--border); border-radius:14px; background:var(--card-strong); margin-bottom:14px; overflow:hidden; }
+  .adv-head { width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:12px 15px; cursor:pointer; border:0; background:transparent; color:var(--ink); font-size:13px; font-weight:600; font-family:inherit; }
+  .adv-head:hover { background:var(--hover); }
+  .adv-head .chev { transition:transform .2s ease; color:var(--faint); }
+  .adv[open] .chev { transform:rotate(180deg); }
+  .adv-body { padding:4px 15px 15px; }
+
+  .cta { width:100%; display:inline-flex; height:44px; align-items:center; justify-content:center; gap:8px;
+    border:0; border-radius:14px; background:var(--ink); color:var(--card-strong); font-size:13.5px; font-weight:700;
+    cursor:pointer; transition:all .18s ease; box-shadow:0 4px 14px rgba(20,47,95,.14); }
+  [data-theme=dark] .cta { background:var(--accent); color:#fff; }
+  .cta:hover { opacity:.92; }
+  .cta:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  .result-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .result-head h3 { margin:0; font-size:14px; font-weight:600; }
+  .result-head .count { font-size:11.5px; color:var(--faint); font-variant-numeric:tabular-nums; }
+  .grid-imgs { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+  .img-card { border:1px solid var(--border); border-radius:14px; overflow:hidden; background:var(--card-strong);
+    position:relative; aspect-ratio:1; }
+  .img-card img { width:100%; height:100%; object-fit:cover; display:block; }
+  .img-ovl { position:absolute; inset:0; background:linear-gradient(to top,rgba(0,0,0,.55),transparent 45%);
+    opacity:0; transition:opacity .18s ease; display:flex; align-items:flex-end; justify-content:flex-end; gap:6px; padding:10px; }
+  .img-card:hover .img-ovl { opacity:1; }
+  .icon-btn { display:grid; place-items:center; width:32px; height:32px; cursor:pointer;
+    border:1px solid rgba(255,255,255,.25); border-radius:9px; background:rgba(255,255,255,.16);
+    color:#fff; transition:all .16s ease; backdrop-filter:blur(4px); }
+  .icon-btn:hover { background:rgba(255,255,255,.3); }
+  .img-badge { position:absolute; top:8px; left:8px; font-size:10px; font-weight:600; color:#fff;
+    background:rgba(0,0,0,.5); border-radius:999px; padding:2px 8px; backdrop-filter:blur(4px); }
+  svg { display:block; }
+</style>
+</head>
+<body>
+  <div class="demo-note">
+    <div class="note-legend">
+      <span>示意图（原型 · 假数据）— 「生图工作台」重构 v2。</span>
+      <span class="badge-new">新</span><span>= 本次重构补齐的能力</span>
+    </div>
+    <button class="theme-toggle" id="themeToggle" aria-label="切换深浅色">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <span id="themeLabel">深色</span>
+    </button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title">
+        <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.6-3.6a2 2 0 0 0-2.8 0L6 20"/></svg></span>
+        <div><h1>生图工作台</h1><p>文本生图 · 分组 Key 自动调用，无需单独配置</p></div>
+      </div>
+      <button class="btn" id="histBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+        历史
+      </button>
+    </div>
+
+    <div class="body">
+      <!-- 左：表单（纯文本生图，无模式切换 / 无图像编辑） -->
+      <div class="form-col">
+        <div class="card">
+          <div class="field">
+            <label>模型</label>
+            <select id="modelSel">
+              <option>flux-1.1-pro</option><option>gpt-image-1</option><option>dall-e-3</option><option>sd-3.5-large</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <span class="field-label">提示词 <span class="req">*</span></span>
+            <textarea id="promptInput" placeholder="描述你想要的画面，例如：赛博朋克风格的城市夜景，霓虹灯，雨后街道…"></textarea>
+          </div>
+
+          <!-- 参考图上传（新 · 可选，图生图引导） -->
+          <div class="field">
+            <span class="field-label">参考图 <span class="badge-new">新 · 可选</span></span>
+            <div class="ref-drop" id="refDrop">
+              <span class="di"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.6-3.6a2 2 0 0 0-2.8 0L6 20"/></svg></span>
+              <div><div class="dt">上传参考图</div><div class="ds">以此图为构图 / 风格参考生成</div></div>
+            </div>
+            <div class="ref-preview" id="refPreview" style="display:none">
+              <img class="rp-thumb" alt="参考图预览" src="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'&gt;&lt;defs&gt;&lt;linearGradient id='rg' x1='0' y1='0' x2='1' y2='1'&gt;&lt;stop offset='0' stop-color='%234f6bb5'/&gt;&lt;stop offset='1' stop-color='%232e8f6a'/&gt;&lt;/linearGradient&gt;&lt;/defs&gt;&lt;rect width='120' height='120' fill='url(%23rg)'/&gt;&lt;circle cx='42' cy='45' r='20' fill='%23ffd97a'/&gt;&lt;path d='M0 120 L42 72 L72 99 L96 78 L120 105 L120 120 Z' fill='%23134e4a' opacity='.6'/&gt;&lt;/svg&gt;"/>
+              <div class="rp-main">
+                <div class="rp-name">reference.png</div>
+                <div class="rp-sub">1024×1024 · 作为参考</div>
+              </div>
+              <button class="ref-remove" id="refRemove" title="移除参考图" aria-label="移除参考图">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 宽高比图标网格（新） -->
+          <div class="field">
+            <span class="field-label">比例 <span class="badge-new">新 · 图标选择</span></span>
+            <div class="ratio-grid" id="ratioGrid" role="group" aria-label="画面比例"></div>
+            <div class="size-preview" id="sizePreview"></div>
+          </div>
+
+          <!-- 分辨率（新）+ 张数 -->
+          <div class="grid2">
+            <div class="field" style="margin:0">
+              <span class="field-label">分辨率 <span class="badge-new">新</span></span>
+              <div class="mini-seg" id="resSeg" role="group" aria-label="分辨率">
+                <button aria-selected="false" data-res="1K">1K</button>
+                <button aria-selected="true" data-res="2K">2K</button>
+                <button aria-selected="false" data-res="4K">4K</button>
+              </div>
+            </div>
+            <div class="field" style="margin:0">
+              <label>张数</label>
+              <select><option>1</option><option>2</option><option selected>3</option><option>4</option></select>
+            </div>
+          </div>
+
+          <!-- 质量档位（新：自动/高/中/低） -->
+          <div class="field">
+            <span class="field-label">质量 <span class="badge-new">新</span></span>
+            <div class="mini-seg" id="qualitySeg" role="group" aria-label="质量">
+              <button aria-selected="true" data-q="auto">自动</button>
+              <button aria-selected="false" data-q="high">高</button>
+              <button aria-selected="false" data-q="medium">中</button>
+              <button aria-selected="false" data-q="low">低</button>
+            </div>
+          </div>
+
+          <!-- 输出格式（质量下方，常规字段） -->
+          <div class="field" style="margin-bottom:0">
+            <label>输出格式</label>
+            <select><option>png</option><option>jpeg</option><option>webp</option></select>
+          </div>
+        </div>
+
+        <button class="cta" id="genBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+          生成
+        </button>
+      </div>
+
+      <!-- 右：结果网格 -->
+      <div class="result-col">
+        <div class="result-head">
+          <h3>生成结果</h3>
+          <span class="count" id="resultMeta">3 张 · flux-1.1-pro · 1:1 · 2K</span>
+        </div>
+        <div class="grid-imgs" id="grid">
+          <div class="img-card">
+            <img src="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'&gt;&lt;defs&gt;&lt;linearGradient id='g' x1='0' y1='0' x2='1' y2='1'&gt;&lt;stop offset='0' stop-color='%237c3aed'/&gt;&lt;stop offset='1' stop-color='%23db2777'/&gt;&lt;/linearGradient&gt;&lt;/defs&gt;&lt;rect width='300' height='300' fill='url(%23g)'/&gt;&lt;circle cx='220' cy='80' r='40' fill='%23fef08a' opacity='.8'/&gt;&lt;/svg&gt;" alt="结果1"/>
+            <span class="img-badge">#1</span>
+            <div class="img-ovl">
+              <button class="icon-btn" title="放大"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3M11 8v6M8 11h6"/></svg></button>
+              <button class="icon-btn" title="下载"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></button>
+            </div>
+          </div>
+          <div class="img-card">
+            <img src="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'&gt;&lt;defs&gt;&lt;linearGradient id='g2' x1='0' y1='0' x2='1' y2='1'&gt;&lt;stop offset='0' stop-color='%230ea5e9'/&gt;&lt;stop offset='1' stop-color='%232dd4bf'/&gt;&lt;/linearGradient&gt;&lt;/defs&gt;&lt;rect width='300' height='300' fill='url(%23g2)'/&gt;&lt;path d='M0 220 L90 150 L160 190 L230 140 L300 185 L300 300 L0 300 Z' fill='%23134e4a' opacity='.55'/&gt;&lt;/svg&gt;" alt="结果2"/>
+            <span class="img-badge">#2</span>
+            <div class="img-ovl">
+              <button class="icon-btn" title="放大"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3M11 8v6M8 11h6"/></svg></button>
+              <button class="icon-btn" title="下载"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></button>
+            </div>
+          </div>
+          <div class="img-card">
+            <img src="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'&gt;&lt;defs&gt;&lt;linearGradient id='g3' x1='0' y1='0' x2='1' y2='1'&gt;&lt;stop offset='0' stop-color='%23f59e0b'/&gt;&lt;stop offset='1' stop-color='%23ef4444'/&gt;&lt;/linearGradient&gt;&lt;/defs&gt;&lt;rect width='300' height='300' fill='url(%23g3)'/&gt;&lt;circle cx='150' cy='150' r='70' fill='%23fff7ed' opacity='.25'/&gt;&lt;/svg&gt;" alt="结果3"/>
+            <span class="img-badge">#3</span>
+            <div class="img-ovl">
+              <button class="icon-btn" title="放大"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3M11 8v6M8 11h6"/></svg></button>
+              <button class="icon-btn" title="下载"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></button>
+            </div>
+          </div>
+          <div class="img-card" style="border-style:dashed;display:grid;place-items:center;background:var(--card-strong)">
+            <div style="text-align:center;color:var(--faint);font-size:12px">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 6px;opacity:.5"><path d="M12 5v14M5 12h14"/></svg>
+              再生成一张
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ── 严格取自 infinite-canvas: IMAGE_SIZE_PRESETS ──
+  const PRESETS=[
+    {id:'square',ratio:'1:1',name:'Square',sizes:{'1K':'1024x1024','2K':'2048x2048','4K':'2880x2880'}},
+    {id:'widescreen',ratio:'16:9',name:'Widescreen',sizes:{'1K':'1280x720','2K':'2048x1152','4K':'3840x2160'}},
+    {id:'story',ratio:'9:16',name:'Story',sizes:{'1K':'720x1280','2K':'1152x2048','4K':'2160x3840'}},
+    {id:'print',ratio:'5:4',name:'Print',sizes:{'1K':'1040x832','2K':'2080x1664','4K':'3200x2560'}},
+    {id:'feed',ratio:'4:5',name:'Feed',sizes:{'1K':'832x1040','2K':'1664x2080','4K':'2560x3200'}},
+    {id:'classic',ratio:'4:3',name:'Classic',sizes:{'1K':'1024x768','2K':'2048x1536','4K':'3264x2448'}},
+    {id:'vertical',ratio:'3:4',name:'Vertical',sizes:{'1K':'768x1024','2K':'1536x2048','4K':'2448x3264'}},
+    {id:'photo',ratio:'3:2',name:'Photo',sizes:{'1K':'1008x672','2K':'2064x1376','4K':'3504x2336'}},
+    {id:'portrait',ratio:'2:3',name:'Portrait',sizes:{'1K':'672x1008','2K':'1376x2064','4K':'2336x3504'}},
+    {id:'exclusive',ratio:'21:9',name:'Exclusive',sizes:{'1K':'1344x576','2K':'2016x864','4K':'3808x1632'}},
+  ];
+  let curPreset='square', curRes='2K';
+
+  // 按 ratio 画一个等比小矩形（最大边 24px）
+  function shapeStyle(ratio){
+    const [w,h]=ratio.split(':').map(Number); const max=24;
+    const rw = w>=h ? max : Math.round(max*w/h);
+    const rh = h>=w ? max : Math.round(max*h/w);
+    return `width:${rw}px;height:${rh}px`;
+  }
+  function renderRatios(){
+    const g=document.getElementById('ratioGrid');
+    g.innerHTML=PRESETS.map(p=>`
+      <button class="ratio-btn" data-id="${p.id}" aria-pressed="${p.id===curPreset}" title="${p.ratio} ${p.name}">
+        <span class="ratio-shape-box"><span class="ratio-shape" style="${shapeStyle(p.ratio)}"></span></span>
+        <span class="ratio-label">${p.ratio}</span>
+        <span class="ratio-name">${p.name}</span>
+      </button>`).join('');
+    g.querySelectorAll('.ratio-btn').forEach(b=>b.onclick=()=>{ curPreset=b.dataset.id; renderRatios(); updatePreview(); });
+  }
+  function updatePreview(){
+    const p=PRESETS.find(x=>x.id===curPreset);
+    document.getElementById('sizePreview').innerHTML=`${p.ratio} ${p.name} · ${curRes} · <b>${p.sizes[curRes].replace('x','×')}</b>`;
+    document.getElementById('resultMeta').textContent=`3 张 · ${document.getElementById('modelSel').value} · ${p.ratio} · ${curRes}`;
+  }
+  renderRatios(); updatePreview();
+
+  // 分辨率 segmented
+  document.querySelectorAll('#resSeg button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#resSeg button').forEach(x=>x.setAttribute('aria-selected','false'));
+    b.setAttribute('aria-selected','true'); curRes=b.dataset.res; updatePreview();
+  });
+  // 质量 segmented
+  document.querySelectorAll('#qualitySeg button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#qualitySeg button').forEach(x=>x.setAttribute('aria-selected','false'));
+    b.setAttribute('aria-selected','true');
+  });
+  document.getElementById('modelSel').onchange=updatePreview;
+  document.getElementById('genBtn').onclick=function(){
+    const s=this.querySelector('svg'); s.style.transition='transform .6s'; s.style.transform='rotate(180deg) scale(1.1)';
+    setTimeout(()=>{s.style.transform='';},650);
+  };
+  document.getElementById('histBtn').onclick=()=>alert('（原型）打开历史面板：最近生成的图像记录。');
+
+  // 参考图：上传 ↔ 预览/移除 切换（原型演示）
+  const refDrop=document.getElementById('refDrop'), refPreview=document.getElementById('refPreview');
+  refDrop.onclick=()=>{ refDrop.style.display='none'; refPreview.style.display='flex'; };
+  document.getElementById('refRemove').onclick=()=>{ refPreview.style.display='none'; refDrop.style.display='flex'; };
+  document.getElementById('themeToggle').onclick=function(){
+    const h=document.documentElement, dark=h.getAttribute('data-theme')==='dark';
+    h.setAttribute('data-theme',dark?'light':'dark');
+    document.getElementById('themeLabel').textContent=dark?'深色':'浅色';
+  };
+</script>
+</body>
+</html>

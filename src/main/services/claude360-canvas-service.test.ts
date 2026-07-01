@@ -131,6 +131,22 @@ describe('Claude360CanvasService.generateImages', () => {
     })
   })
 
+  it('把 quality / output_format 透传进请求 body（白名单显式加入）', async () => {
+    const calls: Array<{ path: string; body: unknown; token: string | undefined }> = []
+    const service = new Claude360CanvasService(
+      makeDeps({
+        apiClient: fakeApi({
+          generate: () => ({ data: [{ url: 'https://cdn/a.png' }] }),
+          onGenerate: (path, body, token) => calls.push({ path, body, token })
+        })
+      })
+    )
+
+    await service.generateImages({ ...generatePayload, quality: 'high', output_format: 'webp' })
+
+    expect(calls[0].body).toMatchObject({ quality: 'high', output_format: 'webp' })
+  })
+
   it('归一化 b64_json 结果为 source=base64', async () => {
     const service = new Claude360CanvasService(
       makeDeps({ apiClient: fakeApi({ generate: () => ({ data: [{ b64_json: validB64 }] }) }) })

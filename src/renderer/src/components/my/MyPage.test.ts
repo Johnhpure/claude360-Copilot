@@ -9,9 +9,8 @@ import type {
   Claude360TopupOrder,
   Claude360TopupOrderStatus
 } from '@shared/claude360'
-import type { Claude360ModelCache, Claude360TokenRef } from '@shared/app-settings-claude360'
+import type { Claude360TokenRef } from '@shared/app-settings-claude360'
 import { MyAccountOverview } from './MyAccountOverview'
-import { MyModelGroupsTable } from './MyModelGroupsTable'
 import { MyBillingPanel } from './MyBillingPanel'
 import {
   createTokenAndRefresh,
@@ -31,11 +30,6 @@ const labels: Record<string, string> = {
   myTodayUsage: "Today's spend",
   myLowBalance: 'Balance is low.',
   myTopupNow: 'Top up now',
-  myModelGroups: 'Model groups & ratios',
-  myNoModels: 'No cached models.',
-  myGroupsLabel: 'Groups',
-  myModelsLabel: 'Models',
-  myRatio: 'Ratio',
   myTopup: 'Top up',
   myMinTopup: 'Minimum top-up',
   myWechatTopup: 'Pay with WeChat',
@@ -72,10 +66,6 @@ function tokenListFixture(): Claude360TokenListItem[] {
     { id: 1, name: 'text-key', maskedKey: 'sk-****aaaa', status: 1, group: 'text', remainQuota: 1000, unlimitedQuota: false },
     { id: 2, name: 'image-key', maskedKey: 'sk-****bbbb', status: 1, group: 'image', remainQuota: 0, unlimitedQuota: true }
   ]
-}
-
-function modelCacheFixture(): Claude360ModelCache {
-  return { groups: ['text', 'image'], models: ['claude360-sonnet', 'claude360-opus'] }
 }
 
 function tokenStatsFixture(): Claude360TokenStat[] {
@@ -140,24 +130,6 @@ describe('MyPage presentational panels', () => {
     )
     expect(low).toContain('Balance is low.')
     expect(low).toContain('Top up now')
-  })
-
-  it('shows API key groups and model groups with ratios', () => {
-    const html = renderToStaticMarkup(
-      createElement(MyModelGroupsTable, {
-        modelCache: modelCacheFixture(),
-        groupRatios: { text: 1, image: 2 },
-        t
-      })
-    )
-    // 分组
-    expect(html).toContain('text')
-    expect(html).toContain('image')
-    // 倍率
-    expect(html).toContain('×1')
-    expect(html).toContain('×2')
-    // 模型
-    expect(html).toContain('claude360-sonnet')
   })
 
   it('renders top-up amount options and, once an order exists, the WeChat QR code', () => {

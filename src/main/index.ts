@@ -63,6 +63,8 @@ import { Claude360ModelService } from './services/claude360-model-service'
 import { Claude360BillingService } from './services/claude360-billing-service'
 import { Claude360MusicService } from './services/claude360-music-service'
 import { Claude360CanvasService } from './services/claude360-canvas-service'
+import { Claude360ChatService } from './services/claude360-chat-service'
+import { registerClaude360ChatStreamIpc } from './claude360-chat-stream-ipc'
 import { createClaude360SecretStore, claude360ApiKeyRef } from './services/claude360-secret-store'
 import { parseRuntimeErrorBody, runtimeErrorToError, type RuntimeErrorCode } from '../shared/runtime-error'
 import type { GuiUpdateState } from '../shared/gui-update'
@@ -1772,6 +1774,13 @@ app.whenReady().then(async () => {
       return (await claude360SecretStore.loadSecret(claude360ApiKeyRef(ref.tokenId))) ?? ''
     }
   })
+  const claude360ChatService = new Claude360ChatService({
+    readClaude360: readClaude360Settings,
+    ensureGroupKey: async (group, purpose) => {
+      const ref = await claude360TokenService.ensureGroupToken(group, purpose)
+      return (await claude360SecretStore.loadSecret(claude360ApiKeyRef(ref.tokenId))) ?? ''
+    }
+  })
 
   registerAppIpcHandlers({
     store,
@@ -1818,6 +1827,7 @@ app.whenReady().then(async () => {
   })
 
   registerRuntimeSseIpc({ ipcMain, store, ensureRuntime, logError })
+  registerClaude360ChatStreamIpc({ ipcMain, chatService: claude360ChatService, logError })
   registerTerminalPtyIpc({
     ipcMain,
     getMainWindow: () => mainWindow,

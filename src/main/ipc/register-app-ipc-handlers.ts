@@ -74,6 +74,8 @@ import {
   claude360EnsureTokenPayloadSchema,
   claude360CreateTokenPayloadSchema,
   claude360RevealTokenPayloadSchema,
+  claude360DeleteTokenPayloadSchema,
+  claude360ModelsByGroupPayloadSchema,
   claude360TopupWechatPayloadSchema,
   claude360TopupOrderPayloadSchema,
   claude360TokenStatsPayloadSchema,
@@ -167,6 +169,7 @@ import { Claude360ModelService } from '../services/claude360-model-service'
 import { Claude360BillingService } from '../services/claude360-billing-service'
 import { Claude360MusicService } from '../services/claude360-music-service'
 import { Claude360CanvasService } from '../services/claude360-canvas-service'
+import { claude360ApiKeyRef } from '../services/claude360-secret-store'
 import {
   createWorkspaceDirectory,
   createWorkspaceFile,
@@ -621,7 +624,22 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('claude360:tokens:list', async () => claude360TokenService.listTokens())
   ipcMain.handle('claude360:tokens:ensure', async (_, payload: unknown) => {
     const req = parseIpcPayload('claude360:tokens:ensure', claude360EnsureTokenPayloadSchema, payload)
-    return claude360TokenService.ensureGroupToken(req.group, req.purpose)
+    const ref = await claude360TokenService.ensureGroupToken(req.group, req.purpose)
+    // 回填对应 claude360:<group> profile 的 apiKeyRef，令运行时（kun-process）能据
+    // runtime.providerId 解出该分组 Key；否则新分组 profile 无 ref → 运行时空 Key → 401。
+    const loaded = await store.load()
+    const providers = (loaded.provider?.providers as ModelProviderProfileV1[] | undefined) ?? []
+    const apiKeyRef = claude360ApiKeyRef(ref.tokenId)
+    let changed = false
+    const updated = providers.map((p) => {
+      if (isClaude360ProviderId(p.id) && p.name === req.group && p.apiKeyRef !== apiKeyRef) {
+        changed = true
+        return { ...p, apiKey: '', apiKeyRef }
+      }
+      return p
+    })
+    if (changed) await applySettingsPatch({ provider: { providers: updated } })
+    return ref
   })
   ipcMain.handle('claude360:tokens:create', async (_, payload: unknown) => {
     const req = parseIpcPayload('claude360:tokens:create', claude360CreateTokenPayloadSchema, payload)
@@ -630,6 +648,16 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('claude360:tokens:reveal', async (_, payload: unknown) => {
     const req = parseIpcPayload('claude360:tokens:reveal', claude360RevealTokenPayloadSchema, payload)
     return { key: await claude360TokenService.revealToken(req.tokenId) }
+  })
+  ipcMain.handle('claude360:tokens:delete', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:tokens:delete', claude360DeleteTokenPayloadSchema, payload)
+    await claude360TokenService.deleteToken(req.tokenId)
+    return { ok: true as const }
+  })
+  ipcMain.handle('claude360:groups:list', async () => claude360ModelService.listGroups())
+  ipcMain.handle('claude360:models:by-group', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:models:by-group', claude360ModelsByGroupPayloadSchema, payload)
+    return { models: await claude360ModelService.listModelsByGroup(req.group) }
   })
   ipcMain.handle('claude360:models:refresh', async () => {
     const result = await claude360ModelService.refreshGroupsAndModels()

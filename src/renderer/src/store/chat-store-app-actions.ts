@@ -3,6 +3,8 @@ import type { AppSettingsV1 } from '@shared/app-settings'
 import { rendererRuntimeClient } from '../agent/runtime-client'
 import type { ChatState, ChatStoreGet, ChatStoreSet, InitialSetupMode, PluginHostRoute, SettingsRouteSection } from './chat-store-types'
 import type { ComposerPlanMode } from './chat-store-helpers'
+import { ensureGroupKeyForSelection, groupNameFromProviderId } from '../lib/group-key-ensure'
+import { useGroupKeyPromptStore } from './group-key-prompt-store'
 import {
   canSwitchComposerModel,
   conversationHasVisionAttachments,
@@ -126,6 +128,24 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
       const trimmed = modelId.trim()
       if (!activeThreadId && trimmed && trimmed.toLowerCase() !== 'auto' && typeof window.kunGui !== 'undefined') {
         void window.kunGui.saveSettingsSilent({ agents: { kun: { model: trimmed } } })
+      }
+      // 选完模型立即检测该分组是否已有 Key；无则弹优雅模态问是否创建。
+      // 取消/失败回退到上一个可用模型，保证运行时始终有可用凭据（否则会 401）。
+      const prevModel = state.composerModel
+      const prevProviderId = state.composerProviderId
+      const groupName = groupNameFromProviderId(nextProviderId)
+      if (groupName && typeof window.kunGui?.claude360TokensList === 'function') {
+        void ensureGroupKeyForSelection(groupName, {
+          listTokens: () => window.kunGui.claude360TokensList(),
+          promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g)
+        }).then((ready) => {
+          if (ready) return
+          set({ composerModel: prevModel, composerProviderId: prevProviderId })
+          if (!activeThreadId) {
+            persistComposerModel(prevModel)
+            persistComposerProviderId(prevProviderId)
+          }
+        })
       }
     },
 

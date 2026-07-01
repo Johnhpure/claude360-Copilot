@@ -41,14 +41,34 @@ describe('MusicCreatePanel · 是创作台（表单）', () => {
       })
     )
     expect(html).toContain('music-create-panel')
-    expect(html).toContain('musicModeSimple')
+    expect(html).toContain('musicModeOneshot')
     expect(html).toContain('musicModeStandard')
     expect(html).toContain('musicGenerate')
-    expect(html).toContain('musicLyricsAssistant')
+    expect(html).toContain('musicOneshotLabel')
     // 断言不出现独立登录 / API Key 配置字样
     expect(html.toLowerCase()).not.toContain('api key')
     expect(html.toLowerCase()).not.toContain('apikey')
     expect(html).not.toContain('musicLogin')
+  })
+
+  it('标准模式渲染 歌词助手 / 曲风预设 chips / 排除风格 / 高级参数(人声性别)', () => {
+    const html = renderToStaticMarkup(
+      createElement(MusicCreatePanel, {
+        form: { ...emptyForm(), mode: 'standard' },
+        submitting: false,
+        onChange: () => undefined,
+        onSubmit: () => undefined,
+        onOpenLyricsAssistant: () => undefined,
+        errors: [],
+        t
+      })
+    )
+    expect(html).toContain('musicLyricsAssistant')
+    expect(html).toContain('musicStylePresetsLabel')
+    expect(html).toContain('合成波') // STYLE_PRESETS 首项
+    expect(html).toContain('musicNegativeTagsLabel')
+    expect(html).toContain('musicAdvancedTitle')
+    expect(html).toContain('musicVocalGender')
   })
 
   it('生成中显示 musicGenerating 且按钮禁用', () => {
@@ -151,22 +171,47 @@ describe('MusicTaskList · 任务列表 + 成功歌曲', () => {
 })
 
 describe('MusicPlayer · 播放器区', () => {
+  const playerBase = {
+    playing: false,
+    currentTime: 0,
+    duration: 0,
+    volume: 0.8,
+    hasPrev: false,
+    hasNext: false,
+    onTogglePlay: () => undefined,
+    onSeek: () => undefined,
+    onVolume: () => undefined,
+    onPrev: () => undefined,
+    onNext: () => undefined,
+    onDownload: () => undefined,
+    t
+  }
   it('无当前歌曲显示空态', () => {
-    const html = renderToStaticMarkup(
-      createElement(MusicPlayer, { current: null, playing: false, onTogglePlay: () => undefined, onDownload: () => undefined, t })
-    )
+    const html = renderToStaticMarkup(createElement(MusicPlayer, { ...playerBase, current: null }))
     expect(html).toContain('music-player')
     expect(html).toContain('musicPlayerEmpty')
   })
-  it('有当前歌曲显示标题 / 中性副标题（不暴露 audioUrl） / 下载', () => {
+  it('有当前歌曲显示标题 / 副标题 / 进度条 / 音量 / 下载（不暴露 audioUrl）', () => {
     const html = renderToStaticMarkup(
-      createElement(MusicPlayer, { current: song('b'), playing: true, onTogglePlay: () => undefined, onDownload: () => undefined, t })
+      createElement(MusicPlayer, {
+        ...playerBase,
+        current: song('b'),
+        playing: true,
+        currentTime: 12,
+        duration: 154,
+        hasNext: true
+      })
     )
     expect(html).toContain('歌曲-b')
     expect(html).toContain('music-player-subtitle')
     expect(html).not.toContain('https://cdn.example/b.mp3')
     expect(html).toContain('musicSongReady')
     expect(html).toContain('musicDownload')
+    // 增强控件
+    expect(html).toContain('music-player-seek')
+    expect(html).toContain('music-player-volume')
+    expect(html).toContain('musicPrev')
+    expect(html).toContain('musicNext')
   })
 })
 
@@ -198,18 +243,30 @@ describe('MusicFixBanner · 未登录 / 无分组 → 去我的页', () => {
   })
 })
 
-describe('LyricsAssistantDrawer', () => {
+describe('LyricsAssistantDrawer · AI 写词模态', () => {
+  const drawerBase = {
+    onClose: () => undefined,
+    onInsert: () => undefined,
+    defaultTheme: '深夜城市',
+    textModels: ['gpt-4o', 'claude-3.5-sonnet'],
+    streamApi: null,
+    t
+  }
   it('open=false 不渲染', () => {
-    const html = renderToStaticMarkup(
-      createElement(LyricsAssistantDrawer, { open: false, onClose: () => undefined, onInsert: () => undefined, t })
-    )
+    const html = renderToStaticMarkup(createElement(LyricsAssistantDrawer, { ...drawerBase, open: false }))
     expect(html).toBe('')
   })
-  it('open=true 渲染歌词结构模板', () => {
-    const html = renderToStaticMarkup(
-      createElement(LyricsAssistantDrawer, { open: true, onClose: () => undefined, onInsert: () => undefined, t })
-    )
+  it('open=true 渲染 AI 写词模态（模型/主题/结构/生成/结果）', () => {
+    const html = renderToStaticMarkup(createElement(LyricsAssistantDrawer, { ...drawerBase, open: true }))
     expect(html).toContain('music-lyrics-drawer')
-    expect(html).toContain('musicLyricsTplPop')
+    expect(html).toContain('musicLyricsAiTitle')
+    expect(html).toContain('lyrics-ai-model')
+    expect(html).toContain('lyrics-ai-generate')
+    expect(html).toContain('lyrics-ai-result')
+    expect(html).toContain('lyrics-ai-apply')
+    // 文本模型下拉来自注入的 textModels
+    expect(html).toContain('gpt-4o')
+    // 结构选项
+    expect(html).toContain('主歌-副歌')
   })
 })

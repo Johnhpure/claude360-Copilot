@@ -29,9 +29,25 @@ export function supportsVoicePersona(model: Claude360SunoModel): boolean {
   return model === 'V5' || model === 'V5_5'
 }
 
+// 曲风预设（迁移自 music-web StandardMode.tsx STYLE_PRESETS，取值一致）。
+// 点击 chip 把该词 toggle 进/出 form.style（逗号分隔串），纯前端，无接口。
+export const STYLE_PRESETS: readonly string[] = [
+  '合成波',
+  '流行',
+  '低保真',
+  '爵士',
+  '节奏布鲁斯',
+  '电子',
+  '民谣',
+  '嘻哈',
+  '摇滚',
+  '古典',
+  '电影感'
+]
+
 export function emptyForm(): Claude360MusicCreateForm {
   return {
-    mode: 'simple',
+    mode: 'oneshot',
     description: '',
     customMode: true,
     instrumental: false,
@@ -43,30 +59,20 @@ export function emptyForm(): Claude360MusicCreateForm {
     vocalGender: '' as Claude360VocalGender,
     styleWeight: 0,
     weirdness: 0,
-    audioWeight: 0,
     personaId: '',
     personaModel: '' as Claude360PersonaModel
   }
 }
 
-const firstLine = (s: string): string => (s.split('\n')[0] || '').trim()
 const round2 = (n: number): number => Math.round(n * 100) / 100
 
 export function buildSubmitPayload(form: Claude360MusicCreateForm): Claude360MusicSubmitPayload {
   const p: Claude360MusicSubmitPayload = { prompt: '', model: form.model }
 
-  if (form.mode === 'simple') {
-    const hasLyrics = form.lyrics.trim().length > 0
-    if (hasLyrics) {
-      p.custom_mode = true
-      p.prompt = form.lyrics.trim()
-      p.style = form.description.trim()
-      p.title = firstLine(form.description) || '未命名'
-    } else {
-      p.custom_mode = false
-      p.prompt = form.description.trim()
-    }
-    if (form.instrumental) p.instrumental = true
+  if (form.mode === 'oneshot') {
+    // 一句话生成：仅描述 + 非自定义模式，模型自动扩写风格与歌词。
+    p.custom_mode = false
+    p.prompt = form.description.trim()
     return p
   }
 
@@ -81,7 +87,6 @@ export function buildSubmitPayload(form: Claude360MusicCreateForm): Claude360Mus
   }
   if (form.styleWeight > 0) p.style_weight = round2(form.styleWeight)
   if (form.weirdness > 0) p.weirdness_constraint = round2(form.weirdness)
-  if (form.audioWeight > 0) p.audio_weight = round2(form.audioWeight)
   if (form.negativeTags.trim()) p.negative_tags = form.negativeTags.trim()
   if (form.personaId.trim()) {
     p.persona_id = form.personaId.trim()
@@ -96,8 +101,8 @@ export function buildSubmitPayload(form: Claude360MusicCreateForm): Claude360Mus
 
 export function validateForm(form: Claude360MusicCreateForm): string[] {
   const errs: string[] = []
-  if (form.mode === 'simple') {
-    if (!form.description.trim()) errs.push('请填写歌曲描述')
+  if (form.mode === 'oneshot') {
+    if (!form.description.trim()) errs.push('请填写一句话描述')
     return errs
   }
   if (form.customMode) {

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { KeyRound, Eye, Copy, Loader2, Plus } from 'lucide-react'
+import { KeyRound, Eye, Copy } from 'lucide-react'
 import type { Claude360TokenListItem } from '@shared/claude360'
 
 type Translate = (key: string, params?: Record<string, unknown>) => string
@@ -12,20 +12,16 @@ type Translate = (key: string, params?: Record<string, unknown>) => string
 export function MyTokenGroupsTable({
   tokens,
   revealed,
-  creating,
   onReveal,
   onCopy,
-  onCreate,
   t
 }: {
   tokens: Claude360TokenListItem[]
   /** tokenId -> 已 reveal 的明文 Key。未在其中的一律脱敏展示。 */
   revealed: Record<number, string>
-  creating: boolean
   onReveal: (tokenId: number) => void
   /** 复制回调：带上 tokenId，便于容器在复制后立即清除该 Key 的明文。 */
   onCopy: (tokenId: number, value: string) => void
-  onCreate: () => void
   t: Translate
 }): ReactElement {
   return (
@@ -35,19 +31,6 @@ export function MyTokenGroupsTable({
           <KeyRound className="h-4 w-4" strokeWidth={1.75} />
           {t('myApiKeys')}
         </h2>
-        <button
-          type="button"
-          onClick={onCreate}
-          disabled={creating}
-          className="flex items-center gap-1.5 rounded-lg border border-ds-border bg-ds-main px-3 py-1.5 text-[12.5px] font-medium text-ds-ink shadow-sm transition hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {creating ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
-          ) : (
-            <Plus className="h-3.5 w-3.5" strokeWidth={2} />
-          )}
-          {creating ? t('myCreatingKey') : t('myCreateKey')}
-        </button>
       </div>
 
       {tokens.length === 0 ? (

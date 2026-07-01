@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>分组及 Key — UI 示意图</title>
+<style>
+  :root {
+    --bg-app:#f3f5fc; --card:rgba(255,255,255,0.9); --card-strong:#ffffff;
+    --main:#eaf0f9; --border:rgba(20,47,95,0.13); --border-muted:rgba(20,47,95,0.085);
+    --ink:#233659; --muted:#54678c; --faint:#8492b1;
+    --accent:#3b82d8; --accent-soft:rgba(59,130,216,0.15);
+    --success:#128a4a; --success-soft:rgba(17,185,129,0.14);
+    --danger:#d6493f; --danger-soft:rgba(244,116,100,0.14); --danger-border:rgba(214,73,63,0.3);
+    --shadow:0 12px 30px rgba(20,47,95,0.08); --hover:rgba(59,110,187,0.065);
+  }
+  [data-theme="dark"] {
+    --bg-app:#0f1422; --card:rgba(22,29,47,0.92); --card-strong:#1b2338;
+    --main:#161d2f; --border:rgba(151,192,235,0.13); --border-muted:rgba(151,192,235,0.08);
+    --ink:#f0f5fc; --muted:#bdc9de; --faint:#8593b1;
+    --accent:#5b9bec; --accent-soft:rgba(91,155,236,0.18);
+    --success:#3ecf8e; --success-soft:rgba(62,207,142,0.16);
+    --danger:#f47464; --danger-soft:rgba(244,116,100,0.16); --danger-border:rgba(244,116,100,0.4);
+    --shadow:0 16px 40px rgba(0,0,0,0.4); --hover:rgba(120,170,235,0.08);
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg-app); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+    padding:28px; min-height:100vh;
+  }
+  .demo-note {
+    max-width:1080px; margin:0 auto 14px; font-size:12px; color:var(--faint);
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .theme-toggle {
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+    border:1px solid var(--border); background:var(--card); color:var(--muted);
+    border-radius:999px; padding:5px 12px; font-size:12px; font-weight:500;
+    transition:all .18s ease;
+  }
+  .theme-toggle:hover { background:var(--card-strong); color:var(--ink); }
+  .theme-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* ── 外层卡片（对应设置页内容区）── */
+  .panel {
+    max-width:1080px; margin:0 auto; background:var(--card);
+    border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow);
+    overflow:hidden; backdrop-filter:blur(8px);
+  }
+  .panel-head {
+    padding:18px 22px; border-bottom:1px solid var(--border-muted);
+    display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  }
+  .panel-title { display:flex; align-items:center; gap:10px; }
+  .panel-title .ic { width:34px; height:34px; border-radius:10px; background:var(--accent-soft);
+    color:var(--accent); display:grid; place-items:center; }
+  .panel-title h1 { margin:0; font-size:16px; font-weight:600; letter-spacing:.2px; }
+  .panel-title p { margin:2px 0 0; font-size:12px; color:var(--faint); }
+
+  .btn {
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;
+    border-radius:999px; font-size:12.5px; font-weight:500; padding:7px 14px;
+    border:1px solid var(--border); background:var(--card-strong); color:var(--muted);
+    transition:all .18s ease;
+  }
+  .btn:hover { background:var(--hover); color:var(--ink); }
+  .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .btn-accent { background:var(--accent); color:#fff; border-color:transparent; font-weight:600; }
+  .btn-accent:hover { opacity:.9; background:var(--accent); color:#fff; }
+  .btn-danger { background:var(--danger-soft); color:var(--danger); border-color:var(--danger-border); }
+  .btn-danger:hover { background:var(--danger-soft); filter:brightness(.97); }
+
+  /* segmented 筛选 */
+  .toolbar { padding:12px 22px; border-bottom:1px solid var(--border-muted);
+    display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+  .seg { display:inline-flex; background:var(--main); border:1px solid var(--border-muted);
+    border-radius:999px; padding:3px; gap:2px; }
+  .seg button { border:0; background:transparent; color:var(--muted); cursor:pointer;
+    padding:6px 14px; border-radius:999px; font-size:12.5px; font-weight:500; transition:all .16s ease; }
+  .seg button:hover { color:var(--ink); }
+  .seg button[aria-selected="true"] { background:var(--card-strong); color:var(--ink);
+    box-shadow:0 1px 3px rgba(20,47,95,0.1); font-weight:600; }
+  .seg button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+
+  /* ── Master-Detail 主体 ── */
+  .body { display:grid; grid-template-columns:264px 1fr; min-height:520px; }
+  .master { border-right:1px solid var(--border-muted); padding:12px; overflow-y:auto; max-height:600px; }
+  .master-label { font-size:11px; font-weight:600; letter-spacing:.4px; text-transform:uppercase;
+    color:var(--faint); padding:4px 8px 10px; }
+
+  .group-item { position:relative; display:block; width:100%; text-align:left; cursor:pointer;
+    border:1px solid transparent; border-radius:12px; background:transparent; color:inherit;
+    padding:11px 13px 11px 15px; margin-bottom:4px; transition:all .16s ease; }
+  .group-item:hover { background:var(--hover); }
+  .group-item:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .group-item[aria-current="true"] { background:var(--card-strong); border-color:var(--border); box-shadow:0 2px 8px rgba(20,47,95,0.06); }
+  .group-item[aria-current="true"]::before { content:""; position:absolute; left:0; top:11px; bottom:11px;
+    width:3px; border-radius:3px; background:var(--accent); }
+  .gi-top { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+  .gi-name { font-size:13.5px; font-weight:600; color:var(--ink); }
+  .gi-sub { display:flex; align-items:center; gap:10px; font-size:11.5px; color:var(--faint); }
+  .ratio-pill { display:inline-flex; align-items:center; font-variant-numeric:tabular-nums;
+    font-weight:600; color:var(--accent); background:var(--accent-soft); border-radius:999px; padding:1px 8px; font-size:11.5px; }
+  .badge-rec { display:inline-flex; align-items:center; gap:3px; font-size:10.5px; font-weight:600;
+    color:var(--success); background:var(--success-soft); border-radius:999px; padding:1px 7px; }
+
+  /* ── 详情面板 ── */
+  .detail { padding:20px 24px; overflow-y:auto; max-height:600px; }
+  .detail-head { display:flex; align-items:flex-start; gap:12px; margin-bottom:4px; }
+  .detail-head h2 { margin:0; font-size:18px; font-weight:650; display:flex; align-items:center; gap:10px; }
+  .detail-desc { color:var(--muted); font-size:13px; margin:6px 0 20px; }
+
+  .section { border:1px solid var(--border); border-radius:14px; background:var(--card-strong); margin-bottom:18px; overflow:hidden; }
+  .section-head { display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:12px 16px; border-bottom:1px solid var(--border-muted); }
+  .section-head h3 { margin:0; font-size:13px; font-weight:600; color:var(--ink); display:flex; align-items:center; gap:8px; }
+  .count-pill { font-size:11px; color:var(--faint); background:var(--main); border-radius:999px; padding:1px 8px; font-weight:600; }
+  .section-body { padding:14px 16px; }
+
+  .chips { display:flex; flex-wrap:wrap; gap:7px; }
+  .chip { font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; font-size:11.5px;
+    color:var(--muted); background:var(--main); border:1px solid var(--border-muted);
+    border-radius:8px; padding:4px 9px; }
+  .chip-more { cursor:pointer; color:var(--accent); background:var(--accent-soft); border-color:transparent; font-family:inherit; font-weight:600; }
+  .chip-more:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+
+  /* Key 表 */
+  table { width:100%; border-collapse:collapse; }
+  thead th { text-align:left; font-size:11px; font-weight:600; letter-spacing:.4px; text-transform:uppercase;
+    color:var(--faint); padding:9px 12px; background:var(--main); border-bottom:1px solid var(--border-muted); }
+  thead th:last-child { text-align:right; }
+  tbody td { padding:11px 12px; border-top:1px solid var(--border-muted); font-size:13px; vertical-align:middle; }
+  tbody tr:hover { background:var(--hover); }
+  .key-name { font-weight:600; color:var(--ink); }
+  .key-val { font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .quota { font-variant-numeric:tabular-nums; }
+  .quota.unlimited { color:var(--success); font-weight:600; }
+  .row-actions { display:flex; align-items:center; gap:6px; justify-content:flex-end; }
+  .icon-btn { display:grid; place-items:center; width:30px; height:30px; cursor:pointer;
+    border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--muted); transition:all .16s ease; }
+  .icon-btn:hover { background:var(--hover); color:var(--ink); }
+  .icon-btn:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .icon-btn.danger:hover { background:var(--danger-soft); color:var(--danger); border-color:var(--danger-border); }
+
+  .empty { text-align:center; padding:30px 16px; color:var(--faint); font-size:13px; }
+  .empty svg { opacity:.5; margin-bottom:8px; }
+  svg { display:block; }
+</style>
+</head>
+<body>
+  <div class="demo-note">
+    <span>示意图（原型 · 假数据）— 「设置 → 分组及 Key」。可点击左侧分组切换、切换筛选、显隐/删除 Key、右上角切换深浅色。</span>
+    <button class="theme-toggle" id="themeToggle" aria-label="切换深浅色">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <span id="themeLabel">深色</span>
+    </button>
+  </div>
+
+  <div class="panel">
+    <!-- 头部 -->
+    <div class="panel-head">
+      <div class="panel-title">
+        <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg></span>
+        <div>
+          <h1>分组及 Key</h1>
+          <p>从 Claude360 拉取的可用模型分组，管理每个分组下的 API Key</p>
+        </div>
+      </div>
+      <button class="btn" id="refreshBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+        刷新模型
+      </button>
+    </div>
+
+    <!-- 筛选 -->
+    <div class="toolbar">
+      <div class="seg" role="tablist" aria-label="按类型筛选分组">
+        <button role="tab" aria-selected="true" data-purpose="all">全部</button>
+        <button role="tab" aria-selected="false" data-purpose="text">文本</button>
+        <button role="tab" aria-selected="false" data-purpose="image">图像</button>
+        <button role="tab" aria-selected="false" data-purpose="music">音乐</button>
+      </div>
+      <span style="font-size:12px;color:var(--faint)" id="groupCount"></span>
+    </div>
+
+    <!-- Master-Detail -->
+    <div class="body">
+      <nav class="master" id="master" aria-label="分组列表">
+        <div class="master-label">分组</div>
+        <div id="groupList"></div>
+      </nav>
+      <section class="detail" id="detail" aria-live="polite"></section>
+    </div>
+  </div>
+
+<script>
+// ── 假数据 ──────────────────────────────────────────────
+const GROUPS = [
+  { name:'auto', display:'自动分组', purpose:'text', ratio:null, recommended:true,
+    desc:'系统按可用性与价格自动择优，适合大多数日常对话。',
+    models:['gpt-4o','claude-3.5-sonnet','deepseek-v4','o1','gemini-2.0-flash','qwen-max','glm-4-plus','moonshot-v1','yi-large','doubao-pro','ernie-4.0','hunyuan-pro'],
+    keys:[ {id:1,name:'默认 Key',masked:'sk-••••••••55cd',plain:'sk-a1b2c3d4e5f655cd',quota:'无限',unlimited:true} ] },
+  { name:'vip-group', display:'vip-group', purpose:'text', ratio:0.8, recommended:true,
+    desc:'高速通道，低倍率优先，适合高频调用。',
+    models:['gpt-4o','claude-3.5-sonnet','o1','deepseek-v4','gemini-2.0-pro','qwen-max','glm-4-plus','moonshot-v1'],
+    keys:[ {id:2,name:'生产 Key',masked:'sk-••••••••1234',plain:'sk-9f8e7d6c5b4a1234',quota:'无限',unlimited:true},
+           {id:3,name:'测试 Key',masked:'sk-••••••••88ab',plain:'sk-1122334455aa88ab',quota:'¥42.50',unlimited:false} ] },
+  { name:'pro-group', display:'pro-group', purpose:'text', ratio:1.5, recommended:false,
+    desc:'旗舰模型专线，最高质量与最长上下文。',
+    models:['claude-3.7-opus','gpt-4.5','o1-pro','deepseek-v4-pro','gemini-2.0-ultra','grok-3','claude-3.5-sonnet','gpt-4o','o1','qwen-max','glm-4-plus','llama-3.3-405b','mistral-large','command-r-plus','yi-large','doubao-pro','ernie-4.0','hunyuan-pro','step-2','minimax-abab7'],
+    keys:[] },
+  { name:'image-hd', display:'image-hd', purpose:'image', ratio:2.0, recommended:false,
+    desc:'高清图像生成与编辑。',
+    models:['flux-1.1-pro','dall-e-3','sd-3.5-large','ideogram-v2','recraft-v3','kolors'],
+    keys:[ {id:4,name:'设计 Key',masked:'sk-••••••••7f0e',plain:'sk-aabbccddee7f0e00',quota:'¥120.00',unlimited:false} ] },
+  { name:'suno-music', display:'suno-music', purpose:'music', ratio:1.2, recommended:false,
+    desc:'音乐与歌词生成。',
+    models:['suno-v4','suno-v3.5','chirp-v3'],
+    keys:[] },
+];
+
+let curPurpose='all';
+let curGroup=GROUPS[0].name;
+const revealed=new Set();
+
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ic={
+  eye:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.2A10.9 10.9 0 0 1 12 4c6.5 0 10 7 10 7a18 18 0 0 1-2.3 3.2M6.6 6.6A18 18 0 0 0 2 11s3.5 7 10 7a10.9 10.9 0 0 0 3.7-.6"/><path d="m2 2 20 20"/></svg>',
+  copy:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  trash:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+  plus:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  key:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></svg>',
+  cpu:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>',
+  rec:'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+};
+
+function renderList(){
+  const list=document.getElementById('groupList');
+  const shown=GROUPS.filter(g=>curPurpose==='all'||g.purpose===curPurpose);
+  document.getElementById('groupCount').textContent=`共 ${shown.length} 个分组`;
+  if(!shown.some(g=>g.name===curGroup) && shown.length) curGroup=shown[0].name;
+  list.innerHTML=shown.map(g=>`
+    <button class="group-item" role="button" aria-current="${g.name===curGroup}" data-g="${g.name}">
+      <div class="gi-top">
+        <span class="gi-name">${esc(g.display)}</span>
+        ${g.recommended?`<span class="badge-rec">${ic.rec}推荐</span>`:''}
+      </div>
+      <div class="gi-sub">
+        <span class="ratio-pill">×${g.ratio==null?'1.0':g.ratio}</span>
+        <span>${g.models.length} 个模型</span>
+        <span>${g.keys.length} Key</span>
+      </div>
+    </button>`).join('');
+  list.querySelectorAll('.group-item').forEach(b=>b.onclick=()=>{curGroup=b.dataset.g;renderAll();});
+}
+
+function renderDetail(){
+  const g=GROUPS.find(x=>x.name===curGroup);
+  const d=document.getElementById('detail');
+  if(!g){ d.innerHTML='<div class="empty">请选择一个分组</div>'; return; }
+  const MAX=10;
+  const modelChips=g.models.slice(0,MAX).map(m=>`<span class="chip">${esc(m)}</span>`).join('')
+    + (g.models.length>MAX?`<button class="chip chip-more" onclick="this.parentNode.innerHTML='${g.models.map(m=>`<span class=\\'chip\\'>${esc(m)}</span>`).join('')}'">+${g.models.length-MAX} 展开全部</button>`:'');
+  const keyRows = g.keys.length ? g.keys.map(k=>{
+    const shown=revealed.has(k.id);
+    return `<tr>
+      <td class="key-name">${esc(k.name)}</td>
+      <td class="key-val">${shown?esc(k.plain):esc(k.masked)}</td>
+      <td class="quota ${k.unlimited?'unlimited':''}">${esc(k.quota)}</td>
+      <td><div class="row-actions">
+        <button class="icon-btn" title="${shown?'隐藏':'显示'}" onclick="toggleReveal(${k.id})" aria-label="${shown?'隐藏':'显示'} Key">${shown?ic.eyeOff:ic.eye}</button>
+        <button class="icon-btn" title="复制" onclick="copyKey(${k.id})" aria-label="复制 Key">${ic.copy}</button>
+        <button class="icon-btn danger" title="删除" onclick="delKey('${g.name}',${k.id})" aria-label="删除 Key">${ic.trash}</button>
+      </div></td>
+    </tr>`; }).join('')
+    : '';
+  const keyBody = g.keys.length
+    ? `<table><thead><tr><th>名称</th><th>Key</th><th>额度</th><th style="text-align:right">操作</th></tr></thead><tbody>${keyRows}</tbody></table>`
+    : `<div class="empty">${ic.key}<div>该分组暂无 API Key</div><div style="margin-top:4px;color:var(--faint)">点击右上角「新建 Key」创建第一个</div></div>`;
+
+  d.innerHTML=`
+    <div class="detail-head">
+      <h2>${esc(g.display)} ${g.recommended?`<span class="badge-rec">${ic.rec}推荐</span>`:''}
+        <span class="ratio-pill" style="font-size:13px">倍率 ×${g.ratio==null?'1.0':g.ratio}</span></h2>
+    </div>
+    <p class="detail-desc">${esc(g.desc)}</p>
+
+    <div class="section">
+      <div class="section-head"><h3>${ic.cpu} 可用模型 <span class="count-pill">${g.models.length}</span></h3></div>
+      <div class="section-body"><div class="chips">${modelChips}</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h3>${ic.key} API Key <span class="count-pill">${g.keys.length}</span></h3>
+        <button class="btn btn-accent" onclick="addKey('${g.name}')">${ic.plus} 新建 Key</button>
+      </div>
+      <div class="section-body" style="padding:${g.keys.length?'0':'14px 16px'}">${keyBody}</div>
+    </div>`;
+}
+
+function renderAll(){ renderList(); renderDetail(); }
+
+window.toggleReveal=id=>{ revealed.has(id)?revealed.delete(id):revealed.add(id); renderDetail(); };
+window.copyKey=id=>{ const g=GROUPS.find(x=>x.name===curGroup); const k=g.keys.find(k=>k.id===id);
+  navigator.clipboard&&navigator.clipboard.writeText(k.plain); revealed.delete(id); alert('已复制到剪贴板（并立即隐藏明文）'); renderDetail(); };
+window.delKey=(gn,id)=>{ if(!confirm('确认删除该 API Key？此操作不可撤销。')) return;
+  const g=GROUPS.find(x=>x.name===gn); g.keys=g.keys.filter(k=>k.id!==id); renderAll(); };
+window.addKey=gn=>{ const name=prompt('新建 Key 名称：','key-'+Date.now().toString().slice(-4));
+  if(!name) return; const g=GROUPS.find(x=>x.name===gn);
+  const id=Date.now(); g.keys.push({id,name,masked:'sk-••••••••'+id.toString().slice(-4),plain:'sk-newgenerated'+id.toString().slice(-4),quota:'无限',unlimited:true});
+  revealed.add(id); renderAll(); };
+
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-selected','false'));
+  b.setAttribute('aria-selected','true'); curPurpose=b.dataset.purpose; renderAll();
+});
+document.getElementById('refreshBtn').onclick=function(){ const s=this.querySelector('svg');
+  s.style.transition='transform .6s'; s.style.transform='rotate(360deg)'; setTimeout(()=>{s.style.transform='';},650); };
+document.getElementById('themeToggle').onclick=function(){
+  const h=document.documentElement, dark=h.getAttribute('data-theme')==='dark';
+  h.setAttribute('data-theme',dark?'light':'dark');
+  document.getElementById('themeLabel').textContent=dark?'深色':'浅色';
+};
+renderAll();
+</script>
+</body>
+</html>

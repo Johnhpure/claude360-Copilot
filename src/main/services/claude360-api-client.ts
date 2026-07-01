@@ -92,6 +92,10 @@ export class Claude360ApiClient {
     return this.request<T>('POST', path, body, token)
   }
 
+  delete<T>(path: string, token?: string): Promise<T> {
+    return this.request<T>('DELETE', path, undefined, token)
+  }
+
   /**
    * Suno raw POST：返回上游 `{ code, message?, data }` 原始 body，不做 `{success}`
    * 信封解包。网络失败沿用中性提示（不泄露 url/header）；日志/错误脱敏由调用方
@@ -177,7 +181,7 @@ export class Claude360ApiClient {
   }
 
   private async request<T>(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'DELETE',
     path: string,
     body: unknown,
     token: string | undefined

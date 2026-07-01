@@ -30,7 +30,7 @@ function storeMock() {
   }
 }
 
-const simpleForm = (): Claude360MusicCreateForm => ({ ...emptyForm(), mode: 'simple', description: '城市夜晚电子乐' })
+const simpleForm = (): Claude360MusicCreateForm => ({ ...emptyForm(), mode: 'oneshot', description: '城市夜晚电子乐' })
 
 describe('submitMusic', () => {
   it('提交成功：payload 来自 suno-params，新增任务并 markSubmitted', async () => {
@@ -52,9 +52,9 @@ describe('submitMusic', () => {
   it('表单非法：不调用 submit，直接返回错误', async () => {
     const store = storeMock()
     const claude360MusicSubmit = vi.fn()
-    const result = await submitMusic({ claude360MusicSubmit }, store, { ...emptyForm(), mode: 'simple', description: '' })
+    const result = await submitMusic({ claude360MusicSubmit }, store, { ...emptyForm(), mode: 'oneshot', description: '' })
     expect(result.ok).toBe(false)
-    expect(result.errors).toContain('请填写歌曲描述')
+    expect(result.errors).toContain('请填写一句话描述')
     expect(claude360MusicSubmit).not.toHaveBeenCalled()
     expect(store.addSubmitting).not.toHaveBeenCalled()
   })

@@ -26,18 +26,44 @@ function image(id: string, overrides: Partial<Claude360CanvasImage> = {}): Claud
   }
 }
 
-describe('canvas-store · prompt/model/size/n 状态', () => {
-  it('setPrompt/setModel/setSize/setN 更新对应字段', () => {
+describe('canvas-store · 表单参数状态', () => {
+  it('setPrompt/setModel/setN 更新对应字段', () => {
     const store = createCanvasStore()
     store.getState().setPrompt('一只柯基')
     store.getState().setModel('flux-pro')
-    store.getState().setSize('1024x1536')
     store.getState().setN(3)
     const s = store.getState()
     expect(s.prompt).toBe('一只柯基')
     expect(s.model).toBe('flux-pro')
-    expect(s.size).toBe('1024x1536')
     expect(s.n).toBe(3)
+  })
+  it('默认宽高比 square + 2K，派生 size 为 2048x2048', () => {
+    const store = createCanvasStore()
+    const s = store.getState()
+    expect(s.aspectPreset).toBe('square')
+    expect(s.resolution).toBe('2K')
+    expect(s.size).toBe('2048x2048')
+  })
+  it('setAspectPreset / setResolution 联动派生 size', () => {
+    const store = createCanvasStore()
+    store.getState().setAspectPreset('widescreen')
+    store.getState().setResolution('4K')
+    const s = store.getState()
+    expect(s.aspectPreset).toBe('widescreen')
+    expect(s.resolution).toBe('4K')
+    expect(s.size).toBe('3840x2160') // widescreen 4K
+  })
+  it('setQuality / setOutputFormat / setReferenceImage 更新对应字段', () => {
+    const store = createCanvasStore()
+    store.getState().setQuality('high')
+    store.getState().setOutputFormat('webp')
+    store.getState().setReferenceImage('data:image/png;base64,AAA')
+    const s = store.getState()
+    expect(s.quality).toBe('high')
+    expect(s.outputFormat).toBe('webp')
+    expect(s.referenceImage).toBe('data:image/png;base64,AAA')
+    store.getState().setReferenceImage(null)
+    expect(store.getState().referenceImage).toBeNull()
   })
   it('setN 夹逼到 1..4', () => {
     const store = createCanvasStore()

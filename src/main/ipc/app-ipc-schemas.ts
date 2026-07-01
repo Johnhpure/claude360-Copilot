@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { CLAUDE360_IMAGE_SIZES } from '../../shared/claude360-canvas'
+import { CLAUDE360_IMAGE_OUTPUT_FORMATS, CLAUDE360_IMAGE_QUALITIES } from '../../shared/claude360-canvas'
+import type { Claude360ImageSize } from '../../shared/claude360-canvas'
 import {
   KUN_APPROVAL_TEMPLATE,
   KUN_ATTACHMENT_CONTENT_TEMPLATE,
@@ -699,6 +700,14 @@ export const claude360RevealTokenPayloadSchema = z.object({
   tokenId: z.number().int().positive()
 }).strict()
 
+export const claude360DeleteTokenPayloadSchema = z.object({
+  tokenId: z.number().int().positive()
+}).strict()
+
+export const claude360ModelsByGroupPayloadSchema = z.object({
+  group: trimmedString(128)
+}).strict()
+
 export const claude360TopupWechatPayloadSchema = z.object({
   amount: z.number().positive(),
   discountCode: z.string().trim().max(128).optional()
@@ -734,7 +743,6 @@ export const claude360MusicSubmitPayloadSchema = z
     vocal_gender: z.enum(['m', 'f']).optional(),
     style_weight: z.number().min(0).max(1).optional(),
     weirdness_constraint: z.number().min(0).max(1).optional(),
-    audio_weight: z.number().min(0).max(1).optional(),
     negative_tags: z.string().trim().max(MAX_MUSIC_TAGS).optional(),
     persona_id: z.string().trim().max(MAX_MUSIC_PERSONA).optional(),
     persona_model: z.enum(['style_persona', 'voice_persona']).optional()
@@ -761,14 +769,23 @@ export const claude360MusicFetchPayloadSchema = z
 const MAX_CANVAS_PROMPT = 4_000
 // 编辑源图/蒙版为 base64 字符串，约 34MB 上限（服务端再按 25MB 解码字节兜底）。
 const MAX_CANVAS_IMAGE_CHARS = 34 * 1024 * 1024
-const claude360ImageSizeSchema = z.enum(CLAUDE360_IMAGE_SIZES)
+// size 放开为任意 "宽x高"（1–5 位）或 auto；quality/output_format 为受限枚举。
+const claude360ImageSizeSchema = z
+  .string()
+  .trim()
+  .regex(/^(auto|\d{1,5}x\d{1,5})$/u, '尺寸格式应为 "宽x高" 或 auto')
+  .transform((v): Claude360ImageSize => v as Claude360ImageSize)
+const claude360ImageQualitySchema = z.enum(CLAUDE360_IMAGE_QUALITIES)
+const claude360ImageOutputFormatSchema = z.enum(CLAUDE360_IMAGE_OUTPUT_FORMATS)
 
 export const claude360CanvasGeneratePayloadSchema = z
   .object({
     model: trimmedString(MAX_MODEL_ID_LENGTH),
     prompt: trimmedString(MAX_CANVAS_PROMPT),
     size: claude360ImageSizeSchema.optional(),
-    n: z.number().int().min(1).max(4).optional()
+    n: z.number().int().min(1).max(4).optional(),
+    quality: claude360ImageQualitySchema.optional(),
+    output_format: claude360ImageOutputFormatSchema.optional()
   })
   .strict()
 
@@ -779,6 +796,17 @@ export const claude360CanvasEditPayloadSchema = z
     image: z.string().trim().min(1).max(MAX_CANVAS_IMAGE_CHARS),
     mask: z.string().trim().min(1).max(MAX_CANVAS_IMAGE_CHARS).optional(),
     size: claude360ImageSizeSchema.optional()
+  })
+  .strict()
+
+// Claude360 通用文本流式 chat（AI 写词助手）：model 必填，system/user 由渲染侧 buildLyricsPrompt 组装。
+const MAX_CHAT_MESSAGE = 8_000
+export const claude360ChatStreamStartPayloadSchema = z
+  .object({
+    model: trimmedString(MAX_MODEL_ID_LENGTH),
+    system: trimmedString(MAX_CHAT_MESSAGE),
+    user: trimmedString(MAX_CHAT_MESSAGE),
+    streamId: z.string().trim().min(1).max(200).optional()
   })
   .strict()
 

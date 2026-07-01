@@ -34,7 +34,8 @@ function fakeApi(routes: Record<string, (body?: unknown) => unknown>, calls: str
   }
   return {
     get: async <T>(path: string) => run(path) as T,
-    post: async <T>(path: string, body?: unknown) => run(path, body) as T
+    post: async <T>(path: string, body?: unknown) => run(path, body) as T,
+    delete: async <T>(path: string) => run(path) as T
   }
 }
 
@@ -67,6 +68,49 @@ describe('Claude360TokenService', () => {
     const tokens = await service.listTokens()
     expect(tokens).toHaveLength(1)
     expect(tokens[0]).toMatchObject({ id: 7, maskedKey: 'sk-***abcd', group: 'auto', unlimitedQuota: true })
+  })
+
+  it('deletes a token via backend DELETE and clears the local plaintext secret', async () => {
+    const port = settingsPort()
+    const secret = fakeSecretStore({ ...CLI, 'claude360:api-key:9': 'sk-plain-9' })
+    const calls: string[] = []
+    const service = new Claude360TokenService({
+      apiClient: fakeApi({ '/api/cli/tokens/9': () => ({ id: 9 }) }, calls),
+      secretStore: secret,
+      readClaude360: port.readClaude360,
+      writeClaude360: port.writeClaude360
+    })
+    await service.deleteToken(9)
+    expect(calls).toContain('/api/cli/tokens/9')
+    expect(await secret.loadSecret('claude360:api-key:9')).toBeNull()
+  })
+
+  it('self-heals a dangling ref when reveal fails (token was deleted), recreating the group key', async () => {
+    // 预置指向已删 token(99) 的 ref：secret 缺失 + reveal 抛错，应丢弃悬空 ref 走重建。
+    const port = settingsPort({
+      tokenRefs: { 'text:auto': { tokenId: 99, name: 'Claude360 Copilot / text', group: 'auto' } }
+    })
+    const secret = fakeSecretStore(CLI)
+    const service = new Claude360TokenService({
+      apiClient: fakeApi({
+        '/api/cli/tokens/99/reveal': () => {
+          throw new Error('token not found')
+        },
+        // GET 列表(无 body)返回空 → 无现存匹配；POST 创建(有 body)返回新 token。
+        '/api/cli/tokens': (body) =>
+          body
+            ? { id: 100, name: 'Claude360 Copilot / text', key: 'sk-new-100', group: 'auto' }
+            : { items: [] }
+      }),
+      secretStore: secret,
+      readClaude360: port.readClaude360,
+      writeClaude360: port.writeClaude360
+    })
+    const ref = await service.ensureGroupToken('auto', 'text')
+    expect(ref.tokenId).toBe(100)
+    expect(await secret.loadSecret('claude360:api-key:100')).toBe('sk-new-100')
+    // scopedKey 被新 ref 覆盖，不再指向已删的 99。
+    expect(port.current().tokenRefs['text:auto'].tokenId).toBe(100)
   })
 
   it('creates a token, stores the plaintext key in the secret store, not settings', async () => {

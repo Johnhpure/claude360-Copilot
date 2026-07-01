@@ -14,6 +14,12 @@ import {
   useMusicTaskStore
 } from '../../music/music-task-store'
 import {
+  currentSong,
+  hasNext as playerHasNext,
+  hasPrev as playerHasPrev,
+  useMusicPlayerStore
+} from '../../music/music-player-store'
+import {
   detectMusicAccess,
   downloadSong,
   pollActiveTasksOnce,
@@ -21,6 +27,7 @@ import {
   type MusicAccess,
   type MusicWorkbenchApi
 } from '../../music/music-workbench-actions'
+import type { LyricsStreamApi } from '../../music/lyrics-ai'
 import { MusicCreatePanel } from './MusicCreatePanel'
 import { MusicTaskList } from './MusicTaskList'
 import { MusicPlayer } from './MusicPlayer'
@@ -50,9 +57,26 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [lyricsOpen, setLyricsOpen] = useState(false)
-  const [current, setCurrent] = useState<Claude360Song | null>(null)
-  const [playing, setPlaying] = useState(false)
   const [access, setAccess] = useState<MusicAccess | null>(null)
+  // 写词助手用的文本模型列表（来自 text 分组）。
+  const [textModels, setTextModels] = useState<string[]>([])
+
+  // 播放器状态（队列 / 进度 / 音量）——store 管状态，容器把状态桥接到 <audio>。
+  const queue = useStore(useMusicPlayerStore, (s) => s.queue)
+  const playIndex = useStore(useMusicPlayerStore, (s) => s.index)
+  const playing = useStore(useMusicPlayerStore, (s) => s.playing)
+  const currentTime = useStore(useMusicPlayerStore, (s) => s.currentTime)
+  const duration = useStore(useMusicPlayerStore, (s) => s.duration)
+  const volume = useStore(useMusicPlayerStore, (s) => s.volume)
+  const setQueue = useStore(useMusicPlayerStore, (s) => s.setQueue)
+  const togglePlayAction = useStore(useMusicPlayerStore, (s) => s.togglePlay)
+  const pauseAction = useStore(useMusicPlayerStore, (s) => s.pause)
+  const nextAction = useStore(useMusicPlayerStore, (s) => s.next)
+  const prevAction = useStore(useMusicPlayerStore, (s) => s.prev)
+  const endedAction = useStore(useMusicPlayerStore, (s) => s.ended)
+  const setProgress = useStore(useMusicPlayerStore, (s) => s.setProgress)
+  const setVolume = useStore(useMusicPlayerStore, (s) => s.setVolume)
+  const current = currentSong({ queue, index: playIndex })
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const api = (): MusicWorkbenchApi | null =>
@@ -73,6 +97,39 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
       alive = false
     }
   }, [])
+
+  // 拉取 text 分组的模型列表，供写词助手的文本模型下拉使用。
+  useEffect(() => {
+    let alive = true
+    const w = typeof window !== 'undefined' ? window.kunGui : undefined
+    if (!w?.getSettings || !w.claude360ModelsByGroup) return
+    void w
+      .getSettings()
+      .then((s) => {
+        const group = (s.claude360?.selectedTextGroup || 'auto').trim() || 'auto'
+        return w.claude360ModelsByGroup({ group })
+      })
+      .then((res) => {
+        if (alive) setTextModels(res.models ?? [])
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  // 写词助手流式 IPC 子集（注入模态，便于测试）。
+  const lyricsStreamApi = (): LyricsStreamApi | null => {
+    const w = typeof window !== 'undefined' ? window.kunGui : undefined
+    if (!w?.claude360ChatStreamStart) return null
+    return {
+      claude360ChatStreamStart: w.claude360ChatStreamStart,
+      claude360ChatStreamStop: w.claude360ChatStreamStop,
+      onClaude360ChatDelta: w.onClaude360ChatDelta,
+      onClaude360ChatEnd: w.onClaude360ChatEnd,
+      onClaude360ChatError: w.onClaude360ChatError
+    }
+  }
 
   // 轮询：有活跃任务才 tick；无活跃任务清除定时器（失败上限在 store 侧兜底）。
   const activeKey = selectActiveTaskIds(tasks).join(',')
@@ -118,26 +175,39 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
     }
   }, [addSubmitting, form, markFailed, markSubmitted, submitting, t])
 
-  const playSong = useCallback((song: Claude360Song): void => {
-    setCurrent(song)
-    setPlaying(true)
-    const el = audioRef.current
-    if (el) {
-      el.src = song.audioUrl
-      void el.play().catch(() => setPlaying(false))
-    }
-  }, [])
+  // 播放：把点击的歌曲 + 其所在列表设为播放队列（支持连续播放 / 上下曲）。
+  const playSong = useCallback(
+    (song: Claude360Song, list: Claude360Song[]): void => {
+      const q = list.length > 0 ? list : [song]
+      const start = Math.max(0, q.findIndex((s) => s.id === song.id))
+      setQueue(q, start)
+    },
+    [setQueue]
+  )
 
-  const togglePlay = useCallback((): void => {
+  // 把播放器 store 状态桥接到 <audio>：切歌换 src、按 playing 播放/暂停。
+  useEffect(() => {
     const el = audioRef.current
     if (!el || !current) return
-    if (el.paused) {
-      void el.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
+    if (el.src !== current.audioUrl) el.src = current.audioUrl
+    if (playing) {
+      void el.play().catch(() => pauseAction())
     } else {
       el.pause()
-      setPlaying(false)
     }
-  }, [current])
+  }, [current, playing, pauseAction])
+
+  // 音量同步。
+  useEffect(() => {
+    const el = audioRef.current
+    if (el) el.volume = volume
+  }, [volume])
+
+  const handleSeek = useCallback((time: number): void => {
+    const el = audioRef.current
+    if (el) el.currentTime = time
+    setProgress(time, audioRef.current?.duration ?? duration)
+  }, [duration, setProgress])
 
   const handleDownload = useCallback((song: Claude360Song): void => {
     void downloadSong(song.audioUrl, song.title, {
@@ -204,21 +274,50 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
             <div className="flex min-w-0 flex-1 flex-col gap-4">
               <MusicTaskList
                 tasks={tasks}
-                onPlay={(song) => playSong(song)}
+                onPlay={(song, list) => playSong(song, list)}
                 onDownload={handleDownload}
                 onRemove={removeTask}
                 t={t}
               />
-              <MusicPlayer current={current} playing={playing} onTogglePlay={togglePlay} onDownload={handleDownload} t={t} />
+              <MusicPlayer
+                current={current}
+                playing={playing}
+                currentTime={currentTime}
+                duration={duration}
+                volume={volume}
+                hasPrev={playerHasPrev({ index: playIndex })}
+                hasNext={playerHasNext({ queue, index: playIndex })}
+                onTogglePlay={togglePlayAction}
+                onSeek={handleSeek}
+                onVolume={setVolume}
+                onPrev={prevAction}
+                onNext={nextAction}
+                onDownload={handleDownload}
+                t={t}
+              />
             </div>
 
-            <LyricsAssistantDrawer open={lyricsOpen} onClose={() => setLyricsOpen(false)} onInsert={insertLyrics} t={t} />
+            <LyricsAssistantDrawer
+              open={lyricsOpen}
+              onClose={() => setLyricsOpen(false)}
+              onInsert={insertLyrics}
+              defaultTheme={form.description}
+              textModels={textModels}
+              streamApi={lyricsStreamApi()}
+              t={t}
+            />
           </div>
         </div>
       </main>
 
-      {/* 隐藏的 audio 元素，播放器条通过 ref 控制。 */}
-      <audio ref={audioRef} onEnded={() => setPlaying(false)} className="hidden" />
+      {/* 隐藏的 audio 元素，播放器条通过 store 状态桥接控制。 */}
+      <audio
+        ref={audioRef}
+        onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration)}
+        onLoadedMetadata={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration)}
+        onEnded={endedAction}
+        className="hidden"
+      />
     </div>
   )
 }

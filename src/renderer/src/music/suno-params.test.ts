@@ -34,25 +34,28 @@ describe('模型能力表', () => {
   })
 })
 
-describe('buildSubmitPayload · 简单模式', () => {
+describe('buildSubmitPayload · 一句话模式', () => {
   it('只填描述 → custom_mode=false, prompt=描述', () => {
-    const f = { ...base, mode: 'simple', description: '轻快的城市夜晚电子乐' } as Claude360MusicCreateForm
+    const f = { ...base, mode: 'oneshot', description: '轻快的城市夜晚电子乐' } as Claude360MusicCreateForm
     const p = buildSubmitPayload(f)
     expect(p.custom_mode).toBe(false)
     expect(p.prompt).toBe('轻快的城市夜晚电子乐')
     expect(p.style).toBeUndefined()
   })
-  it('填了歌词 → custom_mode=true, prompt=歌词, style=描述, title 自动', () => {
-    const f = { ...base, mode: 'simple', description: '城市夜晚', lyrics: '[Verse]\n霓虹河流' } as Claude360MusicCreateForm
+  it('忽略歌词与纯器乐，仅发送描述（一句话生成收敛为 custom_mode:false）', () => {
+    const f = {
+      ...base,
+      mode: 'oneshot',
+      description: '城市夜晚',
+      lyrics: '[Verse]\n霓虹河流',
+      instrumental: true
+    } as Claude360MusicCreateForm
     const p = buildSubmitPayload(f)
-    expect(p.custom_mode).toBe(true)
-    expect(p.prompt).toBe('[Verse]\n霓虹河流')
-    expect(p.style).toBe('城市夜晚')
-    expect(p.title).toBe('城市夜晚')
-  })
-  it('纯器乐 → instrumental=true', () => {
-    const f = { ...base, mode: 'simple', description: 'x', instrumental: true } as Claude360MusicCreateForm
-    expect(buildSubmitPayload(f).instrumental).toBe(true)
+    expect(p.custom_mode).toBe(false)
+    expect(p.prompt).toBe('城市夜晚')
+    expect(p.instrumental).toBeUndefined()
+    expect(p.style).toBeUndefined()
+    expect(p.title).toBeUndefined()
   })
 })
 
@@ -93,6 +96,19 @@ describe('buildSubmitPayload · 标准模式', () => {
     expect(p.style_weight).toBeUndefined()
     expect(p.weirdness_constraint).toBe(0.7)
   })
+  it('不透传旧版 audioWeight/audio_weight 字段', () => {
+    const f = {
+      ...base,
+      mode: 'standard',
+      customMode: true,
+      model: 'V5',
+      lyrics: 'x',
+      style: 'pop',
+      audioWeight: 0.7
+    } as unknown as Claude360MusicCreateForm
+    const p = buildSubmitPayload(f)
+    expect('audio_weight' in p).toBe(false)
+  })
   it('voice_persona 在不支持的模型上降级为 style_persona', () => {
     const f = {
       ...base,
@@ -111,14 +127,14 @@ describe('buildSubmitPayload · 标准模式', () => {
 })
 
 describe('validateForm', () => {
-  it('简单模式缺描述 → 报错', () => {
-    expect(validateForm({ ...base, mode: 'simple', description: '' } as Claude360MusicCreateForm)).toContain('请填写歌曲描述')
+  it('一句话模式缺描述 → 报错', () => {
+    expect(validateForm({ ...base, mode: 'oneshot', description: '' } as Claude360MusicCreateForm)).toContain('请填写一句话描述')
   })
   it('自定义模式缺曲风 → 报错', () => {
     const errs = validateForm({ ...base, mode: 'standard', customMode: true, lyrics: 'x', style: '' } as Claude360MusicCreateForm)
     expect(errs.some((e) => e.includes('曲风'))).toBe(true)
   })
-  it('合法的简单描述 → 无错误', () => {
-    expect(validateForm({ ...base, mode: 'simple', description: '一首钢琴曲' } as Claude360MusicCreateForm)).toEqual([])
+  it('合法的一句话描述 → 无错误', () => {
+    expect(validateForm({ ...base, mode: 'oneshot', description: '一首钢琴曲' } as Claude360MusicCreateForm)).toEqual([])
   })
 })

@@ -9,7 +9,20 @@
 // - base64 体积大：持久化时丢弃超阈值 base64（只留 url / 小 base64），
 //   历史条数硬上限 CANVAS_HISTORY_LIMIT，损坏数据安全恢复空列表。
 import { create, type StoreApi } from 'zustand'
-import type { Claude360CanvasImage, Claude360ImageSize } from '@shared/claude360-canvas'
+import type {
+  Claude360CanvasImage,
+  Claude360ImageOutputFormat,
+  Claude360ImageQuality,
+  Claude360ImageResolution,
+  Claude360ImageSize
+} from '@shared/claude360-canvas'
+import {
+  CLAUDE360_DEFAULT_ASPECT,
+  CLAUDE360_DEFAULT_OUTPUT_FORMAT,
+  CLAUDE360_DEFAULT_QUALITY,
+  CLAUDE360_DEFAULT_RESOLUTION,
+  resolveImageSizeValue
+} from '@shared/claude360-canvas'
 import {
   readBrowserStorageItem,
   writeBrowserStorageItem
@@ -22,8 +35,11 @@ export const CANVAS_HISTORY_STORAGE_KEY = 'c360-copilot-canvas-history'
 // 约 200KB；超过只留元信息占位不落盘 b64Json。
 export const CANVAS_HISTORY_MAX_BASE64_LENGTH = 200 * 1024
 
-// —— 生图参数默认值 ——
-export const CANVAS_DEFAULT_SIZE: Claude360ImageSize = '1024x1024'
+// —— 生图参数默认值（size 由默认宽高比 + 分辨率派生）——
+export const CANVAS_DEFAULT_SIZE: Claude360ImageSize = resolveImageSizeValue(
+  CLAUDE360_DEFAULT_ASPECT,
+  CLAUDE360_DEFAULT_RESOLUTION
+)
 export const CANVAS_MIN_N = 1
 export const CANVAS_MAX_N = 4
 
@@ -31,8 +47,13 @@ export interface CanvasState {
   // 表单参数
   prompt: string
   model: string
-  size: Claude360ImageSize
+  size: Claude360ImageSize // 由 aspectPreset + resolution 派生
   n: number
+  aspectPreset: string
+  resolution: Claude360ImageResolution
+  quality: Claude360ImageQuality
+  outputFormat: Claude360ImageOutputFormat
+  referenceImage: string | null // 参考图 dataURL（有值时走 editImage，不带 mask）
   // 运行态
   generating: boolean
   editing: boolean
@@ -44,7 +65,11 @@ export interface CanvasState {
   // actions —— 表单
   setPrompt: (prompt: string) => void
   setModel: (model: string) => void
-  setSize: (size: Claude360ImageSize) => void
+  setAspectPreset: (aspectPreset: string) => void
+  setResolution: (resolution: Claude360ImageResolution) => void
+  setQuality: (quality: Claude360ImageQuality) => void
+  setOutputFormat: (outputFormat: Claude360ImageOutputFormat) => void
+  setReferenceImage: (referenceImage: string | null) => void
   setN: (n: number) => void
   // actions —— 生成
   beginGenerate: () => void
@@ -133,7 +158,12 @@ export function createCanvasStore(
   const store = create<CanvasState>((set) => ({
     prompt: '',
     model: '',
-    size: CANVAS_DEFAULT_SIZE,
+    aspectPreset: CLAUDE360_DEFAULT_ASPECT,
+    resolution: CLAUDE360_DEFAULT_RESOLUTION,
+    size: resolveImageSizeValue(CLAUDE360_DEFAULT_ASPECT, CLAUDE360_DEFAULT_RESOLUTION),
+    quality: CLAUDE360_DEFAULT_QUALITY,
+    outputFormat: CLAUDE360_DEFAULT_OUTPUT_FORMAT,
+    referenceImage: null,
     n: CANVAS_MIN_N,
     generating: false,
     editing: false,
@@ -143,7 +173,13 @@ export function createCanvasStore(
     activeImageId: null,
     setPrompt: (prompt) => set({ prompt }),
     setModel: (model) => set({ model }),
-    setSize: (size) => set({ size }),
+    setAspectPreset: (aspectPreset) =>
+      set((s) => ({ aspectPreset, size: resolveImageSizeValue(aspectPreset, s.resolution) })),
+    setResolution: (resolution) =>
+      set((s) => ({ resolution, size: resolveImageSizeValue(s.aspectPreset, resolution) })),
+    setQuality: (quality) => set({ quality }),
+    setOutputFormat: (outputFormat) => set({ outputFormat }),
+    setReferenceImage: (referenceImage) => set({ referenceImage }),
     setN: (n) => set({ n: clampN(n) }),
     beginGenerate: () => set({ generating: true, error: null }),
     generateSuccess: (images) =>

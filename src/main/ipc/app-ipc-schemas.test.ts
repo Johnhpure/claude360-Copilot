@@ -770,7 +770,7 @@ describe('app-ipc-schemas', () => {
 })
 
 describe('claude360 music IPC schemas', () => {
-  it('accepts a simple-mode submit with a prompt', () => {
+  it('accepts a oneshot submit with a prompt', () => {
     const payload = claude360MusicSubmitPayloadSchema.parse({
       prompt: '轻快的电子舞曲',
       model: 'V5_5',
@@ -778,6 +778,16 @@ describe('claude360 music IPC schemas', () => {
     })
     expect(payload.prompt).toBe('轻快的电子舞曲')
     expect(payload.model).toBe('V5_5')
+  })
+
+  it('rejects legacy audio_weight', () => {
+    expect(() =>
+      claude360MusicSubmitPayloadSchema.parse({
+        prompt: 'x',
+        model: 'V5_5',
+        audio_weight: 0.7
+      })
+    ).toThrow()
   })
 
   it('accepts an instrumental submit with no prompt', () => {
@@ -883,9 +893,31 @@ describe('claude360 canvas IPC schemas', () => {
     ).toThrow()
   })
 
-  it('rejects generate with a size outside the allowed set', () => {
+  it('accepts any WxH size and rejects malformed size', () => {
+    const ok = claude360CanvasGeneratePayloadSchema.parse({ model: 'm', prompt: 'x', size: '512x512' })
+    expect(ok.size).toBe('512x512')
     expect(() =>
-      claude360CanvasGeneratePayloadSchema.parse({ model: 'm', prompt: 'x', size: '512x512' })
+      claude360CanvasGeneratePayloadSchema.parse({ model: 'm', prompt: 'x', size: 'huge' })
+    ).toThrow()
+  })
+
+  it('accepts generate with quality and output_format', () => {
+    const payload = claude360CanvasGeneratePayloadSchema.parse({
+      model: 'm',
+      prompt: 'x',
+      quality: 'high',
+      output_format: 'webp'
+    })
+    expect(payload.quality).toBe('high')
+    expect(payload.output_format).toBe('webp')
+  })
+
+  it('rejects generate with invalid quality / output_format', () => {
+    expect(() =>
+      claude360CanvasGeneratePayloadSchema.parse({ model: 'm', prompt: 'x', quality: 'ultra' })
+    ).toThrow()
+    expect(() =>
+      claude360CanvasGeneratePayloadSchema.parse({ model: 'm', prompt: 'x', output_format: 'gif' })
     ).toThrow()
   })
 
@@ -919,4 +951,3 @@ describe('claude360 canvas IPC schemas', () => {
     ).toThrow()
   })
 })
-

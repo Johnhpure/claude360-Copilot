@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import { useChatStore } from './store/chat-store'
 import { supportsDesktopTitleBar, WindowsTitleBar } from './components/WindowsTitleBar'
 import { RuntimeStatusBanner } from './components/RuntimeStatusBanner'
+import { GroupKeyPromptModal } from './components/GroupKeyPromptModal'
 import i18n from './i18n'
 
 const Workbench = lazy(() =>
@@ -65,6 +66,7 @@ export default function AppShell(): React.ReactElement {
           <InitialSetupDialog />
         </Suspense>
       ) : null}
+      <GroupKeyPromptModal />
     </div>
   )
 }

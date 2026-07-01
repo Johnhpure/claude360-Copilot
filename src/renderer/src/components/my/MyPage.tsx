@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import type {
   Claude360Me,
   Claude360TokenListItem,
@@ -9,14 +9,12 @@ import type {
   Claude360TopupOptions,
   Claude360TopupOrder
 } from '@shared/claude360'
-import type { Claude360ModelCache } from '@shared/app-settings-claude360'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { MyAccountOverview } from './MyAccountOverview'
 import { MyBillingPanel, type BillingPollPhase } from './MyBillingPanel'
 import { MyTokenGroupsTable } from './MyTokenGroupsTable'
-import { MyModelGroupsTable } from './MyModelGroupsTable'
 import { MyUsagePanel } from './MyUsagePanel'
-import { createTokenAndRefresh, pollTopupOrderUntilComplete } from './my-page-actions'
+import { pollTopupOrderUntilComplete } from './my-page-actions'
 
 type Props = {
   leftSidebarCollapsed: boolean
@@ -34,11 +32,8 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
   const { t } = useTranslation('common')
   const [me, setMe] = useState<Claude360Me | null>(null)
   const [tokens, setTokens] = useState<Claude360TokenListItem[]>([])
-  const [modelCache, setModelCache] = useState<Claude360ModelCache | null>(null)
   const [usageStats, setUsageStats] = useState<Claude360TokenStat[]>([])
   const [revealed, setRevealed] = useState<Record<number, string>>({})
-  const [creatingKey, setCreatingKey] = useState(false)
-  const [refreshingModels, setRefreshingModels] = useState(false)
 
   const [topupOptions, setTopupOptions] = useState<Claude360TopupOptions | null>(null)
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null)
@@ -98,10 +93,9 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
   const loadAll = useCallback(async () => {
     if (typeof window.kunGui === 'undefined') return
     try {
-      const [meResult, tokenResult, modelResult, statsResult, optionsResult] = await Promise.all([
+      const [meResult, tokenResult, statsResult, optionsResult] = await Promise.all([
         window.kunGui.claude360BillingMe(),
         window.kunGui.claude360TokensList(),
-        window.kunGui.claude360ModelsList(),
         window.kunGui.claude360BillingTokenStats({}),
         window.kunGui.claude360BillingTopupOptions()
       ])
@@ -110,7 +104,6 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
       setTokens(tokenResult)
       // 列表刷新：清空旧的 reveal 明文，避免与新列表错配或长期驻留。
       clearAllRevealed()
-      setModelCache(modelResult)
       setUsageStats(statsResult)
       setTopupOptions(optionsResult)
       setSelectedAmount((prev) => prev ?? optionsResult.amountOptions[0] ?? null)
@@ -123,37 +116,6 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
   useEffect(() => {
     void loadAll()
   }, [loadAll])
-
-  const handleRefreshModels = useCallback(async () => {
-    if (typeof window.kunGui === 'undefined' || refreshingModels) return
-    setRefreshingModels(true)
-    try {
-      const result = await window.kunGui.claude360ModelsRefresh()
-      if (!abortedRef.current) setModelCache(result.modelCache)
-    } catch (e) {
-      if (!abortedRef.current) setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      if (!abortedRef.current) setRefreshingModels(false)
-    }
-  }, [refreshingModels])
-
-  const handleCreateKey = useCallback(async () => {
-    if (typeof window.kunGui === 'undefined' || creatingKey) return
-    setCreatingKey(true)
-    // Key 名称用固定非本地化前缀,避免把界面语言写进后端持久数据(与 token-service 命名对齐)。
-    const name = `Claude360 Copilot-${Date.now()}`
-    const result = await createTokenAndRefresh(window.kunGui, { name })
-    if (abortedRef.current) return
-    if (result.ok) {
-      setTokens(result.tokens)
-      // 新建/刷新列表：清空旧明文。
-      clearAllRevealed()
-      setError(null)
-    } else {
-      setError(result.message)
-    }
-    setCreatingKey(false)
-  }, [creatingKey, clearAllRevealed])
 
   const handleReveal = useCallback(async (tokenId: number) => {
     if (typeof window.kunGui === 'undefined') return
@@ -242,18 +204,6 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
                 {t('myBackToWorkbench')}
               </button>
               <h1 className="min-w-0 flex-1 truncate text-[15px] font-medium text-ds-muted">{t('myPage')}</h1>
-              <button
-                type="button"
-                onClick={() => void handleRefreshModels()}
-                disabled={refreshingModels}
-                className="ds-no-drag flex items-center gap-1.5 rounded-lg border border-ds-border bg-ds-card px-2.5 py-1.5 text-[12.5px] font-medium text-ds-muted shadow-sm transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <RefreshCw
-                  className={`h-3.5 w-3.5 ${refreshingModels ? 'animate-spin' : ''}`}
-                  strokeWidth={1.75}
-                />
-                {t('myRefreshModels')}
-              </button>
             </div>
           </div>
         </header>
@@ -272,14 +222,10 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
           <MyTokenGroupsTable
             tokens={tokens}
             revealed={revealed}
-            creating={creatingKey}
             onReveal={(tokenId) => void handleReveal(tokenId)}
             onCopy={handleCopy}
-            onCreate={() => void handleCreateKey()}
             t={t}
           />
-
-          <MyModelGroupsTable modelCache={modelCache} t={t} />
 
           <div id="my-billing-panel">
             <MyBillingPanel

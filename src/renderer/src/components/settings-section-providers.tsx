@@ -70,6 +70,7 @@ import {
   ProviderModelImportDialog,
   type ProviderModelImportResult
 } from './provider-model-import-dialog'
+import { GroupsKeysSection } from './settings-section-groups-keys'
 
 // Claude360 二开:普通用户不再手动配置自定义供应商。供应商 profile 由「我的」页
 // (route==='my')登录后按套餐下发,这里仅做只读展示并引导去「我的」页管理。
@@ -462,6 +463,19 @@ function ModelChipsInput({
 }
 
 export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }): ReactElement {
+  // Claude360 二开:普通用户看到的是「分组及 Key」页(从 claude360 拉取模型分组 +
+  // 每组 API Key 管理),而非手动供应商配置。手动配置分支(SHOW_MANUAL_PROVIDER_CONFIG
+  // =true)以下代码全部保留,便于内部/后续需要时恢复。
+  if (!SHOW_MANUAL_PROVIDER_CONFIG) {
+    return <GroupsKeysSection t={ctx.t} />
+  }
+  return <ManualProviderConfigSection ctx={ctx} />
+}
+
+// 手动供应商配置（内部保留分支）。抽成独立组件，使上面 ProvidersSettingsSection 的
+// 早返回不违反 React hooks 规则——本组件内的 useState/useEffect 均无条件调用；
+// 普通用户（SHOW_MANUAL_PROVIDER_CONFIG=false）根本不会渲染本组件、不执行这些 hooks。
+function ManualProviderConfigSection({ ctx }: { ctx: Record<string, any> }): ReactElement {
   const {
     t,
     form,

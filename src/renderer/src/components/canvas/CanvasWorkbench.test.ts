@@ -38,16 +38,19 @@ describe('CanvasWorkbench · 首屏是工具型工作台', () => {
     useCanvasStore.setState({ lastResult: [], history: [], error: null, activeImageId: null })
   })
 
-  it('渲染工作台容器 + prompt/模型/尺寸/生成按钮 + 结果区 + 历史区', () => {
+  it('渲染工作台容器 + prompt/模型/比例/质量/生成按钮 + 结果区 + 历史区', () => {
     const html = renderWorkbench()
     expect(html).toContain('canvas-workbench')
     expect(html).toContain('canvasWorkbenchTitle')
-    // 生图面板控件
+    // 生图面板控件（宽高比图标网格 + 分辨率 + 质量 + 输出格式 + 参考图）
     expect(html).toContain('image-prompt-input')
-    expect(html).toContain('image-size-select')
+    expect(html).toContain('image-aspect-square')
+    expect(html).toContain('image-resolution-2K')
+    expect(html).toContain('image-quality-auto')
+    expect(html).toContain('image-output-format-select')
     expect(html).toContain('image-generate-button')
-    // 编辑面板
-    expect(html).toContain('image-editor-panel')
+    // 已移除独立图像编辑面板
+    expect(html).not.toContain('image-editor-panel')
     // 结果区（空态）+ 历史区
     expect(html).toContain('image-result-grid-empty')
     expect(html).toContain('image-history-panel')

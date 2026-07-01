@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>音乐工作台 — UI 重构示意图 v2</title>
+<style>
+  :root {
+    --bg-app:#f3f5fc; --card:rgba(255,255,255,0.9); --card-strong:#ffffff;
+    --main:#eaf0f9; --border:rgba(20,47,95,0.13); --border-muted:rgba(20,47,95,0.085);
+    --ink:#233659; --muted:#54678c; --faint:#8492b1;
+    --accent:#3b82d8; --accent-soft:rgba(59,130,216,0.15);
+    --success:#128a4a; --success-soft:rgba(17,185,129,0.14);
+    --danger:#d6493f; --danger-soft:rgba(244,116,100,0.14); --danger-border:rgba(214,73,63,0.3);
+    --new:#8b5cf6; --new-soft:rgba(139,92,246,0.14);
+    --api:#0891b2; --api-soft:rgba(8,145,178,0.14);
+    --shadow:0 12px 30px rgba(20,47,95,0.08); --hover:rgba(59,110,187,0.065);
+  }
+  [data-theme="dark"] {
+    --bg-app:#0f1422; --card:rgba(22,29,47,0.92); --card-strong:#1b2338;
+    --main:#161d2f; --border:rgba(151,192,235,0.13); --border-muted:rgba(151,192,235,0.08);
+    --ink:#f0f5fc; --muted:#bdc9de; --faint:#8593b1;
+    --accent:#5b9bec; --accent-soft:rgba(91,155,236,0.18);
+    --success:#3ecf8e; --success-soft:rgba(62,207,142,0.16);
+    --danger:#f47464; --danger-soft:rgba(244,116,100,0.16); --danger-border:rgba(244,116,100,0.4);
+    --new:#a78bfa; --new-soft:rgba(167,139,250,0.2);
+    --api:#22d3ee; --api-soft:rgba(34,211,238,0.16);
+    --shadow:0 16px 40px rgba(0,0,0,0.4); --hover:rgba(120,170,235,0.08);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg-app); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased; padding:24px; min-height:100vh; }
+  .demo-note { max-width:1180px; margin:0 auto 14px; font-size:12px; color:var(--faint);
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .note-legend { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .badge-new { display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700;
+    color:var(--new); background:var(--new-soft); border-radius:999px; padding:1px 7px; letter-spacing:.3px; vertical-align:middle; }
+  .badge-api { display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700;
+    color:var(--api); background:var(--api-soft); border-radius:999px; padding:1px 7px; letter-spacing:.3px; vertical-align:middle; }
+  .theme-toggle { display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+    border:1px solid var(--border); background:var(--card); color:var(--muted);
+    border-radius:999px; padding:5px 12px; font-size:12px; font-weight:500; transition:all .18s ease; }
+  .theme-toggle:hover { background:var(--card-strong); color:var(--ink); }
+  .theme-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  .panel { max-width:1180px; margin:0 auto; background:var(--card);
+    border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; backdrop-filter:blur(8px); }
+  .panel-head { padding:16px 22px; border-bottom:1px solid var(--border-muted);
+    display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  .panel-title { display:flex; align-items:center; gap:10px; }
+  .panel-title .ic { width:34px; height:34px; border-radius:10px; background:var(--accent-soft);
+    color:var(--accent); display:grid; place-items:center; }
+  .panel-title h1 { margin:0; font-size:16px; font-weight:600; letter-spacing:.2px; }
+  .panel-title p { margin:2px 0 0; font-size:12px; color:var(--faint); }
+
+  .body { display:grid; grid-template-columns:430px 1fr; min-height:640px; }
+  .form-col { border-right:1px solid var(--border-muted); padding:16px; overflow-y:auto; max-height:760px; }
+  .list-col { display:flex; flex-direction:column; background:var(--main); }
+  .list-scroll { padding:16px 18px; overflow-y:auto; flex:1; max-height:640px; }
+
+  .card { border:1px solid var(--border); border-radius:16px; background:var(--card-strong); padding:16px; margin-bottom:14px; }
+
+  .seg { display:inline-flex; width:100%; background:var(--main); border:1px solid var(--border-muted);
+    border-radius:12px; padding:3px; gap:2px; margin-bottom:14px; }
+  .seg button { flex:1; border:0; background:transparent; color:var(--muted); cursor:pointer;
+    padding:9px 8px; border-radius:9px; font-size:12.5px; font-weight:500; transition:all .16s ease;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px; position:relative; }
+  .seg button:hover { color:var(--ink); }
+  .seg button[aria-selected="true"] { background:var(--card-strong); color:var(--ink);
+    box-shadow:0 1px 3px rgba(20,47,95,0.1); font-weight:600; }
+  .seg button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .seg .badge-new { position:absolute; top:-7px; right:6px; }
+
+  .field { display:flex; flex-direction:column; gap:6px; margin-bottom:13px; }
+  .field:last-child { margin-bottom:0; }
+  .field > label, .field-label { font-size:12.5px; color:var(--muted); font-weight:500;
+    display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .req { color:var(--danger); }
+  select, input[type=text], textarea {
+    width:100%; border:1px solid var(--border); background:var(--main); color:var(--ink);
+    border-radius:10px; padding:8px 10px; font-size:12.5px; font-family:inherit; }
+  select:focus-visible, input:focus-visible, textarea:focus-visible { outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent); }
+  textarea { resize:vertical; min-height:74px; }
+  .hint { font-size:11px; color:var(--faint); margin-top:2px; }
+  .lyrics-head { display:flex; align-items:center; justify-content:space-between; }
+  .ai-btn { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--new);
+    background:var(--new-soft); color:var(--new); font-size:11.5px; font-weight:600; cursor:pointer;
+    font-family:inherit; padding:4px 10px; border-radius:999px; transition:all .16s; }
+  .ai-btn:hover { filter:brightness(1.05); }
+  .ai-btn:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+
+  /* 曲风预设 chips */
+  .chips { display:flex; flex-wrap:wrap; gap:7px; margin-top:2px; }
+  .chip { font-size:11.5px; color:var(--muted); background:var(--main); border:1px solid var(--border-muted);
+    border-radius:999px; padding:4px 11px; cursor:pointer; transition:all .16s; font-family:inherit; }
+  .chip:hover { border-color:var(--accent); color:var(--ink); }
+  .chip[aria-pressed="true"] { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); font-weight:600; }
+
+  /* switch */
+  .switch-row { display:flex; align-items:center; justify-content:space-between; font-size:12.5px; color:var(--muted); margin-bottom:13px; }
+  .switch { position:relative; width:44px; height:24px; border:0; border-radius:999px; background:var(--faint); cursor:pointer; transition:background .2s; flex:none; }
+  .switch[aria-checked="true"] { background:var(--accent); }
+  .switch span { position:absolute; left:2px; top:2px; width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:transform .2s; }
+  .switch[aria-checked="true"] span { transform:translateX(20px); }
+  .switch:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* 参考音频上传 */
+  .drop-row { border:1.5px dashed var(--border); border-radius:12px; background:var(--main);
+    padding:12px; display:flex; align-items:center; gap:10px; cursor:pointer; transition:all .16s ease; }
+  .drop-row:hover { border-color:var(--accent); background:var(--accent-soft); }
+  .drop-row .di { width:34px; height:34px; border-radius:9px; background:var(--card-strong); display:grid; place-items:center; color:var(--muted); flex:none; }
+  .drop-row .dt { font-size:12.5px; font-weight:600; color:var(--ink); }
+  .drop-row .ds { font-size:11px; color:var(--faint); }
+
+  /* 高级参数 */
+  .adv { border:1px solid var(--border); border-radius:14px; background:var(--card-strong); margin-bottom:14px; overflow:hidden; }
+  .adv-head { width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:12px 15px; cursor:pointer; border:0; background:transparent; color:var(--ink); font-size:13px; font-weight:600; font-family:inherit; }
+  .adv-head:hover { background:var(--hover); }
+  .adv-head .chev { transition:transform .2s ease; color:var(--faint); }
+  .adv[open] .chev { transform:rotate(180deg); }
+  .adv-body { padding:6px 15px 15px; }
+  .slider-field { margin-bottom:14px; }
+  .slider-field .field-label { margin-bottom:6px; }
+  .slider-field .val { font-variant-numeric:tabular-nums; color:var(--ink); font-weight:600; }
+  input[type=range] { width:100%; accent-color:var(--accent); }
+  /* vocal gender segmented */
+  .vg-seg { display:inline-flex; width:100%; background:var(--main); border:1px solid var(--border-muted); border-radius:10px; padding:3px; gap:2px; }
+  .vg-seg button { flex:1; border:0; background:transparent; color:var(--muted); cursor:pointer; padding:6px 8px; border-radius:8px; font-size:12px; font-weight:500; transition:all .16s; font-family:inherit; }
+  .vg-seg button[aria-selected="true"] { background:var(--card-strong); color:var(--ink); box-shadow:0 1px 3px rgba(20,47,95,.1); font-weight:600; }
+  .vg-seg button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+
+  .cta { width:100%; display:inline-flex; height:44px; align-items:center; justify-content:center; gap:8px;
+    border:0; border-radius:14px; background:var(--ink); color:var(--card-strong); font-size:13.5px; font-weight:700;
+    cursor:pointer; transition:all .18s ease; box-shadow:0 4px 14px rgba(20,47,95,.14); }
+  [data-theme=dark] .cta { background:var(--accent); color:#fff; }
+  .cta:hover { opacity:.92; }
+  .cta:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* 任务列表（带封面） */
+  .list-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .list-head h3 { margin:0; font-size:14px; font-weight:600; }
+  .list-head .count { font-size:11.5px; color:var(--faint); }
+  .track { display:flex; align-items:center; gap:12px; border:1px solid var(--border); border-radius:14px;
+    background:var(--card-strong); padding:11px 13px; margin-bottom:10px; transition:all .16s ease; }
+  .track:hover { box-shadow:0 4px 14px rgba(20,47,95,.07); }
+  .track.playing { border-color:var(--accent); background:var(--accent-soft); }
+  .cover { width:54px; height:54px; border-radius:10px; flex:none; position:relative; overflow:hidden; background:var(--main); }
+  .cover img { width:100%; height:100%; object-fit:cover; display:block; }
+  .cover .gen { position:absolute; inset:0; display:grid; place-items:center; color:var(--faint); background:var(--main); }
+  .play-fab { position:absolute; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.32); opacity:0; transition:opacity .16s; }
+  .cover:hover .play-fab { opacity:1; }
+  .t-main { flex:1; min-width:0; }
+  .t-title { font-size:13px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .t-sub { font-size:11px; color:var(--faint); margin-top:2px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .status { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:600; border-radius:999px; padding:1px 8px; }
+  .status.done { color:var(--success); background:var(--success-soft); }
+  .status.run { color:var(--accent); background:var(--accent-soft); }
+  .t-actions { display:flex; align-items:center; gap:5px; flex:none; }
+  .icon-btn { display:grid; place-items:center; width:32px; height:32px; cursor:pointer;
+    border:1px solid var(--border); border-radius:9px; background:var(--card); color:var(--muted); transition:all .16s ease; }
+  .icon-btn:hover { background:var(--hover); color:var(--ink); }
+  .icon-btn:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .icon-btn.accent { color:var(--accent); }
+
+  /* 增强播放器 */
+  .player { border-top:1px solid var(--border); background:var(--card-strong); padding:12px 18px;
+    display:flex; flex-direction:column; gap:9px; }
+  .player-top { display:flex; align-items:center; gap:12px; }
+  .p-cover { width:44px; height:44px; border-radius:9px; flex:none; overflow:hidden; }
+  .p-cover img { width:100%; height:100%; object-fit:cover; }
+  .p-meta { flex:1; min-width:0; }
+  .p-title { font-size:12.5px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .p-sub { font-size:11px; color:var(--faint); }
+  .p-ctrls { display:flex; align-items:center; gap:4px; }
+  .p-btn { display:grid; place-items:center; width:34px; height:34px; cursor:pointer; border:0; border-radius:9px;
+    background:transparent; color:var(--muted); transition:all .16s; }
+  .p-btn:hover { background:var(--hover); color:var(--ink); }
+  .p-btn.main { width:40px; height:40px; background:var(--ink); color:var(--card-strong); }
+  [data-theme=dark] .p-btn.main { background:var(--accent); color:#fff; }
+  .p-btn:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .progress-row { display:flex; align-items:center; gap:10px; }
+  .time { font-size:10.5px; color:var(--faint); font-variant-numeric:tabular-nums; flex:none; min-width:34px; }
+  .bar { flex:1; height:5px; border-radius:999px; background:var(--main); position:relative; cursor:pointer; }
+  .bar .fill { position:absolute; left:0; top:0; bottom:0; width:38%; border-radius:999px; background:var(--accent); }
+  .bar .knob { position:absolute; left:38%; top:50%; width:12px; height:12px; border-radius:50%; background:#fff;
+    border:2px solid var(--accent); transform:translate(-50%,-50%); box-shadow:0 1px 3px rgba(0,0,0,.25); }
+  .vol-row { display:flex; align-items:center; gap:8px; }
+  .vol { width:80px; }
+  .queue-badge { display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--muted);
+    background:var(--main); border:1px solid var(--border-muted); border-radius:999px; padding:3px 10px; cursor:pointer; }
+  .queue-badge:hover { background:var(--hover); }
+
+  /* AI 写词助手模态 */
+  .modal-mask { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(2px); z-index:200; display:none; }
+  .modal-mask.open { display:block; }
+  .modal { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:201;
+    width:640px; max-width:calc(100vw - 32px); max-height:calc(100vh - 48px); display:none; flex-direction:column;
+    background:var(--card-strong); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); overflow:hidden; }
+  .modal.open { display:flex; }
+  .modal-head { display:flex; align-items:flex-start; gap:14px; padding:16px 18px; border-bottom:1px solid var(--border-muted); }
+  .modal-head h3 { margin:0; font-size:16px; font-weight:700; color:var(--ink); }
+  .modal-head p { margin:3px 0 0; font-size:12px; color:var(--faint); }
+  .modal-close { margin-left:auto; display:grid; place-items:center; width:34px; height:34px; flex:none;
+    border:1px solid var(--border); border-radius:9px; background:var(--card); color:var(--muted); cursor:pointer; transition:all .16s; }
+  .modal-close:hover { background:var(--hover); color:var(--ink); }
+  .modal-body { overflow-y:auto; padding:18px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .result-box { margin-top:14px; border:1px solid var(--border); border-radius:12px; background:var(--main); padding:12px; }
+  .result-box .rb-title { font-size:11.5px; font-weight:600; color:var(--muted); margin-bottom:8px; }
+  .result-box .rb-text { min-height:120px; white-space:pre-wrap; font-size:12.5px; line-height:1.7; color:var(--ink);
+    background:var(--card-strong); border-radius:8px; padding:10px; border:1px solid var(--border-muted); }
+  .modal-actions { display:flex; gap:8px; margin-top:14px; }
+  .btn-line { flex:1; display:inline-flex; height:40px; align-items:center; justify-content:center; gap:6px;
+    border:1px solid var(--border); border-radius:11px; background:var(--card); color:var(--ink); font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; transition:all .16s; }
+  .btn-line:hover { background:var(--hover); }
+  .btn-fill { background:var(--ink); color:var(--card-strong); border-color:transparent; }
+  [data-theme=dark] .btn-fill { background:var(--accent); color:#fff; }
+  .btn-line:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  svg { display:block; }
+</style>
+</head>
+<body>
+  <div class="demo-note">
+    <div class="note-legend">
+      <span>示意图（原型 · 假数据）— 「音乐工作台」重构 v2。</span>
+      <span class="badge-new">新</span><span style="font-size:11px">补齐/需后端</span>
+      <span class="badge-api">仅UI</span><span style="font-size:11px">后端已就绪</span>
+    </div>
+    <button class="theme-toggle" id="themeToggle" aria-label="切换深浅色">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <span id="themeLabel">深色</span>
+    </button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title">
+        <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+        <div><h1>音乐工作台</h1><p>Suno 歌曲生成 · 分组 Key 自动调用，无需单独配置</p></div>
+      </div>
+    </div>
+
+    <div class="body">
+      <!-- 左：创建表单 -->
+      <div class="form-col">
+        <!-- 两模式：一句话生成 / 标准（已移除简单模式） -->
+        <div class="seg" role="tablist" aria-label="创作模式">
+          <button role="tab" aria-selected="true" data-mode="oneshot">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+            一句话生成
+          </button>
+          <button role="tab" aria-selected="false" data-mode="standard">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            标准
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="field">
+            <label>模型</label>
+            <select id="modelSel">
+              <option value="V5_5">V5.5 · 最新推荐</option>
+              <option value="V5">V5 · 更快更强</option>
+              <option value="V4_5PLUS">V4.5+ · 最长 8 分钟</option>
+              <option value="V4_5ALL">V4.5 All</option>
+              <option value="V4_5">V4.5</option>
+              <option value="V4">V4</option>
+            </select>
+          </div>
+
+          <!-- ① 一句话生成：仅一句话描述（已移除参考音频/高级参数） -->
+          <div class="mode-block" data-mode="oneshot">
+            <div class="field">
+              <span class="field-label">一句话描述 <span class="req">*</span></span>
+              <textarea placeholder="用一句话描述你想要的歌，例如：一首温暖治愈的城市民谣，讲述深夜加班后回家路上的心情…AI 自动补全风格与歌词"></textarea>
+              <span class="hint">最省心的创作方式，模型自动扩写风格与歌词。</span>
+            </div>
+          </div>
+
+          <!-- ② 标准模式 -->
+          <div class="mode-block" data-mode="standard" style="display:none">
+            <div class="field">
+              <label>标题</label>
+              <input type="text" placeholder="歌曲标题，例如：夏夜的风（可选）"/>
+            </div>
+
+            <!-- 歌词 + AI 写词助手 -->
+            <div class="field">
+              <span class="field-label lyrics-head">
+                <span>歌词</span>
+                <button class="ai-btn" id="openLyricsAi">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+                  AI 写词助手 <span class="badge-new" style="position:static">新</span>
+                </button>
+              </span>
+              <textarea placeholder="[Verse]&#10;城市的霓虹 照亮回家的路&#10;[Chorus]&#10;我们的歌 在风里飘&#10;（支持 [Verse]/[Chorus]/[Bridge] 段落标记）"></textarea>
+            </div>
+
+            <!-- 曲风 / 风格 + 预设 chips 新 -->
+            <div class="field">
+              <span class="field-label">曲风 / 风格 <span class="badge-new">新 · 预设</span></span>
+              <input type="text" id="styleInput" placeholder="曲风 / 风格，例如：流行, 抒情, 钢琴, 男声"/>
+              <div class="chips" id="styleChips" role="group" aria-label="曲风预设"></div>
+            </div>
+
+            <!-- negative_tags：移到曲风下方 -->
+            <div class="field">
+              <span class="field-label">排除风格 negative_tags <span class="badge-api">仅UI</span></span>
+              <input type="text" placeholder="不想要的元素，例如：重金属, 喊麦, 嘈杂鼓点"/>
+            </div>
+
+            <!-- 纯器乐 -->
+            <div class="switch-row" style="margin-bottom:0">
+              <span>纯器乐（无人声）</span>
+              <button class="switch" role="switch" aria-checked="false" aria-label="纯器乐开关" onclick="this.setAttribute('aria-checked',this.getAttribute('aria-checked')==='true'?'false':'true')"><span></span></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 高级参数（仅标准模式）：第一排 vocal_gender -->
+        <details class="adv mode-block" data-mode="standard" style="display:none">
+          <summary class="adv-head">
+            <span style="display:flex;align-items:center;gap:8px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+              高级参数 · 音色与微调
+            </span>
+            <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="adv-body">
+            <!-- 第一排：人声性别 -->
+            <div class="field">
+              <span class="field-label">人声性别 vocal_gender <span class="badge-api">仅UI</span></span>
+              <div class="vg-seg" role="group" aria-label="人声性别">
+                <button aria-selected="true">不限</button>
+                <button aria-selected="false">女</button>
+                <button aria-selected="false">男</button>
+              </div>
+            </div>
+            <div class="slider-field">
+              <span class="field-label">风格遵循 style_weight <span class="val">0.60</span></span>
+              <input type="range" min="0" max="1" step="0.05" value="0.6" oninput="this.parentNode.querySelector('.val').textContent=(+this.value).toFixed(2)"/>
+            </div>
+            <div class="slider-field">
+              <span class="field-label">创意新奇度 weirdness <span class="val">0.40</span></span>
+              <input type="range" min="0" max="1" step="0.05" value="0.4" oninput="this.parentNode.querySelector('.val').textContent=(+this.value).toFixed(2)"/>
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <span class="field-label">角色音色 Persona <span class="badge-api">仅UI</span></span>
+              <input type="text" placeholder="persona_id（选填，复用此前歌曲音色）"/>
+            </div>
+          </div>
+        </details>
+
+        <button class="cta">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+          生成歌曲
+        </button>
+      </div>
+
+      <!-- 右：任务列表 + 播放器 -->
+      <div class="list-col">
+        <div class="list-scroll">
+          <div class="list-head">
+            <h3>我的作品</h3>
+            <span class="count">共 12 首 · 每 12s 自动刷新</span>
+          </div>
+
+          <!-- 已完成：显示接口回传封面 -->
+          <div class="track playing">
+            <div class="cover">
+              <img alt="封面" src="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'&gt;&lt;defs&gt;&lt;linearGradient id='c1' x1='0' y1='0' x2='1' y2='1'&gt;&lt;stop offset='0' stop-color='%237c3aed'/&gt;&lt;stop offset='1' stop-color='%23db2777'/&gt;&lt;/linearGradient&gt;&lt;/defs&gt;&lt;rect width='120' height='120' fill='url(%23c1)'/&gt;&lt;circle cx='60' cy='60' r='30' fill='none' stroke='%23fff' stroke-width='3' opacity='.6'/&gt;&lt;circle cx='60' cy='60' r='8' fill='%23fff' opacity='.85'/&gt;&lt;/svg&gt;"/>
+              <div class="play-fab"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" stroke="none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></div>
+            </div>
+            <div class="t-main">
+              <div class="t-title">深夜归途</div>
+              <div class="t-sub"><span class="status done">已完成</span><span>城市民谣 · 2:34</span></div>
+            </div>
+            <div class="t-actions">
+              <button class="icon-btn" title="下载"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></button>
+            </div>
+          </div>
+
+          <!-- 生成中：封面占位（尚未回传） -->
+          <div class="track">
+            <div class="cover">
+              <div class="gen"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.2-8.5"/></svg></div>
+            </div>
+            <div class="t-main">
+              <div class="t-title">夏日海滩派对</div>
+              <div class="t-sub"><span class="status run">生成中 68%</span><span>封面生成中…</span></div>
+            </div>
+            <div class="t-actions"><button class="icon-btn" title="取消"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+          </div>
+
+          <!-- 已完成：封面 -->
+          <div class="track">
+            <div class="cover">
+              <img alt="封面" src="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'&gt;&lt;defs&gt;&lt;linearGradient id='c2' x1='0' y1='0' x2='1' y2='1'&gt;&lt;stop offset='0' stop-color='%23f59e0b'/&gt;&lt;stop offset='1' stop-color='%23ef4444'/&gt;&lt;/linearGradient&gt;&lt;/defs&gt;&lt;rect width='120' height='120' fill='url(%23c2)'/&gt;&lt;path d='M35 82 V45 l45 -9 v37' fill='none' stroke='%23fff' stroke-width='4' opacity='.8'/&gt;&lt;circle cx='35' cy='82' r='8' fill='%23fff' opacity='.9'/&gt;&lt;circle cx='80' cy='73' r='8' fill='%23fff' opacity='.9'/&gt;&lt;/svg&gt;"/>
+              <div class="play-fab"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" stroke="none"><path d="M8 5v14l11-7z"/></svg></div>
+            </div>
+            <div class="t-main">
+              <div class="t-title">纯钢琴 · 雨声</div>
+              <div class="t-sub"><span class="status done">已完成</span><span>器乐 · 4:12</span></div>
+            </div>
+            <div class="t-actions">
+              <button class="icon-btn" title="下载"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></button>
+            </div>
+          </div>
+
+          <div class="track">
+            <div class="cover">
+              <img alt="封面" src="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'&gt;&lt;defs&gt;&lt;linearGradient id='c3' x1='0' y1='0' x2='1' y2='1'&gt;&lt;stop offset='0' stop-color='%2322c55e'/&gt;&lt;stop offset='1' stop-color='%230891b2'/&gt;&lt;/linearGradient&gt;&lt;/defs&gt;&lt;rect width='120' height='120' fill='url(%23c3)'/&gt;&lt;path d='M20 70 Q60 20 100 70' stroke='%23fff' stroke-width='5' fill='none' opacity='.7'/&gt;&lt;/svg&gt;"/>
+              <div class="play-fab"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" stroke="none"><path d="M8 5v14l11-7z"/></svg></div>
+            </div>
+            <div class="t-main">
+              <div class="t-title">霓虹之夜</div>
+              <div class="t-sub"><span class="status done">已完成</span><span>合成波 · 3:20</span></div>
+            </div>
+            <div class="t-actions">
+              <button class="icon-btn" title="下载"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 增强播放器 -->
+        <div class="player">
+          <div class="player-top">
+            <div class="p-cover"><img alt="封面" src="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' width='88' height='88'&gt;&lt;defs&gt;&lt;linearGradient id='pc' x1='0' y1='0' x2='1' y2='1'&gt;&lt;stop offset='0' stop-color='%237c3aed'/&gt;&lt;stop offset='1' stop-color='%23db2777'/&gt;&lt;/linearGradient&gt;&lt;/defs&gt;&lt;rect width='88' height='88' fill='url(%23pc)'/&gt;&lt;circle cx='44' cy='44' r='22' fill='none' stroke='%23fff' stroke-width='2.5' opacity='.6'/&gt;&lt;circle cx='44' cy='44' r='6' fill='%23fff' opacity='.85'/&gt;&lt;/svg&gt;"/></div>
+            <div class="p-meta">
+              <div class="p-title">深夜归途</div>
+              <div class="p-sub">城市民谣 · V5.5</div>
+            </div>
+            <div class="p-ctrls">
+              <button class="p-btn" title="上一首" aria-label="上一首"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 6h2v12H6zM20 6l-9 6 9 6z"/></svg></button>
+              <button class="p-btn main" id="playBtn" title="播放/暂停" aria-label="播放/暂停"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+              <button class="p-btn" title="下一首" aria-label="下一首"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16 6h2v12h-2zM4 6l9 6-9 6z"/></svg></button>
+            </div>
+          </div>
+          <div class="progress-row">
+            <span class="time">0:58</span>
+            <div class="bar" id="bar" title="拖动跳转"><div class="fill"></div><div class="knob"></div></div>
+            <span class="time">2:34</span>
+          </div>
+          <div class="player-top" style="gap:14px">
+            <div class="vol-row">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted)"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>
+              <input class="vol" type="range" min="0" max="100" value="72" aria-label="音量"/>
+            </div>
+            <div style="flex:1"></div>
+            <span class="queue-badge badge-new" style="cursor:pointer" onclick="alert('（原型）打开播放队列：连续播放多首作品。queue 参数已预留。')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13M3 12h13M3 18h9M17 15v6"/><path d="M17 15l4 3-4 3z"/></svg>
+              播放队列 · 3
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✨ AI 写词助手模态（参考 claude360-music-web） -->
+  <div class="modal-mask" id="lyricsMask"></div>
+  <div class="modal" id="lyricsModal" role="dialog" aria-modal="true" aria-labelledby="lyricsAiTitle">
+    <div class="modal-head">
+      <div>
+        <h3 id="lyricsAiTitle">✨ AI 写词助手</h3>
+        <p>根据主题、语言、情绪和结构生成可直接填入创作表单的歌词。</p>
+      </div>
+      <button class="modal-close" id="closeLyricsAi" aria-label="关闭"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>文本模型 <span class="hint" style="margin:0">用于写词，不影响 Suno 音乐模型</span></label>
+        <select><option>gpt-4o</option><option>claude-3.5-sonnet</option><option>deepseek-v4</option></select>
+      </div>
+      <div class="field">
+        <span class="field-label"><span>主题 / 灵感</span><button class="ai-btn" style="border-color:var(--border);background:var(--card);color:var(--muted)" onclick="document.getElementById('themeInput').value='一首温暖治愈的城市民谣，讲述深夜加班后回家的心情'">带入歌曲描述</button></span>
+        <input type="text" id="themeInput" placeholder="城市夜晚 · 霓虹 · 孤独又自由"/>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>语言</label><input type="text" value="中文"/></div>
+        <div class="field"><label>情绪</label><input type="text" value="忧郁而热烈"/></div>
+      </div>
+      <div class="field">
+        <label>结构</label>
+        <div class="chips" role="group" aria-label="歌曲结构">
+          <button class="chip" aria-pressed="true">主歌-副歌</button>
+          <button class="chip" aria-pressed="false">含 Bridge</button>
+          <button class="chip" aria-pressed="false">自由发挥</button>
+        </div>
+      </div>
+      <button class="cta" style="margin-top:6px" id="genLyrics">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+        生成歌词
+      </button>
+      <div class="result-box">
+        <div class="rb-title">生成结果 · 满意后采用并填入</div>
+        <div class="rb-text" id="lyricsResult"><span style="color:var(--faint)">生成的歌词会显示在这里。</span></div>
+        <div class="modal-actions">
+          <button class="btn-line btn-fill" id="applyLyrics">采用并填入</button>
+          <button class="btn-line" id="regenLyrics">重新生成</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const STYLE_PRESETS=['合成波','流行','低保真','爵士','节奏布鲁斯','电子','民谣','嘻哈','摇滚','古典','电影感'];
+
+  // 模式切换：oneshot / standard
+  function applyMode(mode){
+    document.querySelectorAll('.mode-block').forEach(el=>{ el.style.display = el.dataset.mode===mode ? '' : 'none'; });
+  }
+  document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-selected','false'));
+    b.setAttribute('aria-selected','true'); applyMode(b.dataset.mode);
+  });
+  applyMode('oneshot');
+
+  // 曲风预设 chips ↔ 输入框联动
+  const styleInput=document.getElementById('styleInput'), styleChips=document.getElementById('styleChips');
+  function selectedStyles(){ return styleInput.value.split(',').map(x=>x.trim()).filter(Boolean); }
+  function renderChips(){
+    const sel=selectedStyles();
+    styleChips.innerHTML=STYLE_PRESETS.map(s=>`<button class="chip" aria-pressed="${sel.includes(s)}">${s}</button>`).join('');
+    styleChips.querySelectorAll('.chip').forEach((b,i)=>b.onclick=()=>{
+      const s=STYLE_PRESETS[i]; let parts=selectedStyles();
+      parts = parts.includes(s) ? parts.filter(x=>x!==s) : [...parts,s];
+      styleInput.value=parts.join(', '); renderChips();
+    });
+  }
+  styleInput.oninput=renderChips; renderChips();
+
+  // 结构 chips 单选（模态内）
+  document.querySelectorAll('#lyricsModal .chips .chip').forEach((b,_,all)=>b.onclick=()=>{
+    all.forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true');
+  });
+
+  // AI 写词助手 模态开关
+  const mask=document.getElementById('lyricsMask'), modal=document.getElementById('lyricsModal');
+  const openAi=()=>{ mask.classList.add('open'); modal.classList.add('open'); document.getElementById('closeLyricsAi').focus(); };
+  const closeAi=()=>{ mask.classList.remove('open'); modal.classList.remove('open'); };
+  document.getElementById('openLyricsAi').onclick=openAi;
+  document.getElementById('closeLyricsAi').onclick=closeAi;
+  mask.onclick=closeAi;
+  window.addEventListener('keydown',e=>{ if(e.key==='Escape' && modal.classList.contains('open')) closeAi(); });
+  const DEMO_LYRICS='[Verse]\n霓虹在雨里融化成河\n加班的灯 又亮了一夜\n地铁的风 吹散了疲惫\n[Chorus]\n可我还想 走这条回家的路\n哪怕孤独 也照亮我脚步\n[Bridge]\n城市睡了 只剩我和月光\n把心事 都写进歌里唱';
+  function fakeGen(){
+    const box=document.getElementById('lyricsResult'); box.textContent='';
+    let i=0; const t=setInterval(()=>{ box.textContent=DEMO_LYRICS.slice(0,i+=3); if(i>=DEMO_LYRICS.length) clearInterval(t); },16);
+  }
+  document.getElementById('genLyrics').onclick=fakeGen;
+  document.getElementById('regenLyrics').onclick=fakeGen;
+  document.getElementById('applyLyrics').onclick=()=>{ closeAi(); alert('（原型）已把生成歌词填入标准模式的歌词框。'); };
+
+  // 播放器
+  const playBtn=document.getElementById('playBtn'); let playing=true;
+  playBtn.onclick=()=>{ playing=!playing;
+    playBtn.innerHTML = playing
+      ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>'
+      : '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>';
+  };
+  document.getElementById('bar').onclick=e=>{
+    const r=e.currentTarget.getBoundingClientRect(); const p=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+    e.currentTarget.querySelector('.fill').style.width=(p*100)+'%';
+    e.currentTarget.querySelector('.knob').style.left=(p*100)+'%';
+  };
+  document.getElementById('themeToggle').onclick=function(){
+    const h=document.documentElement, dark=h.getAttribute('data-theme')==='dark';
+    h.setAttribute('data-theme',dark?'light':'dark');
+    document.getElementById('themeLabel').textContent=dark?'深色':'浅色';
+  };
+  const st=document.createElement('style'); st.textContent='@keyframes spin{to{transform:rotate(360deg)}}'; document.head.appendChild(st);
+</script>
+</body>
+</html>
