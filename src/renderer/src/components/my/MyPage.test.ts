@@ -13,7 +13,6 @@ import type { Claude360TokenRef } from '@shared/app-settings-claude360'
 import { MyAccountOverview } from './MyAccountOverview'
 import { MyBillingPanel } from './MyBillingPanel'
 import {
-  createTokenAndRefresh,
   isTopupOrderComplete,
   pollTopupOrderUntilComplete,
   type MyPageApi
@@ -173,18 +172,6 @@ describe('MyPage presentational panels', () => {
 describe('MyPage orchestration', () => {
   afterEach(() => {
     vi.restoreAllMocks()
-  })
-
-  it('creating a key calls claude360TokensCreate then refreshes the list', async () => {
-    const { api, calls } = buildApiMock()
-    const result = await createTokenAndRefresh(api, { name: 'new-key', group: 'text' })
-    expect(calls.create).toHaveBeenCalledWith({ name: 'new-key', group: 'text' })
-    expect(calls.list).toHaveBeenCalledTimes(1)
-    expect(result.ok).toBe(true)
-    if (result.ok) {
-      expect(result.tokens).toHaveLength(2)
-      expect(result.ref.tokenId).toBe(9)
-    }
   })
 
   it('treats an order with completeTime > 0 as complete', () => {

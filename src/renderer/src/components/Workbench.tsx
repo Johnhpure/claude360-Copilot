@@ -2672,6 +2672,21 @@ export function Workbench(): ReactElement {
               leftSidebarCollapsed={leftSidebarCollapsed}
               onToggleLeftSidebar={toggleLeftSidebar}
               onBack={() => setRoute('chat')}
+              onLogout={() => {
+                void (async () => {
+                  if (typeof window.kunGui !== 'undefined' && window.kunGui.claude360Logout) {
+                    try {
+                      await window.kunGui.claude360Logout()
+                    } catch {
+                      /* 忽略登出网络错误，本地态照常清理 */
+                    }
+                  }
+                  const store = useChatStore.getState()
+                  await store.reloadUiSettings()
+                  setRoute('chat')
+                  store.openInitialSetup('required')
+                })()
+              }}
             />
           </Suspense>
         ) : route === 'music' ? (

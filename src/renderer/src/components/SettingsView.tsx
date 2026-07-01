@@ -6,7 +6,6 @@ import {
   kunSettingsPatch,
   DEFAULT_WRITE_WORKSPACE_ROOT,
   type AppSettingsPatch,
-  getActiveAgentApiKey,
   getKunRuntimeSettings,
   getModelProviderSettings,
   isKunRuntimeInsecure,
@@ -183,7 +182,6 @@ export function SettingsView(): ReactElement {
   const [writeCompletionDebugSelectedId, setWriteCompletionDebugSelectedId] = useState<string | null>(null)
   const [writeDebugLoading, setWriteDebugLoading] = useState(false)
   const [writeDebugError, setWriteDebugError] = useState<string | null>(null)
-  const initializedCategory = useRef(false)
   const saveTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null)
   const statusTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null)
   const draftVersion = useRef(0)
@@ -318,14 +316,6 @@ export function SettingsView(): ReactElement {
     if (category !== 'write') return
     void loadWriteDebugEntries()
   }, [category, loadWriteDebugEntries])
-
-  useEffect(() => {
-    if (!form || initializedCategory.current) return
-    initializedCategory.current = true
-    if (!getActiveAgentApiKey(form).trim()) {
-      setCategory('providers')
-    }
-  }, [form])
 
   useEffect(() => {
     if (settingsSection === 'general') {
@@ -846,7 +836,6 @@ export function SettingsView(): ReactElement {
 
   const kun = getKunRuntimeSettings(form)
   const provider = getModelProviderSettings(form)
-  const activeApiKey = getActiveAgentApiKey(form)
 
   const update = (partial: SettingsPatch): void => {
     const next = mergeSettings(form, partial)
@@ -1005,7 +994,6 @@ export function SettingsView(): ReactElement {
     form,
     provider,
     kun,
-    activeApiKey,
     update,
     updateKun,
     updateSharedCredential,
@@ -1104,17 +1092,8 @@ export function SettingsView(): ReactElement {
     <div className="ds-drag flex h-full min-h-0 w-full min-w-0 bg-ds-main">
       <SettingsSidebar category={category} setCategory={setCategory} goBack={goBack} t={t} />
 
-      <div className="ds-no-drag min-h-0 min-w-0 flex-1 overflow-y-auto px-10 py-10">
-        <div className="mx-auto max-w-3xl">
-          {!activeApiKey.trim() ? (
-            <div className="mb-6 rounded-2xl border border-amber-300/80 bg-amber-50/95 px-5 py-4 text-amber-950 shadow-sm dark:border-amber-700/60 dark:bg-amber-950/35 dark:text-amber-100">
-              <div className="text-[15px] font-semibold">{t('apiKeyRequiredTitle')}</div>
-              <p className="mt-1 text-[13px] leading-6 text-amber-900/90 dark:text-amber-100/90">
-                {t('apiKeyRequiredBody')}
-              </p>
-            </div>
-          ) : null}
-
+      <div className="ds-no-drag min-h-0 min-w-0 flex-1 overflow-y-auto px-8 py-10">
+        <div className="mx-auto w-full max-w-[1040px]">
           <div className="mb-8 flex items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-ds-ink">{t('title')}</h1>

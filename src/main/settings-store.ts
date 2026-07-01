@@ -223,7 +223,7 @@ async function ensureClawChannelWorkspaceRootsExist(settings: AppSettingsV1): Pr
 
 const defaultSettings = (): AppSettingsV1 => ({
   version: 1,
-  locale: 'en',
+  locale: 'zh',
   theme: 'system',
   uiFontScale: DEFAULT_UI_FONT_SCALE,
   chatContentMaxWidthPx: DEFAULT_CHAT_CONTENT_MAX_WIDTH_PX,

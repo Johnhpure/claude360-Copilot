@@ -28,6 +28,8 @@ import {
   type MusicWorkbenchApi
 } from '../../music/music-workbench-actions'
 import type { LyricsStreamApi } from '../../music/lyrics-ai'
+import { ensureGroupKeyForSelection } from '../../lib/group-key-ensure'
+import { useGroupKeyPromptStore } from '../../store/group-key-prompt-store'
 import { MusicCreatePanel } from './MusicCreatePanel'
 import { MusicTaskList } from './MusicTaskList'
 import { MusicPlayer } from './MusicPlayer'
@@ -60,6 +62,8 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
   const [access, setAccess] = useState<MusicAccess | null>(null)
   // 写词助手用的文本模型列表（来自 text 分组）。
   const [textModels, setTextModels] = useState<string[]>([])
+  // 当前 music 分组（选模型时用于确保该分组已有 Key）。
+  const [musicGroup, setMusicGroup] = useState('')
 
   // 播放器状态（队列 / 进度 / 音量）——store 管状态，容器把状态桥接到 <audio>。
   const queue = useStore(useMusicPlayerStore, (s) => s.queue)
@@ -106,6 +110,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
     void w
       .getSettings()
       .then((s) => {
+        if (alive) setMusicGroup((s.claude360?.selectedMusicGroup ?? '').trim())
         const group = (s.claude360?.selectedTextGroup || 'auto').trim() || 'auto'
         return w.claude360ModelsByGroup({ group })
       })
@@ -153,7 +158,15 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
 
   const patchForm = useCallback((patch: Partial<Claude360MusicCreateForm>): void => {
     setForm((prev) => ({ ...prev, ...patch }))
-  }, [])
+    // 选模型后确保该 music 分组已有 Key：无则弹优雅模态询问是否创建（取消则仅切换模型）。
+    if (patch.model && musicGroup.trim() && typeof window !== 'undefined' && window.kunGui) {
+      const kun = window.kunGui
+      void ensureGroupKeyForSelection(musicGroup.trim(), {
+        listTokens: () => kun.claude360TokensList(),
+        promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g, 'music')
+      })
+    }
+  }, [musicGroup])
 
   const handleSubmit = useCallback(async (): Promise<void> => {
     const k = api()

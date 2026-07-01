@@ -1,24 +1,19 @@
 // 「我的」页的纯编排函数(codex plan-03 Task 6)。
 //
-// 把创建 Key、充值、订单轮询等异步流程从 React 组件里剥离出来,
-// 只依赖一个最小的 kunGui 子集(通过参数注入),便于在 node 环境下用
+// 把充值、订单轮询等异步流程从 React 组件里剥离出来,便于在 node 环境下用
 // renderToStaticMarkup + mock 直接单测,而不需要 jsdom / testing-library。
+// 注：API Key 的分组/创建管理已归口到「设置 → 分组及 Key」，本文件不再涉及 Key 编排。
 import type {
   Claude360Me,
-  Claude360TokenListItem,
   Claude360TokenStat,
   Claude360TopupOptions,
   Claude360TopupOrder,
   Claude360TopupOrderStatus
 } from '@shared/claude360'
-import type { Claude360TokenRef } from '@shared/app-settings-claude360'
 
 /** 「我的」页需要用到的 kunGui 子集(与真实签名一致)。 */
 export type MyPageApi = {
   claude360BillingMe: () => Promise<Claude360Me>
-  claude360TokensList: () => Promise<Claude360TokenListItem[]>
-  claude360TokensCreate: (payload: { group?: string; name: string }) => Promise<Claude360TokenRef>
-  claude360TokensReveal: (payload: { tokenId: number }) => Promise<{ key: string }>
   claude360BillingTopupOptions: () => Promise<Claude360TopupOptions>
   claude360BillingTopupWechat: (payload: { amount: number; discountCode?: string }) => Promise<Claude360TopupOrder>
   claude360BillingTopupOrder: (payload: { orderId: string }) => Promise<Claude360TopupOrderStatus>
@@ -28,27 +23,6 @@ export type MyPageApi = {
 /** 订单是否已完成:newapi 完成后会回填 completeTime(秒)。 */
 export function isTopupOrderComplete(order: Claude360TopupOrderStatus): boolean {
   return order.completeTime > 0
-}
-
-export type CreateTokenResult =
-  | { ok: true; ref: Claude360TokenRef; tokens: Claude360TokenListItem[] }
-  | { ok: false; message: string }
-
-/**
- * 创建一个新的 API Key,成功后重新拉取分组列表。
- * 返回刷新后的 tokens,供调用方直接落到 state。
- */
-export async function createTokenAndRefresh(
-  api: Pick<MyPageApi, 'claude360TokensCreate' | 'claude360TokensList'>,
-  input: { name: string; group?: string }
-): Promise<CreateTokenResult> {
-  try {
-    const ref = await api.claude360TokensCreate({ name: input.name, group: input.group })
-    const tokens = await api.claude360TokensList()
-    return { ok: true, ref, tokens }
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : String(e) }
-  }
 }
 
 export type PollTopupOptions = {
@@ -97,21 +71,4 @@ export async function pollTopupOrderUntilComplete(
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }
-}
-
-/** 组内所有 Key 的剩余额度合计(unlimited 不计入数值)。 */
-export function summarizeTokenGroups(
-  tokens: Claude360TokenListItem[]
-): { group: string; count: number; hasUnlimited: boolean }[] {
-  const byGroup = new Map<string, { count: number; hasUnlimited: boolean }>()
-  for (const token of tokens) {
-    const key = token.group || 'default'
-    const entry = byGroup.get(key) ?? { count: 0, hasUnlimited: false }
-    entry.count += 1
-    if (token.unlimitedQuota) entry.hasUnlimited = true
-    byGroup.set(key, entry)
-  }
-  return [...byGroup.entries()]
-    .map(([group, value]) => ({ group, ...value }))
-    .sort((a, b) => a.group.localeCompare(b.group))
 }

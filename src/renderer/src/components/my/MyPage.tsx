@@ -1,10 +1,9 @@
 import type { ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, LogOut } from 'lucide-react'
 import type {
   Claude360Me,
-  Claude360TokenListItem,
   Claude360TokenStat,
   Claude360TopupOptions,
   Claude360TopupOrder
@@ -12,7 +11,6 @@ import type {
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { MyAccountOverview } from './MyAccountOverview'
 import { MyBillingPanel, type BillingPollPhase } from './MyBillingPanel'
-import { MyTokenGroupsTable } from './MyTokenGroupsTable'
 import { MyUsagePanel } from './MyUsagePanel'
 import { pollTopupOrderUntilComplete } from './my-page-actions'
 
@@ -20,20 +18,22 @@ type Props = {
   leftSidebarCollapsed: boolean
   onToggleLeftSidebar: () => void
   onBack: () => void
+  /** 退出登录（清账号态并回登录框）。由容器注入，MyPage 只负责触发。 */
+  onLogout: () => void
 }
 
-// reveal 出的明文 Key 只在本地短暂驻留：60s 后自动清除，复制后立即清除，
-// 刷新列表/离开页面时清空——避免明文长期留在 renderer 内存里（P1-3 安全硬化）。
-const REVEAL_TTL_MS = 60_000
-
-// 「我的」页容器:拥有数据加载与异步编排(创建 Key / 充值 / 订单轮询),
-// 具体展示交给 my/ 下的纯子面板。所有 window.kunGui 调用都做存在性守卫。
-export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Props): ReactElement {
+// 「我的」页容器:账号 / 余额 / 今日用量概览 + 充值 + 退出登录。
+// API Key 的分组管理已归口到「设置 → 分组及 Key」，本页不再展示 Key 分组表。
+// 所有 window.kunGui 调用都做存在性守卫。
+export function MyPage({
+  leftSidebarCollapsed,
+  onToggleLeftSidebar,
+  onBack,
+  onLogout
+}: Props): ReactElement {
   const { t } = useTranslation('common')
   const [me, setMe] = useState<Claude360Me | null>(null)
-  const [tokens, setTokens] = useState<Claude360TokenListItem[]>([])
   const [usageStats, setUsageStats] = useState<Claude360TokenStat[]>([])
-  const [revealed, setRevealed] = useState<Record<number, string>>({})
 
   const [topupOptions, setTopupOptions] = useState<Claude360TopupOptions | null>(null)
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null)
@@ -44,38 +44,11 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
 
   // 组件卸载后中断订单轮询,避免对已卸载组件 setState。
   const abortedRef = useRef(false)
-  // 每个已 reveal tokenId 的 TTL 定时器,卸载/清除时统一清理。
-  const revealTimersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
   useEffect(() => {
     abortedRef.current = false
     return () => {
       abortedRef.current = true
-      // 离开页面：清掉所有 TTL 定时器（明文 state 随组件卸载一并释放）。
-      for (const timer of Object.values(revealTimersRef.current)) clearTimeout(timer)
-      revealTimersRef.current = {}
     }
-  }, [])
-
-  // 清除单个 tokenId 的明文与其 TTL 定时器。
-  const clearRevealed = useCallback((tokenId: number) => {
-    const timer = revealTimersRef.current[tokenId]
-    if (timer) {
-      clearTimeout(timer)
-      delete revealTimersRef.current[tokenId]
-    }
-    setRevealed((prev) => {
-      if (!(tokenId in prev)) return prev
-      const next = { ...prev }
-      delete next[tokenId]
-      return next
-    })
-  }, [])
-
-  // 清空全部明文（刷新列表时调用，避免旧明文残留）。
-  const clearAllRevealed = useCallback(() => {
-    for (const timer of Object.values(revealTimersRef.current)) clearTimeout(timer)
-    revealTimersRef.current = {}
-    setRevealed({})
   }, [])
 
   const refreshMe = useCallback(async () => {
@@ -84,26 +57,16 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
     if (!abortedRef.current) setMe(next)
   }, [])
 
-  const refreshTokens = useCallback(async () => {
-    if (typeof window.kunGui === 'undefined') return
-    const next = await window.kunGui.claude360TokensList()
-    if (!abortedRef.current) setTokens(next)
-  }, [])
-
   const loadAll = useCallback(async () => {
     if (typeof window.kunGui === 'undefined') return
     try {
-      const [meResult, tokenResult, statsResult, optionsResult] = await Promise.all([
+      const [meResult, statsResult, optionsResult] = await Promise.all([
         window.kunGui.claude360BillingMe(),
-        window.kunGui.claude360TokensList(),
         window.kunGui.claude360BillingTokenStats({}),
         window.kunGui.claude360BillingTopupOptions()
       ])
       if (abortedRef.current) return
       setMe(meResult)
-      setTokens(tokenResult)
-      // 列表刷新：清空旧的 reveal 明文，避免与新列表错配或长期驻留。
-      clearAllRevealed()
       setUsageStats(statsResult)
       setTopupOptions(optionsResult)
       setSelectedAmount((prev) => prev ?? optionsResult.amountOptions[0] ?? null)
@@ -111,34 +74,11 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
     } catch (e) {
       if (!abortedRef.current) setError(e instanceof Error ? e.message : String(e))
     }
-  }, [clearAllRevealed])
+  }, [])
 
   useEffect(() => {
     void loadAll()
   }, [loadAll])
-
-  const handleReveal = useCallback(async (tokenId: number) => {
-    if (typeof window.kunGui === 'undefined') return
-    try {
-      const { key } = await window.kunGui.claude360TokensReveal({ tokenId })
-      if (abortedRef.current) return
-      setRevealed((prev) => ({ ...prev, [tokenId]: key }))
-      // 启动/重置该 tokenId 的 TTL：到期自动清除明文。
-      const existing = revealTimersRef.current[tokenId]
-      if (existing) clearTimeout(existing)
-      revealTimersRef.current[tokenId] = setTimeout(() => clearRevealed(tokenId), REVEAL_TTL_MS)
-    } catch (e) {
-      if (!abortedRef.current) setError(e instanceof Error ? e.message : String(e))
-    }
-  }, [clearRevealed])
-
-  const handleCopy = useCallback((tokenId: number, value: string) => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      void navigator.clipboard.writeText(value)
-    }
-    // 复制后立即清除该 Key 的明文，不等 TTL。
-    clearRevealed(tokenId)
-  }, [clearRevealed])
 
   const handleCreateWechatTopup = useCallback(async () => {
     if (typeof window.kunGui === 'undefined' || submittingTopup || selectedAmount == null) return
@@ -204,6 +144,15 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
                 {t('myBackToWorkbench')}
               </button>
               <h1 className="min-w-0 flex-1 truncate text-[15px] font-medium text-ds-muted">{t('myPage')}</h1>
+              <button
+                type="button"
+                data-testid="my-logout"
+                onClick={onLogout}
+                className="ds-no-drag flex shrink-0 items-center gap-1.5 rounded-lg border border-ds-border bg-ds-card px-2.5 py-1.5 text-[12.5px] font-medium text-ds-muted shadow-sm transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:hover:border-red-500/40 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+              >
+                <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
+                {t('myLogout')}
+              </button>
             </div>
           </div>
         </header>
@@ -218,14 +167,6 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
           ) : null}
 
           <MyAccountOverview me={me} onTopup={scrollToBilling} t={t} />
-
-          <MyTokenGroupsTable
-            tokens={tokens}
-            revealed={revealed}
-            onReveal={(tokenId) => void handleReveal(tokenId)}
-            onCopy={handleCopy}
-            t={t}
-          />
 
           <div id="my-billing-panel">
             <MyBillingPanel

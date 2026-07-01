@@ -22,6 +22,8 @@ import { CanvasToolbar } from './CanvasToolbar'
 import { ImagePromptPanel } from './ImagePromptPanel'
 import { ImageResultGrid } from './ImageResultGrid'
 import { ImageHistoryPanel } from './ImageHistoryPanel'
+import { ensureGroupKeyForSelection } from '../../lib/group-key-ensure'
+import { useGroupKeyPromptStore } from '../../store/group-key-prompt-store'
 
 type Props = {
   leftSidebarCollapsed: boolean
@@ -76,6 +78,8 @@ export function CanvasWorkbench({
   const [imageModels, setImageModels] = useState<string[]>([])
   // 复制结果的一次性反馈（成功「已复制」/ 失败提示），短暂展示后自动消失。
   const [copyNotice, setCopyNotice] = useState<string | null>(null)
+  // 当前 image 分组（选模型时用于确保该分组已有 Key）。
+  const [imageGroup, setImageGroup] = useState('')
 
   const api = (): CanvasWorkbenchApi | null =>
     typeof window !== 'undefined' && window.kunGui
@@ -109,7 +113,9 @@ export function CanvasWorkbench({
     const w = window.kunGui
     if (w?.getSettings) {
       void w.getSettings().then((settings) => {
-        if (alive) applyModelsFromCache(settings.claude360?.modelCache?.models ?? [])
+        if (!alive) return
+        applyModelsFromCache(settings.claude360?.modelCache?.models ?? [])
+        setImageGroup((settings.claude360?.selectedImageGroup ?? '').trim())
       }).catch(() => undefined)
     }
     if (w?.claude360BillingMe) {
@@ -130,6 +136,18 @@ export function CanvasWorkbench({
     }).catch(() => undefined)
   }, [applyModelsFromCache])
 
+  // 选模型后确保该 image 分组已有 Key：无则弹优雅模态询问是否创建（取消则仅切换模型）。
+  const handleChangeModel = useCallback((m: string): void => {
+    setModel(m)
+    const g = imageGroup.trim()
+    const kun = api()
+    if (!g || !kun) return
+    void ensureGroupKeyForSelection(g, {
+      listTokens: () => kun.claude360TokensList(),
+      promptCreateAndEnsure: (grp) => useGroupKeyPromptStore.getState().open(grp, 'image')
+    })
+  }, [imageGroup, setModel])
+
   // 统一提交：有参考图 → 走 editImage(不带 mask)；否则文本生图(带 quality/output_format)。
   const handleGenerate = useCallback(async (): Promise<void> => {
     const kun = api()
@@ -141,7 +159,9 @@ export function CanvasWorkbench({
         model: s.model,
         prompt: s.prompt,
         image: s.referenceImage,
-        size: s.size
+        size: s.size,
+        quality: s.quality,
+        output_format: s.outputFormat
       })
       return
     }
@@ -248,7 +268,7 @@ export function CanvasWorkbench({
                 imageModels={imageModels}
                 generating={generating || editing}
                 onChangePrompt={setPrompt}
-                onChangeModel={setModel}
+                onChangeModel={handleChangeModel}
                 onChangeAspect={setAspectPreset}
                 onChangeResolution={setResolution}
                 onChangeQuality={setQuality}

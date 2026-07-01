@@ -116,7 +116,9 @@ export async function submitEdit(
       prompt: payload.prompt,
       image: payload.image,
       ...(payload.mask ? { mask: payload.mask } : {}),
-      ...(payload.size ? { size: payload.size } : {})
+      ...(payload.size ? { size: payload.size } : {}),
+      ...(payload.quality ? { quality: payload.quality } : {}),
+      ...(payload.output_format ? { output_format: payload.output_format } : {})
     })
     if (result.ok) {
       store.editSuccess(result.images)

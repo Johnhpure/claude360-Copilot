@@ -135,7 +135,12 @@ describe('Claude360ModelService.listGroups / listModelsByGroup', () => {
       apiClient: fakeApi({
         '/api/cli/groups?tool=codex': () => [{ name: 'auto', recommended: true, ratio: 1, desc: '自动分组' }],
         '/api/cli/groups?tool=image': () => [],
-        '/api/cli/groups?tool=music': () => []
+        '/api/cli/groups?tool=music': () => [],
+        // 全量（不带 tool）：含未被任何 tool 命中的通用分组 claude-only。
+        '/api/cli/groups': () => [
+          { name: 'auto', recommended: true, ratio: 1, desc: '自动分组' },
+          { name: 'claude-only', recommended: false, ratio: 1.5, desc: '纯 Claude' }
+        ]
       }),
       secretStore: fakeSecretStore(),
       ensureGroupRef: async (group, purpose) => {
@@ -144,7 +149,11 @@ describe('Claude360ModelService.listGroups / listModelsByGroup', () => {
       }
     })
     const groups = await service.listGroups()
-    expect(groups.text).toEqual([{ name: 'auto', recommended: true, ratio: 1, desc: '自动分组' }])
+    // 「分组及Key」展示全量：tool 命中的 auto + 全量独有的 claude-only 都进 all(text 桶兜底)。
+    expect(groups.text).toEqual([
+      { name: 'auto', recommended: true, ratio: 1, desc: '自动分组' },
+      { name: 'claude-only', recommended: false, ratio: 1.5, desc: '纯 Claude' }
+    ])
     expect(groups.image).toEqual([])
     // 纯拉取：绝不触发建 Key（无副作用）。
     expect(ensureCalls).toBe(0)

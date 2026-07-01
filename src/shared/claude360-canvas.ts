@@ -95,13 +95,15 @@ export interface Claude360ImageGeneratePayload {
 
 // —— 单图编辑请求体（multipart POST /v1/images/edits）——
 // image：源图 / 参考图，接受纯 base64 或 dataURL 字符串（main 侧统一解码为 Blob）。
-// mask：可选蒙版（参考图场景不传）。size：可选尺寸。
+// mask：可选蒙版（参考图场景不传）。size/quality/output_format：可选，随参考图(图生图)一并透传。
 export interface Claude360ImageEditPayload {
   model: string
   prompt: string
   image: string
   mask?: string
   size?: Claude360ImageSize
+  quality?: Claude360ImageQuality
+  output_format?: Claude360ImageOutputFormat
 }
 
 // —— main → renderer 的生图/编辑结果（不含 API Key）——

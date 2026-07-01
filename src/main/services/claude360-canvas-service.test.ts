@@ -271,14 +271,22 @@ describe('Claude360CanvasService.editImage', () => {
     expect(captured?.get('image')).toBeInstanceOf(Blob)
   })
 
-  it('携带 mask/size 时一并放入 multipart，否则不放', async () => {
+  it('携带 mask/size/quality/output_format 时一并放入 multipart，否则不放', async () => {
     let withMask: FormData | undefined
     const svcWith = new Claude360CanvasService(
       makeDeps({ apiClient: fakeApi({ onEdit: (_p, form) => { withMask = form } }) })
     )
-    await svcWith.editImage({ ...editPayload, mask: validB64, size: '1024x1536' })
+    await svcWith.editImage({
+      ...editPayload,
+      mask: validB64,
+      size: '1024x1536',
+      quality: 'high',
+      output_format: 'webp'
+    })
     expect(withMask?.get('mask')).toBeInstanceOf(Blob)
     expect(withMask?.get('size')).toBe('1024x1536')
+    expect(withMask?.get('quality')).toBe('high')
+    expect(withMask?.get('output_format')).toBe('webp')
 
     let withoutMask: FormData | undefined
     const svcWithout = new Claude360CanvasService(
@@ -287,6 +295,8 @@ describe('Claude360CanvasService.editImage', () => {
     await svcWithout.editImage(editPayload)
     expect(withoutMask?.has('mask')).toBe(false)
     expect(withoutMask?.has('size')).toBe(false)
+    expect(withoutMask?.has('quality')).toBe(false)
+    expect(withoutMask?.has('output_format')).toBe(false)
   })
 
   it('image 为空/非法 base64 时返回可展示错误，不发起请求', async () => {

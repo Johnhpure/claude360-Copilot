@@ -116,9 +116,9 @@ describe('submitEdit · 编辑编排', () => {
     const ok: Claude360ImageResult = { ok: true, images: [image('edited')] }
     const api = { claude360CanvasEdit: vi.fn(async () => ok) }
     const store = { beginEdit: vi.fn(), editSuccess: vi.fn(), editFailure: vi.fn() }
-    const result = await submitEdit(api, store, { prompt: '加个帽子', model: 'flux-pro', image: 'data:image/png;base64,AAA', size: '1024x1024' })
+    const result = await submitEdit(api, store, { prompt: '加个帽子', model: 'flux-pro', image: 'data:image/png;base64,AAA', size: '1024x1024', quality: 'high', output_format: 'webp' })
     expect(result.ok).toBe(true)
-    expect(api.claude360CanvasEdit).toHaveBeenCalledWith({ model: 'flux-pro', prompt: '加个帽子', image: 'data:image/png;base64,AAA', size: '1024x1024' })
+    expect(api.claude360CanvasEdit).toHaveBeenCalledWith({ model: 'flux-pro', prompt: '加个帽子', image: 'data:image/png;base64,AAA', size: '1024x1024', quality: 'high', output_format: 'webp' })
     expect(store.editSuccess).toHaveBeenCalledWith([image('edited')])
   })
   it('后端 ok:false → editFailure', async () => {

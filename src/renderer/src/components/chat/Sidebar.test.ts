@@ -50,7 +50,10 @@ vi.mock('./ConnectPhoneView', () => ({
   ConnectPhoneSidebarPanel: () => createElement('div', { 'data-testid': 'connect-phone-panel' })
 }))
 vi.mock('./WorkspaceModeTabs', () => ({
-  WorkspaceModeTabs: () => createElement('div', { 'data-testid': 'mode-tabs' })
+  WorkspaceModeTabs: () => createElement('div', { 'data-testid': 'mode-tabs' }),
+  sidebarSegTabsContainerClass: '',
+  sidebarSegTabClass: () => '',
+  sidebarSegTabIconClass: () => ''
 }))
 
 import { Sidebar } from './Sidebar'

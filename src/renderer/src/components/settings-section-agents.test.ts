@@ -277,7 +277,6 @@ function baseCtx(): Record<string, unknown> {
     tCommon: t,
     form: { claw: { skills: { extraDirs: ['/tmp/project/.agents/skills'] } } },
     kun,
-    activeApiKey: '',
     update: noop,
     updateKun: noop,
     updateSharedCredential: noop,

@@ -936,6 +936,18 @@ describe('claude360 canvas IPC schemas', () => {
     expect(payload.image).toBe('data:image/png;base64,QUJD')
   })
 
+  it('accepts an edit payload with quality and output_format', () => {
+    const payload = claude360CanvasEditPayloadSchema.parse({
+      model: 'gpt-image-1',
+      prompt: '把帽子改成红色',
+      image: 'data:image/png;base64,QUJD',
+      quality: 'high',
+      output_format: 'webp'
+    })
+    expect(payload.quality).toBe('high')
+    expect(payload.output_format).toBe('webp')
+  })
+
   it('rejects an edit payload with an empty image', () => {
     expect(() =>
       claude360CanvasEditPayloadSchema.parse({ model: 'm', prompt: 'x', image: '' })

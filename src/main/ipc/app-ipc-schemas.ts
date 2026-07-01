@@ -795,7 +795,9 @@ export const claude360CanvasEditPayloadSchema = z
     prompt: trimmedString(MAX_CANVAS_PROMPT),
     image: z.string().trim().min(1).max(MAX_CANVAS_IMAGE_CHARS),
     mask: z.string().trim().min(1).max(MAX_CANVAS_IMAGE_CHARS).optional(),
-    size: claude360ImageSizeSchema.optional()
+    size: claude360ImageSizeSchema.optional(),
+    quality: claude360ImageQualitySchema.optional(),
+    output_format: claude360ImageOutputFormatSchema.optional()
   })
   .strict()
 

@@ -31,7 +31,12 @@ import { ClawAddImDialog } from './SidebarClawDialog'
 import { ConnectPhoneSidebarPanel } from './ConnectPhoneView'
 import { SidebarProjectsSection } from './SidebarProjectsSection'
 import { SidebarConversationsSection } from './SidebarConversationsSection'
-import { WorkspaceModeTabs } from './WorkspaceModeTabs'
+import {
+  WorkspaceModeTabs,
+  sidebarSegTabsContainerClass,
+  sidebarSegTabClass,
+  sidebarSegTabIconClass
+} from './WorkspaceModeTabs'
 import {
   SidebarCommandRow,
   SidebarFrame,
@@ -213,6 +218,42 @@ export function Sidebar({
           onWriteOpen={onWriteOpen}
         />
 
+        {/* 生图 / 音乐：与 Code/写作 同款分段按钮，紧邻其下方。 */}
+        {isPrimaryRouteVisible('canvas') || isPrimaryRouteVisible('music') ? (
+          <div
+            role="tablist"
+            aria-label={`${t('canvas')} / ${t('music')}`}
+            className={sidebarSegTabsContainerClass}
+          >
+            {isPrimaryRouteVisible('canvas') ? (
+              <button
+                type="button"
+                data-cursor-spotlight-target
+                role="tab"
+                aria-selected={canvasActive}
+                onClick={onOpenCanvas}
+                className={sidebarSegTabClass(canvasActive)}
+              >
+                <Image className={sidebarSegTabIconClass(canvasActive)} strokeWidth={1.9} />
+                <span className="truncate">{t('canvas')}</span>
+              </button>
+            ) : null}
+            {isPrimaryRouteVisible('music') ? (
+              <button
+                type="button"
+                data-cursor-spotlight-target
+                role="tab"
+                aria-selected={musicActive}
+                onClick={onOpenMusic}
+                className={sidebarSegTabClass(musicActive)}
+              >
+                <Music className={sidebarSegTabIconClass(musicActive)} strokeWidth={1.9} />
+                <span className="truncate">{t('music')}</span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
         {activeView !== 'claw' && activeView !== 'schedule' && activeView !== 'workflow' ? (
           <>
             <SidebarCommandRow
@@ -232,23 +273,6 @@ export function Sidebar({
               variant="accent"
             />
           </>
-        ) : null}
-        {/* 第一阶段新增可见入口:生图(Canvas)/音乐(Music)。 */}
-        {isPrimaryRouteVisible('canvas') ? (
-          <SidebarCommandRow
-            icon={<Image className="h-4 w-4" strokeWidth={1.75} />}
-            label={t('canvas')}
-            onClick={onOpenCanvas}
-            active={canvasActive}
-          />
-        ) : null}
-        {isPrimaryRouteVisible('music') ? (
-          <SidebarCommandRow
-            icon={<Music className="h-4 w-4" strokeWidth={1.75} />}
-            label={t('music')}
-            onClick={onOpenMusic}
-            active={musicActive}
-          />
         ) : null}
         {/* 隐藏≠删除:第一阶段不暴露插件/定时任务/Workflow 入口,
             但保留 onOpenPlugins/onScheduleOpen/onWorkflowOpen 等 handler 与 props。 */}

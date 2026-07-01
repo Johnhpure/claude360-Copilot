@@ -213,6 +213,9 @@ export class Claude360CanvasService {
       form.append('mask', new Blob([mask.buffer], { type: mask.mimeType }), 'mask.png')
     }
     if (input.size) form.append('size', input.size)
+    // 参考图(图生图)一并透传质量与输出格式；newapi edits 走 multipart 全字段转发上游。
+    if (input.quality) form.append('quality', input.quality)
+    if (input.output_format) form.append('output_format', input.output_format)
 
     let env: Claude360ImagesRawEnvelope
     try {

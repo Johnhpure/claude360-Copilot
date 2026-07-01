@@ -110,10 +110,46 @@ export class Claude360ModelService {
     return { groupsByPurpose, purposeByGroup }
   }
 
+  /** 拉取用户全部可用分组（不带 tool 过滤），供「分组及Key」全量展示。 */
+  private async fetchAllGroups(token: string): Promise<Claude360ToolGroupInfo[]> {
+    const resp = await this.deps.apiClient.get<unknown>('/api/cli/groups', token)
+    const seen = new Set<string>()
+    const out: Claude360ToolGroupInfo[] = []
+    for (const g of extractGroups(resp)) {
+      const name = (g.name ?? '').trim()
+      if (!name || seen.has(name)) continue
+      seen.add(name)
+      out.push({
+        name,
+        recommended: g.recommended === true,
+        ratio: typeof g.ratio === 'number' ? g.ratio : null,
+        desc: typeof g.desc === 'string' ? g.desc : undefined
+      })
+    }
+    return out
+  }
+
   /** 纯拉分组清单（含倍率/描述/推荐），无副作用（不 ensure Key、不写 settings）。供「分组及Key」页。 */
   async listGroups(): Promise<Record<Claude360TokenPurpose, Claude360ToolGroupInfo[]>> {
     const token = await this.cliToken()
     const { groupsByPurpose } = await this.fetchGroupsByPurpose(token)
+    // 「分组及Key」需展示用户**全部**可用分组：额外拉一次不带 tool 的全量清单，
+    // 把未被 codex/image/music 命中的分组补入 text 桶（多为纯文本/通用分组），
+    // 使 all 视图（三桶并集）= 用户全量分组。选默认分组的带 tool 归类不受影响。
+    // 全量补全失败不应拖垮整页：降级为仅展示三桶命中的分组（保证鲁棒性）。
+    let all: Claude360ToolGroupInfo[] = []
+    try {
+      all = await this.fetchAllGroups(token)
+    } catch {
+      all = []
+    }
+    const known = new Set<string>()
+    for (const p of ['text', 'image', 'music'] as Claude360TokenPurpose[]) {
+      for (const g of groupsByPurpose[p]) known.add(g.name)
+    }
+    for (const g of all) {
+      if (!known.has(g.name)) groupsByPurpose.text.push(g)
+    }
     return groupsByPurpose
   }
 

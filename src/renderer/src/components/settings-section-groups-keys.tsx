@@ -26,7 +26,7 @@ import type { Claude360TokenListItem, Claude360TokenPurpose } from '@shared/clau
 // 把旧的「供应商」只读壳改造成:左列 = 从 claude360 拉取的模型分组,
 // 右侧 = 该分组的可用模型 + 该分组下的 API Key 管理。
 //
-// 安全约束(与 MyPage/MyTokenGroupsTable 对齐):
+// 安全约束(与 MyPage 对齐):
 //   - 明文 Key 默认不显示,列表只展示脱敏 maskedKey;
 //   - reveal 走显式点击 + 60s TTL 自动隐藏;
 //   - 复制后立即清除明文,不等 TTL。
@@ -721,7 +721,7 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
           <p className="text-[12px] text-ds-faint">{t('groupsKeysNoGroupsHint')}</p>
         </div>
       ) : (
-        <div className="grid gap-0 md:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="grid gap-0 md:grid-cols-[240px_minmax(0,1fr)]">
           {/* 左列:分组 */}
           <nav
             aria-label={t('groupsKeysListAria')}
@@ -747,12 +747,12 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
             {activeGroup ? (
               <div className="flex flex-col gap-4">
                 <div>
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <h2 className="text-[18px] font-semibold text-ds-ink">{activeGroup.name}</h2>
+                  <div className="flex min-w-0 flex-nowrap items-center gap-2.5">
+                    <h2 className="min-w-0 truncate text-[18px] font-semibold text-ds-ink">{activeGroup.name}</h2>
                     {activeGroup.recommended ? (
                       <RecommendedBadge label={t('groupsKeysRecommended')} />
                     ) : null}
-                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2.5 py-0.5 text-[12.5px] font-semibold tabular-nums text-accent">
+                    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-accent/15 px-2.5 py-0.5 text-[12.5px] font-semibold tabular-nums text-accent">
                       {t('groupsKeysRatioLabel')} ×{formatRatio(activeGroup.ratio)}
                     </span>
                   </div>
