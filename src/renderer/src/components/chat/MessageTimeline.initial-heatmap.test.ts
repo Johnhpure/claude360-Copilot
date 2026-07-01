@@ -34,13 +34,13 @@ describe('MessageTimeline initial heatmap empty hero routing', () => {
     const html = renderHero()
 
     expect(html).toContain('Expand calendar')
-    expect(html).not.toContain('Daily Kun usage calendar')
+    expect(html).not.toContain('Daily agent usage calendar')
     expect(html).not.toContain('Start a new conversation')
   })
 
   it('keeps offline, missing-workspace, and Claw empty states gated away from the heatmap', () => {
     const offlineHtml = renderHero({ ready: false })
-    expect(offlineHtml).toContain('Kun is waking the local agent')
+    expect(offlineHtml).toContain('Claude360 Copilot is waking the local agent')
     expect(offlineHtml).toContain('ds-kun-state-sleep')
     const workspaceHtml = renderHero({ hasWorkspace: false })
     expect(workspaceHtml).toContain('Choose working directory')
@@ -48,7 +48,7 @@ describe('MessageTimeline initial heatmap empty hero routing', () => {
     const clawHtml = renderHero({ route: 'claw' })
     expect(clawHtml).toContain('Start a conversation with this assistant')
     expect(clawHtml).toContain('ds-kun-state-greet')
-    expect(clawHtml).not.toContain('Kun usage')
+    expect(clawHtml).not.toContain('Agent usage')
   })
 
   it('shows the runtime error in the offline hero when one is available', () => {

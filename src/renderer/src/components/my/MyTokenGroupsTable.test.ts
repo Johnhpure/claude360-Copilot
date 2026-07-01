@@ -87,6 +87,23 @@ describe('MyTokenGroupsTable', () => {
     expect(onReveal).toHaveBeenCalledWith(42)
   })
 
+  it('invokes onCopy with the token id and plaintext so the container can clear it', () => {
+    const onCopy = vi.fn()
+    const dialog = MyTokenGroupsTable({
+      tokens: [token({ id: 7 })],
+      revealed: { 7: 'sk-plain-7' },
+      creating: false,
+      onReveal: () => undefined,
+      onCopy,
+      onCreate: () => undefined,
+      t
+    })
+    const copyClick = findClickByAriaLabel(dialog, 'Copy')
+    expect(copyClick).toBeTypeOf('function')
+    copyClick?.()
+    expect(onCopy).toHaveBeenCalledWith(7, 'sk-plain-7')
+  })
+
   it('exposes a create button that calls onCreate', () => {
     const onCreate = vi.fn()
     const dialog = MyTokenGroupsTable({

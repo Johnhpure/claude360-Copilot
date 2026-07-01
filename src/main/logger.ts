@@ -1,6 +1,7 @@
 import { appendFile, mkdir, readdir, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { DEFAULT_LOG_RETENTION_DAYS } from '../shared/app-settings'
+import { redactSecrets, redactSecretText } from '../shared/secret-redaction'
 
 export type LogLevel = 'error' | 'warn' | 'info'
 export type ManagedLogFilePrefix = 'deepseek-gui' | 'kun'
@@ -107,10 +108,16 @@ export async function pruneOnStartup(): Promise<void> {
 }
 
 function safeStringify(value: unknown): string {
+  // 统一脱敏：字符串走文本脱敏（Authorization/Bearer/apiKey=… 等），
+  // 对象/数组深度脱敏后再 stringify，异常兜底的 String(value) 同样脱敏，
+  // 确保任何 detail 都不会把明文凭据写进日志文件。
   try {
-    if (typeof value === 'string') return value.slice(0, 2000)
-    return JSON.stringify(value, null, 2).slice(0, 2000)
+    if (typeof value === 'string') return redactSecretText(value).slice(0, 2000)
+    return JSON.stringify(redactSecrets(value), null, 2).slice(0, 2000)
   } catch {
-    return String(value).slice(0, 2000)
+    return redactSecretText(String(value)).slice(0, 2000)
   }
 }
+
+// 供单测校验日志 detail 脱敏行为（不改变对外日志 API）。
+export const _internals = { safeStringify }

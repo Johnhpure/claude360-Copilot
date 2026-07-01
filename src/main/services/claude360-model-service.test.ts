@@ -72,6 +72,47 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
     // image-group 用途为 image，codex 分组用途为 text
     expect(ensured).toContainEqual(['image-group', 'image'])
     expect(ensured).toContainEqual(['auto', 'text'])
+
+    // 分组清单按用途返回，供上层持久化 selectedTextGroup/Image/Music。
+    expect(result.groupsByPurpose.text.map((g) => g.name).sort()).toEqual(['auto', 'vip'])
+    expect(result.groupsByPurpose.image.map((g) => g.name)).toEqual(['image-group'])
+    expect(result.groupsByPurpose.music).toEqual([])
+  })
+
+  it('parses the array-shaped groups envelope and carries recommended flags', async () => {
+    // 后端 /api/cli/groups 的 data 实为数组（common.ApiSuccess 直接包数组），
+    // 服务须兼容数组形态，否则分组读不到、provider 与 selected group 全部落空。
+    const service = new Claude360ModelService({
+      apiClient: fakeApi({
+        '/api/cli/groups?tool=codex': () => [
+          { name: 'auto', recommended: false },
+          { name: 'vip', recommended: true }
+        ],
+        '/api/cli/groups?tool=image': () => [{ name: 'image-group', recommended: true }],
+        '/api/cli/groups?tool=music': () => [{ name: 'music-group', recommended: false }],
+        '/api/cli/models?group=auto': () => ({ models: [{ id: 'gpt-5.1-codex-max' }] }),
+        '/api/cli/models?group=vip': () => ({ models: [{ id: 'gpt-5.1-codex-max' }] }),
+        '/api/cli/models?group=image-group': () => ({ models: [{ id: 'gemini-2.5-flash-image' }] }),
+        '/api/cli/models?group=music-group': () => ({ models: [{ id: 'suno-v4' }] })
+      }),
+      secretStore: fakeSecretStore(),
+      ensureGroupRef: async (group, purpose) => ({ tokenId: 1, name: purpose, group })
+    })
+
+    const result = await service.refreshGroupsAndModels()
+
+    expect(result.groupsByPurpose.text).toEqual([
+      { name: 'auto', recommended: false },
+      { name: 'vip', recommended: true }
+    ])
+    expect(result.groupsByPurpose.image).toEqual([{ name: 'image-group', recommended: true }])
+    expect(result.groupsByPurpose.music).toEqual([{ name: 'music-group', recommended: false }])
+    expect(result.providerProfiles.map((p) => p.id).sort()).toEqual([
+      'claude360:auto',
+      'claude360:image-group',
+      'claude360:music-group',
+      'claude360:vip'
+    ])
   })
 
   it('throws when not logged in', async () => {

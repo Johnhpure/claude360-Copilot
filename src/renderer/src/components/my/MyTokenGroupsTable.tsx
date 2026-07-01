@@ -23,7 +23,8 @@ export function MyTokenGroupsTable({
   revealed: Record<number, string>
   creating: boolean
   onReveal: (tokenId: number) => void
-  onCopy: (value: string) => void
+  /** 复制回调：带上 tokenId，便于容器在复制后立即清除该 Key 的明文。 */
+  onCopy: (tokenId: number, value: string) => void
   onCreate: () => void
   t: Translate
 }): ReactElement {
@@ -93,7 +94,7 @@ export function MyTokenGroupsTable({
                             type="button"
                             aria-label={t('myCopyKey')}
                             title={t('myCopyKey')}
-                            onClick={() => onCopy(plain)}
+                            onClick={() => onCopy(token.id, plain)}
                             className="rounded-md border border-ds-border px-2 py-1 text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
                           >
                             <Copy className="h-3.5 w-3.5" strokeWidth={1.75} />

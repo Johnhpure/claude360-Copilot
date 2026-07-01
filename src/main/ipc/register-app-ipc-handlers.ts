@@ -125,7 +125,11 @@ import {
 } from '../agent-sdk-installer'
 import type { JsonSettingsStore } from '../settings-store'
 import { probeModelProvider } from '../provider-connection'
-import { isClaude360ProviderId } from '../../shared/app-settings-provider'
+import {
+  isClaude360ProviderId,
+  mergeClaude360ProviderProfiles,
+  resolveClaude360SelectedGroup
+} from '../../shared/app-settings-provider'
 import type { ModelProviderProfileV1 } from '../../shared/app-settings-types'
 import type { ClawRuntime } from '../claw-runtime'
 import type { ScheduleRuntime } from '../schedule-runtime'
@@ -629,9 +633,34 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
   ipcMain.handle('claude360:models:refresh', async () => {
     const result = await claude360ModelService.refreshGroupsAndModels()
+    const loaded = await store.load()
+    // 架构收口：只替换 Claude360 自动生成 provider，保留用户/迁移遗留的自定义 provider。
+    const mergedProviders = mergeClaude360ProviderProfiles(
+      (loaded.provider?.providers as ModelProviderProfileV1[] | undefined) ?? [],
+      result.providerProfiles
+    )
+    // 分组持久化：登录/刷新后据后端分组清单为 text/image/music 各选定默认分组，
+    // 保留仍有效的用户选择；否则用 recommended；否则第一个可用；无分组则保持空。
+    const selectedTextGroup = resolveClaude360SelectedGroup(
+      loaded.claude360.selectedTextGroup,
+      result.groupsByPurpose.text
+    )
+    const selectedImageGroup = resolveClaude360SelectedGroup(
+      loaded.claude360.selectedImageGroup,
+      result.groupsByPurpose.image
+    )
+    const selectedMusicGroup = resolveClaude360SelectedGroup(
+      loaded.claude360.selectedMusicGroup,
+      result.groupsByPurpose.music
+    )
     await applySettingsPatch({
-      provider: { providers: result.providerProfiles },
-      claude360: { modelCache: result.modelCache }
+      provider: { providers: mergedProviders },
+      claude360: {
+        modelCache: result.modelCache,
+        selectedTextGroup,
+        selectedImageGroup,
+        selectedMusicGroup
+      }
     })
     return { ok: true as const, modelCache: result.modelCache }
   })

@@ -1,8 +1,38 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   canCloseInitialSetup,
-  completeInitialSetupAfterSave
+  completeInitialSetupAfterSave,
+  ensureCliAuthUrlUserCode
 } from './InitialSetupDialog'
+
+describe('ensureCliAuthUrlUserCode', () => {
+  it('appends user_code when the verification URL lacks it (legacy backend)', () => {
+    expect(ensureCliAuthUrlUserCode('https://claude360.xyz/cli-auth', 'ABCD-2345')).toBe(
+      'https://claude360.xyz/cli-auth?user_code=ABCD-2345'
+    )
+  })
+
+  it('keeps the existing user_code when the backend already provided it', () => {
+    const url = 'https://claude360.xyz/cli-auth?user_code=WXYZ-6789'
+    expect(ensureCliAuthUrlUserCode(url, 'ABCD-2345')).toBe(url)
+  })
+
+  it('preserves other query params while adding user_code', () => {
+    const out = ensureCliAuthUrlUserCode('https://claude360.xyz/cli-auth?foo=bar', 'ABCD-2345')
+    expect(out).toContain('foo=bar')
+    expect(out).toContain('user_code=ABCD-2345')
+  })
+
+  it('returns the URL unchanged when there is no user code to append', () => {
+    expect(ensureCliAuthUrlUserCode('https://claude360.xyz/cli-auth', '   ')).toBe(
+      'https://claude360.xyz/cli-auth'
+    )
+  })
+
+  it('falls back to string concatenation for non-absolute URLs', () => {
+    expect(ensureCliAuthUrlUserCode('/cli-auth', 'ABCD-2345')).toBe('/cli-auth?user_code=ABCD-2345')
+  })
+})
 
 describe('InitialSetupDialog completion flow', () => {
   it('keeps required first-run setup modal-only until the runtime is ready, then opens Code', async () => {

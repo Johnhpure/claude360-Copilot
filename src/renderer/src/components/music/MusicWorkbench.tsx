@@ -108,9 +108,14 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
     }
     setSubmitting(true)
     setErrors([])
-    const result = await submitMusic(k, { addSubmitting, markSubmitted, markFailed }, form)
-    if (!result.ok && result.errors) setErrors(result.errors)
-    setSubmitting(false)
+    // try/finally 兜底：即便 submitMusic 抛出（同步异常或立即失败），也要复位
+    // submitting，避免提交按钮永久卡在 loading 态。
+    try {
+      const result = await submitMusic(k, { addSubmitting, markSubmitted, markFailed }, form)
+      if (!result.ok && result.errors) setErrors(result.errors)
+    } finally {
+      setSubmitting(false)
+    }
   }, [addSubmitting, form, markFailed, markSubmitted, submitting, t])
 
   const playSong = useCallback((song: Claude360Song): void => {

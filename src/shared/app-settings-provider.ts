@@ -1302,6 +1302,39 @@ export function isClaude360ProviderId(id: string | undefined | null): boolean {
   return normalized.startsWith('claude360:') || normalized.startsWith('claude360-')
 }
 
+/** 后端 `/api/cli/groups` 返回的单个分组的精简形态（选择分组时只需名称与推荐位）。 */
+export type Claude360ToolGroupInfo = { name: string; recommended: boolean }
+
+/**
+ * 依据后端某工具（text/image/music）的分组清单，为对应 selected group 选一个合理值：
+ * 1) 当前已选仍在清单内 → 保留用户选择（不打断用户手动选择）；
+ * 2) 否则取后端标记 recommended 的分组；
+ * 3) 否则取第一个可用分组；
+ * 4) 清单为空 → 返回空串，交由 UI 显示"暂无可用分组/请到我的页选择"。
+ */
+export function resolveClaude360SelectedGroup(
+  current: string | undefined,
+  groups: Claude360ToolGroupInfo[]
+): string {
+  const trimmed = (current ?? '').trim()
+  if (trimmed && groups.some((g) => g.name === trimmed)) return trimmed
+  const recommended = groups.find((g) => g.recommended)
+  if (recommended) return recommended.name
+  return groups[0]?.name ?? ''
+}
+
+/**
+ * models:refresh 落盘 provider 时只替换 Claude360 自动生成的 provider，
+ * 保留用户/迁移遗留的非 Claude360 自定义 provider，避免被整表覆盖丢失。
+ */
+export function mergeClaude360ProviderProfiles(
+  existing: ModelProviderProfileV1[],
+  claude360Profiles: ModelProviderProfileV1[]
+): ModelProviderProfileV1[] {
+  const preserved = existing.filter((profile) => !isClaude360ProviderId(profile.id))
+  return [...preserved, ...claude360Profiles]
+}
+
 export function buildClaude360ProviderProfiles(
   groups: Claude360GroupModelsInput[],
   refsByGroup: Record<string, string>

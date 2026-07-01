@@ -611,10 +611,11 @@ describe('claude360 token/model/billing IPC handlers', () => {
 
   it('models:refresh persists provider profiles and model cache', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
-    const applySettingsPatch = vi.fn(async () => settings())
+    const applySettingsPatch = vi.fn(async (_patch: unknown) => settings())
     const refreshGroupsAndModels = vi.fn(async () => ({
       modelCache: { groups: ['auto'], models: ['m1'] },
-      providerProfiles: [{ id: 'claude360:auto' }]
+      providerProfiles: [{ id: 'claude360:auto' }],
+      groupsByPurpose: { text: [{ name: 'auto', recommended: true }], image: [], music: [] }
     }))
     registerAppIpcHandlers(
       registerOptions({
@@ -625,9 +626,21 @@ describe('claude360 token/model/billing IPC handlers', () => {
     const handler = handlers.get('claude360:models:refresh')
     const result = await handler?.({})
     expect(refreshGroupsAndModels).toHaveBeenCalled()
-    expect(applySettingsPatch).toHaveBeenCalledWith({
-      provider: { providers: [{ id: 'claude360:auto' }] },
-      claude360: { modelCache: { groups: ['auto'], models: ['m1'] } }
+    const patch = applySettingsPatch.mock.calls[0]?.[0] as {
+      provider: { providers: Array<{ id: string }> }
+      claude360: Record<string, unknown>
+    }
+    // 架构收口：保留非 Claude360 的 deepseek provider，仅追加/替换 Claude360 自动 provider。
+    expect(patch.provider.providers).toEqual([
+      expect.objectContaining({ id: 'deepseek' }),
+      { id: 'claude360:auto' }
+    ])
+    // 分组持久化：text 当前选择 auto 仍有效则保留；image/music 无分组保持空。
+    expect(patch.claude360).toEqual({
+      modelCache: { groups: ['auto'], models: ['m1'] },
+      selectedTextGroup: 'auto',
+      selectedImageGroup: '',
+      selectedMusicGroup: ''
     })
     expect(result).toMatchObject({ ok: true })
   })

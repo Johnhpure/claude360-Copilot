@@ -25,6 +25,8 @@ export function sanitizeClaude360Message(message: string): string {
 export type Claude360ApiClientOptions = {
   baseUrl: string
   fetchImpl?: typeof fetch
+  /** 单次请求超时（毫秒），默认 120s；超时返回中性可重试错误，不泄露 url/header/body。 */
+  timeoutMs?: number
 }
 
 /**
@@ -56,10 +58,30 @@ export type Claude360ImagesRawEnvelope = {
 export class Claude360ApiClient {
   private readonly baseUrl: string
   private readonly fetchImpl: typeof fetch
+  private readonly timeoutMs: number
 
   constructor(options: Claude360ApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '')
     this.fetchImpl = options.fetchImpl ?? fetch
+    this.timeoutMs = options.timeoutMs && options.timeoutMs > 0 ? options.timeoutMs : 120_000
+  }
+
+  /**
+   * 统一带超时的 fetch：用 AbortController 在 timeoutMs 后中断请求。
+   * 超时与网络错误都不透出原始错误（可能含 url/header）；超时给可重试中性提示，
+   * 与其它网络错误区分，便于 UI 提示用户重试而非误判为格式/鉴权错误。
+   */
+  private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs)
+    try {
+      return await this.fetchImpl(url, { ...init, signal: controller.signal })
+    } catch {
+      if (controller.signal.aborted) throw new Claude360ApiError('请求超时，请稍后重试')
+      throw new Claude360ApiError('网络请求失败，请检查网络连接')
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   get<T>(path: string, token?: string): Promise<T> {
@@ -83,16 +105,11 @@ export class Claude360ApiClient {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (token) headers.Authorization = `Bearer ${token}`
 
-    let response: Response
-    try {
-      response = await this.fetchImpl(`${this.baseUrl}${path}`, {
-        method: 'POST',
-        headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined
-      })
-    } catch {
-      throw new Claude360ApiError('网络请求失败，请检查网络连接')
-    }
+    const response = await this.fetchWithTimeout(`${this.baseUrl}${path}`, {
+      method: 'POST',
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    })
 
     let parsed: unknown = null
     try {
@@ -141,13 +158,7 @@ export class Claude360ApiClient {
     path: string,
     init: RequestInit
   ): Promise<Claude360ImagesRawEnvelope> {
-    let response: Response
-    try {
-      response = await this.fetchImpl(`${this.baseUrl}${path}`, init)
-    } catch {
-      // 不透出原始网络错误（可能含 url/header），给中性提示，标记可重试。
-      throw new Claude360ApiError('网络请求失败，请检查网络连接')
-    }
+    const response = await this.fetchWithTimeout(`${this.baseUrl}${path}`, init)
 
     let parsed: unknown = null
     try {
@@ -174,17 +185,11 @@ export class Claude360ApiClient {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (token) headers.Authorization = `Bearer ${token}`
 
-    let response: Response
-    try {
-      response = await this.fetchImpl(`${this.baseUrl}${path}`, {
-        method,
-        headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined
-      })
-    } catch {
-      // 不把原始网络错误(可能含 url/header)透出，给中性提示。
-      throw new Claude360ApiError('网络请求失败，请检查网络连接')
-    }
+    const response = await this.fetchWithTimeout(`${this.baseUrl}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    })
 
     let envelope: unknown = null
     try {

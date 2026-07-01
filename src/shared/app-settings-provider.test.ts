@@ -1255,3 +1255,55 @@ describe('buildClaude360ProviderProfiles', () => {
     expect(profiles[0].apiKeyRef).toBeUndefined()
   })
 })
+
+describe('resolveClaude360SelectedGroup', () => {
+  it('keeps the current selection when it is still available', async () => {
+    const { resolveClaude360SelectedGroup } = await import('./app-settings-provider')
+    expect(
+      resolveClaude360SelectedGroup('vip', [
+        { name: 'auto', recommended: true },
+        { name: 'vip', recommended: false }
+      ])
+    ).toBe('vip')
+  })
+
+  it('falls back to the recommended group when the current one is gone', async () => {
+    const { resolveClaude360SelectedGroup } = await import('./app-settings-provider')
+    expect(
+      resolveClaude360SelectedGroup('stale', [
+        { name: 'auto', recommended: false },
+        { name: 'vip', recommended: true }
+      ])
+    ).toBe('vip')
+  })
+
+  it('falls back to the first group when nothing is recommended', async () => {
+    const { resolveClaude360SelectedGroup } = await import('./app-settings-provider')
+    expect(
+      resolveClaude360SelectedGroup('', [
+        { name: 'auto', recommended: false },
+        { name: 'vip', recommended: false }
+      ])
+    ).toBe('auto')
+  })
+
+  it('returns empty string when there is no available group', async () => {
+    const { resolveClaude360SelectedGroup } = await import('./app-settings-provider')
+    expect(resolveClaude360SelectedGroup('vip', [])).toBe('')
+  })
+})
+
+describe('mergeClaude360ProviderProfiles', () => {
+  it('replaces only Claude360 auto profiles and preserves custom providers', async () => {
+    const { mergeClaude360ProviderProfiles } = await import('./app-settings-provider')
+    const existing = [
+      { id: 'claude360-auto', name: 'stale', apiKey: '', baseUrl: '', models: [], modelProfiles: {} },
+      { id: 'my-custom', name: 'custom', apiKey: 'k', baseUrl: '', models: [], modelProfiles: {} }
+    ]
+    const fresh = [
+      { id: 'claude360:auto', name: 'auto', apiKey: '', baseUrl: '', models: [], modelProfiles: {} }
+    ]
+    const merged = mergeClaude360ProviderProfiles(existing as never, fresh as never)
+    expect(merged.map((p) => p.id)).toEqual(['my-custom', 'claude360:auto'])
+  })
+})

@@ -60,7 +60,7 @@ describe('ConnectPhoneView', () => {
     expect(html).toContain('grid-cols-4')
     expect(html).toContain('w-full min-w-0 items-center justify-center')
     expect(html).toContain('TELE')
-    expect(html).not.toContain('Kun usage')
+    expect(html).not.toContain('Agent usage')
   })
 
   it('maps scan targets to the matching install API provider', () => {

@@ -62,4 +62,40 @@ describe('Claude360ApiClient', () => {
     const client = new Claude360ApiClient({ baseUrl: 'https://x.test', fetchImpl: fetchImpl as unknown as typeof fetch })
     await expect(client.get('/x')).rejects.toThrow('bad token=[redacted]')
   })
+
+  it('aborts a hung request after the timeout with a neutral retryable message', async () => {
+    // fetch 永不 resolve，但尊重 AbortSignal：超时后应以中性可重试提示拒绝，
+    // 不泄露 url/header/body。
+    const fetchImpl = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError'))
+          )
+        })
+    )
+    const client = new Claude360ApiClient({
+      baseUrl: 'https://x.test',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      timeoutMs: 20
+    })
+    await expect(client.get('/x', 'tok-should-not-leak')).rejects.toThrow('请求超时，请稍后重试')
+  })
+
+  it('applies the timeout to raw suno/images channels too', async () => {
+    const fetchImpl = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError'))
+          )
+        })
+    )
+    const client = new Claude360ApiClient({
+      baseUrl: 'https://x.test',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      timeoutMs: 20
+    })
+    await expect(client.postSunoRaw('/suno/submit/music', {}, 'tok')).rejects.toThrow('请求超时，请稍后重试')
+  })
 })

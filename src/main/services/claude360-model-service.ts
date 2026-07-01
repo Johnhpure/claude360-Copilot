@@ -1,7 +1,8 @@
 import {
   buildClaude360ProviderProfiles,
   isClaude360ImageModelId,
-  type Claude360GroupModelsInput
+  type Claude360GroupModelsInput,
+  type Claude360ToolGroupInfo
 } from '../../shared/app-settings-provider'
 import type { ModelProviderProfileV1 } from '../../shared/app-settings-types'
 import type { Claude360ModelCache, Claude360TokenRef } from '../../shared/app-settings-claude360'
@@ -33,15 +34,29 @@ export type Claude360ModelServiceDeps = {
 export type Claude360ModelSyncResult = {
   modelCache: Claude360ModelCache
   providerProfiles: ModelProviderProfileV1[]
+  /**
+   * 每个用途（text/image/music）后端返回的分组清单（含 recommended），
+   * 供上层据此持久化 selectedTextGroup/selectedImageGroup/selectedMusicGroup。
+   */
+  groupsByPurpose: Record<Claude360TokenPurpose, Claude360ToolGroupInfo[]>
 }
 
-type GroupsResponse = { groups?: { name?: string }[] }
+type GroupItem = { name?: string; recommended?: boolean }
 type ModelsResponse = { models?: { id?: string }[] }
 
 const TOOL_TO_PURPOSE: Record<string, Claude360TokenPurpose> = {
   codex: 'text',
   image: 'image',
   music: 'music'
+}
+
+// 后端 `/api/cli/groups` 经 common.ApiSuccess 包装后 `data` 为**数组**；
+// 但历史/测试也可能是 `{ groups: [...] }`。这里两种形态都兼容，避免因外层
+// 形态差异导致分组读不到、provider 与 selected group 全部落空。
+function extractGroups(resp: unknown): GroupItem[] {
+  if (Array.isArray(resp)) return resp as GroupItem[]
+  const nested = (resp as { groups?: unknown } | null)?.groups
+  return Array.isArray(nested) ? (nested as GroupItem[]) : []
 }
 
 export class Claude360ModelService {
@@ -60,14 +75,24 @@ export class Claude360ModelService {
   async refreshGroupsAndModels(): Promise<Claude360ModelSyncResult> {
     const token = await this.cliToken()
 
-    // 1) 按工具拉分组，记录每个分组首次出现的用途（codex→text / image / music）。
+    // 1) 按工具拉分组：记录每个分组首次出现的用途（codex→text / image / music），
+    //    并保留每个用途完整的分组清单（含 recommended），供上层选择默认分组。
+    const groupsByPurpose: Record<Claude360TokenPurpose, Claude360ToolGroupInfo[]> = {
+      text: [],
+      image: [],
+      music: []
+    }
     const purposeByGroup = new Map<string, Claude360TokenPurpose>()
     for (const tool of ['codex', 'image', 'music'] as const) {
-      const resp = await this.deps.apiClient.get<GroupsResponse>(`/api/cli/groups?tool=${tool}`, token)
-      for (const g of resp.groups ?? []) {
+      const purpose = TOOL_TO_PURPOSE[tool]
+      const resp = await this.deps.apiClient.get<unknown>(`/api/cli/groups?tool=${tool}`, token)
+      const seen = new Set<string>()
+      for (const g of extractGroups(resp)) {
         const name = (g.name ?? '').trim()
-        if (!name || purposeByGroup.has(name)) continue
-        purposeByGroup.set(name, TOOL_TO_PURPOSE[tool])
+        if (!name || seen.has(name)) continue
+        seen.add(name)
+        groupsByPurpose[purpose].push({ name, recommended: g.recommended === true })
+        if (!purposeByGroup.has(name)) purposeByGroup.set(name, purpose)
       }
     }
 
@@ -96,6 +121,6 @@ export class Claude360ModelService {
       groups: [...purposeByGroup.keys()],
       models: allModels
     }
-    return { modelCache, providerProfiles }
+    return { modelCache, providerProfiles, groupsByPurpose }
   }
 }

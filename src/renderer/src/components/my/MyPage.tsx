@@ -24,6 +24,10 @@ type Props = {
   onBack: () => void
 }
 
+// reveal 出的明文 Key 只在本地短暂驻留：60s 后自动清除，复制后立即清除，
+// 刷新列表/离开页面时清空——避免明文长期留在 renderer 内存里（P1-3 安全硬化）。
+const REVEAL_TTL_MS = 60_000
+
 // 「我的」页容器:拥有数据加载与异步编排(创建 Key / 充值 / 订单轮询),
 // 具体展示交给 my/ 下的纯子面板。所有 window.kunGui 调用都做存在性守卫。
 export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Props): ReactElement {
@@ -45,11 +49,38 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
 
   // 组件卸载后中断订单轮询,避免对已卸载组件 setState。
   const abortedRef = useRef(false)
+  // 每个已 reveal tokenId 的 TTL 定时器,卸载/清除时统一清理。
+  const revealTimersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
   useEffect(() => {
     abortedRef.current = false
     return () => {
       abortedRef.current = true
+      // 离开页面：清掉所有 TTL 定时器（明文 state 随组件卸载一并释放）。
+      for (const timer of Object.values(revealTimersRef.current)) clearTimeout(timer)
+      revealTimersRef.current = {}
     }
+  }, [])
+
+  // 清除单个 tokenId 的明文与其 TTL 定时器。
+  const clearRevealed = useCallback((tokenId: number) => {
+    const timer = revealTimersRef.current[tokenId]
+    if (timer) {
+      clearTimeout(timer)
+      delete revealTimersRef.current[tokenId]
+    }
+    setRevealed((prev) => {
+      if (!(tokenId in prev)) return prev
+      const next = { ...prev }
+      delete next[tokenId]
+      return next
+    })
+  }, [])
+
+  // 清空全部明文（刷新列表时调用，避免旧明文残留）。
+  const clearAllRevealed = useCallback(() => {
+    for (const timer of Object.values(revealTimersRef.current)) clearTimeout(timer)
+    revealTimersRef.current = {}
+    setRevealed({})
   }, [])
 
   const refreshMe = useCallback(async () => {
@@ -77,6 +108,8 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
       if (abortedRef.current) return
       setMe(meResult)
       setTokens(tokenResult)
+      // 列表刷新：清空旧的 reveal 明文，避免与新列表错配或长期驻留。
+      clearAllRevealed()
       setModelCache(modelResult)
       setUsageStats(statsResult)
       setTopupOptions(optionsResult)
@@ -85,7 +118,7 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
     } catch (e) {
       if (!abortedRef.current) setError(e instanceof Error ? e.message : String(e))
     }
-  }, [])
+  }, [clearAllRevealed])
 
   useEffect(() => {
     void loadAll()
@@ -113,28 +146,37 @@ export function MyPage({ leftSidebarCollapsed, onToggleLeftSidebar, onBack }: Pr
     if (abortedRef.current) return
     if (result.ok) {
       setTokens(result.tokens)
+      // 新建/刷新列表：清空旧明文。
+      clearAllRevealed()
       setError(null)
     } else {
       setError(result.message)
     }
     setCreatingKey(false)
-  }, [creatingKey])
+  }, [creatingKey, clearAllRevealed])
 
   const handleReveal = useCallback(async (tokenId: number) => {
     if (typeof window.kunGui === 'undefined') return
     try {
       const { key } = await window.kunGui.claude360TokensReveal({ tokenId })
-      if (!abortedRef.current) setRevealed((prev) => ({ ...prev, [tokenId]: key }))
+      if (abortedRef.current) return
+      setRevealed((prev) => ({ ...prev, [tokenId]: key }))
+      // 启动/重置该 tokenId 的 TTL：到期自动清除明文。
+      const existing = revealTimersRef.current[tokenId]
+      if (existing) clearTimeout(existing)
+      revealTimersRef.current[tokenId] = setTimeout(() => clearRevealed(tokenId), REVEAL_TTL_MS)
     } catch (e) {
       if (!abortedRef.current) setError(e instanceof Error ? e.message : String(e))
     }
-  }, [])
+  }, [clearRevealed])
 
-  const handleCopy = useCallback((value: string) => {
+  const handleCopy = useCallback((tokenId: number, value: string) => {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       void navigator.clipboard.writeText(value)
     }
-  }, [])
+    // 复制后立即清除该 Key 的明文，不等 TTL。
+    clearRevealed(tokenId)
+  }, [clearRevealed])
 
   const handleCreateWechatTopup = useCallback(async () => {
     if (typeof window.kunGui === 'undefined' || submittingTopup || selectedAmount == null) return

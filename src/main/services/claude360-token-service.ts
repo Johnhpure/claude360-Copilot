@@ -35,6 +35,15 @@ export type Claude360TokenServiceDeps = {
 
 export const CLAUDE360_TOKEN_NAME_PREFIX = 'Claude360 Copilot'
 
+/**
+ * tokenRefs 存储键：按 `purpose + group` 双维度隔离，避免同一 purpose 下
+ * 不同分组（如 auto/text 与 vip/text）互相覆盖、复用到错误分组的 API Key。
+ * 旧数据用扁平 purpose 作键（legacy），读取时单独兜底并做 group 校验。
+ */
+export function claude360TokenRefKey(purpose: Claude360TokenPurpose, group: string): string {
+  return `${purpose}:${group}`
+}
+
 function mapTokenItem(item: Claude360TokenListResponse['items'][number]): Claude360TokenListItem {
   return {
     id: item.id,
@@ -109,12 +118,20 @@ export class Claude360TokenService {
     purpose: Claude360TokenPurpose
   ): Promise<Claude360TokenRef> {
     const settings = await this.deps.readClaude360()
-    const existing = settings.tokenRefs[purpose]
+    const scopedKey = claude360TokenRefKey(purpose, group)
+    // 读取顺序：优先 group-scoped ref；否则回退 legacy 扁平 tokenRefs[purpose]，
+    // 但仅当其 group 与请求 group 一致才允许复用（否则可能把 A 组 Key 用到 B 组）。
+    const scoped = settings.tokenRefs[scopedKey]
+    const legacy = settings.tokenRefs[purpose]
+    const existing = scoped ?? (legacy && legacy.group === group ? legacy : undefined)
     if (existing) {
       const secret = await this.deps.secretStore.loadSecret(claude360ApiKeyRef(existing.tokenId))
-      if (secret) return existing
-      const revealed = await this.revealToken(existing.tokenId)
-      await this.deps.secretStore.saveSecret(claude360ApiKeyRef(existing.tokenId), revealed)
+      if (!secret) {
+        const revealed = await this.revealToken(existing.tokenId)
+        await this.deps.secretStore.saveSecret(claude360ApiKeyRef(existing.tokenId), revealed)
+      }
+      // 固化/迁移到 group-scoped key（legacy 命中或首次写入时补齐）。
+      await this.deps.writeClaude360({ tokenRefs: { [scopedKey]: existing } })
       return existing
     }
 
@@ -130,7 +147,7 @@ export class Claude360TokenService {
     } else {
       ref = await this.createToken(group, `${CLAUDE360_TOKEN_NAME_PREFIX} / ${purpose}`)
     }
-    await this.deps.writeClaude360({ tokenRefs: { ...settings.tokenRefs, [purpose]: ref } })
+    await this.deps.writeClaude360({ tokenRefs: { [scopedKey]: ref } })
     return ref
   }
 }

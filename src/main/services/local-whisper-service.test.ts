@@ -1,4 +1,4 @@
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -41,21 +41,33 @@ describe('local-whisper-service helpers', () => {
     expect(_internals.localWhisperDownloadUrl(model, 'hf-sufy')).toContain('https://hf-cdn.sufy.com/')
   })
 
-  it('bundles Whisper runners for supported desktop platforms', () => {
-    const runners = [
-      ['darwin-arm64', 'whisper-cli'],
-      ['win32-x64', 'whisper-cli.exe'],
-      ['linux-x64', 'whisper-cli'],
-      ['linux-arm64', 'whisper-cli']
-    ] as const
-
-    for (const [platformDir, executable] of runners) {
-      const runnerDir = join(process.cwd(), 'resources', 'whisper', platformDir)
-      const runnerPath = join(runnerDir, executable)
+  it('keeps a well-formed Whisper runner for the committed baseline platform', () => {
+    // 仓库只随源码跟踪基线平台（win32-x64）的 whisper runner；其余平台由
+    // scripts/prepare-whisper-runner.cjs 在对应 OS/CI 上原生构建（见 before-pack.cjs），
+    // 不进仓库（体积大且无法跨平台交叉编译）。此单测校验：
+    //   1) 基线 runner 结构完整（runner.json + 可执行文件 > 64KB）；
+    //   2) 任何“已存在”的其它平台 runner 也必须完整（防止误提交损坏资源）。
+    // 发布期的全目标平台覆盖由打包流水线（before-pack + prepare-whisper-runner）保证，
+    // 不在此弱化——本测试只针对当前仓库实际跟踪/存在的资源。
+    const whisperDir = join(process.cwd(), 'resources', 'whisper')
+    const executableFor = (platformDir: string): string =>
+      platformDir.startsWith('win32') ? 'whisper-cli.exe' : 'whisper-cli'
+    const assertRunnerDir = (platformDir: string): void => {
+      const runnerDir = join(whisperDir, platformDir)
+      const runnerPath = join(runnerDir, executableFor(platformDir))
       expect(existsSync(join(runnerDir, 'runner.json'))).toBe(true)
       expect(existsSync(runnerPath)).toBe(true)
       expect(statSync(runnerPath).size).toBeGreaterThan(64 * 1024)
     }
+
+    // 基线 runner 必须存在且完整。
+    assertRunnerDir('win32-x64')
+
+    // 其它已存在的平台 runner 目录也必须完整（存在即校验，不强制齐全）。
+    const presentPlatformDirs = readdirSync(whisperDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && /^(darwin|win32|linux)-(arm64|x64)$/.test(entry.name))
+      .map((entry) => entry.name)
+    for (const platformDir of presentPlatformDirs) assertRunnerDir(platformDir)
   })
 
   it('computes sha256 checksums for downloaded files', async () => {

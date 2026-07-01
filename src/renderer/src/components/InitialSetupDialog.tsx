@@ -14,6 +14,29 @@ export function canCloseInitialSetup(mode: InitialSetupMode): boolean {
   return mode === 'preview'
 }
 
+/**
+ * 兜底：确保打开的网页授权 URL 携带 user_code。
+ * 正常情况下后端返回的 verification_url 已含 ?user_code=；但旧版后端可能只返回
+ * 裸 /cli-auth，网页会提示「缺少授权码」。此处在缺失时补上，令客户端对后端
+ * URL 形态更健壮（user_code 为 A-Z2-9 与连字符，URL 安全）。
+ */
+export function ensureCliAuthUrlUserCode(verificationUrl: string, userCode: string): string {
+  const code = userCode.trim()
+  if (!code) return verificationUrl
+  try {
+    const url = new URL(verificationUrl)
+    if (!url.searchParams.get('user_code')) {
+      url.searchParams.set('user_code', code)
+    }
+    return url.toString()
+  } catch {
+    // verificationUrl 非合法绝对 URL 时，退化为字符串判断后拼接。
+    if (/[?&]user_code=/.test(verificationUrl)) return verificationUrl
+    const sep = verificationUrl.includes('?') ? '&' : '?'
+    return `${verificationUrl}${sep}user_code=${encodeURIComponent(code)}`
+  }
+}
+
 // 保留：登录/设置完成后的运行时就绪收尾（与登录方式无关）。
 // preview 模式后台探测即可关闭；required 模式需运行时就绪才进入 Code。
 export async function completeInitialSetupAfterSave(input: {
@@ -156,7 +179,9 @@ export function InitialSetupDialog(): ReactElement {
       setDevice({ userCode: r.userCode, verificationUrl: r.verificationUrl, deviceCode: r.deviceCode })
       setDeviceStatus('pending')
       if (typeof window.kunGui?.openExternal === 'function') {
-        void window.kunGui.openExternal(r.verificationUrl).catch(() => undefined)
+        void window.kunGui
+          .openExternal(ensureCliAuthUrlUserCode(r.verificationUrl, r.userCode))
+          .catch(() => undefined)
       }
       const intervalMs = Math.max(2, r.interval || 3) * 1000
       pollTimer.current = window.setTimeout(() => void pollOnce(r.deviceCode, intervalMs), intervalMs)
@@ -278,7 +303,9 @@ export function InitialSetupDialog(): ReactElement {
                     type="button"
                     onClick={() => {
                       if (typeof window.kunGui?.openExternal === 'function') {
-                        void window.kunGui.openExternal(device.verificationUrl).catch(() => undefined)
+                        void window.kunGui
+                          .openExternal(ensureCliAuthUrlUserCode(device.verificationUrl, device.userCode))
+                          .catch(() => undefined)
                       }
                     }}
                     className="mt-3 inline-flex items-center justify-center gap-1.5 text-sm text-sky-600 hover:underline dark:text-sky-300"

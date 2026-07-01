@@ -132,8 +132,56 @@ describe('Claude360TokenService', () => {
     })
     const ref = await service.ensureGroupToken('image', 'image')
     expect(ref).toMatchObject({ tokenId: 12, group: 'image' })
-    expect(port.current().tokenRefs.image?.tokenId).toBe(12)
+    expect(port.current().tokenRefs['image:image']?.tokenId).toBe(12)
     expect(await secretStore.loadSecret('claude360:api-key:12')).toBe('sk-new')
+  })
+
+  it('does not reuse a ref across different groups sharing the same purpose', async () => {
+    // 场景：已存在 auto/text 的 legacy ref；请求 vip/text 时不得复用 tokenId 1，
+    // 必须为 vip 分组单独查列表/建 token，避免 vip provider 指向 auto 的 Key。
+    const calls: string[] = []
+    const port = settingsPort({
+      tokenRefs: { text: { tokenId: 1, name: 'Claude360 Copilot / text', group: 'auto' } }
+    })
+    const secretStore = fakeSecretStore({ ...CLI, 'claude360:api-key:1': 'sk-auto' })
+    const service = new Claude360TokenService({
+      apiClient: fakeApi(
+        {
+          '/api/cli/tokens': (body) =>
+            body
+              ? { id: 2, name: 'Claude360 Copilot / text', key: 'sk-vip', group: 'vip' }
+              : { items: [] }
+        },
+        calls
+      ),
+      secretStore,
+      readClaude360: port.readClaude360,
+      writeClaude360: port.writeClaude360
+    })
+    const ref = await service.ensureGroupToken('vip', 'text')
+    expect(ref.tokenId).toBe(2)
+    expect(ref.group).toBe('vip')
+    expect(port.current().tokenRefs['text:vip']?.tokenId).toBe(2)
+    // legacy auto ref 保持不变，未被 vip 覆盖。
+    expect(port.current().tokenRefs.text?.tokenId).toBe(1)
+  })
+
+  it('reuses a legacy purpose ref only when its group matches, migrating to a scoped key', async () => {
+    const calls: string[] = []
+    const port = settingsPort({
+      tokenRefs: { text: { tokenId: 5, name: 'Claude360 Copilot / text', group: 'auto' } }
+    })
+    const service = new Claude360TokenService({
+      apiClient: fakeApi({}, calls),
+      secretStore: fakeSecretStore({ ...CLI, 'claude360:api-key:5': 'sk-existing' }),
+      readClaude360: port.readClaude360,
+      writeClaude360: port.writeClaude360
+    })
+    const ref = await service.ensureGroupToken('auto', 'text')
+    expect(ref.tokenId).toBe(5)
+    expect(calls).toHaveLength(0) // secret 命中，无需任何 API 调用
+    // 复用后固化到 group-scoped key。
+    expect(port.current().tokenRefs['text:auto']?.tokenId).toBe(5)
   })
 
   it('ensureGroupToken de-dupes concurrent calls: creates the token only once', async () => {
@@ -166,7 +214,7 @@ describe('Claude360TokenService', () => {
     expect(b).toEqual(c)
     expect(createCount).toBe(1)
     expect(listCount).toBe(1)
-    expect(port.current().tokenRefs.music?.tokenId).toBe(30)
+    expect(port.current().tokenRefs['music:music']?.tokenId).toBe(30)
     // in-flight 结束后可再次调用（此时命中已存 ref，不再建 token）。
     const again = await service.ensureGroupToken('music', 'music')
     expect(again.tokenId).toBe(30)
