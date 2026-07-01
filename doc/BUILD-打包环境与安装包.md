@@ -18,10 +18,14 @@
 - 原生模块（node-pty / better-sqlite3 / nut-js）在各自平台 runner 原生编译，无跨平台问题。
 
 ### 触发方式（二选一）
-- **手动**：GitHub → Actions → Build Installers → Run workflow。
-- **打 tag 自动触发**：推送 `v*` 标签即云端产出三平台安装包，版本号取自标签（去前导 `v`，须合法 semver）：
+- **手动**：GitHub → Actions → Build Installers → Run workflow。可勾选 `only_windows` **仅打 Windows x64**（跳过 macOS job）。
+- **打 tag 自动触发**：
+  - `v*`（如 `v0.2.0`）：云端产出**三平台**安装包。
+  - `win-v*`（如 `win-v0.1.3-test.1`）：**仅打 Windows x64**，用于测试阶段快速出 win 包。
+  版本号取自标签（去掉 `win-`/`v` 前缀，须合法 semver）：
   ```bash
-  git tag v0.2.0 && git push origin v0.2.0
+  git tag v0.2.0 && git push origin v0.2.0            # 三平台
+  git tag win-v0.1.3-test.1 && git push origin win-v0.1.3-test.1  # 仅 Windows
   ```
 
 ### 使用步骤
