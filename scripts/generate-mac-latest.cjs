@@ -37,7 +37,8 @@ async function main() {
   const artifacts = []
 
   for (const fileName of entries) {
-    const match = fileName.match(/^Kun-(.+)-mac-(arm64|x64)\.(zip|dmg)$/)
+    // 品牌已升级为 Claude360 Copilot：产物名前缀随 artifactName（Claude360-Copilot-…）。
+    const match = fileName.match(/^Claude360-Copilot-(.+)-mac-(arm64|x64)\.(zip|dmg)$/)
     if (!match) continue
     artifacts.push({
       fileName,

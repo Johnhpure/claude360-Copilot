@@ -27,9 +27,11 @@ if (!version) {
 
 const distDir = resolve(process.env.KUN_DIST_DIR || process.env.DEEPSEEK_GUI_DIST_DIR || join(root, 'dist'))
 const appOutDir = join(distDir, arch === 'arm64' ? 'mac-arm64' : 'mac')
-const appName = 'Kun.app'
+// 品牌已升级为 Claude360 Copilot：.app 与 zip 名须与 electron-builder.config.cjs 的
+// productName / artifactName 保持一致（旧值 Kun.app 会导致 App bundle not found）。
+const appName = 'Claude360 Copilot.app'
 const appPath = join(appOutDir, appName)
-const zipPath = join(distDir, `Kun-${version}-mac-${arch}.zip`)
+const zipPath = join(distDir, `Claude360-Copilot-${version}-mac-${arch}.zip`)
 
 if (!existsSync(appPath)) {
   console.error(`[zip-mac-app] App bundle not found: ${appPath}`)
