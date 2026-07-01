@@ -160,4 +160,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           path: |
+            dist/Claude360-Copilot-*-win-x64.exe
+            dist/Claude360-Copilot-*-win-x64.exe.blockmap
             dist/Claude360-Copilot-*-win-x64.zip

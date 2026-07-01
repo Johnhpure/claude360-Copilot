@@ -191,9 +191,10 @@ module.exports = {
     // npx --yes png2icons src/asset/img/claude360_mac.png build/icon-claude360 -icowe -bc
     // 当前 icon-claude360.ico 为旧 icon.ico 的占位副本,待替换真实设计资源。
     icon: './build/icon-claude360.ico',
-    // x64：仅 zip 便携包（免安装，解压即用；不打 nsis 安装包）。在 Windows/CI 上
-    // 产出；Linux 本机因 node-pty 无法交叉编译，打不出（与 exe/zip 无关）。
+    // x64：nsis 安装包（双击安装）+ zip 便携包（免安装，解压后运行内含的
+    // "Claude360 Copilot.exe"）。二者均在 Windows/CI 上产出。
     target: [
+      { target: 'nsis', arch: ['x64'] },
       { target: 'zip', arch: ['x64'] }
     ]
   },
