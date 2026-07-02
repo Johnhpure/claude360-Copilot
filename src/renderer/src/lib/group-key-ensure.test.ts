@@ -53,4 +53,17 @@ describe('ensureGroupKeyForSelection', () => {
     })
     expect(ok).toBe(false)
   })
+
+  it('fails open (returns true, no prompt) when the token check itself throws', async () => {
+    const promptCreateAndEnsure = vi.fn()
+    const ok = await ensureGroupKeyForSelection('vip', {
+      listTokens: async () => {
+        throw new Error('not signed in / network down')
+      },
+      promptCreateAndEnsure
+    })
+    // 检测失败时放行：请求走出去由运行时/服务端报可见错误，而不是静默吞掉任务。
+    expect(ok).toBe(true)
+    expect(promptCreateAndEnsure).not.toHaveBeenCalled()
+  })
 })

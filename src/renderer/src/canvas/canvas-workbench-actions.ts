@@ -1,6 +1,6 @@
 // 生图工作台的纯编排函数（plan-06 Task 5+7）。
 //
-// 把 image 模型过滤、access 探测、生成/编辑提交、上传本地图片、复制/下载等副作用
+// 把 image 模型过滤、生成/编辑提交、上传本地图片、复制/下载等副作用
 // 从 React 组件里剥离出来，只依赖通过参数注入的最小 kunGui 子集与 store 动作，
 // 便于在 node 环境下用 renderToStaticMarkup + mock 直接单测（与 music-workbench-actions 同款）。
 //
@@ -33,32 +33,6 @@ export function filterImageModels(models: string[]): string[] {
 /** 默认模型：第一个 image 模型；无则空串（UI 显示「暂无可用生图模型」）。 */
 export function defaultImageModel(models: string[]): string {
   return filterImageModels(models)[0] ?? ''
-}
-
-// —— access 探测 ——
-export type CanvasAccess = {
-  loggedIn: boolean
-  hasImageGroup: boolean
-}
-
-/** 从 token 列表判断是否有 image 分组 Key（大小写不敏感，含子串匹配 image）。 */
-export function hasImageGroupToken(tokens: Claude360TokenListItem[]): boolean {
-  return tokens.some((t) => (t.group || '').toLowerCase().includes('image'))
-}
-
-/**
- * 探测生图可用性：拉取 token 列表，判断登录态与 image 分组。
- * 失败（未登录/网络）时返回 loggedIn:false，让 UI 显示「去我的页修复」入口。
- */
-export async function detectCanvasAccess(
-  api: Pick<CanvasWorkbenchApi, 'claude360TokensList'>
-): Promise<CanvasAccess> {
-  try {
-    const tokens = await api.claude360TokensList()
-    return { loggedIn: true, hasImageGroup: hasImageGroupToken(tokens) }
-  } catch {
-    return { loggedIn: false, hasImageGroup: false }
-  }
 }
 
 export type SubmitResult = { ok: boolean; message?: string }

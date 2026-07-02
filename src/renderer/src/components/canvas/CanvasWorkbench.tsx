@@ -7,7 +7,6 @@ import type { Claude360CanvasImage } from '@shared/claude360-canvas'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { useCanvasStore } from '../../canvas/canvas-store'
 import {
-  detectCanvasAccess,
   defaultImageModel,
   filterImageModels,
   submitGenerate,
@@ -15,7 +14,6 @@ import {
   fileToDataUrl,
   copyImage,
   downloadImage,
-  type CanvasAccess,
   type CanvasWorkbenchApi
 } from '../../canvas/canvas-workbench-actions'
 import { CanvasToolbar } from './CanvasToolbar'
@@ -28,7 +26,7 @@ import { useGroupKeyPromptStore } from '../../store/group-key-prompt-store'
 type Props = {
   leftSidebarCollapsed: boolean
   onToggleLeftSidebar: () => void
-  /** 跳转「我的」页（未登录 / 无 image 分组 / 低余额充值的修复入口）。 */
+  /** 跳转「我的」页（低余额充值入口）。 */
   onOpenMy: () => void
 }
 
@@ -73,7 +71,6 @@ export function CanvasWorkbench({
   const editFailure = useStore(useCanvasStore, (s) => s.editFailure)
   const setActiveImage = useStore(useCanvasStore, (s) => s.setActiveImage)
 
-  const [access, setAccess] = useState<CanvasAccess | null>(null)
   const [lowBalance, setLowBalance] = useState(false)
   const [imageModels, setImageModels] = useState<string[]>([])
   // 复制结果的一次性反馈（成功「已复制」/ 失败提示），短暂展示后自动消失。
@@ -99,17 +96,11 @@ export function CanvasWorkbench({
     [setModel]
   )
 
-  // 首屏加载：探测登录/分组 + 拉低余额标记 + 读取 image 模型缓存。
+  // 首屏加载：读取 image 模型缓存 + 低余额标记（分组模式不再探测/报错 image 分组 Key）。
   useEffect(() => {
     let alive = true
     const kun = api()
-    if (!kun) {
-      setAccess({ loggedIn: false, hasImageGroup: false })
-      return
-    }
-    void detectCanvasAccess(kun).then((a) => {
-      if (alive) setAccess(a)
-    })
+    if (!kun) return
     const w = window.kunGui
     if (w?.getSettings) {
       void w.getSettings().then((settings) => {
@@ -136,22 +127,22 @@ export function CanvasWorkbench({
     }).catch(() => undefined)
   }, [applyModelsFromCache])
 
-  // 选模型后确保该 image 分组已有 Key：无则弹优雅模态询问是否创建（取消则仅切换模型）。
+  // 选模型仅切换模型，不再即时检测 Key；Key 改到「点开始生成」时按所选分组检测/创建。
   const handleChangeModel = useCallback((m: string): void => {
     setModel(m)
-    const g = imageGroup.trim()
-    const kun = api()
-    if (!g || !kun) return
-    void ensureGroupKeyForSelection(g, {
-      listTokens: () => kun.claude360TokensList(),
-      promptCreateAndEnsure: (grp) => useGroupKeyPromptStore.getState().open(grp, 'image')
-    })
-  }, [imageGroup, setModel])
+  }, [setModel])
 
   // 统一提交：有参考图 → 走 editImage(不带 mask)；否则文本生图(带 quality/output_format)。
+  // 执行时按所选 image 分组确保有 Key：无则弹「需要创建分组 Key」模态，用户确认→
+  // 自动创建 Key→续跑本次生成；取消/失败→静默中止。
   const handleGenerate = useCallback(async (): Promise<void> => {
     const kun = api()
     if (!kun) return
+    const ready = await ensureGroupKeyForSelection(imageGroup.trim() || null, {
+      listTokens: () => kun.claude360TokensList(),
+      promptCreateAndEnsure: (grp) => useGroupKeyPromptStore.getState().open(grp, 'image')
+    })
+    if (!ready) return
     const s = useCanvasStore.getState()
     if (s.referenceImage) {
       if (s.editing) return
@@ -174,7 +165,7 @@ export function CanvasWorkbench({
       quality: s.quality,
       output_format: s.outputFormat
     })
-  }, [beginEdit, editFailure, editSuccess, beginGenerate, generateFailure, generateSuccess])
+  }, [beginEdit, editFailure, editSuccess, beginGenerate, generateFailure, generateSuccess, imageGroup])
 
   const handlePickReference = useCallback((file: File): void => {
     void fileToDataUrl(file, (f) =>
@@ -242,7 +233,7 @@ export function CanvasWorkbench({
 
       <main className="ds-no-drag min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-5">
         <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-4">
-          <CanvasToolbar access={access} lowBalance={lowBalance} onOpenMy={onOpenMy} t={t} />
+          <CanvasToolbar lowBalance={lowBalance} onOpenMy={onOpenMy} t={t} />
           {copyNotice ? (
             <div
               className="rounded-xl border border-ds-border bg-ds-card px-3 py-1.5 text-[13px] text-ds-muted"

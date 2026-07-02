@@ -16,8 +16,6 @@ import type { WriteWorkspaceState } from './write-workspace-store-types'
 import { createWriteSettingsActions } from './write-workspace-settings-actions'
 import { createWriteFileActions } from './write-workspace-file-actions'
 import { writeBrowserStorageItem } from '../lib/browser-storage'
-import { ensureGroupKeyForSelection, groupNameFromProviderId } from '../lib/group-key-ensure'
-import { useGroupKeyPromptStore } from '../store/group-key-prompt-store'
 import {
   WRITE_ASSISTANT_MODEL_KEY,
   WRITE_ASSISTANT_PROVIDER_KEY,
@@ -355,22 +353,8 @@ export const useWriteWorkspaceStore = create<WriteWorkspaceState>((set, get) => 
     writeBrowserStorageItem(WRITE_ASSISTANT_MODEL_KEY, normalized)
     const normalizedProviderId = providerId?.trim() ?? ''
     writeBrowserStorageItem(WRITE_ASSISTANT_PROVIDER_KEY, normalizedProviderId)
-    const prevModel = get().assistantModel
-    const prevProviderId = get().assistantProviderId
     set({ assistantModel: normalized, assistantProviderId: normalizedProviderId })
-    // 选完写作模型立即检测该分组 Key；无则弹优雅模态问是否创建，取消/失败回退。
-    const groupName = groupNameFromProviderId(normalizedProviderId)
-    if (groupName && typeof window.kunGui?.claude360TokensList === 'function') {
-      void ensureGroupKeyForSelection(groupName, {
-        listTokens: () => window.kunGui.claude360TokensList(),
-        promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g)
-      }).then((ready) => {
-        if (ready) return
-        writeBrowserStorageItem(WRITE_ASSISTANT_MODEL_KEY, prevModel)
-        writeBrowserStorageItem(WRITE_ASSISTANT_PROVIDER_KEY, prevProviderId)
-        set({ assistantModel: prevModel, assistantProviderId: prevProviderId })
-      })
-    }
+    // 分组模式：选写作模型仅切换，不再即时检测 Key；Key 在调用 AI 写作时按所选分组检测/创建。
   },
 
   setAssistantAgentPresetId: (id) => {

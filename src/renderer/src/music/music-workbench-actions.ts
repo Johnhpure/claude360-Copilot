@@ -1,6 +1,6 @@
 // 音乐工作台的纯编排函数（Task 6）。
 //
-// 把提交、轮询、下载、登录/分组检测等副作用从 React 组件里剥离出来，只依赖
+// 把提交、轮询、下载等副作用从 React 组件里剥离出来，只依赖
 // 通过参数注入的最小 kunGui 子集与 store 动作，便于在 node 环境下用
 // renderToStaticMarkup + mock 直接单测（与 my-page-actions.ts 同款抽离）。
 //
@@ -88,33 +88,6 @@ export async function pollActiveTasksOnce(
   // 即使本轮全部为网络错误也调用 applyFetched：store 只对“有 taskId 却未在结果里”的
   // 任务累加 miss。但网络错误不应累加 miss —— 故仅在拿到 >=1 条结果时才归约。
   if (resolved.length > 0) store.applyFetched(resolved)
-}
-
-export type MusicAccess = {
-  /** 已登录（token 列表可用视为已登录，main 会在未登录时抛错，UI 兜底为未登录）。 */
-  loggedIn: boolean
-  /** 是否存在 music 分组的 API Key。 */
-  hasMusicGroup: boolean
-}
-
-/** 从 token 列表判断是否有 music 分组 Key（大小写不敏感，含子串匹配 music）。 */
-export function hasMusicGroupToken(tokens: Claude360TokenListItem[]): boolean {
-  return tokens.some((t) => (t.group || '').toLowerCase().includes('music'))
-}
-
-/**
- * 探测音乐可用性：拉取 token 列表，判断登录态与 music 分组。
- * 失败（未登录/网络）时返回 loggedIn:false，让 UI 显示“去我的页修复”入口。
- */
-export async function detectMusicAccess(
-  api: Pick<MusicWorkbenchApi, 'claude360TokensList'>
-): Promise<MusicAccess> {
-  try {
-    const tokens = await api.claude360TokensList()
-    return { loggedIn: true, hasMusicGroup: hasMusicGroupToken(tokens) }
-  } catch {
-    return { loggedIn: false, hasMusicGroup: false }
-  }
 }
 
 // —— 下载（迁移自 music-web download.ts；仅允许 http(s)，纵深防御）——

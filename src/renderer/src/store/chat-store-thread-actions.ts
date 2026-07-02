@@ -5,6 +5,8 @@ import i18n from '../i18n'
 import { applyTheme, applyUiFontScale } from '../lib/apply-theme'
 import { formatWorkspacePickerError } from '../lib/format-workspace-picker-error'
 import { formatRuntimeError, getRuntimeErrorCode } from '../lib/format-runtime-error'
+import { ensureGroupKeyForSelection, groupNameFromProviderId } from '../lib/group-key-ensure'
+import { useGroupKeyPromptStore } from './group-key-prompt-store'
 import {
   deriveThreadTitleFromPrompt,
   getDefaultThreadTitle,
@@ -27,8 +29,7 @@ import { workspaceLabelFromPath } from '../lib/workspace-label'
 import { isInternalTemporaryWorkspace, normalizeWorkspaceRoot } from '../lib/workspace-path'
 import {
   buildClawRuntimePrompt,
-  buildCodeRuntimePrompt,
-  getActiveAgentApiKey
+  buildCodeRuntimePrompt
 } from '@shared/app-settings'
 import type { ChatState, ChatStoreGet, ChatStoreSet } from './chat-store-types'
 import {
@@ -603,6 +604,19 @@ export function createThreadActions(
     if (get().runtimeConnection !== 'ready') {
       set({ error: i18n.t('common:runtimeActionNeedsConnection') })
       return false
+    }
+    // 执行时按所选分组确保有 Key：无则弹「需要创建分组 Key」模态，确认→自动创建 Key→
+    // 续跑本次发送；取消/失败→中止（调用方据返回 false 恢复草稿）。
+    // provider 解析必须与下方实际发送一致（queued 优先），否则 drain 队列时会检测错分组。
+    const sendProviderId =
+      overrides?.queued?.providerId ?? overrides?.providerId?.trim() ?? fallbackComposerProviderIdForSend(get())
+    const groupForKey = groupNameFromProviderId(sendProviderId)
+    if (groupForKey && typeof window.kunGui?.claude360TokensList === 'function') {
+      const keyReady = await ensureGroupKeyForSelection(groupForKey, {
+        listTokens: () => window.kunGui.claude360TokensList(),
+        promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g)
+      })
+      if (!keyReady) return false
     }
     const p = getProvider()
     if (get().route === 'write') {

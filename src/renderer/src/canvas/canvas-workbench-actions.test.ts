@@ -1,13 +1,10 @@
 // 生图工作台纯编排函数的单元测试（plan-06 Task 5+7）。
-// node 环境：注入 mock kunGui 子集与 store 动作，断言调用顺序、image 模型过滤、上传转 dataURL、access 探测、复制/下载。
+// node 环境：注入 mock kunGui 子集与 store 动作，断言调用顺序、image 模型过滤、上传转 dataURL、复制/下载。
 import { describe, it, expect, vi } from 'vitest'
 import type { Claude360CanvasImage, Claude360ImageResult } from '@shared/claude360-canvas'
-import type { Claude360TokenListItem } from '@shared/claude360'
 import {
   filterImageModels,
   defaultImageModel,
-  hasImageGroupToken,
-  detectCanvasAccess,
   submitGenerate,
   submitEdit,
   fileToDataUrl,
@@ -28,10 +25,6 @@ function image(id: string, overrides: Partial<Claude360CanvasImage> = {}): Claud
   }
 }
 
-function token(group: string): Claude360TokenListItem {
-  return { id: 1, name: 'k', maskedKey: '****', status: 1, group, remainQuota: 1, unlimitedQuota: false }
-}
-
 describe('filterImageModels / defaultImageModel · 只筛 image 模型（不硬编码）', () => {
   it('从 modelCache.models 过滤出 image 模型', () => {
     const models = ['claude-3-5-sonnet', 'flux-pro', 'gpt-image-1', 'suno-v5', 'dall-e-3']
@@ -43,21 +36,6 @@ describe('filterImageModels / defaultImageModel · 只筛 image 模型（不硬�
   it('默认模型取第一个 image 模型；无则空串', () => {
     expect(defaultImageModel(['gpt-4o', 'flux-pro', 'dall-e-3'])).toBe('flux-pro')
     expect(defaultImageModel(['gpt-4o'])).toBe('')
-  })
-})
-
-describe('hasImageGroupToken / detectCanvasAccess', () => {
-  it('识别 image 分组 Key（大小写不敏感 + 子串）', () => {
-    expect(hasImageGroupToken([token('text'), token('Image-group')])).toBe(true)
-    expect(hasImageGroupToken([token('text'), token('music')])).toBe(false)
-  })
-  it('探测：拉 token 列表判断登录态与 image 分组', async () => {
-    const api = { claude360TokensList: vi.fn(async () => [token('image')]) }
-    await expect(detectCanvasAccess(api)).resolves.toEqual({ loggedIn: true, hasImageGroup: true })
-  })
-  it('探测失败（未登录/网络）返回 loggedIn:false', async () => {
-    const api = { claude360TokensList: vi.fn(async () => { throw new Error('401') }) }
-    await expect(detectCanvasAccess(api)).resolves.toEqual({ loggedIn: false, hasImageGroup: false })
   })
 })
 

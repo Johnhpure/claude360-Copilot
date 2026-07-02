@@ -279,10 +279,10 @@ export function GroupKeysTable({
           <table className="w-full border-collapse text-left text-[13px]">
             <thead className="bg-ds-main text-[11px] uppercase tracking-wide text-ds-faint">
               <tr>
-                <th className="px-4 py-2.5 font-semibold">{t('groupsKeysColName')}</th>
-                <th className="px-4 py-2.5 font-semibold">{t('groupsKeysColKey')}</th>
-                <th className="px-4 py-2.5 font-semibold">{t('groupsKeysColQuota')}</th>
-                <th className="px-4 py-2.5 text-right font-semibold">{t('groupsKeysColActions')}</th>
+                <th className="px-5 py-3 font-semibold">{t('groupsKeysColName')}</th>
+                <th className="px-5 py-3 font-semibold">{t('groupsKeysColKey')}</th>
+                <th className="px-5 py-3 font-semibold">{t('groupsKeysColQuota')}</th>
+                <th className="px-5 py-3 text-right font-semibold">{t('groupsKeysColActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -291,12 +291,12 @@ export function GroupKeysTable({
                 const isRevealed = typeof plain === 'string' && plain.length > 0
                 return (
                   <tr key={token.id} className="border-t border-ds-border-muted transition hover:bg-ds-hover">
-                    <td className="px-4 py-2.5 font-medium text-ds-ink">{token.name}</td>
-                    <td className="px-4 py-2.5 font-mono text-[12px] tabular-nums text-ds-muted">
+                    <td className="px-5 py-3 font-medium text-ds-ink">{token.name}</td>
+                    <td className="px-5 py-3 font-mono text-[12px] tabular-nums text-ds-muted">
                       {isRevealed ? plain : token.maskedKey}
                     </td>
                     <td
-                      className={`px-4 py-2.5 tabular-nums ${
+                      className={`px-5 py-3 tabular-nums ${
                         token.unlimitedQuota
                           ? 'font-semibold text-emerald-600 dark:text-emerald-300'
                           : 'text-ds-muted'
@@ -306,7 +306,7 @@ export function GroupKeysTable({
                         ? t('groupsKeysQuotaUnlimited')
                         : token.remainQuota.toLocaleString()}
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-5 py-3">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
@@ -635,7 +635,7 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
   const activeGroupKeys = activeGroup ? keysForGroup(activeGroup.name) : []
 
   return (
-    <section className="rounded-2xl border border-ds-border bg-ds-card/95 shadow-sm shadow-black/5 dark:shadow-black/25">
+    <section className="w-full rounded-2xl border border-ds-border bg-ds-card/95 shadow-sm shadow-black/5 dark:shadow-black/25">
       {/* 头部:标题 + 刷新 */}
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-ds-border-muted px-5 py-3.5">
         <div className="flex items-center gap-2.5">
@@ -721,11 +721,13 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
           <p className="text-[12px] text-ds-faint">{t('groupsKeysNoGroupsHint')}</p>
         </div>
       ) : (
-        <div className="grid gap-0 md:grid-cols-[240px_minmax(0,1fr)]">
+        // 主区高度：至少撑到接近整屏（顶部标题/卡片头部/筛选约占 360px），
+        // 左右两栏随 grid 拉伸等高；内容超出时由设置页外层统一滚动。
+        <div className="grid gap-0 md:min-h-[calc(100vh-360px)] md:grid-cols-[240px_minmax(0,1fr)]">
           {/* 左列:分组 */}
           <nav
             aria-label={t('groupsKeysListAria')}
-            className="flex max-h-[560px] flex-col gap-1 overflow-y-auto border-b border-ds-border-muted p-2.5 md:border-b-0 md:border-r"
+            className="flex flex-col gap-1 border-b border-ds-border-muted p-2.5 md:border-b-0 md:border-r"
           >
             <div className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-ds-faint">
               {t('groupsKeysListLabel')}
@@ -743,7 +745,7 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
           </nav>
 
           {/* 右侧:详情 */}
-          <div className="max-h-[560px] overflow-y-auto p-5">
+          <div className="p-5">
             {activeGroup ? (
               <div className="flex flex-col gap-4">
                 <div>

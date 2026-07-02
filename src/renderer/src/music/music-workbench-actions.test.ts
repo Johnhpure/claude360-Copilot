@@ -1,6 +1,6 @@
 // 音乐工作台纯编排函数测试（Task 6）。
 // 覆盖：提交（参数来自 suno-params + mock claude360MusicSubmit + 任务新增）、
-// 轮询、下载、登录/分组检测。全部 node 环境，无 jsdom。
+// 轮询、下载。全部 node 环境，无 jsdom。
 import { describe, it, expect, vi } from 'vitest'
 import type {
   Claude360MusicCreateForm,
@@ -9,13 +9,10 @@ import type {
   Claude360MusicSubmitPayload,
   Claude360MusicSubmitResult
 } from '@shared/claude360-music'
-import type { Claude360TokenListItem } from '@shared/claude360'
 import { emptyForm } from './suno-params'
 import {
   submitMusic,
   pollActiveTasksOnce,
-  detectMusicAccess,
-  hasMusicGroupToken,
   downloadSong,
   isSafeHttpUrl,
   safeSongFilename
@@ -106,32 +103,6 @@ describe('pollActiveTasksOnce', () => {
     })
     await pollActiveTasksOnce({ claude360MusicFetch }, store, ['t1'])
     expect(store.applyFetched).not.toHaveBeenCalled()
-  })
-})
-
-describe('detectMusicAccess / hasMusicGroupToken', () => {
-  const token = (group: string): Claude360TokenListItem => ({
-    id: 1,
-    name: 'k',
-    maskedKey: 'sk-****',
-    status: 1,
-    group,
-    remainQuota: 0,
-    unlimitedQuota: true
-  })
-  it('存在 music 分组 → hasMusicGroup=true', () => {
-    expect(hasMusicGroupToken([token('text'), token('music')])).toBe(true)
-    expect(hasMusicGroupToken([token('text')])).toBe(false)
-  })
-  it('成功拉取 → loggedIn=true 且据分组判断', async () => {
-    const claude360TokensList = vi.fn(async () => [token('music')])
-    await expect(detectMusicAccess({ claude360TokensList })).resolves.toEqual({ loggedIn: true, hasMusicGroup: true })
-  })
-  it('拉取失败（未登录）→ loggedIn=false', async () => {
-    const claude360TokensList = vi.fn(async () => {
-      throw new Error('unauthorized')
-    })
-    await expect(detectMusicAccess({ claude360TokensList })).resolves.toEqual({ loggedIn: false, hasMusicGroup: false })
   })
 })
 

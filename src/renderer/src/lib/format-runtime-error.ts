@@ -89,10 +89,6 @@ function localizedRuntimeSummary(code: string | null, text: string): string | nu
     return i18n.t('common:runtimeFetchFailed')
   }
 
-  if (code === 'missing_api_key') {
-    return i18n.t('common:runtimeMissingApiKey')
-  }
-
   if (code === 'runtime_offline') {
     return i18n.t('common:runtimeAutoStartDisabled')
   }
@@ -129,8 +125,7 @@ function localizedRuntimeSummary(code: string | null, text: string): string | nu
 }
 
 function shouldOpenAgentsSettings(code: string | null): boolean {
-  return code === 'missing_api_key' ||
-    code === 'runtime_offline' ||
+  return code === 'runtime_offline' ||
     code === 'runtime_auth_required' ||
     code === 'runtime_port_conflict'
 }

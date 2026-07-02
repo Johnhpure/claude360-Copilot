@@ -638,7 +638,22 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       }
       return p
     })
-    if (changed) await applySettingsPatch({ provider: { providers: updated } })
+    if (changed) {
+      await applySettingsPatch({ provider: { providers: updated } })
+      // 关键：kun 子进程的 provider Key 在 spawn 时一次性烘焙进子进程 config，运行中
+      // 不会按请求重解 apiKeyRef；而 ref-only 变更不改变启动指纹、不会触发自动重启。
+      // 故 ref 变化（新建分组 Key / 换 Key）后必须显式重启运行时，否则「创建成功续跑」
+      // 的下一发仍带旧 Key/空 Key → 持续 401 且无自愈路径。
+      // 重启失败不阻塞返回：Key 已建好，发送侧会得到可见错误，可重试。
+      try {
+        await restartRuntime()
+      } catch (error) {
+        console.warn(
+          '[kun-gui] runtime restart after token ensure failed:',
+          error instanceof Error ? error.message : String(error)
+        )
+      }
+    }
     return ref
   })
   ipcMain.handle('claude360:tokens:create', async (_, payload: unknown) => {

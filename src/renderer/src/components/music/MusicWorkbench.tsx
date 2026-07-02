@@ -20,11 +20,9 @@ import {
   useMusicPlayerStore
 } from '../../music/music-player-store'
 import {
-  detectMusicAccess,
   downloadSong,
   pollActiveTasksOnce,
   submitMusic,
-  type MusicAccess,
   type MusicWorkbenchApi
 } from '../../music/music-workbench-actions'
 import type { LyricsStreamApi } from '../../music/lyrics-ai'
@@ -34,19 +32,17 @@ import { MusicCreatePanel } from './MusicCreatePanel'
 import { MusicTaskList } from './MusicTaskList'
 import { MusicPlayer } from './MusicPlayer'
 import { LyricsAssistantDrawer } from './LyricsAssistantDrawer'
-import { MusicFixBanner } from './MusicFixBanner'
 
 type Props = {
   leftSidebarCollapsed: boolean
   onToggleLeftSidebar: () => void
-  /** 跳转「我的」页（未登录 / 无 music 分组时的修复入口）。容器只调用，不感知 setRoute。 */
-  onOpenMy: () => void
 }
 
-// 音乐工作台容器：拥有表单 state 与副作用编排（提交 / 轮询 / 播放 / 下载 / 权限探测）。
+// 音乐工作台容器：拥有表单 state 与副作用编排（提交 / 轮询 / 播放 / 下载）。
 // 具体副作用委托给 music-workbench-actions.ts（可注入依赖），本容器只做 state/effect 编排，
 // 便于 node 单测直接测 actions 与展示子组件。renderer 全程不持有 / 输入 API Key。
-export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOpenMy }: Props): ReactElement {
+// 分组模式：打开页面不检测 music 分组 Key；Key 在「点开始生成」时按所选分组检测/创建。
+export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Props): ReactElement {
   const { t } = useTranslation('common')
   const tasks = useStore(useMusicTaskStore, (s) => s.tasks)
   const addSubmitting = useStore(useMusicTaskStore, (s) => s.addSubmitting)
@@ -59,7 +55,6 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [lyricsOpen, setLyricsOpen] = useState(false)
-  const [access, setAccess] = useState<MusicAccess | null>(null)
   // 写词助手用的文本模型列表（来自 text 分组）。
   const [textModels, setTextModels] = useState<string[]>([])
   // 当前 music 分组（选模型时用于确保该分组已有 Key）。
@@ -85,22 +80,6 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const api = (): MusicWorkbenchApi | null =>
     typeof window !== 'undefined' && window.kunGui ? (window.kunGui as unknown as MusicWorkbenchApi) : null
-
-  // 权限探测：拉取 token 列表判断登录态与 music 分组。
-  useEffect(() => {
-    let alive = true
-    const k = api()
-    if (!k) {
-      setAccess({ loggedIn: false, hasMusicGroup: false })
-      return
-    }
-    void detectMusicAccess(k).then((a) => {
-      if (alive) setAccess(a)
-    })
-    return () => {
-      alive = false
-    }
-  }, [])
 
   // 拉取 text 分组的模型列表，供写词助手的文本模型下拉使用。
   useEffect(() => {
@@ -156,17 +135,10 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
     }
   }, [activeKey, applyFetched])
 
+  // 选模型仅更新表单，不再即时检测 Key；Key 改到「点开始生成」时按所选分组检测/创建。
   const patchForm = useCallback((patch: Partial<Claude360MusicCreateForm>): void => {
     setForm((prev) => ({ ...prev, ...patch }))
-    // 选模型后确保该 music 分组已有 Key：无则弹优雅模态询问是否创建（取消则仅切换模型）。
-    if (patch.model && musicGroup.trim() && typeof window !== 'undefined' && window.kunGui) {
-      const kun = window.kunGui
-      void ensureGroupKeyForSelection(musicGroup.trim(), {
-        listTokens: () => kun.claude360TokensList(),
-        promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g, 'music')
-      })
-    }
-  }, [musicGroup])
+  }, [])
 
   const handleSubmit = useCallback(async (): Promise<void> => {
     const k = api()
@@ -176,17 +148,24 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
       setErrors([t('musicTaskInProgress')])
       return
     }
+    // submitting 必须在 Key 门禁（含网络往返）之前置位：否则弹窗/网络窗口内双击会
+    // 双双通过上面的同步检查 → 双提交 → 双扣费。try/finally 兜底复位。
     setSubmitting(true)
     setErrors([])
-    // try/finally 兜底：即便 submitMusic 抛出（同步异常或立即失败），也要复位
-    // submitting，避免提交按钮永久卡在 loading 态。
     try {
+      // 执行时按所选 music 分组确保有 Key：无则弹「需要创建分组 Key」模态，用户确认→
+      // 自动创建 Key→续跑本次生成；取消/失败→静默中止（不留报错横幅）。
+      const ready = await ensureGroupKeyForSelection(musicGroup.trim() || null, {
+        listTokens: () => k.claude360TokensList(),
+        promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g, 'music')
+      })
+      if (!ready) return
       const result = await submitMusic(k, { addSubmitting, markSubmitted, markFailed }, form)
       if (!result.ok && result.errors) setErrors(result.errors)
     } finally {
       setSubmitting(false)
     }
-  }, [addSubmitting, form, markFailed, markSubmitted, submitting, t])
+  }, [addSubmitting, form, markFailed, markSubmitted, musicGroup, submitting, t])
 
   // 播放：把点击的歌曲 + 其所在列表设为播放队列（支持连续播放 / 上下曲）。
   const playSong = useCallback(
@@ -269,8 +248,6 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar, onOp
 
       <main className="ds-no-drag min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-5">
         <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-4">
-          <MusicFixBanner access={access} onOpenMy={onOpenMy} t={t} />
-
           <div className="flex min-h-0 flex-col gap-4 lg:flex-row">
             <div className="flex w-full flex-col gap-4 lg:max-w-[380px]">
               <MusicCreatePanel

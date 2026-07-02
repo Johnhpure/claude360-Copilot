@@ -53,7 +53,7 @@ export async function fetchUpstreamModelIds(
     })
   }
   if (textModelIds.length === 0) {
-    return { ok: false, message: 'Claude360 暂无可用文本模型，请在“我的”页刷新模型。' }
+    return { ok: false, message: 'Claude360 暂无可用文本模型，请打开 设置 → 分组及 Key 刷新。' }
   }
   const modelIds = sortComposerModelIds(textModelIds)
   const defaultModelId = resolveClaude360DefaultModelId(settings, modelIds)

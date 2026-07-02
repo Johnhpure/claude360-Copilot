@@ -1093,7 +1093,8 @@ export function SettingsView(): ReactElement {
       <SettingsSidebar category={category} setCategory={setCategory} goBack={goBack} t={t} />
 
       <div className="ds-no-drag min-h-0 min-w-0 flex-1 overflow-y-auto px-8 py-10">
-        <div className="mx-auto w-full max-w-[1040px]">
+        {/* 分组及Key（providers）内容密度更高，放宽到 1200px；其余分区维持 1040px。 */}
+        <div className={`mx-auto w-full ${category === 'providers' ? 'max-w-[1200px]' : 'max-w-[1040px]'}`}>
           <div className="mb-8 flex items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-ds-ink">{t('title')}</h1>

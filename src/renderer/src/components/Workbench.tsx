@@ -1349,6 +1349,9 @@ export function Workbench(): ReactElement {
       if (sent) {
         useWriteWorkspaceStore.getState().clearQuotedSelections()
         if (attachments.length > 0) clearComposerAttachments()
+      } else {
+        // 与 SDD 路径先例一致：发送中止（如取消建 Key 弹窗）时恢复草稿。
+        setInput(v)
       }
     })()
   }
@@ -2095,15 +2098,22 @@ export function Workbench(): ReactElement {
       const prepared = await prepareChatMessage()
       if (!prepared) return
       setInput('')
-      clearComposerAttachments()
-      clearComposerFileReferences()
-      void sendPlanTurn(prepared.text, {
-        ...(prepared.displayText ? { displayText: prepared.displayText } : {}),
-        ...(reasoningEffort ? { reasoningEffort } : {}),
-        ...(attachmentIds.length ? { attachmentIds } : {}),
-        ...(publicAttachments.length ? { attachments: publicAttachments } : {}),
-        ...(userFileReferences.length ? { fileReferences: userFileReferences } : {})
-      })
+      void (async () => {
+        const sent = await sendPlanTurn(prepared.text, {
+          ...(prepared.displayText ? { displayText: prepared.displayText } : {}),
+          ...(reasoningEffort ? { reasoningEffort } : {}),
+          ...(attachmentIds.length ? { attachmentIds } : {}),
+          ...(publicAttachments.length ? { attachments: publicAttachments } : {}),
+          ...(userFileReferences.length ? { fileReferences: userFileReferences } : {})
+        })
+        if (sent) {
+          clearComposerAttachments()
+          clearComposerFileReferences()
+        } else {
+          // 与 chat 路径一致：Key 弹窗取消等中止场景恢复草稿。
+          setInput(v)
+        }
+      })()
       return
     }
     if (route === 'write') {
@@ -2203,15 +2213,22 @@ export function Workbench(): ReactElement {
     const prepared = await prepareChatMessage()
     if (!prepared) return
     setInput('')
-    clearComposerAttachments()
-    clearComposerFileReferences()
-    void sendMessage(prepared.text, composerMode === 'plan' ? 'plan' : 'agent', {
-      ...(prepared.displayText ? { displayText: prepared.displayText } : {}),
-      ...(reasoningEffort ? { reasoningEffort } : {}),
-      ...(attachmentIds.length ? { attachmentIds } : {}),
-      ...(publicAttachments.length ? { attachments: publicAttachments } : {}),
-      ...(userFileReferences.length ? { fileReferences: userFileReferences } : {})
-    })
+    void (async () => {
+      const sent = await sendMessage(prepared.text, composerMode === 'plan' ? 'plan' : 'agent', {
+        ...(prepared.displayText ? { displayText: prepared.displayText } : {}),
+        ...(reasoningEffort ? { reasoningEffort } : {}),
+        ...(attachmentIds.length ? { attachmentIds } : {}),
+        ...(publicAttachments.length ? { attachments: publicAttachments } : {}),
+        ...(userFileReferences.length ? { fileReferences: userFileReferences } : {})
+      })
+      if (sent) {
+        clearComposerAttachments()
+        clearComposerFileReferences()
+      } else {
+        // 发送被中止（如用户取消「创建分组 Key」弹窗）：恢复草稿，别让输入蒸发。
+        setInput(v)
+      }
+    })()
   }
 
   const openThread = (id: string): void => {
@@ -2420,7 +2437,7 @@ export function Workbench(): ReactElement {
                 onInterrupt={(options) => void interrupt(options)}
                 onRetryConnection={() => void probeRuntime('user', { restart: true })}
                 onOpenSettings={() => openSettings('agents')}
-                onConfigureProviders={() => setRoute('my')}
+                onConfigureProviders={() => openSettings('providers')}
                 onNewConversation={startNewWriteAssistantConversation}
                 onPickWorkspace={() => void pickWriteAssistantWorkspace()}
                 onCollapse={closeRightPanel}
@@ -2459,7 +2476,7 @@ export function Workbench(): ReactElement {
                 onInterrupt={(options) => void interrupt(options)}
                 onRetryConnection={() => void probeRuntime('user', { restart: true })}
                 onOpenSettings={() => openSettings('agents')}
-                onConfigureProviders={() => setRoute('my')}
+                onConfigureProviders={() => openSettings('providers')}
                 onApplyFramework={applySddFramework}
                 onNewConversation={() => {
                   setInput('')
@@ -2694,12 +2711,11 @@ export function Workbench(): ReactElement {
             <MusicWorkbench
               leftSidebarCollapsed={leftSidebarCollapsed}
               onToggleLeftSidebar={toggleLeftSidebar}
-              onOpenMy={() => setRoute('my')}
             />
           </Suspense>
         ) : route === 'canvas' ? (
           // 生图(canvas)工作台由 plan-06 交付：懒加载 CanvasWorkbench，与 music/my 同款。
-          // 不误进旧 infinite-canvas iframe。修复 / 充值入口经 onOpenMy 跳「我的」页。
+          // 不误进旧 infinite-canvas iframe。低余额充值入口经 onOpenMy 跳「我的」页。
           <Suspense fallback={<div className="h-full bg-ds-main" />}>
             <CanvasWorkbench
               leftSidebarCollapsed={leftSidebarCollapsed}
@@ -2863,7 +2879,7 @@ export function Workbench(): ReactElement {
                 onComposerReasoningEffortChange={
                   route === 'chat' || route === 'claw' ? setComposerReasoningEffort : undefined
                 }
-                onConfigureProviders={() => setRoute('my')}
+                onConfigureProviders={() => openSettings('providers')}
                 onSend={handleSend}
                 attachments={composerAttachments}
                 attachmentUploadEnabled={attachmentUploadEnabled}

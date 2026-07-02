@@ -1,7 +1,7 @@
 // 音乐工作台展示组件的静态渲染测试（Task 6）。
 // 按仓库约定：node 环境、无 jsdom，用 renderToStaticMarkup + 注入 props/mock t。
 // 容器 MusicWorkbench 的副作用（提交/轮询/下载）已在 music-workbench-actions.test.ts 覆盖，
-// 这里只验证「是创作台、有表单/任务列表/播放器、未登录显示去我的页入口、成功歌曲有标题/audioUrl/cover/下载」。
+// 这里只验证「是创作台、有表单/任务列表/播放器、成功歌曲有标题/audioUrl/cover/下载」。
 import { describe, it, expect } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -11,7 +11,6 @@ import { emptyForm } from '../../music/suno-params'
 import { MusicCreatePanel } from './MusicCreatePanel'
 import { MusicTaskList } from './MusicTaskList'
 import { MusicPlayer } from './MusicPlayer'
-import { MusicFixBanner } from './MusicFixBanner'
 import { LyricsAssistantDrawer } from './LyricsAssistantDrawer'
 
 // 直通式 t：返回 key（含插值 title），便于断言文案 key 已接入。
@@ -212,34 +211,6 @@ describe('MusicPlayer · 播放器区', () => {
     expect(html).toContain('music-player-volume')
     expect(html).toContain('musicPrev')
     expect(html).toContain('musicNext')
-  })
-})
-
-describe('MusicFixBanner · 未登录 / 无分组 → 去我的页', () => {
-  it('探测中（null）不渲染', () => {
-    const html = renderToStaticMarkup(createElement(MusicFixBanner, { access: null, onOpenMy: () => undefined, t }))
-    expect(html).toBe('')
-  })
-  it('未登录显示 musicNeedsLogin + 去我的页入口', () => {
-    const html = renderToStaticMarkup(
-      createElement(MusicFixBanner, { access: { loggedIn: false, hasMusicGroup: false }, onOpenMy: () => undefined, t })
-    )
-    expect(html).toContain('music-fix-banner')
-    expect(html).toContain('musicNeedsLogin')
-    expect(html).toContain('musicGoToMy')
-  })
-  it('已登录但无 music 分组显示 musicNeedsGroup', () => {
-    const html = renderToStaticMarkup(
-      createElement(MusicFixBanner, { access: { loggedIn: true, hasMusicGroup: false }, onOpenMy: () => undefined, t })
-    )
-    expect(html).toContain('musicNeedsGroup')
-    expect(html).toContain('musicGoToMy')
-  })
-  it('权限齐全不渲染 banner', () => {
-    const html = renderToStaticMarkup(
-      createElement(MusicFixBanner, { access: { loggedIn: true, hasMusicGroup: true }, onOpenMy: () => undefined, t })
-    )
-    expect(html).toBe('')
   })
 })
 

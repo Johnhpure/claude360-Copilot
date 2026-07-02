@@ -846,11 +846,11 @@ async function superviseKunCrash(info: KunUnexpectedExitInfo): Promise<void> {
   try {
     const settings = await store.load()
     const runtime = getKunRuntimeSettings(settings)
-    if (!resolveConfiguredApiKey(settings) || !runtime.autoStart) {
+    if (!runtime.autoStart) {
       publishRuntimeStatus({
         state: 'stopped',
         source: 'supervisor',
-        message: 'Kun exited and automatic restart is unavailable (missing API key or auto-start disabled).'
+        message: 'Kun exited and automatic restart is unavailable (auto-start disabled).'
       })
       return
     }
@@ -1101,7 +1101,6 @@ async function resolveManagedKunLaunchSettings(
 
 async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1> {
   const runtime = getKunRuntimeSettings(settings)
-  const hasApiKey = Boolean(resolveConfiguredApiKey(settings))
 
   const healthy = await waitForKunHealth(settings, 2_000)
   if (healthy) {
@@ -1113,12 +1112,8 @@ async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1>
     throw runtimeJsonError(threadApi.error, threadApi.message)
   }
 
-  if (!hasApiKey) {
-    throw runtimeJsonError(
-      'missing_api_key',
-      'DeepSeek API Key is required before the GUI can start Kun.'
-    )
-  }
+  // 分组模式：运行时启动不再依赖「全局默认 API Key」。Key 在执行任务时按所选分组
+  // 动态解析/创建；运行时只需起 HTTP/SSE 服务，故无 Key 也应正常启动。
   if (!runtime.autoStart) {
     throw runtimeJsonError(
       'runtime_offline',
@@ -1204,12 +1199,7 @@ async function restartRuntimeOnce(settings: AppSettingsV1): Promise<void> {
   await waitForKunStartupSettled()
   const runtime = getKunRuntimeSettings(settings)
 
-  if (!resolveConfiguredApiKey(settings)) {
-    throw runtimeJsonError(
-      'missing_api_key',
-      'DeepSeek API Key is required before the GUI can start Kun.'
-    )
-  }
+  // 分组模式：无「全局默认 API Key」也允许重启运行时（见 ensureKunRuntime）。
   if (!runtime.autoStart) {
     throw runtimeJsonError(
       'runtime_offline',
@@ -1416,11 +1406,11 @@ async function restartManagedRuntimeForSettingsChange(
 
   await waitForManagedRuntimeReadyBeforeStop(prev, 'settings-apply')
   await adapter.stopAndWait()
-  if (!nextHasApiKey || !runtime.autoStart) {
+  if (!runtime.autoStart) {
     publishRuntimeStatus({
       state: 'stopped',
       source: 'settings-apply',
-      message: 'Kun was stopped: the new settings have no API key or auto-start is disabled.'
+      message: 'Kun was stopped: auto-start is disabled.'
     })
     return
   }
@@ -1465,7 +1455,7 @@ async function rollbackRuntimeSettingsAfterFailedApply(
       message: error instanceof Error ? error.message : String(error)
     })
   }
-  if (!resolveConfiguredApiKey(base) || !getKunRuntimeSettings(base).autoStart) {
+  if (!getKunRuntimeSettings(base).autoStart) {
     publishRuntimeStatus({
       state: 'stopped',
       source: 'settings-apply',
@@ -1512,7 +1502,7 @@ async function restartManagedRuntimeForMcpConfigChange(settings: AppSettingsV1):
   if (!wasRunning) return
   await waitForManagedRuntimeReadyBeforeStop(settings, 'mcp-config')
   await adapter.stopAndWait()
-  if (!resolveConfiguredApiKey(settings) || !runtime.autoStart) return
+  if (!runtime.autoStart) return
 
   publishRuntimeStatus({ state: 'restarting', source: 'mcp-config' })
   try {
@@ -1848,13 +1838,12 @@ app.whenReady().then(async () => {
     console.warn('[kun-gui] prune logs:', err)
   })
 
-  if (resolveConfiguredApiKey(initial)) {
-    setTimeout(() => {
-      void kunRuntimeAdapter.resolveExecutable(initial).catch((err) => {
-        console.warn('[kun-gui] prewarm Kun binary:', err)
-      })
-    }, 1500)
-  }
+  // 分组模式：无「全局默认 API Key」也预热运行时二进制，让首次调用更快。
+  setTimeout(() => {
+    void kunRuntimeAdapter.resolveExecutable(initial).catch((err) => {
+      console.warn('[kun-gui] prewarm Kun binary:', err)
+    })
+  }, 1500)
 
   app.on('second-instance', () => {
     revealMainWindow()

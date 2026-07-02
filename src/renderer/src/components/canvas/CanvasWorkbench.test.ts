@@ -1,7 +1,7 @@
 // CanvasWorkbench 静态渲染测试（plan-06 Task 5）。
 // node 环境：mock react-i18next（t 返回 key）+ 用真实 useCanvasStore（静态渲染不跑 useEffect）。
 // 覆盖：首屏是工具型工作台（非营销 hero）、含 prompt/模型/尺寸/生成按钮、结果区、历史区；
-// CanvasToolbar：无 image Key → 去我的页；低余额 → 去充值。
+// CanvasToolbar：低余额 → 去充值（分组模式下不再有「缺 Key 去我的页」初始化报错）。
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -65,59 +65,18 @@ describe('CanvasWorkbench · 首屏是工具型工作台', () => {
   })
 })
 
-describe('CanvasToolbar · 修复 / 低余额入口', () => {
-  it('探测中（access=null）不渲染修复条', () => {
+describe('CanvasToolbar · 低余额入口', () => {
+  it('低余额显示充值入口', () => {
     const html = renderToStaticMarkup(
-      createElement(CanvasToolbar, { access: null, lowBalance: false, onOpenMy: () => undefined, t })
-    )
-    expect(html).toBe('')
-  })
-  it('未登录显示 canvasNeedsLogin + 去我的页', () => {
-    const html = renderToStaticMarkup(
-      createElement(CanvasToolbar, {
-        access: { loggedIn: false, hasImageGroup: false },
-        lowBalance: false,
-        onOpenMy: () => undefined,
-        t
-      })
-    )
-    expect(html).toContain('canvas-fix-banner')
-    expect(html).toContain('canvasNeedsLogin')
-    expect(html).toContain('canvasGoToMy')
-  })
-  it('已登录但无 image 分组显示 canvasNeedsGroup', () => {
-    const html = renderToStaticMarkup(
-      createElement(CanvasToolbar, {
-        access: { loggedIn: true, hasImageGroup: false },
-        lowBalance: false,
-        onOpenMy: () => undefined,
-        t
-      })
-    )
-    expect(html).toContain('canvasNeedsGroup')
-    expect(html).toContain('canvasGoToMy')
-  })
-  it('权限齐全 + 低余额显示充值入口', () => {
-    const html = renderToStaticMarkup(
-      createElement(CanvasToolbar, {
-        access: { loggedIn: true, hasImageGroup: true },
-        lowBalance: true,
-        onOpenMy: () => undefined,
-        t
-      })
+      createElement(CanvasToolbar, { lowBalance: true, onOpenMy: () => undefined, t })
     )
     expect(html).toContain('canvas-lowbalance-banner')
     expect(html).toContain('canvasLowBalance')
     expect(html).toContain('canvasTopup')
   })
-  it('权限齐全且余额正常不渲染', () => {
+  it('余额正常不渲染', () => {
     const html = renderToStaticMarkup(
-      createElement(CanvasToolbar, {
-        access: { loggedIn: true, hasImageGroup: true },
-        lowBalance: false,
-        onOpenMy: () => undefined,
-        t
-      })
+      createElement(CanvasToolbar, { lowBalance: false, onOpenMy: () => undefined, t })
     )
     expect(html).toBe('')
   })

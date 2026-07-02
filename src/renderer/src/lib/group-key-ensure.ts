@@ -1,9 +1,9 @@
 /**
- * 「选定分组模型 → 确保该分组有可用 API Key」的核心逻辑（Code 与写作共用）。
+ * 「执行任务时 → 确保所选分组有可用 API Key」的核心逻辑（Code/写作/生图/音乐共用）。
  *
  * 移除"供应商"概念后，选模型 = 选分组(claude360:<group>)+模型。运行时按分组的
- * Key 调用；若选了一个还没建过 Key 的分组，profile.apiKeyRef 为空 → 运行时 401。
- * 本模块在"选完模型立即检测"时补上这一环：无 Key 则弹优雅模态询问，确认后建 Key。
+ * Key 调用；若分组还没建过 Key，profile.apiKeyRef 为空 → 401。本模块在「点执行」
+ * 时补上这一环：无 Key 则弹优雅模态询问，确认后自动建 Key 并续跑本次任务。
  *
  * 纯逻辑，所有副作用经 deps 注入，便于单测。
  */
@@ -36,14 +36,21 @@ export type GroupKeyEnsureDeps = {
  * 确保 group 有可用 Key。
  * - group 为 null（非 claude360 分组/未识别）→ 直接放行 true。
  * - 已有该分组 Key → true。
- * - 无 → 弹窗询问；确认建成 → true；取消/失败 → false（调用方据此回退所选模型）。
+ * - 无 → 弹窗询问；确认建成 → true（调用方续跑）；取消/失败 → false（调用方中止本次任务）。
+ * - 检测本身失败（未登录/网络）→ fail-open 放行 true：让请求继续走出去，由运行时/
+ *   服务端返回可见错误；否则任务会被静默吞掉且无任何提示。
  */
 export async function ensureGroupKeyForSelection(
   group: string | null,
   deps: GroupKeyEnsureDeps
 ): Promise<boolean> {
   if (!group) return true
-  const tokens = await deps.listTokens()
+  let tokens: { group: string }[]
+  try {
+    tokens = await deps.listTokens()
+  } catch {
+    return true
+  }
   if (tokens.some((t) => t.group === group)) return true
   return deps.promptCreateAndEnsure(group)
 }
