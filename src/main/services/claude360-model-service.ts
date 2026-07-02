@@ -62,6 +62,22 @@ function extractGroups(resp: unknown): GroupItem[] {
   return Array.isArray(nested) ? (nested as GroupItem[]) : []
 }
 
+function groupSummary(group: Claude360ToolGroupInfo): string {
+  return `${group.name}(recommended=${group.recommended}, ratio=${group.ratio ?? 'n/a'}, desc=${group.desc ?? ''})`
+}
+
+function logGroupsByPurpose(
+  scope: string,
+  groupsByPurpose: Record<Claude360TokenPurpose, Claude360ToolGroupInfo[]>
+): void {
+  console.info(
+    `[kun-gui] Claude360 groups ${scope}: ` +
+      `text=[${groupsByPurpose.text.map(groupSummary).join(', ')}] ` +
+      `image=[${groupsByPurpose.image.map(groupSummary).join(', ')}] ` +
+      `music=[${groupsByPurpose.music.map(groupSummary).join(', ')}]`
+  )
+}
+
 export class Claude360ModelService {
   private readonly deps: Claude360ModelServiceDeps
 
@@ -126,27 +142,51 @@ export class Claude360ModelService {
     return out
   }
 
-  /** 纯拉分组清单（含倍率/描述/推荐），无副作用（不 ensure Key、不写 settings）。供「分组及Key」页。 */
-  async listGroups(): Promise<Record<Claude360TokenPurpose, Claude360ToolGroupInfo[]>> {
-    const token = await this.cliToken()
-    const { groupsByPurpose } = await this.fetchGroupsByPurpose(token)
-    // 「分组及Key」需展示用户**全部**可用分组：额外拉一次不带 tool 的全量清单，
-    // 把未被 codex/image/music 命中的分组补入 text 桶（多为纯文本/通用分组），
-    // 使 all 视图（三桶并集）= 用户全量分组。选默认分组的带 tool 归类不受影响。
-    // 全量补全失败不应拖垮整页：降级为仅展示三桶命中的分组（保证鲁棒性）。
+  /**
+   * 统一拉取 Claude360 分组：先按 tool=codex/image/music 分类，再用不带 tool 的全量
+   * 分组补齐 text 桶。这样设置页与 Code 模型选择器共享同一套分组兜底逻辑。
+   */
+  private async fetchClaude360Groups(token: string): Promise<{
+    groupsByPurpose: Record<Claude360TokenPurpose, Claude360ToolGroupInfo[]>
+    purposeByGroup: Map<string, Claude360TokenPurpose>
+  }> {
+    console.info('[kun-gui] Claude360 groups login=true; fetching tool-scoped groups for code/text,image,music')
+    const { groupsByPurpose, purposeByGroup } = await this.fetchGroupsByPurpose(token)
+    logGroupsByPurpose('tool-scoped', groupsByPurpose)
+
     let all: Claude360ToolGroupInfo[] = []
     try {
       all = await this.fetchAllGroups(token)
-    } catch {
-      all = []
+      console.info(`[kun-gui] Claude360 groups full-list=[${all.map(groupSummary).join(', ')}]`)
+    } catch (error) {
+      console.warn(
+        '[kun-gui] Claude360 groups full-list fetch failed; using tool-scoped groups only:',
+        error instanceof Error ? error.message : String(error)
+      )
     }
+
     const known = new Set<string>()
-    for (const p of ['text', 'image', 'music'] as Claude360TokenPurpose[]) {
-      for (const g of groupsByPurpose[p]) known.add(g.name)
+    for (const purpose of ['text', 'image', 'music'] as Claude360TokenPurpose[]) {
+      for (const group of groupsByPurpose[purpose]) known.add(group.name)
     }
-    for (const g of all) {
-      if (!known.has(g.name)) groupsByPurpose.text.push(g)
+    for (const group of all) {
+      if (known.has(group.name)) continue
+      groupsByPurpose.text.push(group)
+      purposeByGroup.set(group.name, 'text')
+      known.add(group.name)
+      console.info(
+        `[kun-gui] Claude360 groups fallback: group="${group.name}" not returned by tool filters; classify as text/code`
+      )
     }
+    logGroupsByPurpose('merged', groupsByPurpose)
+    return { groupsByPurpose, purposeByGroup }
+  }
+
+  /** 纯拉分组清单（含倍率/描述/推荐），无副作用（不 ensure Key、不写 settings）。供「分组及Key」页。 */
+  async listGroups(): Promise<Record<Claude360TokenPurpose, Claude360ToolGroupInfo[]>> {
+    const token = await this.cliToken()
+    const { groupsByPurpose } = await this.fetchClaude360Groups(token)
+    console.info('[kun-gui] settings groups page receives merged Claude360 groups')
     return groupsByPurpose
   }
 
@@ -172,13 +212,14 @@ export class Claude360ModelService {
   async refreshGroupsAndModels(): Promise<Claude360ModelSyncResult> {
     const token = await this.cliToken()
 
-    // 1) 拉分组（含 recommended/ratio/desc）。
-    const { groupsByPurpose, purposeByGroup } = await this.fetchGroupsByPurpose(token)
+    // 1) 拉分组（含 recommended/ratio/desc）。设置页和 Code picker 共用同一兜底逻辑。
+    const { groupsByPurpose, purposeByGroup } = await this.fetchClaude360Groups(token)
 
     // 2) 每个分组拉模型，标注图片模型。刷新只同步服务端状态，不创建 Key。
     const groupInputs: Claude360GroupModelsInput[] = []
     const allModels: string[] = []
     for (const group of purposeByGroup.keys()) {
+      const purpose = purposeByGroup.get(group)
       const resp = await this.deps.apiClient.get<ModelsResponse>(
         `/api/cli/models?group=${encodeURIComponent(group)}`,
         token
@@ -187,6 +228,10 @@ export class Claude360ModelService {
         .map((m) => (m.id ?? '').trim())
         .filter(Boolean)
         .map((id) => ({ id, isImage: isClaude360ImageModelId(id) }))
+      console.info(
+        `[kun-gui] Claude360 group models feature=code purpose=${purpose ?? 'unknown'} ` +
+          `group="${group}" models=[${models.map((m) => m.id).join(', ')}]`
+      )
       groupInputs.push({ group, models })
       for (const m of models) if (!allModels.includes(m.id)) allModels.push(m.id)
     }

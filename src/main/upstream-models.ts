@@ -28,17 +28,49 @@ export type FetchUpstreamModelsResult =
 export async function fetchUpstreamModelIds(
   settings: AppSettingsV1
 ): Promise<FetchUpstreamModelsResult> {
+  console.info(
+    `[kun-gui] Code model picker feature=code Claude360 loggedIn=${settings.claude360?.loggedIn === true}`
+  )
   if (!settings.claude360?.loggedIn) {
     return { ok: false, message: 'Claude360 未登录，登录后即可选择模型。' }
   }
   const nonTextModelIds = listNonTextModelIds(settings)
+  const nonTextSet = new Set(nonTextModelIds.map((id) => id.trim().toLowerCase()).filter(Boolean))
   const groups: ModelProviderModelGroup[] = []
   const textModelIds: string[] = []
-  for (const provider of getModelProviderSettings(settings).providers) {
+  const providers = getModelProviderSettings(settings).providers
+  console.info(
+    `[kun-gui] Code model picker provider count=${providers.length} ` +
+      `cachedGroups=[${settings.claude360?.modelCache?.groups?.join(', ') ?? ''}] ` +
+      `cachedModels=[${settings.claude360?.modelCache?.models?.join(', ') ?? ''}]`
+  )
+  for (const provider of providers) {
     if (!isClaude360ProviderId(provider.id)) continue
-    const modelIds = provider.models.filter((id) =>
-      isComposerChatModelId(id, nonTextModelIds)
-      && modelProfileSupportsTextChat(modelProviderModelProfile(provider, id))
+    console.info(
+      `[kun-gui] Code model picker group before filter ` +
+        `id="${provider.id}" name="${provider.name}" models=[${provider.models.join(', ')}] ` +
+        `hasApiKeyRef=${Boolean(provider.apiKeyRef?.trim())}`
+    )
+    const modelIds: string[] = []
+    const filtered: string[] = []
+    for (const id of provider.models) {
+      const normalized = id.trim().toLowerCase()
+      const profile = modelProviderModelProfile(provider, id)
+      const reasons: string[] = []
+      if (!isComposerChatModelId(id, nonTextModelIds)) {
+        reasons.push(nonTextSet.has(normalized) ? 'non-text-capability-cache' : 'not-composer-chat-model-id')
+      }
+      if (!modelProfileSupportsTextChat(profile)) reasons.push('profile-not-text-chat')
+      if (reasons.length === 0) {
+        modelIds.push(id)
+      } else {
+        filtered.push(`${id}:${reasons.join('+')}`)
+      }
+    }
+    console.info(
+      `[kun-gui] Code model picker group after filter ` +
+        `id="${provider.id}" name="${provider.name}" kept=[${modelIds.join(', ')}] ` +
+        `filtered=[${filtered.join(', ')}]`
     )
     if (modelIds.length === 0) continue
     for (const id of modelIds) textModelIds.push(id)
@@ -50,11 +82,17 @@ export async function fetchUpstreamModelIds(
     })
   }
   if (textModelIds.length === 0) {
+    console.warn('[kun-gui] Code model picker filtered all Claude360 groups; no text/code models remain')
     return { ok: false, message: 'Claude360 暂无可用文本模型，请打开 设置 → 分组及 Key 刷新。' }
   }
   const modelIds = sortComposerModelIds(textModelIds)
   const defaultModelId = resolveClaude360DefaultModelId(settings, modelIds)
-  return { ok: true, modelIds, defaultModelId, modelGroups: mergeModelGroups(groups) }
+  const modelGroups = mergeModelGroups(groups)
+  console.info(
+    `[kun-gui] Code model picker final groups=${modelGroups.length} ` +
+      `models=[${modelIds.join(', ')}] default="${defaultModelId ?? ''}"`
+  )
+  return { ok: true, modelIds, defaultModelId, modelGroups }
 }
 
 /**

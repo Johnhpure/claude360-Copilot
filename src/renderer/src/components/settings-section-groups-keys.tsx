@@ -61,6 +61,12 @@ const MODEL_CHIP_LIMIT = 10
 // reveal 明文只在 renderer 短暂驻留:60s TTL 后自动清除(与 MyPage 一致)。
 const REVEAL_TTL_MS = 60_000
 
+function summarizeGroupsByPurpose(groupsByPurpose: Record<Claude360TokenPurpose, GroupSummary[]>): string {
+  return (['text', 'image', 'music'] as Claude360TokenPurpose[])
+    .map((purpose) => `${purpose}=[${(groupsByPurpose[purpose] ?? []).map((group) => group.name).join(', ')}]`)
+    .join(' ')
+}
+
 function formatRatio(ratio: number | null | undefined): string {
   if (ratio == null) return '1.0'
   return String(ratio)
@@ -456,6 +462,7 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
         window.kunGui.claude360TokensList()
       ])
       if (abortedRef.current) return
+      console.info(`[kun-gui] settings groups page fetched groups ${summarizeGroupsByPurpose(groupsResult)}`)
       setGroupsByPurpose(groupsResult)
       setTokens(tokensResult)
       clearAllRevealed()
@@ -544,6 +551,7 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
         window.kunGui.claude360TokensList()
       ])
       if (abortedRef.current) return
+      console.info(`[kun-gui] settings groups page refreshed groups ${summarizeGroupsByPurpose(groupsResult)}`)
       setGroupsByPurpose(groupsResult)
       setTokens(tokensResult)
       clearAllRevealed()

@@ -644,6 +644,99 @@ describe('claude360 token/model/billing IPC handlers', () => {
     expect(result).toMatchObject({ ok: true })
   })
 
+  it('upstream:models refreshes Claude360 groups when the logged-in model cache is empty', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    let current: AppSettingsV1 = {
+      ...settings(),
+      claude360: {
+        ...defaultClaude360Settings(),
+        loggedIn: true,
+        cliTokenRef: 'claude360:cli-token',
+        modelCache: { groups: [] as string[], models: [] as string[] }
+      }
+    }
+    const store = { load: vi.fn(async () => current) }
+    const applySettingsPatch = vi.fn(async (patch: AppSettingsPatch) => {
+      current = {
+        ...current,
+        provider: {
+          ...current.provider,
+          ...(patch.provider?.providers ? { providers: patch.provider.providers as AppSettingsV1['provider']['providers'] } : {})
+        },
+        claude360: {
+          ...current.claude360,
+          ...(patch.claude360 ?? {}),
+          modelCache: {
+            ...current.claude360.modelCache,
+            ...(patch.claude360?.modelCache ?? {})
+          }
+        }
+      }
+      return current
+    })
+    const refreshGroupsAndModels = vi.fn(async () => ({
+      modelCache: { groups: ['Codex'], models: ['gpt-5.5'] },
+      providerProfiles: [
+        {
+          id: 'claude360:Codex',
+          name: 'Codex',
+          apiKey: '',
+          baseUrl: 'https://claude360.xyz/v1',
+          endpointFormat: 'chat_completions',
+          models: ['gpt-5.5'],
+          modelProfiles: {
+            'gpt-5.5': {
+              inputModalities: ['text'],
+              outputModalities: ['text'],
+              supportsToolCalling: true,
+              messageParts: ['text']
+            }
+          }
+        }
+      ],
+      groupsByPurpose: { text: [{ name: 'Codex', recommended: true }], image: [], music: [] }
+    }))
+    const fetchUpstreamModels = vi.fn(async () => ({
+      ok: true as const,
+      modelIds: current.claude360.modelCache.models,
+      modelGroups: current.provider.providers
+        .filter((provider) => provider.id.startsWith('claude360'))
+        .map((provider) => ({
+          providerId: provider.id,
+          label: provider.name,
+          modelIds: provider.models
+        }))
+    }))
+
+    registerAppIpcHandlers(
+      registerOptions({
+        store: store as never,
+        applySettingsPatch,
+        fetchUpstreamModels,
+        claude360ModelService: { refreshGroupsAndModels } as never
+      })
+    )
+
+    const handler = handlers.get('upstream:models')
+    const result = await handler?.({})
+
+    expect(refreshGroupsAndModels).toHaveBeenCalled()
+    expect(applySettingsPatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        claude360: expect.objectContaining({
+          modelCache: { groups: ['Codex'], models: ['gpt-5.5'] },
+          selectedTextGroup: 'Codex'
+        })
+      })
+    )
+    expect(fetchUpstreamModels).toHaveBeenCalled()
+    expect(result).toMatchObject({
+      ok: true,
+      modelIds: ['gpt-5.5'],
+      modelGroups: [expect.objectContaining({ label: 'Codex', modelIds: ['gpt-5.5'] })]
+    })
+  })
+
   it('forwards token stats payload to the billing service', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const getTokenStats = vi.fn(async () => [])

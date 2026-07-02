@@ -117,6 +117,46 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
     ])
   })
 
+  it('uses the full group list as text fallback so Code sees Codex when tool=codex is empty', async () => {
+    const service = new Claude360ModelService({
+      apiClient: fakeApi({
+        '/api/cli/groups?tool=codex': () => [],
+        '/api/cli/groups?tool=image': () => [{ name: 'image', recommended: false }],
+        '/api/cli/groups?tool=music': () => [{ name: 'Suno', recommended: false }],
+        '/api/cli/groups': () => [
+          { name: 'Codex', recommended: true, ratio: 1, desc: 'Code 分组' },
+          { name: 'image', recommended: false },
+          { name: 'Suno', recommended: false }
+        ],
+        '/api/cli/models?group=Codex': () => ({ models: [{ id: 'gpt-5.5' }] }),
+        '/api/cli/models?group=image': () => ({ models: [{ id: 'gemini-2.5-flash-image' }] }),
+        '/api/cli/models?group=Suno': () => ({ models: [{ id: 'suno-v4' }] })
+      }),
+      secretStore: fakeSecretStore(),
+      ensureGroupRef: async () => {
+        throw new Error('refresh must not ensure keys')
+      }
+    })
+
+    const result = await service.refreshGroupsAndModels()
+
+    expect(result.groupsByPurpose.text).toEqual([
+      { name: 'Codex', recommended: true, ratio: 1, desc: 'Code 分组' }
+    ])
+    expect(result.modelCache.groups).toEqual(expect.arrayContaining(['Codex']))
+    expect(result.modelCache.models).toContain('gpt-5.5')
+    expect(result.providerProfiles).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'claude360:Codex',
+          name: 'Codex',
+          apiKey: '',
+          models: ['gpt-5.5']
+        })
+      ])
+    )
+  })
+
   it('throws when not logged in', async () => {
     const service = new Claude360ModelService({
       apiClient: fakeApi({}),

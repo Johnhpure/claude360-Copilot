@@ -457,6 +457,54 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
   const workspaceFileWatchers = new Map<string, WorkspaceFileWatchRecord>()
 
+  const shouldRefreshClaude360ModelsForCode = (settings: AppSettingsV1): boolean => {
+    if (!settings.claude360?.loggedIn) return false
+    const providers = (settings.provider?.providers as ModelProviderProfileV1[] | undefined) ?? []
+    const hasClaude360Provider = providers.some((provider) => isClaude360ProviderId(provider.id))
+    const hasCachedGroups = (settings.claude360.modelCache?.groups ?? []).length > 0
+    const hasCachedModels = (settings.claude360.modelCache?.models ?? []).length > 0
+    return !hasClaude360Provider || !hasCachedGroups || !hasCachedModels
+  }
+
+  const syncClaude360ModelSettings = async (reason: string) => {
+    console.info(`[kun-gui] Claude360 model sync start reason=${reason}`)
+    const result = await claude360ModelService.refreshGroupsAndModels()
+    const loaded = await store.load()
+    // 架构收口：只替换 Claude360 自动生成 provider，保留用户/迁移遗留的自定义 provider。
+    const mergedProviders = mergeClaude360ProviderProfiles(
+      (loaded.provider?.providers as ModelProviderProfileV1[] | undefined) ?? [],
+      result.providerProfiles
+    )
+    // 分组持久化：登录/刷新后据后端分组清单为 text/image/music 各选定默认分组，
+    // 保留仍有效的用户选择；否则用 recommended；否则第一个可用；无分组则保持空。
+    const selectedTextGroup = resolveClaude360SelectedGroup(
+      loaded.claude360.selectedTextGroup,
+      result.groupsByPurpose.text
+    )
+    const selectedImageGroup = resolveClaude360SelectedGroup(
+      loaded.claude360.selectedImageGroup,
+      result.groupsByPurpose.image
+    )
+    const selectedMusicGroup = resolveClaude360SelectedGroup(
+      loaded.claude360.selectedMusicGroup,
+      result.groupsByPurpose.music
+    )
+    await applySettingsPatch({
+      provider: { providers: mergedProviders },
+      claude360: {
+        modelCache: result.modelCache,
+        selectedTextGroup,
+        selectedImageGroup,
+        selectedMusicGroup
+      }
+    })
+    console.info(
+      `[kun-gui] Claude360 model sync done reason=${reason} ` +
+        `groups=[${result.modelCache.groups.join(', ')}] models=[${result.modelCache.models.join(', ')}]`
+    )
+    return result
+  }
+
   const disposeWorkspaceFileWatch = (watchId: string): boolean => {
     const record = workspaceFileWatchers.get(watchId)
     if (!record) return false
@@ -703,36 +751,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     return { models: await claude360ModelService.listModelsByGroup(req.group) }
   })
   ipcMain.handle('claude360:models:refresh', async () => {
-    const result = await claude360ModelService.refreshGroupsAndModels()
-    const loaded = await store.load()
-    // 架构收口：只替换 Claude360 自动生成 provider，保留用户/迁移遗留的自定义 provider。
-    const mergedProviders = mergeClaude360ProviderProfiles(
-      (loaded.provider?.providers as ModelProviderProfileV1[] | undefined) ?? [],
-      result.providerProfiles
-    )
-    // 分组持久化：登录/刷新后据后端分组清单为 text/image/music 各选定默认分组，
-    // 保留仍有效的用户选择；否则用 recommended；否则第一个可用；无分组则保持空。
-    const selectedTextGroup = resolveClaude360SelectedGroup(
-      loaded.claude360.selectedTextGroup,
-      result.groupsByPurpose.text
-    )
-    const selectedImageGroup = resolveClaude360SelectedGroup(
-      loaded.claude360.selectedImageGroup,
-      result.groupsByPurpose.image
-    )
-    const selectedMusicGroup = resolveClaude360SelectedGroup(
-      loaded.claude360.selectedMusicGroup,
-      result.groupsByPurpose.music
-    )
-    await applySettingsPatch({
-      provider: { providers: mergedProviders },
-      claude360: {
-        modelCache: result.modelCache,
-        selectedTextGroup,
-        selectedImageGroup,
-        selectedMusicGroup
-      }
-    })
+    const result = await syncClaude360ModelSettings('manual-refresh')
     return { ok: true as const, modelCache: result.modelCache }
   })
   ipcMain.handle('claude360:models:list', async () => (await store.load()).claude360.modelCache)
@@ -810,7 +829,24 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
 
   ipcMain.handle('runtime:restart', async () => restartRuntime())
 
-  ipcMain.handle('upstream:models', async () => fetchUpstreamModels())
+  ipcMain.handle('upstream:models', async () => {
+    const loaded = await store.load()
+    if (shouldRefreshClaude360ModelsForCode(loaded)) {
+      console.info(
+        `[kun-gui] Code model picker auto-refresh Claude360 groups ` +
+          `cachedGroups=[${loaded.claude360.modelCache.groups.join(', ')}] ` +
+          `cachedModels=[${loaded.claude360.modelCache.models.join(', ')}]`
+      )
+      try {
+        await syncClaude360ModelSettings('code-picker-empty-cache')
+      } catch (error) {
+        logError('claude360-models', 'Failed to refresh Claude360 models for Code picker', {
+          message: error instanceof Error ? error.message : String(error)
+        })
+      }
+    }
+    return fetchUpstreamModels()
+  })
 
   ipcMain.handle('claw:status', async (): Promise<ClawRuntimeStatus> =>
     getClawRuntime()?.status() ?? {

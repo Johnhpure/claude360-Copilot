@@ -141,6 +141,14 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
         const res = await window.kunGui.fetchUpstreamModels()
         const pick = mergeComposerPickList(res.ok, res.ok ? res.modelIds : [])
         const groups = res.ok ? res.modelGroups ?? [] : []
+        console.info(
+          `[kun-gui] Code page model groups fetched ok=${res.ok} feature=code ` +
+            `groups=[${groups.map((group) => `${group.providerId}/${group.label}:${group.modelIds.join('|')}`).join(', ')}] ` +
+            `models=[${res.ok ? res.modelIds.join(', ') : ''}]`
+        )
+        if (res.ok && groups.length === 0) {
+          console.warn('[kun-gui] Code page model groups empty after upstream fetch; picker will show no Claude360 groups')
+        }
         const runtimeDefault = res.ok ? res.defaultModelId?.trim() ?? '' : ''
         set((state) => {
           const isSelectable = (model: string): boolean => composerModelSelectable(pick, groups, model)

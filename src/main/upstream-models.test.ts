@@ -16,7 +16,7 @@ import { fetchUpstreamModelIds } from './upstream-models'
 
 // Claude360 收口后，composer 模型列表只来自登录后自动生成的 `claude360:*`
 // provider profile 与 modelCache，不再回落到 Kun/DeepSeek 默认模型。
-function settings(options: { loggedIn?: boolean; runtimeModel?: string } = {}): AppSettingsV1 {
+function settings(options: { loggedIn?: boolean; runtimeModel?: string; providers?: AppSettingsV1['provider']['providers'] } = {}): AppSettingsV1 {
   const provider = defaultModelProviderSettings()
   const claude360Providers = buildClaude360ProviderProfiles(
     [
@@ -40,7 +40,7 @@ function settings(options: { loggedIn?: boolean; runtimeModel?: string } = {}): 
     theme: 'system',
     uiFontScale: 0.82,
     chatContentMaxWidthPx: 896,
-    provider: { ...provider, providers: claude360Providers },
+    provider: { ...provider, providers: options.providers ?? claude360Providers },
     agents: {
       kun: {
         ...defaultKunRuntimeSettings(),
@@ -130,6 +130,27 @@ describe('upstream model picker list (Claude360 source)', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.message).toBeTruthy()
+    }
+  })
+
+  it('keeps Codex available for Code even when provider has no apiKeyRef', async () => {
+    const codexProvider = buildClaude360ProviderProfiles(
+      [{ group: 'Codex', models: [{ id: 'gpt-5.5', supportsToolCalling: true }] }],
+      {}
+    )
+
+    const result = await fetchUpstreamModelIds(settings({ providers: codexProvider, runtimeModel: '' }))
+
+    expect(result).toMatchObject({ ok: true })
+    if (result.ok) {
+      expect(result.modelIds).toContain('gpt-5.5')
+      expect(result.modelGroups).toEqual([
+        expect.objectContaining({
+          providerId: 'claude360-codex',
+          label: 'Codex',
+          modelIds: ['gpt-5.5']
+        })
+      ])
     }
   })
 })
