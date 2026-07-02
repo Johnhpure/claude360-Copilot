@@ -131,6 +131,25 @@ describe('Claude360CanvasService.generateImages', () => {
     })
   })
 
+  it('未选择生图分组：返回可展示错误，引导到 设置 → 分组及 Key（不再指向「我的」页）', async () => {
+    const ensureGroupKey = vi.fn(async (group: string) => `key-${group}`)
+    const service = new Claude360CanvasService(
+      makeDeps({
+        readClaude360: async () => settingsWithImageGroup(''),
+        ensureGroupKey
+      })
+    )
+
+    const result = await service.generateImages(generatePayload)
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toContain('设置 → 分组及 Key')
+      expect(result.message).not.toContain('我的')
+    }
+    expect(ensureGroupKey).not.toHaveBeenCalled()
+  })
+
   it('把 quality / output_format 透传进请求 body（白名单显式加入）', async () => {
     const calls: Array<{ path: string; body: unknown; token: string | undefined }> = []
     const service = new Claude360CanvasService(

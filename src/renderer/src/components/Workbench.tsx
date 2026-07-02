@@ -2601,6 +2601,8 @@ export function Workbench(): ReactElement {
                   connectPhoneSidebarOpen={connectPhoneSidebarOpen}
                   onCodeOpen={openCodeMode}
                   onWriteOpen={openWriteMode}
+                  onOpenCanvas={() => setRoute('canvas')}
+                  onOpenMusic={() => setRoute('music')}
                   onOpenSettings={(section) => openSettings(section)}
                   onToggleConnectPhone={toggleConnectPhone}
                 />

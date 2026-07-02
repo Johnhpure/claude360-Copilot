@@ -308,7 +308,7 @@
   "groupsKeysDeleteConfirmDetail": "This cannot be undone. Calls using this key stop working immediately.",
   "groupsKeysDeleteConfirmAction": "Delete",
   "modelProviderAdd": "Add provider",
-  "modelProviderManagedNotice": "Providers are provisioned by your Claude360 plan. Sign in on the My page to manage them.",
+  "modelProviderManagedNotice": "Groups are provisioned by your Claude360 plan. Sign in and manage them under Settings → Groups & Keys.",
   "modelProviderAddMenuCustom": "Custom provider…",
   "modelProviderRemove": "Remove provider",
   "modelProviderNewName": "Custom provider {{index}}",

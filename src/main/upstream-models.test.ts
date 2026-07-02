@@ -81,7 +81,7 @@ describe('upstream model picker list (Claude360 source)', () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
     try {
-      const result = await fetchUpstreamModelIds(settings(), '')
+      const result = await fetchUpstreamModelIds(settings())
 
       expect(result).toMatchObject({ ok: true })
       if (result.ok) {
@@ -110,7 +110,7 @@ describe('upstream model picker list (Claude360 source)', () => {
   })
 
   it('uses the runtime model as defaultModelId when it is a known Claude360 text model', async () => {
-    const result = await fetchUpstreamModelIds(settings({ runtimeModel: 'gpt-5-codex' }), '')
+    const result = await fetchUpstreamModelIds(settings({ runtimeModel: 'gpt-5-codex' }))
     expect(result).toMatchObject({ ok: true })
     if (result.ok) {
       expect(result.defaultModelId).toBe('gpt-5-codex')
@@ -118,7 +118,7 @@ describe('upstream model picker list (Claude360 source)', () => {
   })
 
   it('falls back to the first cached text model when the runtime model is unknown', async () => {
-    const result = await fetchUpstreamModelIds(settings({ runtimeModel: 'no-such-model' }), '')
+    const result = await fetchUpstreamModelIds(settings({ runtimeModel: 'no-such-model' }))
     expect(result).toMatchObject({ ok: true })
     if (result.ok) {
       expect(result.defaultModelId).toBe('claude-sonnet-4-6')
@@ -126,7 +126,7 @@ describe('upstream model picker list (Claude360 source)', () => {
   })
 
   it('returns an explicit error and no fallback models when Claude360 is not logged in', async () => {
-    const result = await fetchUpstreamModelIds(settings({ loggedIn: false }), '')
+    const result = await fetchUpstreamModelIds(settings({ loggedIn: false }))
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.message).toBeTruthy()

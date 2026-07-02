@@ -224,14 +224,6 @@ export type ModelProviderModelGroup = {
   modelIds: string[]
   modelProfiles?: Record<string, ModelProviderModelProfileV1>
 }
-export type ModelProviderProbeRequest = {
-  baseUrl: string
-  apiKey: string
-  endpointFormat: ModelEndpointFormat
-}
-export type ModelProviderProbeResult =
-  | { ok: true; latencyMs: number; modelIds: string[] }
-  | { ok: false; message: string }
 export type ClawImInstallQrResult =
   | { ok: true; url: string; deviceCode: string; userCode: string; interval: number; expireIn: number }
   | { ok: false; message: string }
@@ -355,7 +347,6 @@ export type KunGuiApi = {
   runtimeRequest: (path: string, method?: string, body?: string) => Promise<RuntimeRequestResult>
   restartRuntime: () => Promise<void>
   fetchUpstreamModels: () => Promise<UpstreamModelsResult>
-  probeModelProvider: (payload: ModelProviderProbeRequest) => Promise<ModelProviderProbeResult>
   getClawStatus: () => Promise<ClawRuntimeStatus>
   runClawTask: (taskId: string) => Promise<ClawRunResult>
   getScheduleStatus: () => Promise<ScheduleRuntimeStatus>

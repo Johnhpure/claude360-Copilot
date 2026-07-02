@@ -109,6 +109,25 @@ describe('Claude360MusicService.submitMusic', () => {
     expect(calls[0]).toMatchObject({ path: '/suno/submit/music', token: 'key-music-vip' })
   })
 
+  it('未选择音乐分组：返回可展示错误，引导到 设置 → 分组及 Key（不再指向「我的」页）', async () => {
+    const ensureGroupKey = vi.fn(async (group: string) => `key-${group}`)
+    const service = new Claude360MusicService(
+      makeDeps({
+        readClaude360: async () => settingsWithMusicGroup(''),
+        ensureGroupKey
+      })
+    )
+
+    const result = await service.submitMusic(samplePayload)
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toContain('设置 → 分组及 Key')
+      expect(result.message).not.toContain('我的')
+    }
+    expect(ensureGroupKey).not.toHaveBeenCalled()
+  })
+
   it('不把 API Key 返回 renderer（结果对象里不含明文 Key）', async () => {
     const service = new Claude360MusicService(
       makeDeps({

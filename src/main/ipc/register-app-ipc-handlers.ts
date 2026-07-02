@@ -51,7 +51,6 @@ import {
   logErrorPayloadSchema,
   notificationPayloadSchema,
   openEditorPathPayloadSchema,
-  providerProbePayloadSchema,
   rootPathSchema,
   worktreeCommitSchema,
   worktreeContinueMergeSchema,
@@ -126,13 +125,13 @@ import {
   startAgentSdkInstall
 } from '../agent-sdk-installer'
 import type { JsonSettingsStore } from '../settings-store'
-import { probeModelProvider } from '../provider-connection'
 import {
   isClaude360ProviderId,
   mergeClaude360ProviderProfiles,
   resolveClaude360SelectedGroup
 } from '../../shared/app-settings-provider'
 import type { ModelProviderProfileV1 } from '../../shared/app-settings-types'
+import { sameClaude360Group } from '../../shared/claude360'
 import type { ClawRuntime } from '../claw-runtime'
 import type { ScheduleRuntime } from '../schedule-runtime'
 import { verifyTelegramBotToken } from '../telegram-runtime'
@@ -624,20 +623,49 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('claude360:tokens:list', async () => claude360TokenService.listTokens())
   ipcMain.handle('claude360:tokens:ensure', async (_, payload: unknown) => {
     const req = parseIpcPayload('claude360:tokens:ensure', claude360EnsureTokenPayloadSchema, payload)
-    const ref = await claude360TokenService.ensureGroupToken(req.group, req.purpose)
+    // 权威化分组名：renderer 传来的 group 多半反解自 provider profile id，而 id 归一化
+    // 会把分组名 lowercase（"Codex"→"claude360-codex"→反解"codex"）；服务端 token.group
+    // 与 profile.name 保留原始大小写。以 profile.name（buildClaude360ProviderProfiles
+    // 写入的原始分组 id）为权威形态创建/查重/回填，避免为已有 Key 的分组重复建 Key、
+    // 或建成后回填不中导致弹窗反复出现。
+    const loaded = await store.load()
+    const preProviders = (loaded.provider?.providers as ModelProviderProfileV1[] | undefined) ?? []
+    const authoritativeGroup =
+      preProviders.find((p) => isClaude360ProviderId(p.id) && sameClaude360Group(p.name, req.group))
+        ?.name ?? req.group
+    if (authoritativeGroup === req.group && preProviders.length === 0) {
+      console.warn(
+        `[kun-gui] tokens:ensure: providers 为空，无法权威化分组名，按 renderer 原样使用 "${req.group}"`
+      )
+    }
+    console.info(
+      `[kun-gui] tokens:ensure group="${req.group}" → authoritative="${authoritativeGroup}" purpose=${req.purpose}`
+    )
+    const ref = await claude360TokenService.ensureGroupToken(authoritativeGroup, req.purpose)
     // 回填对应 claude360:<group> profile 的 apiKeyRef，令运行时（kun-process）能据
     // runtime.providerId 解出该分组 Key；否则新分组 profile 无 ref → 运行时空 Key → 401。
-    const loaded = await store.load()
-    const providers = (loaded.provider?.providers as ModelProviderProfileV1[] | undefined) ?? []
+    // 注意：ensure 跨多次网络往返，期间 providers 可能被并发写（另一分组的 ensure、
+    // models:refresh 落盘）；provider.providers 是整表替换合并，必须在回填前重新 load
+    // 最新快照，否则会把并发写入静默回滚（如回滚掉别的分组刚回填的 apiKeyRef）。
+    const fresh = await store.load()
+    const providers = (fresh.provider?.providers as ModelProviderProfileV1[] | undefined) ?? []
     const apiKeyRef = claude360ApiKeyRef(ref.tokenId)
     let changed = false
     const updated = providers.map((p) => {
-      if (isClaude360ProviderId(p.id) && p.name === req.group && p.apiKeyRef !== apiKeyRef) {
+      if (
+        isClaude360ProviderId(p.id) &&
+        sameClaude360Group(p.name, authoritativeGroup) &&
+        p.apiKeyRef !== apiKeyRef
+      ) {
         changed = true
         return { ...p, apiKey: '', apiKeyRef }
       }
       return p
     })
+    console.info(
+      `[kun-gui] tokens:ensure group="${authoritativeGroup}" → token #${ref.tokenId}(group="${ref.group}") ` +
+        (changed ? 'apiKeyRef 已回填，重启运行时' : 'profile ref 无变化')
+    )
     if (changed) {
       await applySettingsPatch({ provider: { providers: updated } })
       // 关键：kun 子进程的 provider Key 在 spawn 时一次性烘焙进子进程 config，运行中
@@ -783,11 +811,6 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('runtime:restart', async () => restartRuntime())
 
   ipcMain.handle('upstream:models', async () => fetchUpstreamModels())
-
-  ipcMain.handle('provider:probe', async (_, payload: unknown) => {
-    const request = parseIpcPayload('provider:probe', providerProbePayloadSchema, payload)
-    return probeModelProvider(request, await store.load())
-  })
 
   ipcMain.handle('claw:status', async (): Promise<ClawRuntimeStatus> =>
     getClawRuntime()?.status() ?? {

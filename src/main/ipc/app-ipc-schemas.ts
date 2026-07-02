@@ -120,14 +120,6 @@ export const legacySessionImportPayloadSchema = z
   })
   .strict()
 
-export const providerProbePayloadSchema = z
-  .object({
-    baseUrl: trimmedString(MAX_URL_LENGTH),
-    apiKey: z.string().max(8_192),
-    endpointFormat: z.enum(MODEL_ENDPOINT_FORMATS)
-  })
-  .strict()
-
 interface EndpointTemplate {
   /** Compiled path matcher. */
   match(path: string): boolean

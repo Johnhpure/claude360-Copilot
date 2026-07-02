@@ -180,6 +180,85 @@ describe('Claude360TokenService', () => {
     expect(await secretStore.loadSecret('claude360:api-key:12')).toBe('sk-new')
   })
 
+  it('reuses an existing server-side key case-insensitively, including manually created ones (no duplicate create)', async () => {
+    // 场景（线上真实 bug）：分组 "Codex" 已有用户手动创建的 Key，但 renderer 反解出的
+    // 分组名是小写 "codex"。必须复用已有 Key，绝不再建新 Key。
+    const port = settingsPort()
+    const secretStore = fakeSecretStore(CLI)
+    const service = new Claude360TokenService({
+      apiClient: fakeApi({
+        '/api/cli/tokens': (body) => {
+          if (body) throw new Error('不应创建新 token：Codex 分组已有可用 Key')
+          return { items: [{ id: 11, name: '我的手动Key', masked_key: 'sk-***11', group: 'Codex' }] }
+        },
+        '/api/cli/tokens/11/reveal': () => ({ key: 'sk-manual-11' })
+      }),
+      secretStore,
+      readClaude360: port.readClaude360,
+      writeClaude360: port.writeClaude360
+    })
+    const ref = await service.ensureGroupToken('codex', 'text')
+    expect(ref).toMatchObject({ tokenId: 11, group: 'Codex' })
+    expect(await secretStore.loadSecret('claude360:api-key:11')).toBe('sk-manual-11')
+    // scopedKey 用归一化小写分组名。
+    expect(port.current().tokenRefs['text:codex']?.tokenId).toBe(11)
+  })
+
+  it('prefers the app-created prefixed key over manual keys within the same group', async () => {
+    const port = settingsPort()
+    const service = new Claude360TokenService({
+      apiClient: fakeApi({
+        '/api/cli/tokens': () => ({
+          items: [
+            { id: 21, name: '手动Key', group: 'Codex' },
+            { id: 22, name: 'Claude360 Copilot / text', group: 'Codex' }
+          ]
+        }),
+        '/api/cli/tokens/22/reveal': () => ({ key: 'sk-app-22' })
+      }),
+      secretStore: fakeSecretStore(CLI),
+      readClaude360: port.readClaude360,
+      writeClaude360: port.writeClaude360
+    })
+    const ref = await service.ensureGroupToken('Codex', 'text')
+    expect(ref.tokenId).toBe(22)
+  })
+
+  it('ignores disabled keys when deduplicating and creates a fresh one', async () => {
+    const port = settingsPort()
+    const service = new Claude360TokenService({
+      apiClient: fakeApi({
+        '/api/cli/tokens': (body) =>
+          body
+            ? { id: 31, name: 'Claude360 Copilot / text', key: 'sk-31', group: 'Codex' }
+            : { items: [{ id: 30, name: '禁用Key', group: 'Codex', status: 2 }] }
+      }),
+      secretStore: fakeSecretStore(CLI),
+      readClaude360: port.readClaude360,
+      writeClaude360: port.writeClaude360
+    })
+    const ref = await service.ensureGroupToken('Codex', 'text')
+    expect(ref.tokenId).toBe(31)
+  })
+
+  it('finds a scoped ref stored under a legacy original-case key (case-insensitive fallback)', async () => {
+    // 历史数据键为原样大小写 'text:Codex'；新请求用小写分组也必须命中并固化到归一键。
+    const calls: string[] = []
+    const port = settingsPort({
+      tokenRefs: { 'text:Codex': { tokenId: 41, name: 'Claude360 Copilot / text', group: 'Codex' } }
+    })
+    const service = new Claude360TokenService({
+      apiClient: fakeApi({}, calls),
+      secretStore: fakeSecretStore({ ...CLI, 'claude360:api-key:41': 'sk-41' }),
+      readClaude360: port.readClaude360,
+      writeClaude360: port.writeClaude360
+    })
+    const ref = await service.ensureGroupToken('codex', 'text')
+    expect(ref.tokenId).toBe(41)
+    expect(calls).toHaveLength(0) // 本地 ref+secret 命中，无任何网络请求
+    expect(port.current().tokenRefs['text:codex']?.tokenId).toBe(41)
+  })
+
   it('does not reuse a ref across different groups sharing the same purpose', async () => {
     // 场景：已存在 auto/text 的 legacy ref；请求 vip/text 时不得复用 tokenId 1，
     // 必须为 vip 分组单独查列表/建 token，避免 vip provider 指向 auto 的 Key。

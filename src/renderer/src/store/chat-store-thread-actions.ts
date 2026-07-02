@@ -612,10 +612,18 @@ export function createThreadActions(
       overrides?.queued?.providerId ?? overrides?.providerId?.trim() ?? fallbackComposerProviderIdForSend(get())
     const groupForKey = groupNameFromProviderId(sendProviderId)
     if (groupForKey && typeof window.kunGui?.claude360TokensList === 'function') {
-      const keyReady = await ensureGroupKeyForSelection(groupForKey, {
-        listTokens: () => window.kunGui.claude360TokensList(),
-        promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g)
-      })
+      const keyReady = await ensureGroupKeyForSelection(
+        groupForKey,
+        {
+          listTokens: () => window.kunGui.claude360TokensList(),
+          promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g)
+        },
+        {
+          feature: get().route === 'write' ? '写作' : 'Code',
+          model: overrides?.queued?.model ?? overrides?.model?.trim() ?? get().composerModel.trim(),
+          providerId: sendProviderId
+        }
+      )
       if (!keyReady) return false
     }
     const p = getProvider()

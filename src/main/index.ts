@@ -34,6 +34,7 @@ import {
   kunSettingsEnvelope,
   getActiveAgentApiKey,
   getKunRuntimeSettings,
+  getModelProviderProfile,
   mergeKunRuntimeSettings,
   mergeClawSettings,
   mergeWorkflowSettings,
@@ -181,6 +182,16 @@ function resolveConfiguredApiKey(settings: AppSettingsV1): string {
   const fromSettings = getActiveAgentApiKey(settings)
   const fromEnv = process.env.DEEPSEEK_API_KEY?.trim() ?? ''
   return fromSettings || fromEnv
+}
+
+// #329 保护的「配置了可用 Key」判定：分组模式下 provider 的 Key 以 apiKeyRef
+// 存 secret-store、明文 apiKey 恒空，判定必须同时认 ref；否则该保护在
+// Claude360 分组模式下恒判「无 Key」而失效/误判。
+function settingsHaveResolvableApiKey(settings: AppSettingsV1): boolean {
+  if (resolveConfiguredApiKey(settings)) return true
+  const providerId = getKunRuntimeSettings(settings).providerId?.trim()
+  if (!providerId) return false
+  return Boolean(getModelProviderProfile(settings, providerId).apiKeyRef?.trim())
 }
 
 function runtimeJsonError(code: string, message: string): Error {
@@ -1395,8 +1406,8 @@ async function restartManagedRuntimeForSettingsChange(
   // key, don't kill it on the strength of a key check the new settings fail —
   // leave it running on its current config; the next save with a resolvable
   // key restarts cleanly.
-  const nextHasApiKey = Boolean(resolveConfiguredApiKey(next))
-  if (!nextHasApiKey && Boolean(resolveConfiguredApiKey(prev))) {
+  const nextHasApiKey = settingsHaveResolvableApiKey(next)
+  if (!nextHasApiKey && settingsHaveResolvableApiKey(prev)) {
     logWarn(
       'settings-apply',
       'Skipping Kun restart: the new settings resolve to no API key but the running runtime had one — leaving the healthy runtime in place.'
@@ -1701,8 +1712,7 @@ app.whenReady().then(async () => {
 
   const fetchModels = async () => {
     const settings = await store.load()
-    const key = resolveConfiguredApiKey(settings)
-    return fetchUpstreamModelIds(settings, key)
+    return fetchUpstreamModelIds(settings)
   }
 
   const saveSettingsPatch = async (partial: AppSettingsPatch): Promise<AppSettingsV1> => {

@@ -155,10 +155,14 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
     try {
       // 执行时按所选 music 分组确保有 Key：无则弹「需要创建分组 Key」模态，用户确认→
       // 自动创建 Key→续跑本次生成；取消/失败→静默中止（不留报错横幅）。
-      const ready = await ensureGroupKeyForSelection(musicGroup.trim() || null, {
-        listTokens: () => k.claude360TokensList(),
-        promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g, 'music')
-      })
+      const ready = await ensureGroupKeyForSelection(
+        musicGroup.trim() || null,
+        {
+          listTokens: () => k.claude360TokensList(),
+          promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g, 'music')
+        },
+        { feature: '音乐', model: form.model }
+      )
       if (!ready) return
       const result = await submitMusic(k, { addSubmitting, markSubmitted, markFailed }, form)
       if (!result.ok && result.errors) setErrors(result.errors)

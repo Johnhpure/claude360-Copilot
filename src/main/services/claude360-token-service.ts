@@ -10,6 +10,7 @@ import type {
   Claude360TokenListResponse,
   Claude360TokenPurpose
 } from '../../shared/claude360'
+import { normalizeClaude360GroupKey, sameClaude360Group } from '../../shared/claude360'
 import { Claude360ApiError } from './claude360-api-client'
 import { CLAUDE360_CLI_TOKEN_REF, claude360ApiKeyRef, type Claude360SecretStore } from './claude360-secret-store'
 
@@ -39,10 +40,33 @@ export const CLAUDE360_TOKEN_NAME_PREFIX = 'Claude360 Copilot'
 /**
  * tokenRefs 存储键：按 `purpose + group` 双维度隔离，避免同一 purpose 下
  * 不同分组（如 auto/text 与 vip/text）互相覆盖、复用到错误分组的 API Key。
+ * group 段统一归一化（小写），避免 "Codex"/"codex" 两种来源写出两个键；
+ * 历史原样大小写的键由 findScopedTokenRef 做不敏感兜底读取。
  * 旧数据用扁平 purpose 作键（legacy），读取时单独兜底并做 group 校验。
  */
 export function claude360TokenRefKey(purpose: Claude360TokenPurpose, group: string): string {
-  return `${purpose}:${group}`
+  return `${purpose}:${normalizeClaude360GroupKey(group)}`
+}
+
+/**
+ * 在 tokenRefs 里按 purpose+group 查 ref：先精确命中归一化键，再对历史键
+ * （可能保留原始大小写）做大小写不敏感兜底；条目自身的 group 也须同组才可信。
+ */
+function findScopedTokenRef(
+  tokenRefs: Record<string, Claude360TokenRef>,
+  purpose: Claude360TokenPurpose,
+  group: string
+): Claude360TokenRef | undefined {
+  const exact = tokenRefs[claude360TokenRefKey(purpose, group)]
+  if (exact) return exact
+  const prefix = `${purpose}:`
+  for (const [key, ref] of Object.entries(tokenRefs)) {
+    if (!key.startsWith(prefix)) continue
+    if (sameClaude360Group(key.slice(prefix.length), group) && sameClaude360Group(ref.group, group)) {
+      return ref
+    }
+  }
+  return undefined
 }
 
 function mapTokenItem(item: Claude360TokenListResponse['items'][number]): Claude360TokenListItem {
@@ -115,7 +139,8 @@ export class Claude360TokenService {
   /** 确保某用途有可用的分组 Key：已存且 secret 可读则复用；secret 缺失则 reveal；都没有则创建。 */
   async ensureGroupToken(group: string, purpose: Claude360TokenPurpose): Promise<Claude360TokenRef> {
     // in-flight 去重：同一 group|purpose 并发调用共用同一 Promise，避免重复建 token。
-    const key = `${group}|${purpose}`
+    // 键用归一化分组名，"Codex"/"codex" 两种来源的并发也能合并。
+    const key = `${normalizeClaude360GroupKey(group)}|${purpose}`
     const pending = this.ensureInflight.get(key)
     if (pending) return pending
     const task = this.ensureGroupTokenUncached(group, purpose).finally(() => {
@@ -131,16 +156,19 @@ export class Claude360TokenService {
   ): Promise<Claude360TokenRef> {
     const settings = await this.deps.readClaude360()
     const scopedKey = claude360TokenRefKey(purpose, group)
-    // 读取顺序：优先 group-scoped ref；否则回退 legacy 扁平 tokenRefs[purpose]，
-    // 但仅当其 group 与请求 group 一致才允许复用（否则可能把 A 组 Key 用到 B 组）。
-    const scoped = settings.tokenRefs[scopedKey]
+    // 读取顺序：优先 group-scoped ref（含历史大小写键兜底）；否则回退 legacy 扁平
+    // tokenRefs[purpose]，但仅当其 group 与请求同组才允许复用（否则可能把 A 组 Key 用到 B 组）。
+    const scoped = findScopedTokenRef(settings.tokenRefs, purpose, group)
     const legacy = settings.tokenRefs[purpose]
-    const existing = scoped ?? (legacy && legacy.group === group ? legacy : undefined)
+    const existing = scoped ?? (legacy && sameClaude360Group(legacy.group, group) ? legacy : undefined)
     if (existing) {
       const secret = await this.deps.secretStore.loadSecret(claude360ApiKeyRef(existing.tokenId))
       if (secret) {
-        // 固化/迁移到 group-scoped key（legacy 命中或首次写入时补齐）。
+        // 固化/迁移到 group-scoped key（legacy/历史大小写键命中或首次写入时补齐）。
         await this.deps.writeClaude360({ tokenRefs: { [scopedKey]: existing } })
+        console.info(
+          `[kun-gui] ensureGroupToken group="${group}" purpose=${purpose} → 复用本地 ref #${existing.tokenId}(group="${existing.group}")`
+        )
         return existing
       }
       // secret 缺失：尝试 reveal 补回；若 token 已被删除（reveal 失败），丢弃悬空 ref，
@@ -156,15 +184,23 @@ export class Claude360TokenService {
     }
 
     const tokens = await this.listTokens()
-    const match = tokens.find(
-      (tk) => tk.group === group && tk.name.startsWith(CLAUDE360_TOKEN_NAME_PREFIX)
-    )
+    // 创建前查重（大小写不敏感）：该分组已有任意启用的 Key 就复用，绝不重复创建——
+    // 优先复用本应用自动创建的前缀 Key；用户手动创建的 Key 同样是该分组的有效凭据。
+    const groupTokens = tokens.filter((tk) => tk.status === 1 && sameClaude360Group(tk.group, group))
+    const match =
+      groupTokens.find((tk) => tk.name.startsWith(CLAUDE360_TOKEN_NAME_PREFIX)) ?? groupTokens[0]
     let ref: Claude360TokenRef
     if (match) {
+      console.info(
+        `[kun-gui] ensureGroupToken group="${group}" purpose=${purpose} → 复用服务端已有 Key #${match.id}(group="${match.group}", name="${match.name}")`
+      )
       const revealed = await this.revealToken(match.id)
       await this.deps.secretStore.saveSecret(claude360ApiKeyRef(match.id), revealed)
       ref = { tokenId: match.id, name: match.name, group: match.group }
     } else {
+      console.info(
+        `[kun-gui] ensureGroupToken group="${group}" purpose=${purpose} → 该分组无任何可用 Key（账号共 ${tokens.length} 个 Key，均不属于此分组或未启用），创建新 Key`
+      )
       ref = await this.createToken(group, `${CLAUDE360_TOKEN_NAME_PREFIX} / ${purpose}`)
     }
     await this.deps.writeClaude360({ tokenRefs: { [scopedKey]: ref } })

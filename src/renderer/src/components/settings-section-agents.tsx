@@ -55,7 +55,6 @@ import {
 import { formatCompactNumber } from '../hooks/use-thread-usage'
 import { parseUsageResponse } from '../hooks/usage-response'
 
-export { modelProvidersSettingsPatch } from './settings-section-providers'
 
 const TOOL_PERMISSION_OPTIONS: Array<{
   value: KunToolPermissionMode

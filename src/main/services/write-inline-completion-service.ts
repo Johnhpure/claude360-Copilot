@@ -4,14 +4,17 @@ import {
   isCustomModelEndpointFormat,
   modelEndpointPath,
   resolveModelProviderProxyUrl,
+  isClaude360ProviderId,
   resolveWriteInlineCompletionEndpointFormat,
   resolveWriteInlineCompletionApiKey,
+  resolveWriteInlineCompletionProviderProfile,
   resolveWriteInlineCompletionBaseUrl,
   resolveWriteInlineCompletionModel,
   resolveModelEndpointFormat,
   type ModelEndpointFormat,
   type AppSettingsV1
 } from '../../shared/app-settings'
+import { resolveProfileApiKey } from '../kun-process'
 import {
   upstreamDeepSeekFimCompletionsUrl,
   upstreamOpenAiCustomEndpointUrl,
@@ -798,7 +801,15 @@ export async function requestWriteInlineCompletion(
     return { ok: false, message: 'Inline completion is disabled.' }
   }
 
-  const apiKey = resolveWriteInlineCompletionApiKey(settings)
+  let apiKey = resolveWriteInlineCompletionApiKey(settings)
+  if (!apiKey) {
+    // 分组模式：claude360 provider 的 Key 以 apiKeyRef 存 secret-store，shared 解析器
+    // 拿不到明文；在 main 侧按 ref 解密（与 kun-process spawn 同一 resolver）。
+    const profile = resolveWriteInlineCompletionProviderProfile(settings)
+    if (isClaude360ProviderId(profile.id)) {
+      apiKey = await resolveProfileApiKey(profile)
+    }
+  }
   if (!apiKey) {
     appendInlineCompletionPreflightFailure(startedAt, settings, request, 'Missing API key for inline completion.')
     return { ok: false, message: 'Missing API key for inline completion.' }

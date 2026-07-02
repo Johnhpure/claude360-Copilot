@@ -111,7 +111,7 @@ export function setClaude360KeyResolver(
  * carry plaintext before the next model refresh). Never throws — a failed
  * resolve degrades to the inline value.
  */
-async function resolveProfileApiKey(
+export async function resolveProfileApiKey(
   profile: Pick<ModelProviderProfileV1, 'apiKey' | 'apiKeyRef'>
 ): Promise<string> {
   const ref = profile.apiKeyRef?.trim()

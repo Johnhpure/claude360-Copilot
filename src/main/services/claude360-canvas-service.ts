@@ -145,7 +145,7 @@ export class Claude360CanvasService {
     const settings = await this.deps.readClaude360()
     const group = (settings.selectedImageGroup ?? '').trim()
     if (!group) {
-      throw new Claude360ApiError('尚未选择生图分组，请到「我的」页选择 image 分组')
+      throw new Claude360ApiError('尚未选择生图分组，请打开 设置 → 分组及 Key 选择 image 分组。')
     }
     // ensureGroupKey 内部会校验登录态（cli_token 缺失时抛「未登录」）。
     return this.deps.ensureGroupKey(group, 'image')

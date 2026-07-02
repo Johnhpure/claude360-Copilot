@@ -54,6 +54,50 @@ describe('ensureGroupKeyForSelection', () => {
     expect(ok).toBe(false)
   })
 
+  it('matches groups case-insensitively (Codex key satisfies codex selection, no prompt)', async () => {
+    // 线上真实 bug：providerId 归一化把分组 lowercase（Codex→codex），而服务端
+    // token.group 保留原始大小写；已有 Key 的分组绝不能再弹创建弹窗。
+    const promptCreateAndEnsure = vi.fn()
+    const ok = await ensureGroupKeyForSelection('codex', {
+      listTokens: async () => [{ id: 1, group: 'Codex', name: '手动Key' }],
+      promptCreateAndEnsure
+    })
+    expect(ok).toBe(true)
+    expect(promptCreateAndEnsure).not.toHaveBeenCalled()
+  })
+
+  it('emits debug logs with feature/group/model/keyList and the match outcome', async () => {
+    const logs: string[] = []
+    await ensureGroupKeyForSelection(
+      'codex',
+      {
+        listTokens: async () => [{ id: 3, group: 'vip', name: 'k' }],
+        promptCreateAndEnsure: async () => true,
+        log: (m) => logs.push(m)
+      },
+      { feature: 'Code', model: 'gpt-5.5', providerId: 'claude360-codex' }
+    )
+    expect(logs).toHaveLength(1)
+    expect(logs[0]).toContain('feature=Code')
+    expect(logs[0]).toContain('group="codex"')
+    expect(logs[0]).toContain('model="gpt-5.5"')
+    expect(logs[0]).toContain('group="vip"')
+    expect(logs[0]).toContain('弹窗询问自动创建')
+  })
+
+  it('prompts when the group only has disabled keys (status !== 1 does not count as usable)', async () => {
+    const promptCreateAndEnsure = vi.fn(async () => true)
+    const logs: string[] = []
+    const ok = await ensureGroupKeyForSelection('codex', {
+      listTokens: async () => [{ id: 9, group: 'Codex', name: '禁用Key', status: 2 }],
+      promptCreateAndEnsure,
+      log: (m) => logs.push(m)
+    })
+    expect(ok).toBe(true)
+    expect(promptCreateAndEnsure).toHaveBeenCalledWith('codex')
+    expect(logs[0]).toContain('均已禁用')
+  })
+
   it('fails open (returns true, no prompt) when the token check itself throws', async () => {
     const promptCreateAndEnsure = vi.fn()
     const ok = await ensureGroupKeyForSelection('vip', {

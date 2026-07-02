@@ -24,12 +24,9 @@ export type FetchUpstreamModelsResult =
  * error instead of silently offering default models — an unauthenticated
  * client must not be able to pick a model.
  *
- * The second argument is kept for call-site compatibility; the upstream key is
- * no longer needed here.
  */
 export async function fetchUpstreamModelIds(
-  settings: AppSettingsV1,
-  _apiKey?: string
+  settings: AppSettingsV1
 ): Promise<FetchUpstreamModelsResult> {
   if (!settings.claude360?.loggedIn) {
     return { ok: false, message: 'Claude360 未登录，登录后即可选择模型。' }

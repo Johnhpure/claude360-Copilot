@@ -308,7 +308,7 @@
   "groupsKeysDeleteConfirmDetail": "此操作不可撤销，使用该 Key 的调用将立即失效。",
   "groupsKeysDeleteConfirmAction": "删除",
   "modelProviderAdd": "添加供应商",
-  "modelProviderManagedNotice": "供应商由 Claude360 账号按套餐下发,请到「我的」页登录后管理。",
+  "modelProviderManagedNotice": "分组由 Claude360 账号按套餐下发,请登录后在 设置 → 分组及 Key 管理。",
   "modelProviderAddMenuCustom": "自定义供应商…",
   "modelProviderRemove": "删除供应商",
   "modelProviderNewName": "自定义供应商 {{index}}",

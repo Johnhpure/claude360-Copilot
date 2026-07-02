@@ -105,6 +105,26 @@ export type Claude360TokenListItem = {
 
 export type Claude360TokenPurpose = 'text' | 'image' | 'music'
 
+/**
+ * Claude360 分组标识的统一归一化（trim + 小写），仅用于「是否同一分组」的比较。
+ * 背景：provider profile id 经 normalizeModelProviderId 会被 lowercase（分组 "Codex"
+ * → id "claude360-codex"），而服务端 token.group / profile.name 保留原始大小写。
+ * 分组 id 语义上唯一且大小写不敏感，所有跨端分组匹配必须经此归一；
+ * 禁止裸 `===` 比较（曾导致已有 Key 的分组被误判无 Key 并重复创建 Key）。
+ */
+export function normalizeClaude360GroupKey(group: string | null | undefined): string {
+  return (group ?? '').trim().toLowerCase()
+}
+
+/** 两个 Claude360 分组标识是否指向同一分组（大小写不敏感；空值不与任何分组相等）。 */
+export function sameClaude360Group(
+  a: string | null | undefined,
+  b: string | null | undefined
+): boolean {
+  const na = normalizeClaude360GroupKey(a)
+  return na !== '' && na === normalizeClaude360GroupKey(b)
+}
+
 /** newapi `/api/cli/tokens` 列表项原始响应。 */
 export type Claude360TokenListResponseItem = {
   id: number

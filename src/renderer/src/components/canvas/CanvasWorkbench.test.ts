@@ -1,10 +1,13 @@
-// CanvasWorkbench 静态渲染测试（plan-06 Task 5）。
+// CanvasWorkbench 静态渲染测试（plan-06 Task 5 → 作品宫格重构）。
 // node 环境：mock react-i18next（t 返回 key）+ 用真实 useCanvasStore（静态渲染不跑 useEffect）。
-// 覆盖：首屏是工具型工作台（非营销 hero）、含 prompt/模型/尺寸/生成按钮、结果区、历史区；
+// 覆盖：左右分栏结构（创作配置区 + 作品区）、作品管理栏、空态；
+// 注意：zustand v5 在 renderToStaticMarkup 下读 getInitialState()，setState 注入不可见，
+// 故非空作品的三态卡片/筛选/批量选择断言放在 ArtworkGrid.test.ts（props 注入）与
+// canvas-store.test.ts（reducer 纯函数），此处只断初始结构。
 // CanvasToolbar：低余额 → 去充值（分组模式下不再有「缺 Key 去我的页」初始化报错）。
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-i18next', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-i18next')>()),
@@ -16,7 +19,6 @@ vi.mock('react-i18next', async (importOriginal) => ({
 
 import { CanvasWorkbench } from './CanvasWorkbench'
 import { CanvasToolbar } from './CanvasToolbar'
-import { useCanvasStore } from '../../canvas/canvas-store'
 
 function t(key: string): string {
   return key
@@ -32,16 +34,14 @@ function renderWorkbench(): string {
   )
 }
 
-describe('CanvasWorkbench · 首屏是工具型工作台', () => {
-  beforeEach(() => {
-    // 隔离残留状态：清干净历史与结果，避免其它用例污染。
-    useCanvasStore.setState({ lastResult: [], history: [], error: null, activeImageId: null })
-  })
-
-  it('渲染工作台容器 + prompt/模型/比例/质量/生成按钮 + 结果区 + 历史区', () => {
+describe('CanvasWorkbench · 左右分栏工作台', () => {
+  it('渲染 左=创作配置区（prompt/比例/质量/生成按钮），右=作品区（管理栏+空态）', () => {
     const html = renderWorkbench()
     expect(html).toContain('canvas-workbench')
     expect(html).toContain('canvasWorkbenchTitle')
+    // 左右两个区域有清晰边界（独立 testid 容器）
+    expect(html).toContain('canvas-config-pane')
+    expect(html).toContain('canvas-artworks-pane')
     // 生图面板控件（宽高比图标网格 + 分辨率 + 质量 + 输出格式 + 参考图）
     expect(html).toContain('image-prompt-input')
     expect(html).toContain('image-aspect-square')
@@ -49,11 +49,16 @@ describe('CanvasWorkbench · 首屏是工具型工作台', () => {
     expect(html).toContain('image-quality-auto')
     expect(html).toContain('image-output-format-select')
     expect(html).toContain('image-generate-button')
-    // 已移除独立图像编辑面板
-    expect(html).not.toContain('image-editor-panel')
-    // 结果区（空态）+ 历史区
-    expect(html).toContain('image-result-grid-empty')
-    expect(html).toContain('image-history-panel')
+    // 管理栏：标题/数量/筛选/清空/批量选择
+    expect(html).toContain('canvas-artworks-toolbar')
+    expect(html).toContain('canvasArtworksTitle')
+    expect(html).toContain('canvasArtworksCount')
+    expect(html).toContain('canvasFilterAll')
+    expect(html).toContain('canvas-clear-button')
+    expect(html).toContain('canvas-batch-select-button')
+    // 空态文案
+    expect(html).toContain('artwork-grid-empty')
+    expect(html).toContain('canvasArtworksEmpty')
   })
 
   it('首屏非营销 hero：不出现常见 landing 文案', () => {

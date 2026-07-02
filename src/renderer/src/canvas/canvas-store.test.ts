@@ -1,16 +1,23 @@
-// 生图工作台 store 的单元测试（plan-06 Task 4）。
-// node 环境：用 createCanvasStore() 得到隔离实例，断言纯 reducer 语义与持久化限量。
-import { afterEach, beforeEach, describe, it, expect } from 'vitest'
+// canvas-store 纯 reducer / 持久化测试（node 环境，无 DOM）。
+// 覆盖：表单参数；pending→success/failed 作品卡片生命周期；筛选/删除/清空/批量选择；
+// 持久化序列化（只存 success、大 base64 丢弃）与恢复（含旧版 history 键迁移）。
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Claude360CanvasImage } from '@shared/claude360-canvas'
 import {
-  createCanvasStore,
-  reduceAddHistory,
-  serializeHistoryForPersist,
-  loadPersistedHistory,
-  sanitizeRehydratedHistory,
+  CANVAS_ARTWORKS_STORAGE_KEY,
   CANVAS_HISTORY_LIMIT,
+  CANVAS_HISTORY_MAX_BASE64_LENGTH,
   CANVAS_HISTORY_STORAGE_KEY,
-  CANVAS_HISTORY_MAX_BASE64_LENGTH
+  clampN,
+  createCanvasStore,
+  filterArtworks,
+  loadPersistedArtworks,
+  migrateLegacyHistory,
+  reduceFailPending,
+  reduceResolvePending,
+  sanitizeRehydratedArtworks,
+  serializeArtworksForPersist,
+  type CanvasArtwork
 } from './canvas-store'
 
 function image(id: string, overrides: Partial<Claude360CanvasImage> = {}): Claude360CanvasImage {
@@ -20,196 +27,279 @@ function image(id: string, overrides: Partial<Claude360CanvasImage> = {}): Claud
     url: `https://cdn.example/${id}.png`,
     mimeType: 'image/png',
     prompt: `p-${id}`,
-    model: 'flux-pro',
-    createdAt: '2026-07-01T00:00:00.000Z',
+    model: 'gpt-image-1',
+    createdAt: '2026-07-02T00:00:00.000Z',
     ...overrides
   }
 }
 
+function successArtwork(id: string, overrides: Partial<CanvasArtwork> = {}): CanvasArtwork {
+  return {
+    id,
+    status: 'success',
+    image: image(id),
+    prompt: `p-${id}`,
+    model: 'gpt-image-1',
+    size: '1024x1024',
+    quality: 'auto',
+    outputFormat: 'png',
+    n: 1,
+    createdAt: '2026-07-02T00:00:00.000Z',
+    ...overrides
+  }
+}
+
+function stubLocalStorage(): Map<string, string> {
+  const storage = new Map<string, string>()
+  vi.stubGlobal('window', {
+    localStorage: {
+      getItem: (k: string) => storage.get(k) ?? null,
+      setItem: (k: string, v: string) => storage.set(k, v),
+      removeItem: (k: string) => storage.delete(k)
+    }
+  })
+  return storage
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe('canvas-store · 表单参数状态', () => {
-  it('setPrompt/setModel/setN 更新对应字段', () => {
+  it('setPrompt/setModel/setN 更新对应字段，clampN 夹逼到 [1,4]', () => {
     const store = createCanvasStore()
     store.getState().setPrompt('一只柯基')
-    store.getState().setModel('flux-pro')
+    store.getState().setModel('gpt-image-1')
     store.getState().setN(3)
     const s = store.getState()
     expect(s.prompt).toBe('一只柯基')
-    expect(s.model).toBe('flux-pro')
+    expect(s.model).toBe('gpt-image-1')
     expect(s.n).toBe(3)
+    expect(clampN(0)).toBe(1)
+    expect(clampN(99)).toBe(4)
+    expect(clampN(Number.NaN)).toBe(1)
   })
-  it('默认宽高比 square + 2K，派生 size 为 2048x2048', () => {
-    const store = createCanvasStore()
-    const s = store.getState()
-    expect(s.aspectPreset).toBe('square')
-    expect(s.resolution).toBe('2K')
-    expect(s.size).toBe('2048x2048')
-  })
-  it('setAspectPreset / setResolution 联动派生 size', () => {
+
+  it('setAspectPreset/setResolution 联动派生 size', () => {
     const store = createCanvasStore()
     store.getState().setAspectPreset('widescreen')
-    store.getState().setResolution('4K')
-    const s = store.getState()
-    expect(s.aspectPreset).toBe('widescreen')
-    expect(s.resolution).toBe('4K')
-    expect(s.size).toBe('3840x2160') // widescreen 4K
-  })
-  it('setQuality / setOutputFormat / setReferenceImage 更新对应字段', () => {
-    const store = createCanvasStore()
-    store.getState().setQuality('high')
-    store.getState().setOutputFormat('webp')
-    store.getState().setReferenceImage('data:image/png;base64,AAA')
-    const s = store.getState()
-    expect(s.quality).toBe('high')
-    expect(s.outputFormat).toBe('webp')
-    expect(s.referenceImage).toBe('data:image/png;base64,AAA')
-    store.getState().setReferenceImage(null)
-    expect(store.getState().referenceImage).toBeNull()
-  })
-  it('setN 夹逼到 1..4', () => {
-    const store = createCanvasStore()
-    store.getState().setN(0)
-    expect(store.getState().n).toBe(1)
-    store.getState().setN(99)
-    expect(store.getState().n).toBe(4)
+    store.getState().setResolution('1K')
+    expect(store.getState().size).toBe('1280x720')
   })
 })
 
-describe('canvas-store · generate/edit pending/success/failure', () => {
-  it('generate pending → success 写入 lastResult 与 history、清 error', () => {
+describe('作品生命周期：pending 占位 → success/failed', () => {
+  it('beginGenerate 用当前表单参数在宫格头部插入 pending 占位（生成中立即可见）', () => {
     const store = createCanvasStore()
+    store.getState().setPrompt('一只柯基')
+    store.getState().setModel('gpt-image-1')
+    store.getState().setN(2)
     store.getState().beginGenerate()
-    expect(store.getState().generating).toBe(true)
-    const imgs = [image('a'), image('b')]
-    store.getState().generateSuccess(imgs)
+
+    const s = store.getState()
+    expect(s.generating).toBe(true)
+    expect(s.artworks).toHaveLength(1)
+    expect(s.artworks[0]).toMatchObject({
+      status: 'pending',
+      prompt: '一只柯基',
+      model: 'gpt-image-1',
+      n: 2
+    })
+    expect(s.pendingArtworkId).toBe(s.artworks[0].id)
+  })
+
+  it('generateSuccess 把 pending 原位替换为一批 success 作品（继承参数快照）', () => {
+    const store = createCanvasStore({ initialArtworks: [successArtwork('old')] })
+    store.getState().setPrompt('新作品')
+    store.getState().beginGenerate()
+    store.getState().generateSuccess([image('a'), image('b')])
+
     const s = store.getState()
     expect(s.generating).toBe(false)
-    expect(s.lastResult).toEqual(imgs)
-    expect(s.error).toBeNull()
-    // 成功结果进入历史
-    expect(s.history.map((i) => i.id)).toEqual(['a', 'b'])
-    // active 落到第一张
-    expect(s.activeImageId).toBe('a')
+    expect(s.pendingArtworkId).toBeNull()
+    expect(s.artworks.map((a) => a.id)).toEqual(['a', 'b', 'old'])
+    expect(s.artworks[0]).toMatchObject({ status: 'success', prompt: 'p-a', n: 1 })
+    expect(s.artworks[0].image?.url).toBe('https://cdn.example/a.png')
   })
-  it('generate failure 记录 error 并停止 pending', () => {
+
+  it('generateFailure 把 pending 标记为 failed 并保留错误信息（失败状态在卡片可见）', () => {
     const store = createCanvasStore()
+    store.getState().setPrompt('会失败的')
     store.getState().beginGenerate()
-    store.getState().generateFailure('余额不足')
+    store.getState().generateFailure('quota exceeded')
+
     const s = store.getState()
     expect(s.generating).toBe(false)
-    expect(s.error).toBe('余额不足')
+    expect(s.artworks[0]).toMatchObject({
+      status: 'failed',
+      error: 'quota exceeded',
+      prompt: '会失败的'
+    })
   })
-  it('edit pending → success 追加到历史', () => {
+
+  it('beginEdit/editSuccess 与 generate 同一套占位生命周期（参考图路径）', () => {
     const store = createCanvasStore()
-    store.getState().generateSuccess([image('a')])
+    store.getState().setPrompt('编辑参考图')
     store.getState().beginEdit()
     expect(store.getState().editing).toBe(true)
-    store.getState().editSuccess([image('edited')])
-    const s = store.getState()
-    expect(s.editing).toBe(false)
-    // 编辑结果排在历史最前
-    expect(s.history[0].id).toBe('edited')
-    expect(s.history.map((i) => i.id)).toContain('a')
-  })
-  it('edit failure 记录 error', () => {
-    const store = createCanvasStore()
-    store.getState().beginEdit()
-    store.getState().editFailure('图片过大')
+    expect(store.getState().artworks[0].status).toBe('pending')
+    store.getState().editSuccess([image('e1')])
     expect(store.getState().editing).toBe(false)
-    expect(store.getState().error).toBe('图片过大')
+    expect(store.getState().artworks[0]).toMatchObject({ id: 'e1', status: 'success' })
+  })
+
+  it('作品总量截断到 CANVAS_HISTORY_LIMIT', () => {
+    const initial = Array.from({ length: CANVAS_HISTORY_LIMIT }, (_, i) => successArtwork(`s${i}`))
+    const store = createCanvasStore({ initialArtworks: initial })
+    store.getState().beginGenerate()
+    expect(store.getState().artworks).toHaveLength(CANVAS_HISTORY_LIMIT)
   })
 })
 
-describe('canvas-store · active image 选择', () => {
-  it('setActiveImage 更新 activeImageId', () => {
-    const store = createCanvasStore()
-    store.getState().generateSuccess([image('a'), image('b')])
-    store.getState().setActiveImage('b')
-    expect(store.getState().activeImageId).toBe('b')
+describe('reduceResolvePending / reduceFailPending', () => {
+  it('未命中 pendingId 时保持原列表（防御 stale 调用）', () => {
+    const artworks = [successArtwork('keep')]
+    expect(reduceResolvePending(artworks, 'nope', [image('x')])).toEqual(artworks)
+    expect(reduceFailPending(artworks, null, 'boom')).toEqual(artworks)
   })
 })
 
-describe('reduceAddHistory · 添加与截断（最多 100 条）', () => {
-  it('新结果排在最前', () => {
-    const next = reduceAddHistory([image('old')], [image('new1'), image('new2')])
-    expect(next.map((i) => i.id)).toEqual(['new1', 'new2', 'old'])
+describe('筛选 / 删除 / 清空 / 批量选择', () => {
+  it('filterArtworks 按状态筛选，all 原样返回', () => {
+    const list: CanvasArtwork[] = [
+      successArtwork('ok'),
+      { ...successArtwork('run'), status: 'pending', image: undefined },
+      { ...successArtwork('bad'), status: 'failed', image: undefined, error: 'x' }
+    ]
+    expect(filterArtworks(list, 'all')).toHaveLength(3)
+    expect(filterArtworks(list, 'success').map((a) => a.id)).toEqual(['ok'])
+    expect(filterArtworks(list, 'pending').map((a) => a.id)).toEqual(['run'])
+    expect(filterArtworks(list, 'failed').map((a) => a.id)).toEqual(['bad'])
   })
-  it('超过上限时截断到 CANVAS_HISTORY_LIMIT', () => {
-    const existing = Array.from({ length: CANVAS_HISTORY_LIMIT }, (_, i) => image(`e${i}`))
-    const next = reduceAddHistory(existing, [image('brand-new')])
-    expect(next.length).toBe(CANVAS_HISTORY_LIMIT)
-    expect(next[0].id).toBe('brand-new')
-    // 最老的一条被挤出
-    expect(next.map((i) => i.id)).not.toContain(`e${CANVAS_HISTORY_LIMIT - 1}`)
+
+  it('removeArtwork 删除单个并同步清掉选中态', () => {
+    const store = createCanvasStore({ initialArtworks: [successArtwork('a'), successArtwork('b')] })
+    store.getState().toggleSelectMode()
+    store.getState().toggleSelected('a')
+    store.getState().removeArtwork('a')
+    expect(store.getState().artworks.map((x) => x.id)).toEqual(['b'])
+    expect(store.getState().selectedIds).toEqual({})
+  })
+
+  it('批量选择：toggleSelected 勾选/反选、removeSelected 删除所选并退出选择模式', () => {
+    const store = createCanvasStore({
+      initialArtworks: [successArtwork('a'), successArtwork('b'), successArtwork('c')]
+    })
+    store.getState().toggleSelectMode()
+    store.getState().toggleSelected('a')
+    store.getState().toggleSelected('b')
+    store.getState().toggleSelected('b') // 反选
+    store.getState().toggleSelected('c')
+    store.getState().removeSelected()
+    const s = store.getState()
+    expect(s.artworks.map((x) => x.id)).toEqual(['b'])
+    expect(s.selectMode).toBe(false)
+    expect(s.selectedIds).toEqual({})
+  })
+
+  it('退出选择模式清空已选', () => {
+    const store = createCanvasStore({ initialArtworks: [successArtwork('a')] })
+    store.getState().toggleSelectMode()
+    store.getState().toggleSelected('a')
+    store.getState().toggleSelectMode()
+    expect(store.getState().selectedIds).toEqual({})
+  })
+
+  it('clearArtworks 全清但豁免飞行中的 pending 占位', () => {
+    const store = createCanvasStore({ initialArtworks: [successArtwork('a')] })
+    store.getState().beginGenerate()
+    store.getState().clearArtworks()
+    expect(store.getState().artworks.map((x) => x.status)).toEqual(['pending'])
+  })
+
+  it('removeSelected 豁免 pending 占位（防飞行中批次结果无处安放）', () => {
+    const store = createCanvasStore({ initialArtworks: [successArtwork('a')] })
+    store.getState().beginGenerate()
+    const pendingId = store.getState().pendingArtworkId as string
+    store.getState().toggleSelectMode()
+    store.getState().toggleSelected('a')
+    store.getState().toggleSelected(pendingId)
+    store.getState().removeSelected()
+    const s = store.getState()
+    expect(s.artworks.map((x) => x.id)).toEqual([pendingId])
+    // 占位仍能被后续 success 正常替换
+    store.getState().generateSuccess([image('done')])
+    expect(store.getState().artworks[0]).toMatchObject({ id: 'done', status: 'success' })
   })
 })
 
-describe('serializeHistoryForPersist · base64 限量（不写超大 base64）', () => {
-  it('丢弃超阈值的 base64 大图，只留元信息占位（source 仍 base64 但 b64Json 清空）', () => {
-    const bigB64 = 'A'.repeat(CANVAS_HISTORY_MAX_BASE64_LENGTH + 10)
-    const persisted = serializeHistoryForPersist([
-      image('big', { source: 'base64', url: undefined, b64Json: bigB64 }),
-      image('url-ok')
+describe('持久化', () => {
+  it('serializeArtworksForPersist 只保留 success，超阈值 base64 丢弃 b64Json', () => {
+    const big = 'x'.repeat(CANVAS_HISTORY_MAX_BASE64_LENGTH + 1)
+    const list: CanvasArtwork[] = [
+      { ...successArtwork('run'), status: 'pending', image: undefined },
+      successArtwork('big', {
+        image: image('big', { source: 'base64', url: undefined, b64Json: big })
+      }),
+      successArtwork('small', {
+        image: image('small', { source: 'base64', url: undefined, b64Json: 'QUJD' })
+      })
+    ]
+    const persisted = serializeArtworksForPersist(list)
+    expect(persisted.map((a) => a.id)).toEqual(['big', 'small'])
+    expect(persisted[0].image?.b64Json).toBeUndefined()
+    expect(persisted[1].image?.b64Json).toBe('QUJD')
+  })
+
+  it('sanitizeRehydratedArtworks 过滤坏条目：非 success、缺图、缺 id', () => {
+    const restored = sanitizeRehydratedArtworks([
+      successArtwork('ok'),
+      { ...successArtwork('no-image'), image: undefined },
+      { ...successArtwork('pending'), status: 'pending' },
+      { bogus: true },
+      null
     ])
-    const big = persisted.find((i) => i.id === 'big')
-    expect(big?.b64Json).toBeUndefined()
-    // url 图片完整保留
-    expect(persisted.find((i) => i.id === 'url-ok')?.url).toBe('https://cdn.example/url-ok.png')
+    expect(restored.map((a) => a.id)).toEqual(['ok'])
   })
-  it('小 base64 图片保留 b64Json', () => {
-    const persisted = serializeHistoryForPersist([
-      image('small', { source: 'base64', url: undefined, b64Json: 'aGVsbG8=' })
-    ])
-    expect(persisted[0].b64Json).toBe('aGVsbG8=')
-  })
-  it('只保留最近 CANVAS_HISTORY_LIMIT 条', () => {
-    const many = Array.from({ length: CANVAS_HISTORY_LIMIT + 20 }, (_, i) => image(`m${i}`))
-    expect(serializeHistoryForPersist(many).length).toBe(CANVAS_HISTORY_LIMIT)
-  })
-})
 
-describe('loadPersistedHistory · 损坏安全恢复空列表', () => {
-  const store: Record<string, string> = {}
-  beforeEach(() => {
-    for (const k of Object.keys(store)) delete store[k]
-    ;(globalThis as unknown as { localStorage: unknown }).localStorage = {
-      getItem: (k: string) => store[k] ?? null,
-      setItem: (k: string, v: string) => {
-        store[k] = v
-      },
-      removeItem: (k: string) => {
-        delete store[k]
-      }
-    }
+  it('migrateLegacyHistory 把旧版纯图片历史映射为 success 作品', () => {
+    const migrated = migrateLegacyHistory([image('legacy'), { broken: true }])
+    expect(migrated).toHaveLength(1)
+    expect(migrated[0]).toMatchObject({
+      id: 'legacy',
+      status: 'success',
+      prompt: 'p-legacy',
+      model: 'gpt-image-1'
+    })
   })
-  afterEach(() => {
-    delete (globalThis as unknown as { localStorage?: unknown }).localStorage
-  })
-  it('无数据返回空列表', () => {
-    expect(loadPersistedHistory()).toEqual([])
-  })
-  it('损坏 JSON 返回空列表', () => {
-    store[CANVAS_HISTORY_STORAGE_KEY] = '{not json'
-    expect(loadPersistedHistory()).toEqual([])
-  })
-  it('非数组 history 字段返回空列表', () => {
-    store[CANVAS_HISTORY_STORAGE_KEY] = JSON.stringify({ history: 'x' })
-    expect(loadPersistedHistory()).toEqual([])
-  })
-  it('合法数据恢复并 sanitize', () => {
-    store[CANVAS_HISTORY_STORAGE_KEY] = JSON.stringify({ history: [image('a'), image('b')] })
-    const loaded = loadPersistedHistory()
-    expect(loaded.map((i) => i.id)).toEqual(['a', 'b'])
-  })
-})
 
-describe('sanitizeRehydratedHistory · 丢弃损坏条目', () => {
-  it('过滤掉既无 url 又无 b64Json 的坏条目', () => {
-    const bad = { ...image('bad'), source: 'url' as const, url: undefined, b64Json: undefined }
-    const clean = sanitizeRehydratedHistory([image('ok'), bad])
-    expect(clean.map((i) => i.id)).toEqual(['ok'])
+  it('loadPersistedArtworks 优先新键，回退旧版 history 键迁移，损坏安全回空', () => {
+    const storage = stubLocalStorage()
+    // 1) 两键都缺 → 空
+    expect(loadPersistedArtworks()).toEqual([])
+    // 2) 旧键迁移：结果落新键 + 旧键删除（防新旧两份 base64 挤爆配额）
+    storage.set(CANVAS_HISTORY_STORAGE_KEY, JSON.stringify({ history: [image('legacy')] }))
+    expect(loadPersistedArtworks().map((a) => a.id)).toEqual(['legacy'])
+    expect(storage.has(CANVAS_HISTORY_STORAGE_KEY)).toBe(false)
+    expect(storage.get(CANVAS_ARTWORKS_STORAGE_KEY)).toContain('legacy')
+    storage.delete(CANVAS_ARTWORKS_STORAGE_KEY)
+    // 3) 新键优先
+    storage.set(CANVAS_ARTWORKS_STORAGE_KEY, JSON.stringify({ artworks: [successArtwork('new')] }))
+    expect(loadPersistedArtworks().map((a) => a.id)).toEqual(['new'])
+    // 4) 损坏 JSON 回空
+    storage.set(CANVAS_ARTWORKS_STORAGE_KEY, '{broken')
+    expect(loadPersistedArtworks()).toEqual([])
   })
-  it('非对象条目被过滤', () => {
-    const clean = sanitizeRehydratedHistory([image('ok'), null as unknown as Claude360CanvasImage])
-    expect(clean.map((i) => i.id)).toEqual(['ok'])
+
+  it('persist:true 时作品变更自动落盘（只写 success，绝不含 Key）', () => {
+    const storage = stubLocalStorage()
+    const store = createCanvasStore({ persist: true })
+    store.getState().setPrompt('落盘测试')
+    store.getState().beginGenerate()
+    store.getState().generateSuccess([image('persisted')])
+    const raw = storage.get(CANVAS_ARTWORKS_STORAGE_KEY)
+    expect(raw).toBeTruthy()
+    const parsed = JSON.parse(raw ?? '{}') as { artworks?: CanvasArtwork[] }
+    expect(parsed.artworks?.map((a) => a.id)).toEqual(['persisted'])
   })
 })
