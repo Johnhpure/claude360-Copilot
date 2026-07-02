@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="src/asset/img/kun.png" width="104" alt="Kun 图标">
+  <img src="src/asset/img/claude360.png" width="104" alt="Claude360 Copilot 图标">
 </p>
 
-<h1 align="center">Kun</h1>
+<h1 align="center">Claude360 Copilot</h1>
 
 <p align="center">
-  <strong>探索需求先行的下一代 coding 范式。</strong><br>
-  用 DeepSeek、Xiaomi MiMo、MiniMax 的高性价比组合，把需求澄清、设计稿、计划和 Agent 编码串成完整闭环。
+  <strong>一个账号，四大工作台：编程 · 写作 · 生图 · 音乐。</strong><br>
+  接入 Claude360 中转站，把 AI Agent 放进真实工作流，而不只是一个聊天框。
 </p>
 
 <p align="center">
@@ -14,93 +14,105 @@
   &nbsp;·&nbsp;
   <strong>简体中文</strong>
   &nbsp;·&nbsp;
-  <a href="https://github.com/KunAgent/Kun/releases">下载</a>
+  <a href="https://github.com/Johnhpure/claude360-Copilot/releases">下载</a>
   &nbsp;·&nbsp;
-  <a href="#文档地图">文档</a>
+  <a href="#核心工作台">功能</a>
   &nbsp;·&nbsp;
   <a href="#从源码运行">源码运行</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/KunAgent/Kun/releases"><img src="https://img.shields.io/github/v/release/KunAgent/Kun?label=release" alt="GitHub release"></a>
+  <a href="https://github.com/Johnhpure/claude360-Copilot/releases"><img src="https://img.shields.io/github/v/release/Johnhpure/claude360-Copilot?label=release" alt="GitHub release"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue" alt="License: PolyForm Noncommercial 1.0.0"></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/Electron-34-47848F?logo=electron&logoColor=white" alt="Electron 34">
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
 </p>
 
-Kun 是一次面向未来编程方式的产品实验：不再从“给 Agent 一句话，让它直接改代码”开始，而是从需求澄清开始，把需求文档、设计稿、交互原型、实施计划、Todo、Agent 编码和变更审查放到一条连续的 GUI 工作流里。
+**Claude360 Copilot** 是一个跨平台桌面 AI 工作台。你用一个 Claude360 账号登录，就能在同一个应用里完成 **编程、写作、生图、音乐** 四类创作——而不用在多个网页、多个订阅、多套 API Key 之间来回切换。
 
-Kun 面向希望把 AI Agent 真正放进日常工作的用户。它不是只聊天的客户端，也不是只给程序员的 CLI 外壳：你可以把本地目录交给它处理代码、需求、计划和变更审查，也可以在独立的 Write 工作区里写作、润色和导出文档。
+它区别于"只会聊天"的客户端：Code 工作台可以绑定本地代码库，读写文件、执行命令、审查每一次变更；写作工作台是一个完整的 Markdown 创作环境；生图与音乐工作台把文生图 / 图生图、Suno 音乐创作直接做进桌面端。所有模型请求统一通过 **Claude360 中转站**（兼容 OpenAI 风格接口）转发，账号、分组、倍率与 Key 都在应用内一站式管理。
 
-这也是 Kun 为什么把 DeepSeek、Xiaomi MiMo、MiniMax 作为默认的一线模型组合，而不是把它们当成普通的“可选 Provider”。需求先行的 coding 范式会带来更多轮澄清、调研、结构化、规划、执行和验证，如果模型成本太高，这条流程很难成为日常工作方式。Kun 选择三家来自中国的高性价比模型供应商，正是为了让完整流程跑得起、用得久、试得多。
-
-Kun 内置同名本地运行时，通过 `kun serve` 连接桌面端。会话、日志、偏好设置和运行时配置默认保存在本机；模型请求使用你自己的模型服务凭据。对会读写文件和执行命令的流程，Kun 提供工具审批、权限模式、内联 diff 和变更审查面板。
+会话、日志、偏好设置和运行时数据默认保存在本机；API Key 仅在主进程加密存储，不落明文。对会读写文件、执行命令的高权限流程，应用提供工具审批、权限模式、内联 diff 和变更审查面板。
 
 ---
 
 <p align="center">
   <a href="src/asset/img/code.mp4">
-    <img src="src/asset/img/code.gif" width="410" alt="Kun Code 模式演示">
+    <img src="src/asset/img/code.gif" width="410" alt="Code 工作台演示">
   </a>
   <a href="src/asset/img/write.mp4">
-    <img src="src/asset/img/write.gif" width="410" alt="Kun Write 模式演示">
+    <img src="src/asset/img/write.gif" width="410" alt="写作工作台演示">
   </a>
 </p>
 
-## 需求先行的 coding 范式
+## 核心工作台
 
-Kun 想探索的是“需求 -> 设计 -> 计划 -> 编码 -> 验证”的下一代编程工作流，而不是把一个聊天框简单贴到 IDE 上。
+Claude360 Copilot 把四类高频创作场景收敛成四个工作台，共享同一套账号、分组与本地运行时。
 
-| 阶段 | Kun 的尝试 |
+### 🧩 Code —— 需求驱动的 Agent 编程
+
+不是"给一句话就直接改代码"，而是把 **需求 → 设计 → 计划 → 编码 → 验收** 串成一条连续的 GUI 工作流。
+
+- 绑定本地项目目录，读取代码上下文、执行 shell 命令、修改文件。
+- 需求草稿与 AI 澄清、实现前调研、结构化需求块与验收标准。
+- `/plan` 生成可管理的实施计划，进入 Todo、`/goal`、旁支对话、会话压缩、分叉与归档。
+- 提交前的内联 diff、变更审查面板、`/review` 与工具审批、文件系统权限模式。
+- 接入 MCP（Model Context Protocol）服务器与项目 / 全局 Skills，按任务扩展工具能力。
+
+### ✍️ 写作 —— 独立的 Markdown 创作环境
+
+一个与 Code 解耦的写作工作区，让长文创作也有 Agent 加持。
+
+- Markdown 文件树 + Live / Source / Split / Preview 多种预览模式切换。
+- AI 行内补全、选区改写润色、图片附件。
+- 一键导出 `HTML / PDF / DOC / DOCX`。
+
+### 🎨 生图 —— 文生图 / 图生图工作台
+
+从提示词到成图的完整参数面板，覆盖主流出图需求。
+
+| 参数 | 可选值 |
 | --- | --- |
-| **澄清需求** | 在 GUI 中新建需求草稿，让需求 AI 帮你补问题、做实现前调研、整理边界 |
-| **沉淀文档** | 把草稿保存为 `.kunsdd/draft/.../requirement.md`，支持结构化需求块、验收标准和需求历史 |
-| **生成设计** | 从需求片段生成 UI 设计稿、信息图或交互式 HTML 原型，让需求不只停留在文字里 |
-| **形成计划** | 通过 `/plan` 和 `create_plan` 生成 GUI 管理的 `.kunsdd/plan/...` 实施计划，并把计划步骤和需求关联 |
-| **Agent 编码** | 计划进入 Todo、文件编辑、命令执行和变更审查；需求变更后可以提示重规划，避免计划和需求脱节 |
-| **回到验收** | 结合需求块、验收标准、计划状态和 `/review`，把“做完了吗”落回最初的需求 |
+| 模型 | 由所选分组下的可用生图模型决定 |
+| 参考图（可选） | 上传后走图生图，不传即文生图 |
+| 宽高比 | 10 档预设（方形 / 宽屏 / 竖屏 / 打印 / 信息流等）图标网格 |
+| 分辨率 | 1K / 2K / 4K |
+| 张数 | 单次批量生成 |
+| 质量 | 自动 / 高 / 中 / 低 |
+| 输出格式 | PNG / JPEG / WebP |
 
-这条线是 Kun 最重要的产品方向：让 AI coding 从“即时问答”走向“需求驱动的软件生产流程”。模型、写作、计划、审查和自动化都围绕这条线服务。
+配套历史面板与结果网格，便于回看与对比。
 
-## 核心模型组合
+### 🎵 音乐 —— Suno 音乐创作工作台
 
-Kun 追求的是“完整能力 + 极致性价比”。需求先行的流程比普通聊天更长，也更依赖反复调用模型；首启和设置页围绕三家中国模型供应商组织，让用户可以用更低的模型成本覆盖更多 Agent 场景。
+两种创作模式，从灵感到成曲。
 
-| 供应商 | 在 Kun 中的角色 |
+- **一句话生成**：仅需模型 + 一句话描述，快速出曲。
+- **标准模式**：标题 + 歌词（内置 **✨ AI 写词助手**，流式逐字生成、采用即填入）+ 曲风预设 chips + 反向曲风标签 + 纯器乐开关 + 高级参数（人声性别 / 曲风权重 / 创意度 / persona）。
+- 作品列表回传封面，内置增强播放器：进度拖动、音量调节、上一首 / 下一首队列播放。
+
+## 账号、分组与 Key
+
+Claude360 Copilot 取消了传统"逐个填 Provider / 手抄 API Key"的心智，改为围绕 **账号 → 分组 → 模型** 组织。
+
+- **应用内登录**：支持网页授权登录与账号密码 + 2FA 两种方式，无需手动粘贴 Key。
+- **分组及 Key**：在设置中查看账号可用分组（含倍率）、每个分组下的模型，并按分组管理 API Key。
+- **按需自动建 Key**：在任一工作台选择模型时，应用会自动检测该分组是否已有可用 Key——没有则弹出优雅模态，确认后自动创建并回填，全程无需离开应用。
+- **安全存储**：API Key 仅在主进程通过加密存储保存，渲染进程与配置文件中不出现明文。
+
+## 为什么选择 Claude360 Copilot
+
+| 你想要 | Claude360 Copilot 提供 |
 | --- | --- |
-| **DeepSeek** | 默认文本与推理主模型，提供 `deepseek-v4-pro` / `deepseek-v4-flash`，支撑代码、计划、审查、长上下文会话和自动模型路由 |
-| **Xiaomi MiMo** | 高性价比多模态与语音入口，覆盖长上下文文本模型、视觉输入、ASR 语音转写、TTS 语音生成和 Token Plan |
-| **MiniMax** | 补齐完整媒体生成能力，覆盖 Anthropic Messages 文本模型、图片生成、语音生成、音乐生成、视频生成和 Token Plan |
-
-这套组合让 Kun 可以把不同任务分配给更合适的能力：轻量澄清走高速模型，复杂代码和推理走更强模型，需求文档和 IM 场景接入语音，设计与创作场景接入图片、音乐和视频。你仍然可以添加 OpenAI 兼容、自托管或其他自定义 Provider，但 Kun 的默认体验会优先围绕这三家高性价比模型服务展开。
-
-## 为什么选择 Kun
-
-| 你想要 | Kun 提供 |
-| --- | --- |
-| 探索下一代 coding 范式 | 从需求澄清、需求文档、设计稿、实施计划一路走到 Agent 编码和验收 |
-| 极致性价比的完整 Agent 能力 | 以 DeepSeek、Xiaomi MiMo、MiniMax 为核心组合，覆盖文本、推理、视觉、语音、图片、音乐和视频 |
-| 让 AI 面向真实项目工作 | 绑定本地工作区，读写文件、搜索代码、执行命令、查看工具调用和结果 |
-| 把需求推进到可执行计划 | 支持新建需求、`/plan`、Todo、`/goal`、旁支对话、会话压缩、分叉和归档 |
-| 让改动保持可控 | 工具审批、文件系统权限模式、内联 diff、变更审查面板和 `/review` |
-| 在同一个应用里写作 | Markdown 文件树、Live / Source / Split / Preview、多种导出格式、选区 inline agent |
-| 离开电脑也能触发任务 | 飞书 / Lark / 微信连接、本地 webhook / relay、一次性或周期性定时任务 |
-| 把重复流程沉淀成可复用工作流 | 可视化「创建 Loop」节点编排，多步 Agent 流程可画、可跑、可复用 |
-| 不被单一模型绑定 | 三家核心供应商之外，也支持自定义 Base URL、协议、模型列表和扩展能力 |
-
-## 核心能力
-
-- **需求先行 coding**：新建需求草稿，AI 澄清和结构化需求，生成设计稿或交互原型，再进入实施计划、Todo、Agent 编码和验收。
-- **Code 工作台**：围绕真实代码库对话，读取项目上下文，执行 shell 命令，修改文件，并在提交前审查每一次变更。
-- **需求、计划与审查**：从需求草稿进入计划，再到 Todo、执行、复盘和代码审查；长会话可以压缩、恢复、分叉或归档。
-- **Write 写作模式**：独立 Markdown 工作区，支持文件树、预览模式切换、补全、选区改写、图片附件，以及 `HTML / PDF / DOC / DOCX` 导出。
-- **自动化与远程入口**：把桌面会话接到飞书 / Lark / 微信等 IM，支持本地 webhook、relay 和定时任务，让后台任务也能回到同一套 Agent loop。
-- **可视化工作流「创建 Loop」**：在定时任务之上提供 n8n / dify 风格的节点式编排画布，把多步 Agent 流程画成可运行、可复用的工作流——丰富的触发器与节点、类型化数据流、本地运行 API，可作为工具暴露给 Kun，也能绑定到 hook 阶段。
-- **模型组合优先**：围绕 DeepSeek、Xiaomi MiMo、MiniMax 设计首启、Provider 预设和能力自动接线，用高性价比模型组合承担完整桌面 Agent 工作流。
-- **多模态与媒体能力**：支持图片附件、视觉输入、语音转写、图片生成、语音生成、音乐生成和视频生成；相关能力随 Provider 配置启用。
-- **MCP 与 Skills**：接入 Model Context Protocol 服务器，加载项目或全局 Skills，让 Kun 按任务获得更专门的工具和工作方式。
-- **本地运行时**：`kun serve` 提供 HTTP/SSE 边界，采用 cache-first agent loop、追加式事件日志、用量统计和上下文压缩策略。
+| 一个入口搞定多类创作 | 编程 / 写作 / 生图 / 音乐四大工作台，共享同一账号与运行时 |
+| 一份账号、一处计费 | 通过 Claude360 中转站统一转发，分组、倍率、Key 应用内管理 |
+| 让 AI 面向真实项目工作 | 绑定本地工作区，读写文件、搜索代码、执行命令、审查变更 |
+| 把需求推进到可执行计划 | 需求草稿、`/plan`、Todo、`/goal`、会话压缩、分叉与归档 |
+| 让改动保持可控 | 工具审批、权限模式、内联 diff、变更审查面板与 `/review` |
+| 在同一个应用里写作 | Markdown 文件树、多预览模式、AI 补全 / 改写、多格式导出 |
+| 直接做出图与音乐 | 文生图 / 图生图参数面板、Suno 一句话 / 标准创作与 AI 写词 |
+| 数据与密钥留在本机 | 会话 / 日志 / 配置本地保存，Key 主进程加密、不落明文 |
 
 ## 更多演示
 
@@ -109,42 +121,37 @@ Kun 追求的是“完整能力 + 极致性价比”。需求先行的流程比�
     <img src="src/asset/img/pdf-research.gif" width="680" alt="PDF 研究演示">
   </a>
 </p>
-<p align="center"><em>PDF 研究与资料整理演示</em></p>
+<p align="center"><em>PDF 研究与资料整理</em></p>
 
 <p align="center">
   <a href="src/asset/img/sdd.mp4">
     <img src="src/asset/img/sdd.gif" width="680" alt="需求澄清、需求文档与计划演示">
   </a>
 </p>
-<p align="center"><em>需求澄清、需求文档与计划演示</em></p>
-
-<p align="center">
-  <a href="src/asset/img/ikun-ui-plugin.mp4">
-    <img src="src/asset/img/ikun-ui-plugin.gif" width="680" alt="iKun UI 插件演示">
-  </a>
-</p>
-<p align="center"><em>iKun UI 插件演示</em></p>
+<p align="center"><em>需求澄清、需求文档与实施计划</em></p>
 
 ## 快速开始
 
 ### 路径 A：下载发布版
 
-前往 [GitHub Releases](https://github.com/KunAgent/Kun/releases) 下载最新版本。
+前往 [GitHub Releases](https://github.com/Johnhpure/claude360-Copilot/releases) 下载最新版本。
 
 | 平台 | 安装包 | 架构 |
 | --- | --- | --- |
+| Windows | `.zip` 便携包（解压即用） | x64 |
 | macOS | `.dmg` 或 `.zip` | Intel / Apple Silicon |
-| Windows | `.exe`，NSIS 安装器 | x64 |
 | Linux | `.AppImage` | x64 |
 
-首次启动时：
+> macOS 无签名版本首次打开需在「系统设置 → 隐私与安全性」点「仍要打开」，或右键 →「打开」。
 
-1. 选择界面语言。
-2. 选择模型服务并填写 API Key 或 Token Plan Key。
-3. 如需兼容服务，在设置里编辑 Base URL、协议和模型列表。
-4. 进入 Code 绑定本地项目，或进入 Write 创建写作工作区。
+### 首次启动
 
-### 路径 B：从源码运行
+1. 选择界面语言（默认 **简体中文**）。
+2. 登录 Claude360 账号：网页授权，或账号密码 + 2FA。
+3. 进入任一工作台开始创作——在 Code 绑定本地项目，或在写作 / 生图 / 音乐工作台直接开工。
+4. 选择模型时若对应分组尚无 Key，按提示确认自动创建即可。
+
+### <a id="从源码运行"></a>路径 B：从源码运行
 
 环境要求：
 
@@ -152,16 +159,16 @@ Kun 追求的是“完整能力 + 极致性价比”。需求先行的流程比�
 | --- | --- |
 | Node.js | 20+ |
 | npm | 随 Node.js 安装 |
-| 模型服务凭据 | DeepSeek / Xiaomi MiMo / MiniMax / 自定义 Provider 至少一个 |
+| Claude360 账号 | 用于登录并获取分组 / 模型 / Key |
 
 ```bash
-git clone https://github.com/KunAgent/Kun.git
-cd Kun
+git clone https://github.com/Johnhpure/claude360-Copilot.git
+cd claude360-Copilot
 npm install
 npm run dev
 ```
 
-中国大陆访问较慢时，可以使用 npm 镜像：
+中国大陆访问较慢时，可使用 npm 镜像：
 
 ```bash
 npm install --registry=https://registry.npmmirror.com
@@ -171,60 +178,67 @@ npm install --registry=https://registry.npmmirror.com
 
 | 命令 | 说明 |
 | --- | --- |
-| `npm run dev` | 构建 Kun 运行时并启动 Electron 开发环境 |
+| `npm run dev` | 构建本地运行时并启动 Electron 开发环境 |
 | `npm run build` | 生产构建 |
-| `npm run typecheck` | TypeScript 类型检查 |
+| `npm run typecheck` | TypeScript 类型检查（web + node 双 tsconfig） |
 | `npm run lint` | ESLint 检查 |
 | `npm run test` | 运行 Vitest 测试 |
-| `npm run dist:mac` | 构建 macOS `.dmg` 和 `.zip` |
-| `npm run dist:win` | 构建 Windows NSIS 安装器 |
-| `npm run dist:linux` | 构建 Linux AppImage |
+| `npm run dist:win` | 本地构建 Windows 便携包（需在 Windows 上） |
+| `npm run dist:mac` | 本地构建 macOS `.dmg` 和 `.zip`（需在 macOS 上） |
+| `npm run dist:linux` | 本地构建 Linux AppImage |
+
+## 打包与发布
+
+原生模块（`node-pty` 等）无法跨平台交叉编译，**Windows 与 macOS 安装包必须在对应平台或 CI 上构建**。仓库已配好 GitHub Actions 工作流 `.github/workflows/build-installers.yml`：
+
+- 打 `v*` 标签（如 `v0.2.0`）：云端产出 **三平台** 安装包。
+- 打 `win-v*` 标签（如 `win-v0.1.3`）：**仅打 Windows x64** 便携包，用于快速出测试包。
+- 也可在 GitHub → Actions → Build Installers → Run workflow 手动触发（可勾选 `only_windows`）。
+
+构建产物在对应 run 页面底部 **Artifacts** 下载（`Claude360-Copilot-Windows-x64` / `Claude360-Copilot-macOS`，保留 14 天）。完整说明见 [打包指引](doc/BUILD-打包环境与安装包.md)。
 
 ## 配置与数据
 
-- 偏好设置、会话、日志、运行时配置和本地运行时数据默认保存在本机。
-- 模型调用通过你配置的 Provider 凭据发起；Provider 预设可以作为起点，字段仍可编辑。
-- Code / Write / 连接手机共用同一个 `kun` 运行时边界，便于复用会话、审批、工具和用量统计。
-- 文件读写、命令执行、MCP 工具、媒体生成等高权限能力会经过权限与配置控制。
+- 偏好设置、会话、日志与本地运行时数据默认保存在本机。
+- 模型请求统一经 Claude360 中转站转发；分组、倍率、模型列表随账号拉取。
+- API Key 仅在主进程加密存储，渲染进程与配置文件中不出现明文。
+- 四大工作台共用同一本地运行时边界（HTTP/SSE），便于复用会话、审批、工具与用量统计。
+- 文件读写、命令执行、MCP 工具等高权限能力均经过权限与审批控制。
+
+## 技术栈
+
+| 层 | 选型 |
+| --- | --- |
+| 桌面框架 | Electron 34 |
+| 前端 | React 19 + TypeScript + Tailwind CSS |
+| 构建 | electron-vite（Vite 6） |
+| 状态管理 | Zustand |
+| 测试 | Vitest |
+| 运行时边界 | 内置本地运行时，提供 HTTP/SSE，采用 cache-first agent loop、追加式事件日志与上下文压缩 |
+| 中转接入 | Claude360 中转站（OpenAI 兼容风格接口） |
 
 ## 文档地图
 
 | 文档 | 内容 |
 | --- | --- |
-| [kun/README.zh-CN.md](kun/README.zh-CN.md) | Kun 运行时、CLI、环境变量、HTTP API |
-| [docs/kun-architecture.md](docs/kun-architecture.md) | 单运行时架构与 GUI 集成 |
-| [docs/kun-cache-optimization.md](docs/kun-cache-optimization.md) | 缓存优化、token economy 与可观测性 |
-| [docs/model-provider-presets.md](docs/model-provider-presets.md) | 模型 Provider 预设与扩展能力 |
-| [docs/workflow-loop.md](docs/workflow-loop.md) | Loop 循环节点与 loop-agent 思想（创建loop / 工作流） |
-| [docs/DEVELOPMENT.zh-CN.md](docs/DEVELOPMENT.zh-CN.md) | 本地开发流程、分支策略和发布说明 |
+| [doc/BUILD-打包环境与安装包.md](doc/BUILD-打包环境与安装包.md) | 打包能力矩阵、GitHub Actions 云端打包与本地打包 |
+| [docs/DEVELOPMENT.zh-CN.md](docs/DEVELOPMENT.zh-CN.md) | 本地开发流程、分支策略与发布说明 |
 | [docs/CONTRIBUTING.zh-CN.md](docs/CONTRIBUTING.zh-CN.md) | 贡献说明 |
 | [SECURITY.zh-CN.md](SECURITY.zh-CN.md) | 安全漏洞披露方式 |
 
 ## 贡献
 
-欢迎提交 bug 修复、UI/UX 优化、文档改进、本地化内容、构建发布流程和运行时集成相关改动。
+欢迎提交 bug 修复、UI/UX 优化、文档改进、本地化内容与构建发布流程相关改动。
 
-协作约定：
-
-- 日常协作与集成分支为 `develop`，稳定发布分支为 `master`。
-- PR 默认提交到 `develop`。
-- 发起 PR 前建议运行 `npm run typecheck`、`npm run build` 和 `npm run test`。
+- 发起 PR 前建议运行 `npm run typecheck`、`npm run lint`、`npm run test` 与 `npm run build`。
 - 外部贡献需接受 [Contributor License Agreement](./CLA.md)。
-
-## 致谢
-
-感谢 [LobsterAI](https://github.com/netease-youdao/LobsterAI)、DeepSeek、Xiaomi MiMo、MiniMax，以及所有提交 issue、建议、代码和文档的贡献者。
-
-<a href="https://github.com/KunAgent/Kun/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=KunAgent/Kun" alt="Kun contributors" />
-</a>
 
 ## 许可证
 
-本项目仅供学习和参考，不可用于任何商业用途。商业使用、商业分发、SaaS/托管服务、二次销售或集成到商业产品中，均需要获得作者的单独书面授权。
+本项目仅供学习和参考，**不可用于任何商业用途**。商业使用、商业分发、SaaS / 托管服务、二次销售或集成到商业产品中，均需获得作者单独书面授权。
 
 教育机构与公益教育机构可用于非商业教学、研究、课程实验和学习参考。完整条款见 [PolyForm Noncommercial License 1.0.0](./LICENSE)。
 
-## Star 历史
+## 致谢
 
-[![Star History Chart](https://api.star-history.com/chart?repos=KunAgent/Kun&type=date&legend=top-left)](https://www.star-history.com/?repos=KunAgent%2FKun&type=date&logscale=&legend=top-left)
+Claude360 Copilot 基于优秀的开源 Electron Agent 客户端二次开发，并深度整合 Claude360 中转站的模型能力。感谢上游开源社区，以及所有提交 issue、建议、代码和文档的贡献者。

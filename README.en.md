@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="src/asset/img/kun.png" width="104" alt="Kun icon">
+  <img src="src/asset/img/claude360.png" width="104" alt="Claude360 Copilot icon">
 </p>
 
-<h1 align="center">Kun</h1>
+<h1 align="center">Claude360 Copilot</h1>
 
 <p align="center">
-  <strong>An experiment in requirement-first coding for the next programming paradigm.</strong><br>
-  Use DeepSeek, Xiaomi MiMo, and MiniMax to connect requirement clarification, design drafts, plans, and agent coding into one loop.
+  <strong>One account, four workbenches: Code · Write · Image · Music.</strong><br>
+  Powered by the Claude360 relay, it puts an AI agent into real workflows — not just another chat box.
 </p>
 
 <p align="center">
@@ -14,94 +14,105 @@
   &nbsp;·&nbsp;
   <strong>English</strong>
   &nbsp;·&nbsp;
-  <a href="https://github.com/KunAgent/Kun/releases">Download</a>
+  <a href="https://github.com/Johnhpure/claude360-Copilot/releases">Download</a>
   &nbsp;·&nbsp;
-  <a href="#documentation-map">Docs</a>
+  <a href="#core-workbenches">Features</a>
   &nbsp;·&nbsp;
   <a href="#path-b-run-from-source">Run from source</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/KunAgent/Kun/releases"><img src="https://img.shields.io/github/v/release/KunAgent/Kun?label=release" alt="GitHub release"></a>
+  <a href="https://github.com/Johnhpure/claude360-Copilot/releases"><img src="https://img.shields.io/github/v/release/Johnhpure/claude360-Copilot?label=release" alt="GitHub release"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue" alt="License: PolyForm Noncommercial 1.0.0"></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/Electron-34-47848F?logo=electron&logoColor=white" alt="Electron 34">
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
 </p>
 
-Kun is a product experiment for the future of programming: instead of starting from “ask the agent to edit code,” it starts from requirement clarification and connects requirement documents, design drafts, interactive prototypes, implementation plans, todos, agent coding, and change review in one GUI workflow.
+**Claude360 Copilot** is a cross-platform desktop AI workbench. Sign in with a single Claude360 account and do **coding, writing, image generation, and music creation** in one app — no more juggling multiple websites, subscriptions, and API keys.
 
-Kun is for users who want to put AI agents into real everyday work. It is not just a chat client, and it is not only a CLI shell for programmers: you can hand it a local folder for code, requirements, plans, and change review, or use the dedicated Write workspace for long-form Markdown, editing, and document export.
+Unlike chat-only clients, it puts AI into real work: the Code workbench binds to a local codebase to read/edit files, run commands, and review every change; the Write workbench is a full Markdown authoring environment; the Image and Music workbenches bring text-to-image / image-to-image and Suno music creation right into the desktop. All model requests are routed through the **Claude360 relay** (OpenAI-compatible style), with accounts, groups, rate multipliers, and keys managed in-app.
 
-This is also why Kun treats DeepSeek, Xiaomi MiMo, and MiniMax as the default first-class model stack, not just ordinary optional providers. Requirement-first coding requires more rounds of clarification, research, structuring, planning, execution, and verification. If model cost is too high, that richer workflow cannot become an everyday habit. Kun chooses three cost-efficient Chinese model providers so the full loop is affordable to run, repeat, and refine.
-
-Kun includes the local `kun serve` runtime for the desktop app. Preferences, sessions, logs, and runtime config stay on your machine; model calls use your own provider credentials. For workflows that can read/write files or run commands, Kun gives you tool approvals, filesystem permission modes, inline diffs, and a change-review panel.
+Sessions, logs, preferences, and runtime data stay on your machine by default; API keys are stored encrypted in the main process and never persisted in plaintext. For flows that read/write files or run commands, the app provides tool approvals, permission modes, inline diffs, and a change-review panel.
 
 ---
 
 <p align="center">
   <a href="src/asset/img/code.mp4">
-    <img src="src/asset/img/code.gif" width="410" alt="Kun Code mode demo">
+    <img src="src/asset/img/code.gif" width="410" alt="Code workbench demo">
   </a>
   <a href="src/asset/img/write.mp4">
-    <img src="src/asset/img/write.gif" width="410" alt="Kun Write mode demo">
+    <img src="src/asset/img/write.gif" width="410" alt="Write workbench demo">
   </a>
 </p>
 
-## Requirement-First Coding
+## Core Workbenches
 
-Kun explores a next-generation programming workflow: **requirement -> design -> plan -> code -> verify**. It is not just a chat box attached to an IDE.
+Claude360 Copilot condenses four high-frequency creative scenarios into four workbenches that share one account, group config, and local runtime.
 
-| Stage | Kun's approach |
+### 🧩 Code — Requirement-Driven Agent Coding
+
+Instead of "one prompt, straight to code edits," it connects **requirement → design → plan → code → verify** into one continuous GUI workflow.
+
+- Bind a local project folder to read code context, run shell commands, and edit files.
+- Requirement drafts with AI clarification, pre-implementation research, structured requirement blocks, and acceptance criteria.
+- `/plan` produces manageable implementation plans; move into todos, `/goal`, side conversations, thread compaction, forking, and archiving.
+- Pre-commit inline diffs, a change-review panel, `/review`, tool approvals, and filesystem permission modes.
+- Connect MCP (Model Context Protocol) servers and project/global Skills to extend tools per task.
+
+### ✍️ Write — A Dedicated Markdown Studio
+
+A writing workspace decoupled from Code, bringing agent assistance to long-form authoring.
+
+- Markdown file tree with Live / Source / Split / Preview modes.
+- AI inline completion, selection-based rewriting/polishing, and image attachments.
+- One-click export to `HTML / PDF / DOC / DOCX`.
+
+### 🎨 Image — Text-to-Image / Image-to-Image
+
+A full parameter panel from prompt to picture, covering mainstream generation needs.
+
+| Parameter | Options |
 | --- | --- |
-| **Clarify** | Create requirement drafts in the GUI and ask Requirement AI to find missing questions, research options, and shape boundaries |
-| **Document** | Save drafts as `.kunsdd/draft/.../requirement.md`, with structured requirement blocks, acceptance criteria, and requirement history |
-| **Design** | Generate UI design drafts, infographics, or interactive HTML prototypes from requirement selections, so requirements become more than text |
-| **Plan** | Use `/plan` and `create_plan` to produce GUI-owned `.kunsdd/plan/...` implementation plans linked back to requirements |
-| **Code** | Move from plan into todos, file edits, command execution, and change review; when requirements change, Kun can surface affected replanning |
-| **Verify** | Bring requirement blocks, acceptance criteria, plan state, and `/review` back together to answer whether the original requirement is done |
+| Model | Determined by the image models available in the selected group |
+| Reference image (optional) | Upload for image-to-image; omit for text-to-image |
+| Aspect ratio | 10 presets (square / widescreen / portrait / print / feed, etc.) as an icon grid |
+| Resolution | 1K / 2K / 4K |
+| Count | Batch generation per run |
+| Quality | Auto / High / Medium / Low |
+| Output format | PNG / JPEG / WebP |
 
-This is Kun's most important product direction: moving AI coding from instant Q&A into a requirement-driven software production workflow. Models, writing, planning, review, and automation all serve that line.
+Paired with a history panel and a result grid for review and comparison.
 
-## Core Model Stack
+### 🎵 Music — Suno Music Studio
 
-Kun optimizes for **complete capability + extreme cost efficiency**. A requirement-first workflow is longer than ordinary chat and depends on repeated model calls; first-run setup and provider settings are organized around three Chinese model providers so users can cover more agent scenarios with lower model cost.
+Two creation modes, from spark to song.
 
-| Provider | Role in Kun |
+- **One-shot**: just a model + a single-sentence description for a quick track.
+- **Standard**: title + lyrics (with a built-in **✨ AI lyrics assistant** — streamed token-by-token, insert on accept) + style preset chips + negative style tags + instrumental toggle + advanced params (vocal gender / style weight / weirdness / persona).
+- The track list shows returned cover art, with an enhanced player: seek, volume control, and previous/next queue playback.
+
+## Account, Groups & Keys
+
+Claude360 Copilot drops the old "add each provider / paste each API key" mental model in favor of **account → group → model**.
+
+- **In-app sign-in**: web authorization or account password + 2FA — no manual key pasting.
+- **Groups & Keys**: view your account's available groups (with rate multipliers) and their models, and manage API keys per group in Settings.
+- **Auto key on demand**: when you pick a model in any workbench, the app checks whether that group already has a usable key — if not, an elegant modal appears, and on confirm it creates and back-fills the key without leaving the app.
+- **Secure storage**: API keys are stored encrypted in the main process; no plaintext in the renderer or config files.
+
+## Why Claude360 Copilot
+
+| You want | Claude360 Copilot provides |
 | --- | --- |
-| **DeepSeek** | Default text and reasoning provider with `deepseek-v4-pro` / `deepseek-v4-flash`, powering coding, planning, review, long-context sessions, and auto model routing |
-| **Xiaomi MiMo** | Cost-efficient multimodal and speech entry point, covering long-context text models, vision input, ASR transcription, TTS generation, and Token Plan |
-| **MiniMax** | Full media generation complement, covering Anthropic Messages text models, image generation, speech generation, music generation, video generation, and Token Plan |
-
-This stack lets Kun route different jobs to the right capability: fast models for lightweight clarification, stronger models for complex coding and reasoning, speech for writing and IM flows, and image/music/video generation for design and creative work. You can still add OpenAI-compatible, self-hosted, or other custom providers, but Kun's default experience is built around these three cost-efficient model services.
-
-## Why Kun
-
-| You want | Kun provides |
-| --- | --- |
-| A next-generation coding workflow | Requirement clarification, requirement documents, design drafts, implementation plans, agent coding, and verification in one line |
-| Complete agent capability at extreme cost efficiency | DeepSeek, Xiaomi MiMo, and MiniMax as the core stack for text, reasoning, vision, speech, image, music, and video |
-| AI that works on real projects | Bind a local workspace, read and edit files, search code, run commands, and inspect tool calls and results |
-| Requirements that become executable plans | New requirements, `/plan`, todos, `/goal`, side conversations, thread compaction, forking, and archiving |
-| Controlled changes | Tool approvals, filesystem permission modes, inline diffs, a change-review panel, and `/review` |
-| Writing in the same app | Markdown file tree, Live / Source / Split / Preview, export formats, and selection-based inline agent actions |
-| Remote or background triggers | Feishu / Lark / WeChat connection, local webhook / relay, and one-time or recurring scheduled tasks |
-| Reusable workflows for repeatable processes | Visual "Create Loop" node editor to draw, run, and reuse multi-step agent flows |
-| More than one model vendor | Custom Base URLs, protocols, model lists, and capability extensions beyond the three core providers |
-
-## Core Features
-
-- **Requirement-first coding**: draft requirements, clarify and structure them with AI, generate design drafts or prototypes, then move into implementation plans, todos, agent coding, and verification.
-- **Code workbench**: bind a local project folder, chat around real codebases, read and edit files, run commands, and inspect tool calls and file changes.
-- **Planning and review**: new requirements, `/plan`, todos, `/goal`, `/review`, side conversations, thread compaction, forking, and archiving.
-- **Controlled changes**: inline diffs, a change-review panel, tool approvals, and filesystem permission modes.
-- **Write mode**: dedicated Markdown workspaces with a file tree, Live / Source / Split / Preview modes, completion, selection-based inline agent actions, and `HTML / PDF / DOC / DOCX` export.
-- **Connect phone**: Feishu / Lark / WeChat IM agents, local webhook / relay support, and one-time, daily, interval, or manual scheduled tasks.
-- **Visual workflows (Create Loop)**: an n8n / dify-style node canvas on top of scheduled tasks that turns multi-step agent flows into runnable, reusable workflows — rich triggers and nodes, typed dataflow, a local run API, exposable to Kun as a tool, and bindable to hook phases.
-- **Model-stack-first**: first-run setup, provider presets, and capability auto-wiring are designed around DeepSeek, Xiaomi MiMo, and MiniMax as a cost-efficient full agent stack.
-- **Multimodal and media capabilities**: image attachments, vision input, speech transcription, image generation, speech generation, music generation, and video generation, enabled by provider configuration.
-- **MCP and Skills**: Model Context Protocol servers and project/global Skills give Kun specialized tools and workflows for different tasks.
-- **Local runtime**: `kun serve` provides the HTTP/SSE boundary with a cache-first agent loop, append-only event logs, usage tracking, and context compaction.
+| One entry for many kinds of creation | Code / Write / Image / Music workbenches sharing one account and runtime |
+| One account, one place to bill | Unified routing via the Claude360 relay; groups, multipliers, and keys managed in-app |
+| AI that works on real projects | Bind a local workspace, read/edit files, search code, run commands, review changes |
+| Requirements that become executable plans | Requirement drafts, `/plan`, todos, `/goal`, thread compaction, forking, and archiving |
+| Controlled changes | Tool approvals, permission modes, inline diffs, a change-review panel, and `/review` |
+| Writing in the same app | Markdown file tree, multiple preview modes, AI completion/rewrite, multi-format export |
+| Direct image and music creation | Text/image-to-image parameter panel, Suno one-shot/standard creation with AI lyrics |
+| Data and keys that stay local | Sessions/logs/config kept local; keys encrypted in the main process, never plaintext |
 
 ## More Demos
 
@@ -110,40 +121,35 @@ This stack lets Kun route different jobs to the right capability: fast models fo
     <img src="src/asset/img/pdf-research.gif" width="680" alt="PDF research demo">
   </a>
 </p>
-<p align="center"><em>PDF research and source organization demo</em></p>
+<p align="center"><em>PDF research and source organization</em></p>
 
 <p align="center">
   <a href="src/asset/img/sdd.mp4">
-    <img src="src/asset/img/sdd.gif" width="680" alt="Requirement clarification, requirement documents, and planning demo">
+    <img src="src/asset/img/sdd.gif" width="680" alt="Requirement clarification, documents, and planning demo">
   </a>
 </p>
-<p align="center"><em>Requirement clarification, requirement documents, and planning demo</em></p>
-
-<p align="center">
-  <a href="src/asset/img/ikun-ui-plugin.mp4">
-    <img src="src/asset/img/ikun-ui-plugin.gif" width="680" alt="iKun UI plugin demo">
-  </a>
-</p>
-<p align="center"><em>iKun UI plugin demo</em></p>
+<p align="center"><em>Requirement clarification, requirement documents, and implementation plans</em></p>
 
 ## Quick Start
 
 ### Path A: Download a Release
 
-Download the latest build from [GitHub Releases](https://github.com/KunAgent/Kun/releases).
+Download the latest build from [GitHub Releases](https://github.com/Johnhpure/claude360-Copilot/releases).
 
 | Platform | Package | Architecture |
 | --- | --- | --- |
+| Windows | `.zip` portable (unzip and run) | x64 |
 | macOS | `.dmg` or `.zip` | Intel / Apple Silicon |
-| Windows | `.exe`, NSIS installer | x64 |
 | Linux | `.AppImage` | x64 |
 
-On first launch:
+> Unsigned macOS builds require "Open Anyway" under System Settings → Privacy & Security on first launch, or right-click → Open.
 
-1. Choose a UI language.
-2. Choose a model provider and enter an API key or Token Plan key.
-3. For compatible providers, edit the Base URL, protocol, and model list in Settings.
-4. Open Code and bind a local project, or open Write and create a writing workspace.
+### First Launch
+
+1. Choose a UI language (defaults to **Simplified Chinese**).
+2. Sign in to your Claude360 account: web authorization, or account password + 2FA.
+3. Open any workbench and start creating — bind a local project in Code, or jump straight into Write / Image / Music.
+4. If the selected group has no key yet, confirm the prompt to auto-create one.
 
 ### Path B: Run From Source
 
@@ -153,11 +159,11 @@ Requirements:
 | --- | --- |
 | Node.js | 20+ |
 | npm | Ships with Node.js |
-| Model credentials | At least one of DeepSeek / Xiaomi MiMo / MiniMax / custom provider |
+| Claude360 account | To sign in and obtain groups / models / keys |
 
 ```bash
-git clone https://github.com/KunAgent/Kun.git
-cd Kun
+git clone https://github.com/Johnhpure/claude360-Copilot.git
+cd claude360-Copilot
 npm install
 npm run dev
 ```
@@ -172,60 +178,67 @@ npm install --registry=https://registry.npmmirror.com
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Build the Kun runtime and start the Electron dev app |
+| `npm run dev` | Build the local runtime and start the Electron dev app |
 | `npm run build` | Production build |
-| `npm run typecheck` | TypeScript type checking |
+| `npm run typecheck` | TypeScript type checking (web + node tsconfigs) |
 | `npm run lint` | ESLint checks |
 | `npm run test` | Vitest tests |
-| `npm run dist:mac` | Build macOS `.dmg` and `.zip` |
-| `npm run dist:win` | Build the Windows NSIS installer |
+| `npm run dist:win` | Build Windows packages locally (on Windows) |
+| `npm run dist:mac` | Build macOS `.dmg` and `.zip` locally (on macOS) |
 | `npm run dist:linux` | Build the Linux AppImage |
+
+## Packaging & Release
+
+Native modules (e.g. `node-pty`) cannot be cross-compiled, so **Windows and macOS installers must be built on their own platform or in CI**. The repo ships a GitHub Actions workflow, `.github/workflows/build-installers.yml`:
+
+- Tag `v*` (e.g. `v0.2.0`): produce **all three platforms** in the cloud.
+- Tag `win-v*` (e.g. `win-v0.1.3`): build **Windows x64 only** (a portable zip) for quick test builds.
+- Or trigger manually via GitHub → Actions → Build Installers → Run workflow (with an optional `only_windows` toggle).
+
+Download build artifacts from the **Artifacts** section at the bottom of the run page (`Claude360-Copilot-Windows-x64` / `Claude360-Copilot-macOS`, retained for 14 days). See the [packaging guide](doc/BUILD-打包环境与安装包.md) for full details.
 
 ## Configuration and Data
 
-- Preferences, sessions, logs, runtime config, and local runtime data stay on your machine by default.
-- Model calls use the provider credentials you configure; provider presets are editable starting points.
-- Code / Write / Connect Phone share the same `kun` runtime boundary for sessions, approvals, tools, and usage tracking.
-- File writes, command execution, MCP tools, and media generation are governed by permissions and configuration.
+- Preferences, sessions, logs, and local runtime data stay on your machine by default.
+- Model requests are routed through the Claude360 relay; groups, multipliers, and model lists are fetched with your account.
+- API keys are stored encrypted in the main process; no plaintext in the renderer or config files.
+- All four workbenches share one local runtime boundary (HTTP/SSE) for sessions, approvals, tools, and usage tracking.
+- File writes, command execution, and MCP tools are governed by permissions and approvals.
+
+## Tech Stack
+
+| Layer | Choice |
+| --- | --- |
+| Desktop framework | Electron 34 |
+| Frontend | React 19 + TypeScript + Tailwind CSS |
+| Build | electron-vite (Vite 6) |
+| State | Zustand |
+| Testing | Vitest |
+| Runtime boundary | Built-in local runtime over HTTP/SSE, with a cache-first agent loop, append-only event logs, and context compaction |
+| Relay | Claude360 relay (OpenAI-compatible style) |
 
 ## Documentation Map
 
 | Doc | Contents |
 | --- | --- |
-| [kun/README.md](kun/README.md) | Kun runtime, CLI, environment variables, HTTP API |
-| [docs/kun-architecture.en.md](docs/kun-architecture.en.md) | Runtime architecture and GUI integration |
-| [docs/kun-cache-optimization.en.md](docs/kun-cache-optimization.en.md) | Cache optimization and token economy |
-| [docs/model-provider-presets.md](docs/model-provider-presets.md) | Model provider presets |
-| [docs/workflow-loop.en.md](docs/workflow-loop.en.md) | The Loop node and the loop-agent idea (Create Loop workflows) |
+| [doc/BUILD-打包环境与安装包.md](doc/BUILD-打包环境与安装包.md) | Packaging matrix, GitHub Actions cloud builds, and local builds (zh) |
+| [docs/DEVELOPMENT.en.md](docs/DEVELOPMENT.en.md) | Local development workflow, branch strategy, and release notes |
 | [docs/CONTRIBUTING.en.md](docs/CONTRIBUTING.en.md) | Contribution guide |
-| [docs/DEVELOPMENT.en.md](docs/DEVELOPMENT.en.md) | Local development workflow |
 | [SECURITY.md](SECURITY.md) | Security disclosure policy |
 
 ## Contributing
 
-Bug fixes, UI/UX improvements, documentation, localization, build/release work, and runtime integration contributions are welcome.
+Bug fixes, UI/UX improvements, documentation, localization, and build/release work are welcome.
 
-Project conventions:
-
-- Day-to-day integration happens on `develop`; stable releases land on `master`.
-- Open pull requests into `develop` by default.
-- Before opening a PR, run `npm run typecheck`, `npm run build`, and `npm run test` when possible.
+- Before opening a PR, run `npm run typecheck`, `npm run lint`, `npm run test`, and `npm run build` when possible.
 - External contributions require acceptance of the [Contributor License Agreement](./CLA.md).
-
-## Thanks
-
-Thanks to [LobsterAI](https://github.com/netease-youdao/LobsterAI), DeepSeek, Xiaomi MiMo, MiniMax, and everyone who contributes issues, ideas, code, and documentation.
-
-<a href="https://github.com/KunAgent/Kun/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=KunAgent/Kun" />
-</a>
 
 ## License
 
-This project is provided for learning and reference only and may not be used for any commercial purpose. Commercial use, commercial distribution, SaaS/hosted services, resale, or integration into commercial products requires separate written authorization from the author.
+This project is provided for learning and reference only and **may not be used for any commercial purpose**. Commercial use, commercial distribution, SaaS/hosted services, resale, or integration into commercial products requires separate written authorization from the author.
 
-Educational institutions and public-interest educational organizations may use the project for noncommercial teaching, research, coursework, experiments, and learning/reference purposes. See [PolyForm Noncommercial License 1.0.0](./LICENSE) for the full terms.
+Educational institutions and public-interest educational organizations may use it for noncommercial teaching, research, coursework, experiments, and learning/reference purposes. See [PolyForm Noncommercial License 1.0.0](./LICENSE) for the full terms.
 
-## Star History
+## Acknowledgements
 
-[![Star History Chart](https://api.star-history.com/chart?repos=KunAgent/Kun&type=date&legend=top-left)](https://www.star-history.com/?repos=KunAgent%2FKun&type=date&logscale=&legend=top-left)
+Claude360 Copilot is built on top of an excellent open-source Electron agent client and deeply integrates the model capabilities of the Claude360 relay. Thanks to the upstream open-source community and everyone who contributes issues, ideas, code, and documentation.
