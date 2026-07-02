@@ -5,7 +5,6 @@ import type {
   ModelProviderProfileV1
 } from '@shared/app-settings'
 import {
-  DEFAULT_MODEL_PROVIDER_ID,
   DEFAULT_WRITE_INLINE_COMPLETION_BASE_URL,
   DEFAULT_WRITE_INLINE_COMPLETION_MAX_TOKENS,
   DEFAULT_WRITE_INLINE_COMPLETION_MODEL,
@@ -14,6 +13,7 @@ import {
   MIN_KUN_LOCAL_PORT,
   WRITE_INLINE_COMPLETION_MODEL_IDS,
   defaultModelProviderSettings,
+  isClaude360ProviderId,
   isKunRuntimeInsecure,
   kunToolPermissionModeFromSettings,
   kunToolPermissionModeSettings
@@ -508,7 +508,8 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
     })
   }
   const provider = form.provider ?? defaultModelProviderSettings()
-  const modelProviders = provider.providers as ModelProviderProfileV1[]
+  const modelProviders = (provider.providers as ModelProviderProfileV1[])
+    .filter((item) => isClaude360ProviderId(item.id))
   const computerUse = kun.computerUse ?? {
     enabled: false,
     mode: 'auto' as const,
@@ -538,16 +539,9 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
       }
     })
   }
-  const activeProviderId = kun.providerId?.trim() || DEFAULT_MODEL_PROVIDER_ID
+  const activeProviderId = kun.providerId?.trim()
   const activeProvider = modelProviders.find((item) => item.id === activeProviderId) ?? modelProviders[0]
   const activeProviderModels = activeProvider?.models ?? []
-  const selectKunProvider = (providerId: string): void => {
-    const nextProvider = modelProviders.find((item) => item.id === providerId) ?? activeProvider
-    const nextModel = nextProvider?.models.includes(kun.model)
-      ? kun.model
-      : nextProvider?.models[0] ?? kun.model
-    updateKun({ providerId, model: nextModel, apiKey: '', baseUrl: '' })
-  }
   const toolPermissionMode = kunToolPermissionModeFromSettings(kun)
 
   return (
@@ -575,21 +569,6 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     }
                   />
                   <SettingRow
-                    title={t('kunProvider')}
-                    description={t('kunProviderSelectDesc')}
-                    control={
-                      <select
-                        className={selectControlClass}
-                        value={activeProvider?.id ?? DEFAULT_MODEL_PROVIDER_ID}
-                        onChange={(e) => selectKunProvider(e.target.value)}
-                      >
-                        {modelProviders.map((item) => (
-                          <option key={item.id} value={item.id}>{item.name}</option>
-                        ))}
-                      </select>
-                    }
-                  />
-                  <SettingRow
                     title={t('kunModel')}
                     description={t('kunModelDesc')}
                     control={
@@ -600,9 +579,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                           model === activeProviderModels[0]
                             ? t('modelSelectDefaultSuffix', { model })
                             : model}
-                        allowCustom
-                        customLabel={t('modelSelectCustomOption')}
-                        customPlaceholder={t('modelSelectCustomPlaceholder')}
+                        defaultLabel={activeProviderModels[0] ? undefined : ''}
                         selectClassName={selectControlClass}
                         onChange={(model) => {
                           const next = model.trim()

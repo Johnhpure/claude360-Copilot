@@ -9,6 +9,10 @@ const labels: Record<string, string> = {
   imageGen: 'Image generation',
   imageGenEnabled: 'Enable image generation',
   imageGenEnabledDesc: 'Enable generate_image',
+  imageGenProvider: 'Image provider',
+  imageGenProviderCustom: 'Custom image API',
+  imageGenBaseUrl: 'Image base URL',
+  imageGenApiKey: 'Image API key',
   textToSpeech: 'Speech generation',
   textToSpeechEnabled: 'Enable speech generation',
   textToSpeechEnabledDesc: 'Enable generate_speech',
@@ -64,7 +68,7 @@ function t(key: string, params?: Record<string, unknown>): string {
 }
 
 describe('MediaGenerationSettingsSection', () => {
-  it('renders configured speech, music, and video provider controls', () => {
+  it('hides legacy custom provider and credential controls', () => {
     const html = renderToStaticMarkup(createElement(MediaGenerationSettingsSection, {
       ctx: {
         t,
@@ -93,6 +97,16 @@ describe('MediaGenerationSettingsSection', () => {
           }]
         },
         kun: {
+          imageGeneration: {
+            enabled: true,
+            providerId: 'custom-image',
+            protocol: 'openai-images',
+            baseUrl: 'https://image.example.com/v1',
+            apiKey: 'sk-image',
+            model: 'custom-image-model',
+            defaultSize: '',
+            timeoutMs: 180000
+          },
           textToSpeech: {
             enabled: true,
             providerId: 'minimax',
@@ -132,12 +146,18 @@ describe('MediaGenerationSettingsSection', () => {
 
     expect(html).toContain('Media generation')
     expect(html).toContain('Image generation')
-    expect(html).toContain('Enable generate_image')
-    expect(html).toContain('Speech generation')
-    expect(html).toContain('speech-2.8-hd')
-    expect(html).toContain('Music generation')
-    expect(html).toContain('music-2.6')
-    expect(html).toContain('Video generation')
-    expect(html).toContain('MiniMax-Hailuo-2.3')
+    expect(html).not.toContain('Custom image API')
+    expect(html).not.toContain('Custom speech API')
+    expect(html).not.toContain('Custom music API')
+    expect(html).not.toContain('Custom video API')
+    expect(html).not.toContain('Image provider')
+    expect(html).not.toContain('Speech provider')
+    expect(html).not.toContain('Music provider')
+    expect(html).not.toContain('Video provider')
+    expect(html).not.toContain('Image base URL')
+    expect(html).not.toContain('Image API key')
+    expect(html).not.toContain('apiKey')
+    expect(html).not.toContain('baseUrl')
+    expect(html).not.toContain('MiniMax')
   })
 })

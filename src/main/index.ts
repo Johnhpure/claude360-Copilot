@@ -1752,9 +1752,7 @@ app.whenReady().then(async () => {
   })
   const claude360ModelService = new Claude360ModelService({
     apiClient: claude360ApiClient,
-    secretStore: claude360SecretStore,
-    ensureGroupRef: async (group, purpose) =>
-      claude360TokenService.ensureGroupToken(group, purpose)
+    secretStore: claude360SecretStore
   })
   const claude360MusicService = new Claude360MusicService({
     apiClient: claude360ApiClient,

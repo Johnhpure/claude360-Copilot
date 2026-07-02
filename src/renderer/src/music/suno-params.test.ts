@@ -42,20 +42,22 @@ describe('buildSubmitPayload · 一句话模式', () => {
     expect(p.prompt).toBe('轻快的城市夜晚电子乐')
     expect(p.style).toBeUndefined()
   })
-  it('忽略歌词与纯器乐，仅发送描述（一句话生成收敛为 custom_mode:false）', () => {
+  it('填了歌词 → custom_mode=true, prompt=歌词, style=描述, title 自动', () => {
     const f = {
       ...base,
       mode: 'oneshot',
       description: '城市夜晚',
-      lyrics: '[Verse]\n霓虹河流',
-      instrumental: true
+      lyrics: '[Verse]\n霓虹河流'
     } as Claude360MusicCreateForm
     const p = buildSubmitPayload(f)
-    expect(p.custom_mode).toBe(false)
-    expect(p.prompt).toBe('城市夜晚')
-    expect(p.instrumental).toBeUndefined()
-    expect(p.style).toBeUndefined()
-    expect(p.title).toBeUndefined()
+    expect(p.custom_mode).toBe(true)
+    expect(p.prompt).toBe('[Verse]\n霓虹河流')
+    expect(p.style).toBe('城市夜晚')
+    expect(p.title).toBe('城市夜晚')
+  })
+  it('纯器乐 → instrumental=true', () => {
+    const f = { ...base, mode: 'oneshot', description: '城市夜晚', instrumental: true } as Claude360MusicCreateForm
+    expect(buildSubmitPayload(f).instrumental).toBe(true)
   })
 })
 

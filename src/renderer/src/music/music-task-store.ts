@@ -46,6 +46,8 @@ export interface MusicTasksState {
   markFailed: (id: string, message: string) => void
   applyFetched: (results: Claude360MusicFetchedTask[]) => void
   removeTask: (id: string) => void
+  removeSong: (id: string) => void
+  clearFinishedTasks: () => void
 }
 
 /**
@@ -156,7 +158,19 @@ export function createMusicTaskStore(
         )
       })),
     applyFetched: (results) => set((s) => ({ tasks: reduceFetched(s.tasks, results) })),
-    removeTask: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }))
+    removeTask: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
+    removeSong: (id) =>
+      set((s) => ({
+        tasks: s.tasks
+          .map((t) =>
+            t.songs.some((song) => song.id === id)
+              ? { ...t, songs: t.songs.filter((song) => song.id !== id) }
+              : t
+          )
+          .filter((t) => t.status !== 'success' || t.songs.length > 0)
+      })),
+    clearFinishedTasks: () =>
+      set((s) => ({ tasks: s.tasks.filter((t) => IN_FLIGHT_STATUSES.includes(t.status)) }))
   }))
 
   if (shouldPersist) {

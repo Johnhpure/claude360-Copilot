@@ -1,4 +1,4 @@
-import type { ChangeEvent, ReactElement } from 'react'
+import { useState, type ChangeEvent, type ReactElement } from 'react'
 import { Download, Music4, Pause, Play, SkipBack, SkipForward, Volume2 } from 'lucide-react'
 import type { Claude360Song } from '@shared/claude360-music'
 
@@ -36,6 +36,28 @@ function playerSubtitle(song: Claude360Song, t: TFn): string {
   return t('musicSongReady')
 }
 
+function PlayerCover({ song, t }: { song: Claude360Song; t: TFn }): ReactElement {
+  const [failed, setFailed] = useState(false)
+  if (song.imageUrl && !failed) {
+    return (
+      <img
+        src={song.imageUrl}
+        alt={t('musicCoverAlt', { title: song.title })}
+        onError={() => setFailed(true)}
+        className="h-11 w-11 shrink-0 rounded-lg object-cover"
+      />
+    )
+  }
+  return (
+    <div
+      data-testid="music-player-cover-placeholder"
+      className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-black text-[#f5c542]"
+    >
+      <Music4 className="h-5 w-5" strokeWidth={1.5} />
+    </div>
+  )
+}
+
 // 底部增强播放器：封面 / 标题 / 副标题 + 上一首·播放暂停·下一首 + 进度条(可拖动) +
 // 音量 + 下载。音频副作用由容器把 store 状态桥接到 <audio>，本组件纯展示 + 回调。
 export function MusicPlayer({
@@ -58,7 +80,7 @@ export function MusicPlayer({
     return (
       <footer
         data-testid="music-player"
-        className="rounded-2xl border border-ds-border bg-ds-card px-4 py-3 text-center text-[12.5px] text-ds-faint"
+        className="rounded-2xl border border-white/10 bg-[#0b0b0b] px-4 py-3 text-center text-[12.5px] text-ds-faint"
       >
         {t('musicPlayerEmpty')}
       </footer>
@@ -70,20 +92,10 @@ export function MusicPlayer({
   return (
     <footer
       data-testid="music-player"
-      className="flex flex-col gap-2.5 rounded-2xl border border-ds-border bg-ds-card px-4 py-3"
+      className="flex flex-col gap-2.5 rounded-2xl border border-white/10 bg-[#0b0b0b] px-4 py-3 shadow-[0_18px_44px_rgba(0,0,0,0.26)]"
     >
       <div className="flex items-center gap-3">
-        {current.imageUrl ? (
-          <img
-            src={current.imageUrl}
-            alt={t('musicCoverAlt', { title: current.title })}
-            className="h-11 w-11 shrink-0 rounded-lg object-cover"
-          />
-        ) : (
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-ds-main text-ds-faint">
-            <Music4 className="h-5 w-5" strokeWidth={1.5} />
-          </div>
-        )}
+        <PlayerCover song={current} t={t} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-medium text-ds-ink">{current.title}</div>
           <div className="truncate text-[11px] text-ds-faint" data-testid="music-player-subtitle">
@@ -104,7 +116,7 @@ export function MusicPlayer({
             type="button"
             aria-label={playing ? t('musicPause') : t('musicPlay')}
             onClick={onTogglePlay}
-            className="grid h-9 w-9 place-items-center rounded-full bg-ds-ink text-ds-main"
+            className="grid h-9 w-9 place-items-center rounded-full bg-[#f5c542] text-black shadow-[0_10px_24px_rgba(245,197,66,0.2)]"
           >
             {playing ? <Pause className="h-4 w-4" strokeWidth={2} /> : <Play className="h-4 w-4" strokeWidth={2} />}
           </button>

@@ -23,11 +23,14 @@ const song = (id: string): Claude360Song => ({
   id,
   audioUrl: `https://cdn.example/${id}.mp3`,
   imageUrl: `https://cdn.example/${id}.png`,
-  title: `歌曲-${id}`
+  title: `歌曲-${id}`,
+  tags: 'synthwave',
+  duration: 126,
+  modelName: 'Suno V5.5'
 })
 
-describe('MusicCreatePanel · 是创作台（表单）', () => {
-  it('渲染模式 segmented control、模型选择、生成按钮（无 API Key / 登录配置）', () => {
+describe('MusicCreatePanel · 创作配置区', () => {
+  it('渲染简单/标准模式、歌曲描述、可选歌词、纯伴奏、模型和开始创作按钮（无 API Key / 登录配置）', () => {
     const html = renderToStaticMarkup(
       createElement(MusicCreatePanel, {
         form: emptyForm(),
@@ -42,8 +45,14 @@ describe('MusicCreatePanel · 是创作台（表单）', () => {
     expect(html).toContain('music-create-panel')
     expect(html).toContain('musicModeOneshot')
     expect(html).toContain('musicModeStandard')
-    expect(html).toContain('musicGenerate')
-    expect(html).toContain('musicOneshotLabel')
+    expect(html).toContain('musicDescriptionLabel')
+    expect(html).toContain('0 / 500')
+    expect(html).toContain('musicLyricsLabel')
+    expect(html).toContain('musicLyricsAssistant')
+    expect(html).toContain('musicInstrumental')
+    expect(html).toContain('musicModelLabel')
+    expect(html).toContain('musicGenerateTwo')
+    expect(html).toContain('musicGenerateHint')
     // 断言不出现独立登录 / API Key 配置字样
     expect(html.toLowerCase()).not.toContain('api key')
     expect(html.toLowerCase()).not.toContain('apikey')
@@ -102,16 +111,83 @@ describe('MusicCreatePanel · 是创作台（表单）', () => {
   })
 })
 
-describe('MusicTaskList · 任务列表 + 成功歌曲', () => {
-  it('空态显示 musicTaskEmpty', () => {
-    const html = renderToStaticMarkup(
-      createElement(MusicTaskList, { tasks: [], onPlay: () => undefined, onDownload: () => undefined, onRemove: () => undefined, t })
-    )
+function renderTasks(tasks: MusicGenTask[], extra: Partial<Parameters<typeof MusicTaskList>[0]> = {}): string {
+  return renderToStaticMarkup(
+    createElement(MusicTaskList, {
+      tasks,
+      currentSongId: null,
+      playing: false,
+      onPlay: () => undefined,
+      onPause: () => undefined,
+      onDownload: () => undefined,
+      onRemoveTask: () => undefined,
+      onRemoveSong: () => undefined,
+      onClear: () => undefined,
+      onCopyPrompt: () => undefined,
+      onRegenerate: () => undefined,
+      t,
+      ...extra
+    })
+  )
+}
+
+describe('MusicTaskList · 作品管理栏 + 宫格', () => {
+  it('空态显示作品管理栏和 musicWorksEmpty', () => {
+    const html = renderTasks([])
     expect(html).toContain('music-task-list')
-    expect(html).toContain('musicTaskEmpty')
+    expect(html).toContain('music-works-toolbar')
+    expect(html).toContain('musicWorksTitle')
+    expect(html).toContain('musicWorksCount')
+    expect(html).toContain('musicWorksEmpty')
   })
 
-  it('成功歌曲显示 标题 / 中性副标题（不暴露 audioUrl） / cover / 下载按钮', () => {
+  it('成功歌曲以作品卡展示封面、状态、标题、提示词、模型、标签、时长和操作按钮', () => {
+    const task: MusicGenTask = {
+      id: 'x',
+      taskId: 't',
+      status: 'success',
+      createdAt: 1,
+      title: '我的创作',
+      params: { prompt: '城市夜晚的合成波', model: 'V5_5', style: 'synthwave', instrumental: true },
+      songs: [song('a')]
+    }
+    const html = renderTasks([task])
+    expect(html).toContain('music-song-grid')
+    expect(html).toContain('music-work-card')
+    expect(html).toContain('musicStatusSuccess')
+    expect(html).toContain('歌曲-a')
+    expect(html).toContain('城市夜晚的合成波')
+    expect(html).toContain('Suno V5.5')
+    expect(html).toContain('synthwave')
+    expect(html).toContain('2:06')
+    expect(html).toContain('musicInstrumental')
+    expect(html).not.toContain('https://cdn.example/a.mp3')
+    expect(html).toContain('https://cdn.example/a.png')
+    expect(html).toContain('musicPlay')
+    expect(html).toContain('musicDownload')
+    expect(html).toContain('musicCopyPrompt')
+    expect(html).toContain('musicRegenerate')
+    expect(html).toContain('musicDelete')
+    expect(html).toContain('musicMoreActions')
+  })
+
+  it('无封面时显示默认封面占位，无音频地址时显示明确错误提示', () => {
+    const task: MusicGenTask = {
+      id: 'x',
+      taskId: 't',
+      status: 'success',
+      createdAt: 1,
+      title: '缺少资源',
+      params: { prompt: 'p', model: 'V5_5' },
+      songs: [{ ...song('missing'), audioUrl: '', imageUrl: undefined }]
+    }
+    const html = renderTasks([task])
+    expect(html).toContain('music-cover-placeholder')
+    expect(html).toContain('musicAudioMissing')
+    expect(html).toContain('disabled')
+  })
+
+  it('当前播放中的卡片有播放中状态', () => {
     const task: MusicGenTask = {
       id: 'x',
       taskId: 't',
@@ -121,36 +197,28 @@ describe('MusicTaskList · 任务列表 + 成功歌曲', () => {
       params: { prompt: 'p', model: 'V5_5' },
       songs: [song('a')]
     }
-    const html = renderToStaticMarkup(
-      createElement(MusicTaskList, { tasks: [task], onPlay: () => undefined, onDownload: () => undefined, onRemove: () => undefined, t })
-    )
-    expect(html).toContain('music-song-card')
-    expect(html).toContain('歌曲-a') // 标题
-    expect(html).not.toContain('https://cdn.example/a.mp3') // 不暴露原始 audioUrl
-    expect(html).toContain('musicSongReady') // 中性副标题
-    expect(html).toContain('https://cdn.example/a.png') // cover
-    expect(html).toContain('musicDownload') // 下载按钮 aria-label
-    expect(html).toContain('musicStatusSuccess')
+    const html = renderTasks([task], { currentSongId: 'a', playing: true })
+    expect(html).toContain('data-playing="true"')
+    expect(html).toContain('musicPlaying')
   })
 
-  it('有 tags 的歌曲副标题展示 tags 而非 audioUrl', () => {
+  it('生成中任务显示宫格 loading 卡片', () => {
     const task: MusicGenTask = {
       id: 'x',
       taskId: 't',
-      status: 'success',
+      status: 'in_progress',
       createdAt: 1,
-      title: '我的创作',
+      title: '城市清晨',
       params: { prompt: 'p', model: 'V5_5' },
-      songs: [{ ...song('a'), tags: 'synthwave, chill' }]
+      songs: []
     }
-    const html = renderToStaticMarkup(
-      createElement(MusicTaskList, { tasks: [task], onPlay: () => undefined, onDownload: () => undefined, onRemove: () => undefined, t })
-    )
-    expect(html).toContain('synthwave, chill')
-    expect(html).not.toContain('https://cdn.example/a.mp3')
+    const html = renderTasks([task])
+    expect(html).toContain('music-work-card')
+    expect(html).toContain('musicStatusInProgress')
+    expect(html).toContain('musicWorkGenerating')
   })
 
-  it('失败任务显示 failReason', () => {
+  it('失败任务显示失败原因和重试按钮', () => {
     const task: MusicGenTask = {
       id: 'x',
       taskId: 't',
@@ -161,11 +229,35 @@ describe('MusicTaskList · 任务列表 + 成功歌曲', () => {
       songs: [],
       failReason: '余额不足'
     }
-    const html = renderToStaticMarkup(
-      createElement(MusicTaskList, { tasks: [task], onPlay: () => undefined, onDownload: () => undefined, onRemove: () => undefined, t })
-    )
+    const html = renderTasks([task])
     expect(html).toContain('余额不足')
     expect(html).toContain('musicStatusFailure')
+    expect(html).toContain('musicRetry')
+  })
+
+  it('工具栏包含状态筛选、清空和批量选择入口', () => {
+    const html = renderToStaticMarkup(
+      createElement(MusicTaskList, {
+        tasks: [],
+        currentSongId: null,
+        playing: false,
+        onPlay: () => undefined,
+        onPause: () => undefined,
+        onDownload: () => undefined,
+        onRemoveTask: () => undefined,
+        onRemoveSong: () => undefined,
+        onClear: () => undefined,
+        onCopyPrompt: () => undefined,
+        onRegenerate: () => undefined,
+        t
+      })
+    )
+    expect(html).toContain('musicFilterAll')
+    expect(html).toContain('musicFilterSuccess')
+    expect(html).toContain('musicFilterGenerating')
+    expect(html).toContain('musicFilterFailure')
+    expect(html).toContain('musicClearAll')
+    expect(html).toContain('musicBatchSelect')
   })
 })
 
@@ -194,7 +286,7 @@ describe('MusicPlayer · 播放器区', () => {
     const html = renderToStaticMarkup(
       createElement(MusicPlayer, {
         ...playerBase,
-        current: song('b'),
+        current: { ...song('b'), tags: undefined },
         playing: true,
         currentTime: 12,
         duration: 154,
@@ -211,6 +303,16 @@ describe('MusicPlayer · 播放器区', () => {
     expect(html).toContain('music-player-volume')
     expect(html).toContain('musicPrev')
     expect(html).toContain('musicNext')
+  })
+
+  it('播放器无封面时显示默认封面占位', () => {
+    const html = renderToStaticMarkup(
+      createElement(MusicPlayer, {
+        ...playerBase,
+        current: { ...song('c'), imageUrl: undefined }
+      })
+    )
+    expect(html).toContain('music-player-cover-placeholder')
   })
 })
 

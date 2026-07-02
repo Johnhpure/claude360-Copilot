@@ -10,7 +10,8 @@ import type {
   Claude360MusicCreateForm,
   Claude360MusicFetchResult,
   Claude360MusicSubmitPayload,
-  Claude360MusicSubmitResult
+  Claude360MusicSubmitResult,
+  Claude360Song
 } from '@shared/claude360-music'
 import type { Claude360TokenListItem } from '@shared/claude360'
 import type { MusicTasksState } from './music-task-store'
@@ -132,5 +133,48 @@ export async function downloadSong(
   } catch {
     deps.openFallback(audioUrl)
     return 'fallback'
+  }
+}
+
+export type MusicPlaybackAudioElement = Pick<HTMLAudioElement, 'src' | 'volume' | 'currentTime' | 'play' | 'pause'>
+
+export type MusicPlaybackResult =
+  | { ok: true }
+  | { ok: false; reason: 'missing-url' }
+  | { ok: false; reason: 'play-failed'; message: string }
+
+function clampPlaybackVolume(volume: number): number {
+  if (!Number.isFinite(volume)) return 0.8
+  return Math.max(0, Math.min(1, volume))
+}
+
+/**
+ * 在用户点击链路内调用：校验音频地址、复用 <audio>、切歌时停掉旧音频，并立即 play。
+ * store 仍只负责状态；这里负责浏览器/Electron 的真实音频副作用。
+ */
+export async function playSongOnAudioElement(
+  audio: MusicPlaybackAudioElement,
+  song: Pick<Claude360Song, 'audioUrl'>,
+  volume: number
+): Promise<MusicPlaybackResult> {
+  const audioUrl = song.audioUrl.trim()
+  if (!audioUrl) return { ok: false, reason: 'missing-url' }
+
+  if (audio.src !== audioUrl) {
+    audio.pause()
+    audio.src = audioUrl
+    audio.currentTime = 0
+  }
+  audio.volume = clampPlaybackVolume(volume)
+
+  try {
+    await audio.play()
+    return { ok: true }
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'play-failed',
+      message: error instanceof Error ? error.message : String(error)
+    }
   }
 }

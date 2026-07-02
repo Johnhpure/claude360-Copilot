@@ -11,7 +11,8 @@ import {
   MUSIC_POLL_INTERVAL_MS,
   hasActiveTask,
   selectActiveTaskIds,
-  useMusicTaskStore
+  useMusicTaskStore,
+  type MusicGenTask
 } from '../../music/music-task-store'
 import {
   currentSong,
@@ -21,6 +22,7 @@ import {
 } from '../../music/music-player-store'
 import {
   downloadSong,
+  playSongOnAudioElement,
   pollActiveTasksOnce,
   submitMusic,
   type MusicWorkbenchApi
@@ -38,6 +40,36 @@ type Props = {
   onToggleLeftSidebar: () => void
 }
 
+function formFromTask(task: { title: string; params: MusicGenTask['params'] }): Claude360MusicCreateForm {
+  const params = task.params
+  const model = params.model as Claude360MusicCreateForm['model']
+  if (params.custom_mode === false) {
+    return {
+      ...emptyForm(),
+      mode: 'oneshot',
+      description: params.prompt || task.title,
+      instrumental: Boolean(params.instrumental),
+      model
+    }
+  }
+  return {
+    ...emptyForm(),
+    mode: 'standard',
+    customMode: params.custom_mode ?? true,
+    instrumental: Boolean(params.instrumental),
+    model,
+    title: params.title || task.title,
+    style: params.style || '',
+    lyrics: params.prompt || '',
+    negativeTags: params.negative_tags || '',
+    vocalGender: (params.vocal_gender || '') as Claude360MusicCreateForm['vocalGender'],
+    styleWeight: typeof params.style_weight === 'number' ? params.style_weight : 0,
+    weirdness: typeof params.weirdness_constraint === 'number' ? params.weirdness_constraint : 0,
+    personaId: params.persona_id || '',
+    personaModel: (params.persona_model || '') as Claude360MusicCreateForm['personaModel']
+  }
+}
+
 // 音乐工作台容器：拥有表单 state 与副作用编排（提交 / 轮询 / 播放 / 下载）。
 // 具体副作用委托给 music-workbench-actions.ts（可注入依赖），本容器只做 state/effect 编排，
 // 便于 node 单测直接测 actions 与展示子组件。renderer 全程不持有 / 输入 API Key。
@@ -50,11 +82,15 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
   const markFailed = useStore(useMusicTaskStore, (s) => s.markFailed)
   const applyFetched = useStore(useMusicTaskStore, (s) => s.applyFetched)
   const removeTask = useStore(useMusicTaskStore, (s) => s.removeTask)
+  const removeSong = useStore(useMusicTaskStore, (s) => s.removeSong)
+  const clearFinishedTasks = useStore(useMusicTaskStore, (s) => s.clearFinishedTasks)
 
   const [form, setForm] = useState<Claude360MusicCreateForm>(() => emptyForm())
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [lyricsOpen, setLyricsOpen] = useState(false)
+  const [copyNotice, setCopyNotice] = useState<string | null>(null)
+  const [playbackError, setPlaybackError] = useState<string | null>(null)
   // 写词助手用的文本模型列表（来自 text 分组）。
   const [textModels, setTextModels] = useState<string[]>([])
   // 当前 music 分组（选模型时用于确保该分组已有 Key）。
@@ -68,6 +104,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
   const duration = useStore(useMusicPlayerStore, (s) => s.duration)
   const volume = useStore(useMusicPlayerStore, (s) => s.volume)
   const setQueue = useStore(useMusicPlayerStore, (s) => s.setQueue)
+  const playAction = useStore(useMusicPlayerStore, (s) => s.play)
   const togglePlayAction = useStore(useMusicPlayerStore, (s) => s.togglePlay)
   const pauseAction = useStore(useMusicPlayerStore, (s) => s.pause)
   const nextAction = useStore(useMusicPlayerStore, (s) => s.next)
@@ -140,7 +177,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
     setForm((prev) => ({ ...prev, ...patch }))
   }, [])
 
-  const handleSubmit = useCallback(async (): Promise<void> => {
+  const submitForm = useCallback(async (nextForm: Claude360MusicCreateForm): Promise<void> => {
     const k = api()
     if (!k || submitting) return
     // 拦截并发提交：已有排队/生成中的任务时不再发起新任务（音乐按次计费，避免并发扣费）。
@@ -161,37 +198,84 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
           listTokens: () => k.claude360TokensList(),
           promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g, 'music')
         },
-        { feature: '音乐', model: form.model }
+        { feature: '音乐', model: nextForm.model }
       )
       if (!ready) return
-      const result = await submitMusic(k, { addSubmitting, markSubmitted, markFailed }, form)
+      const result = await submitMusic(k, { addSubmitting, markSubmitted, markFailed }, nextForm)
       if (!result.ok && result.errors) setErrors(result.errors)
     } finally {
       setSubmitting(false)
     }
-  }, [addSubmitting, form, markFailed, markSubmitted, musicGroup, submitting, t])
+  }, [addSubmitting, markFailed, markSubmitted, musicGroup, submitting, t])
+
+  const handleSubmit = useCallback(async (): Promise<void> => {
+    await submitForm(form)
+  }, [form, submitForm])
 
   // 播放：把点击的歌曲 + 其所在列表设为播放队列（支持连续播放 / 上下曲）。
   const playSong = useCallback(
     (song: Claude360Song, list: Claude360Song[]): void => {
       const q = list.length > 0 ? list : [song]
       const start = Math.max(0, q.findIndex((s) => s.id === song.id))
-      setQueue(q, start)
+      const el = audioRef.current
+      if (!el) {
+        setPlaybackError(t('musicAudioPlayerUnavailable'))
+        return
+      }
+      void playSongOnAudioElement(el, song, volume).then((result) => {
+        if (!result.ok) {
+          pauseAction()
+          setPlaybackError(result.reason === 'missing-url' ? t('musicAudioMissing') : t('musicAudioPlayFailed'))
+          return
+        }
+        setPlaybackError(null)
+        setQueue(q, start)
+      })
     },
-    [setQueue]
+    [pauseAction, setQueue, t, volume]
   )
+
+  const togglePlayerPlayback = useCallback((): void => {
+    if (!current || playing) {
+      togglePlayAction()
+      return
+    }
+    const el = audioRef.current
+    if (!el) {
+      setPlaybackError(t('musicAudioPlayerUnavailable'))
+      return
+    }
+    void playSongOnAudioElement(el, current, volume).then((result) => {
+      if (!result.ok) {
+        pauseAction()
+        setPlaybackError(result.reason === 'missing-url' ? t('musicAudioMissing') : t('musicAudioPlayFailed'))
+        return
+      }
+      setPlaybackError(null)
+      playAction()
+    })
+  }, [current, pauseAction, playAction, playing, t, togglePlayAction, volume])
 
   // 把播放器 store 状态桥接到 <audio>：切歌换 src、按 playing 播放/暂停。
   useEffect(() => {
     const el = audioRef.current
     if (!el || !current) return
+    if (!current.audioUrl.trim()) {
+      setPlaybackError(t('musicAudioMissing'))
+      pauseAction()
+      return
+    }
     if (el.src !== current.audioUrl) el.src = current.audioUrl
     if (playing) {
-      void el.play().catch(() => pauseAction())
+      if (!el.paused) return
+      void el.play().catch(() => {
+        pauseAction()
+        setPlaybackError(t('musicAudioPlayFailed'))
+      })
     } else {
       el.pause()
     }
-  }, [current, playing, pauseAction])
+  }, [current, playing, pauseAction, t])
 
   // 音量同步。
   useEffect(() => {
@@ -222,6 +306,31 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
     })
   }, [])
 
+  const showCopyNotice = useCallback((message: string): void => {
+    setCopyNotice(message)
+    window.setTimeout(() => setCopyNotice(null), 1800)
+  }, [])
+
+  const handleCopyPrompt = useCallback((prompt: string): void => {
+    if (!navigator?.clipboard?.writeText) return
+    void navigator.clipboard
+      .writeText(prompt)
+      .then(() => showCopyNotice(t('musicPromptCopied')))
+      .catch(() => showCopyNotice(t('musicPromptCopyFailed')))
+  }, [showCopyNotice, t])
+
+  const handleClearFinished = useCallback((): void => {
+    if (tasks.length === 0) return
+    const ok = window.confirm(t('musicClearConfirm'))
+    if (ok) clearFinishedTasks()
+  }, [clearFinishedTasks, tasks.length, t])
+
+  const handleRegenerate = useCallback((task: MusicGenTask): void => {
+    const nextForm = formFromTask(task)
+    setForm(nextForm)
+    void submitForm(nextForm)
+  }, [submitForm])
+
   const insertLyrics = useCallback((lyrics: string): void => {
     setForm((prev) => ({ ...prev, lyrics }))
     setLyricsOpen(false)
@@ -233,7 +342,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
   )
 
   return (
-    <div className="ds-drag flex h-full min-h-0 flex-col bg-ds-main" data-testid="music-workbench">
+    <div className="ds-drag flex h-full min-h-0 flex-col bg-[#050505]" data-testid="music-workbench">
       <div className="ds-stage-inset shrink-0">
         <header className="ds-topbar-surface relative z-10 mt-3 flex min-h-[46px] w-full items-stretch overflow-visible rounded-[24px]">
           <div className="grid w-full min-w-0 items-center gap-2.5 px-3 py-2 sm:px-4 md:pl-5 md:pr-2">
@@ -250,58 +359,77 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
         </header>
       </div>
 
-      <main className="ds-no-drag min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-5">
-        <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-4">
-          <div className="flex min-h-0 flex-col gap-4 lg:flex-row">
-            <div className="flex w-full flex-col gap-4 lg:max-w-[380px]">
-              <MusicCreatePanel
-                form={form}
-                submitting={submitting}
-                onChange={patchForm}
-                onSubmit={() => void handleSubmit()}
-                onOpenLyricsAssistant={() => setLyricsOpen(true)}
-                errors={errors}
-                t={t}
-              />
-            </div>
+      <main className="ds-no-drag flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 pb-5 pt-4 lg:flex-row lg:overflow-hidden">
+        <aside
+          data-testid="music-create-pane"
+          className="flex w-full shrink-0 flex-col gap-4 lg:w-[360px] lg:overflow-y-auto lg:pr-1"
+        >
+          <MusicCreatePanel
+            form={form}
+            submitting={submitting}
+            onChange={patchForm}
+            onSubmit={() => void handleSubmit()}
+            onOpenLyricsAssistant={() => setLyricsOpen(true)}
+            errors={errors}
+            t={t}
+          />
+        </aside>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-4">
-              <MusicTaskList
-                tasks={tasks}
-                onPlay={(song, list) => playSong(song, list)}
-                onDownload={handleDownload}
-                onRemove={removeTask}
-                t={t}
-              />
-              <MusicPlayer
-                current={current}
-                playing={playing}
-                currentTime={currentTime}
-                duration={duration}
-                volume={volume}
-                hasPrev={playerHasPrev({ index: playIndex })}
-                hasNext={playerHasNext({ queue, index: playIndex })}
-                onTogglePlay={togglePlayAction}
-                onSeek={handleSeek}
-                onVolume={setVolume}
-                onPrev={prevAction}
-                onNext={nextAction}
-                onDownload={handleDownload}
-                t={t}
-              />
+        <section
+          data-testid="music-works-pane"
+          className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:border-l lg:border-white/10 lg:pl-4"
+        >
+          <MusicTaskList
+            tasks={tasks}
+            currentSongId={current?.id ?? null}
+            playing={playing}
+            onPlay={(song, list) => playSong(song, list)}
+            onPause={pauseAction}
+            onDownload={handleDownload}
+            onRemoveTask={removeTask}
+            onRemoveSong={removeSong}
+            onClear={handleClearFinished}
+            onCopyPrompt={handleCopyPrompt}
+            onRegenerate={handleRegenerate}
+            t={t}
+          />
+          {copyNotice ? (
+            <div className="self-center rounded-full border border-white/10 bg-[#111]/95 px-3 py-1.5 text-[12px] text-ds-ink shadow-[0_14px_32px_rgba(0,0,0,0.28)]">
+              {copyNotice}
             </div>
+          ) : null}
+          {playbackError ? (
+            <div className="self-center rounded-full border border-[#f5c542]/20 bg-[#1d1606]/95 px-3 py-1.5 text-[12px] text-[#f5c542] shadow-[0_14px_32px_rgba(0,0,0,0.28)]">
+              {playbackError}
+            </div>
+          ) : null}
+          <MusicPlayer
+            current={current}
+            playing={playing}
+            currentTime={currentTime}
+            duration={duration}
+            volume={volume}
+            hasPrev={playerHasPrev({ index: playIndex })}
+            hasNext={playerHasNext({ queue, index: playIndex })}
+            onTogglePlay={togglePlayerPlayback}
+            onSeek={handleSeek}
+            onVolume={setVolume}
+            onPrev={prevAction}
+            onNext={nextAction}
+            onDownload={handleDownload}
+            t={t}
+          />
+        </section>
 
-            <LyricsAssistantDrawer
-              open={lyricsOpen}
-              onClose={() => setLyricsOpen(false)}
-              onInsert={insertLyrics}
-              defaultTheme={form.description}
-              textModels={textModels}
-              streamApi={lyricsStreamApi()}
-              t={t}
-            />
-          </div>
-        </div>
+        <LyricsAssistantDrawer
+          open={lyricsOpen}
+          onClose={() => setLyricsOpen(false)}
+          onInsert={insertLyrics}
+          defaultTheme={form.description}
+          textModels={textModels}
+          streamApi={lyricsStreamApi()}
+          t={t}
+        />
       </main>
 
       {/* 隐藏的 audio 元素，播放器条通过 store 状态桥接控制。 */}

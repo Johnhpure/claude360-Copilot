@@ -22,6 +22,7 @@ import { toggleWriteInlineFormat, type WriteInlineFormatKind } from '../../write
 import type { WriteBlockType } from '../../write/block-type'
 import { createWriteRecentEdit } from '../../write/recent-edits'
 import { resolveWriteQuickActions, type ResolvedWriteQuickAction } from '../../write/quick-actions'
+import { ensureWriteTextGroupKey } from '../../write/write-group-key-ensure'
 import {
   formatWriteQuotedSelectionForPrompt,
   quotedSelectionFromEditor
@@ -586,6 +587,12 @@ export function SddDraftEditorView({
       language: 'markdown',
       recentEdits
     })
+
+    const keyReady = await ensureWriteTextGroupKey({
+      feature: '写作',
+      model: inlineCompletion.model
+    })
+    if (!keyReady) return
 
     setInlineEditInFlight(true)
     try {

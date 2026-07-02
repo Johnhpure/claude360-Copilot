@@ -15,6 +15,7 @@ import {
   pollActiveTasksOnce,
   downloadSong,
   isSafeHttpUrl,
+  playSongOnAudioElement,
   safeSongFilename
 } from './music-workbench-actions'
 
@@ -135,5 +136,49 @@ describe('downloadSong', () => {
     expect(isSafeHttpUrl('data:x')).toBe(false)
     expect(safeSongFilename('a/b:c')).toBe('a_b_c.mp3')
     expect(safeSongFilename('')).toBe('未命名.mp3')
+  })
+})
+
+describe('playSongOnAudioElement', () => {
+  function fakeAudio(src = '') {
+    return {
+      src,
+      volume: 0,
+      currentTime: 12,
+      play: vi.fn(async () => undefined),
+      pause: vi.fn()
+    }
+  }
+
+  it('缺少音频地址时返回明确失败，不调用 play', async () => {
+    const audio = fakeAudio()
+    const result = await playSongOnAudioElement(audio, { audioUrl: '   ' }, 0.8)
+    expect(result).toEqual({ ok: false, reason: 'missing-url' })
+    expect(audio.play).not.toHaveBeenCalled()
+  })
+
+  it('用户点击播放时复用 audio，设置 src/音量并调用 play', async () => {
+    const audio = fakeAudio()
+    const result = await playSongOnAudioElement(audio, { audioUrl: 'https://cdn/a.mp3' }, 0.6)
+    expect(result).toEqual({ ok: true })
+    expect(audio.src).toBe('https://cdn/a.mp3')
+    expect(audio.currentTime).toBe(0)
+    expect(audio.volume).toBe(0.6)
+    expect(audio.play).toHaveBeenCalledTimes(1)
+  })
+
+  it('切换歌曲时先暂停旧音频，再加载新地址', async () => {
+    const audio = fakeAudio('https://cdn/old.mp3')
+    await playSongOnAudioElement(audio, { audioUrl: 'https://cdn/new.mp3' }, 1.5)
+    expect(audio.pause).toHaveBeenCalledTimes(1)
+    expect(audio.src).toBe('https://cdn/new.mp3')
+    expect(audio.volume).toBe(1)
+  })
+
+  it('浏览器拒绝播放时返回 play-failed，供 UI 展示错误', async () => {
+    const audio = fakeAudio()
+    audio.play.mockRejectedValueOnce(new Error('NotAllowedError'))
+    const result = await playSongOnAudioElement(audio, { audioUrl: 'https://cdn/a.mp3' }, 0.8)
+    expect(result).toEqual({ ok: false, reason: 'play-failed', message: 'NotAllowedError' })
   })
 })

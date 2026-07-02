@@ -113,6 +113,34 @@ describe('music-task-store 状态机', () => {
     store.getState().removeTask('tmp1')
     expect(store.getState().tasks.map((t) => t.id)).toEqual(['tmp2'])
   })
+
+  it('removeSong 删除单首成功歌曲，任务无歌曲后移除', () => {
+    const store = createMusicTaskStore({
+      initialTasks: [
+        { id: 'task-a', taskId: 'up-a', status: 'success', createdAt: 1, title: 'a', params: payload(), songs: [song('s1'), song('s2')] },
+        { id: 'task-b', taskId: 'up-b', status: 'success', createdAt: 2, title: 'b', params: payload(), songs: [song('s3')] }
+      ]
+    })
+    store.getState().removeSong('s1')
+    expect(store.getState().tasks.find((t) => t.id === 'task-a')?.songs.map((s) => s.id)).toEqual(['s2'])
+
+    store.getState().removeSong('s3')
+    expect(store.getState().tasks.map((t) => t.id)).toEqual(['task-a'])
+  })
+
+  it('clearFinishedTasks 清空成功/失败历史，但保留提交中/排队/生成中任务以继续轮询', () => {
+    const store = createMusicTaskStore({
+      initialTasks: [
+        { id: 'submitting', status: 'submitting', createdAt: 1, title: 'submitting', params: payload(), songs: [] },
+        { id: 'queued', taskId: 'q', status: 'queued', createdAt: 2, title: 'queued', params: payload(), songs: [] },
+        { id: 'running', taskId: 'r', status: 'in_progress', createdAt: 3, title: 'running', params: payload(), songs: [] },
+        { id: 'done', taskId: 'd', status: 'success', createdAt: 4, title: 'done', params: payload(), songs: [song('s1')] },
+        { id: 'bad', taskId: 'b', status: 'failure', createdAt: 5, title: 'bad', params: payload(), songs: [], failReason: '余额不足' }
+      ]
+    })
+    store.getState().clearFinishedTasks()
+    expect(store.getState().tasks.map((t) => t.id)).toEqual(['submitting', 'queued', 'running'])
+  })
 })
 
 describe('selectActiveTaskIds / hasActiveTask', () => {

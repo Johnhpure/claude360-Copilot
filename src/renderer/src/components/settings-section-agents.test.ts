@@ -422,6 +422,34 @@ describe('AgentsSettingsSection Kun diagnostics smoke', () => {
     expect(html).not.toContain('<details open')
   })
 
+  it('does not expose runtime provider switching or custom model entry', () => {
+    const html = renderToStaticMarkup(createElement(AgentsSettingsSection, {
+      ctx: {
+        ...baseCtx(),
+        provider: {
+          ...defaultModelProviderSettings(),
+          providers: [
+            ...defaultModelProviderSettings().providers,
+            {
+              id: 'my-custom',
+              name: 'My Custom Provider',
+              apiKey: 'sk-custom',
+              baseUrl: 'https://api.example.com/v1',
+              endpointFormat: 'chat_completions',
+              models: ['custom-model'],
+              modelProfiles: {}
+            } satisfies ModelProviderProfileV1
+          ]
+        }
+      }
+    }))
+
+    expect(html).not.toContain('Provider select description')
+    expect(html).not.toContain('My Custom Provider')
+    expect(html).not.toContain('modelSelectCustomOption')
+    expect(html).not.toContain('modelSelectCustomPlaceholder')
+  })
+
   it('does not render image generation settings inside the agent section', () => {
     const html = renderToStaticMarkup(createElement(AgentsSettingsSection, { ctx: baseCtx() }))
 

@@ -3,12 +3,21 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { canonicalPath, normalizePathSeparators, resolveTargetPathWithinWorkspace } from './workspace-paths'
 import {
+  getModelProviderSettings,
+  isClaude360ProviderId,
   normalizeWriteSettings,
-  resolveKunImageGenerationSettings,
   type AppSettingsV1,
-  type KunImageGenerationSettingsV1,
   type WriteSettingsPatchV1
 } from '../../shared/app-settings'
+import { sameClaude360Group } from '../../shared/claude360'
+import {
+  resolveImageSizeValue,
+  type Claude360CanvasImage,
+  type Claude360ImageEditPayload,
+  type Claude360ImageGeneratePayload,
+  type Claude360ImageResult,
+  type Claude360ImageSize
+} from '../../shared/claude360-canvas'
 import {
   WRITE_DESIGN_DRAFT_DEFAULT_PROMPT,
   WRITE_INFOGRAPHIC_DEFAULT_PROMPT,
@@ -17,26 +26,17 @@ import {
   type WriteInfographicRequest,
   type WriteInfographicResult
 } from '../../shared/write-infographic'
-import {
-  mapImageSize,
-  createImageGenClient,
-  ImageGenHttpError,
-  type ImageGenClient
-} from '../../../kun/src/adapters/tool/image-gen-tool-provider.js'
 import { detectImage } from '../../../kun/src/attachments/attachment-store.js'
 
 // Matches WORKSPACE_IMAGE_DIR in workspace-files.ts so infographics land in
 // the same workspace-level folder as pasted images.
 const INFOGRAPHIC_IMAGE_DIR = 'img'
-const IMAGE_SIZE_TIER = '1K'
-const MINIMAX_PROMPT_MAX_CHARS = 1_500
 const MAX_REFERENCE_IMAGE_BYTES = 10 * 1024 * 1024
 const REFERENCE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
-// Portrait reads best for infographics (768x1024); design mockups read best
-// in landscape (1024x768). An explicit defaultSize setting overrides both.
-const KIND_ASPECT_RATIO: Record<WriteInfographicKind, string> = {
-  infographic: '3:4',
-  design: '4:3'
+// Portrait reads best for infographics (768x1024); design mockups read best in landscape (1024x768).
+const KIND_SIZE_PRESET: Record<WriteInfographicKind, string> = {
+  infographic: 'vertical',
+  design: 'classic'
 }
 const KIND_FILE_PREFIX: Record<WriteInfographicKind, string> = {
   infographic: 'infographic',
@@ -47,15 +47,13 @@ const KIND_DEFAULT_PROMPT: Record<WriteInfographicKind, string> = {
   design: WRITE_DESIGN_DRAFT_DEFAULT_PROMPT
 }
 
-export function isWriteInfographicConfigured(
-  imageGeneration: Pick<KunImageGenerationSettingsV1, 'enabled' | 'baseUrl' | 'apiKey' | 'model'>
-): boolean {
-  return (
-    imageGeneration.enabled &&
-    Boolean(imageGeneration.baseUrl.trim()) &&
-    Boolean(imageGeneration.apiKey.trim()) &&
-    Boolean(imageGeneration.model.trim())
-  )
+type Claude360CanvasPort = {
+  generateImages(request: Claude360ImageGeneratePayload): Promise<Claude360ImageResult>
+  editImage(request: Claude360ImageEditPayload): Promise<Claude360ImageResult>
+}
+
+export function isWriteInfographicConfigured(settings: AppSettingsV1): boolean {
+  return resolveClaude360ImageModel(settings) !== null
 }
 
 export function buildWriteInfographicPrompt(
@@ -80,10 +78,6 @@ function fitPromptToMaxChars(prefix: string, text: string, maxChars: number): st
   const textBudget = Math.max(0, max - fittedPrefix.length - separator.length)
   const fittedText = text.slice(0, textBudget).trimEnd()
   return fittedText ? `${fittedPrefix}${separator}${fittedText}` : fittedPrefix
-}
-
-function imagePromptMaxChars(imageGeneration: KunImageGenerationSettingsV1): number | undefined {
-  return imageGeneration.protocol === 'minimax-image' ? MINIMAX_PROMPT_MAX_CHARS : undefined
 }
 
 async function readReferenceImage(
@@ -121,13 +115,64 @@ async function readReferenceImage(
   }
 }
 
+function resolveClaude360ImageModel(settings: AppSettingsV1): { model: string } | null {
+  const selectedGroup = ((settings as { claude360?: { selectedImageGroup?: string } }).claude360?.selectedImageGroup ?? '').trim()
+  if (!selectedGroup) return null
+
+  const provider = getModelProviderSettings(settings).providers.find((profile) =>
+    isClaude360ProviderId(profile.id) &&
+    sameClaude360Group(claude360ProfileGroup(profile), selectedGroup)
+  )
+  const model = provider?.image?.models.find((item) => item.trim())?.trim()
+  return model ? { model } : null
+}
+
+function claude360ProfileGroup(profile: { id: string; name: string }): string {
+  const name = profile.name.trim()
+  if (name) return name
+  const id = profile.id.trim()
+  const lower = id.toLowerCase()
+  if (lower.startsWith('claude360:')) return id.slice('claude360:'.length)
+  if (lower.startsWith('claude360-')) return id.slice('claude360-'.length)
+  return id
+}
+
+function imageSizeForKind(kind: WriteInfographicKind): Claude360ImageSize {
+  return resolveImageSizeValue(KIND_SIZE_PRESET[kind], '1K')
+}
+
+function referenceImageDataUrl(image: { mimeType: string; data: Buffer }): string {
+  return `data:${image.mimeType};base64,${image.data.toString('base64')}`
+}
+
+async function readCanvasImage(image: Claude360CanvasImage): Promise<{ data: Buffer; mimeType: string }> {
+  if (image.b64Json?.trim()) {
+    return {
+      data: Buffer.from(image.b64Json.trim(), 'base64'),
+      mimeType: image.mimeType || 'image/png'
+    }
+  }
+  if (image.url?.trim()) {
+    const response = await fetch(image.url)
+    if (!response.ok) {
+      throw new Error(`image download failed with status ${response.status}`)
+    }
+    const contentType = response.headers.get('content-type')?.split(';')[0]?.trim()
+    return {
+      data: Buffer.from(await response.arrayBuffer()),
+      mimeType: contentType || image.mimeType || 'image/png'
+    }
+  }
+  throw new Error('image generation returned an empty image')
+}
+
 export async function requestWriteInfographic(
   settings: AppSettingsV1,
   request: WriteInfographicRequest,
-  options: { client?: ImageGenClient } = {}
+  options: { canvas?: Claude360CanvasPort } = {}
 ): Promise<WriteInfographicResult> {
-  const imageGeneration = resolveKunImageGenerationSettings(settings)
-  if (!isWriteInfographicConfigured(imageGeneration)) {
+  const imageGeneration = resolveClaude360ImageModel(settings)
+  if (!imageGeneration || !options.canvas) {
     return { ok: false, message: 'image generation provider is not configured' }
   }
 
@@ -142,12 +187,8 @@ export async function requestWriteInfographic(
   }
 
   const kind: WriteInfographicKind = request.kind ?? 'infographic'
-  const client = options.client ?? createImageGenClient(imageGeneration)
-  // An explicit defaultSize wins: users set it when their provider only
-  // accepts fixed sizes (e.g. gpt-image's 1024x1536). Otherwise use an
-  // aspect ratio that suits the image kind.
-  const size = imageGeneration.defaultSize.trim() ||
-    mapImageSize(KIND_ASPECT_RATIO[kind], IMAGE_SIZE_TIER, undefined)
+  const canvas = options.canvas
+  const size = imageSizeForKind(kind)
 
   const selectionAssist = normalizeWriteSettings(
     (settings as { write?: WriteSettingsPatchV1 }).write
@@ -161,24 +202,16 @@ export async function requestWriteInfographic(
   let image: { data: Buffer; mimeType: string }
   try {
     const generationRequest = {
-      prompt: buildWriteInfographicPrompt(text, customPrompt, kind, {
-        maxPromptChars: imagePromptMaxChars(imageGeneration)
-      }),
+      prompt: buildWriteInfographicPrompt(text, customPrompt, kind),
       model: imageGeneration.model.trim(),
-      ...(size && size !== 'auto' ? { size } : {}),
-      timeoutMs: imageGeneration.timeoutMs,
-      signal: AbortSignal.timeout(imageGeneration.timeoutMs)
+      ...(size && size !== 'auto' ? { size } : {})
     }
-    image = reference.image
-      ? await client.edit({ ...generationRequest, images: [reference.image] })
-      : await client.generate(generationRequest)
+    const result = reference.image
+      ? await canvas.editImage({ ...generationRequest, image: referenceImageDataUrl(reference.image) })
+      : await canvas.generateImages(generationRequest)
+    if (!result.ok) return { ok: false, message: result.message }
+    image = await readCanvasImage(result.images[0])
   } catch (error) {
-    if (reference.image && error instanceof ImageGenHttpError && [404, 405, 501].includes(error.status)) {
-      return {
-        ok: false,
-        message: 'the configured image provider does not support reference images'
-      }
-    }
     return { ok: false, message: error instanceof Error ? error.message : String(error) }
   }
 

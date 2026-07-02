@@ -1,8 +1,14 @@
 import {
-  resolveKunImageGenerationSettings,
+  getModelProviderProfile,
+  getModelProviderSettings,
+  isClaude360ProviderId,
   resolveKunRuntimeSettings,
-  resolveWriteInlineCompletionApiKey
+  resolveWriteInlineCompletionApiKey,
+  resolveWriteInlineCompletionProviderProfile,
+  type AppSettingsV1,
+  type ModelProviderProfileV1
 } from '@shared/app-settings'
+import { sameClaude360Group } from '@shared/claude360'
 import { rendererRuntimeClient } from '../agent/runtime-client'
 import type { WriteWorkspaceGet, WriteWorkspaceSet, WriteWorkspaceState } from './write-workspace-store-types'
 import {
@@ -27,26 +33,57 @@ function applyWriteSettingsState(
   settings: Awaited<ReturnType<typeof rendererRuntimeClient.getSettings>>
 ): ReturnType<typeof withResolvedInlineCompletionSettings> {
   const write = withResolvedInlineCompletionSettings(normalizeWriteSettings(settings.write), settings)
-  const imageGeneration = resolveKunImageGenerationSettings(settings)
-  const runtime = resolveKunRuntimeSettings(settings)
   set({
     defaultWorkspaceRoot: write.defaultWorkspaceRoot,
     workspaceRoots: write.workspaces,
     inlineCompletion: write.inlineCompletion,
     selectionAssist: write.selectionAssist,
     agentPresets: write.agentPresets,
-    inlineCompletionApiReady: Boolean(resolveWriteInlineCompletionApiKey(settings).trim()),
-    imageGenReady: Boolean(
-      imageGeneration?.enabled &&
-      imageGeneration.baseUrl.trim() &&
-      imageGeneration.apiKey.trim() &&
-      imageGeneration.model.trim()
-    ),
+    inlineCompletionApiReady: isInlineCompletionApiReady(settings),
+    imageGenReady: isClaude360ImageGenerationReady(settings),
     // Prototype generation rides the primary chat provider, not the image one.
-    prototypeReady: Boolean(runtime.apiKey.trim() && runtime.model.trim()),
+    prototypeReady: isPrototypeGenerationReady(settings),
     settingsError: null
   })
   return write
+}
+
+function profileCredentialReady(profile: ModelProviderProfileV1): boolean {
+  return Boolean(profile.apiKey.trim() || profile.apiKeyRef?.trim())
+}
+
+function isInlineCompletionApiReady(settings: AppSettingsV1): boolean {
+  if (resolveWriteInlineCompletionApiKey(settings).trim()) return true
+  const profile = resolveWriteInlineCompletionProviderProfile(settings)
+  return isClaude360ProviderId(profile.id) && profileCredentialReady(profile)
+}
+
+function isClaude360ImageGenerationReady(settings: AppSettingsV1): boolean {
+  const selectedGroup = ((settings as { claude360?: { selectedImageGroup?: string } }).claude360?.selectedImageGroup ?? '').trim()
+  if (!selectedGroup) return false
+  const profile = getModelProviderSettings(settings).providers.find((item) =>
+    isClaude360ProviderId(item.id) &&
+    sameClaude360Group(claude360ProfileGroup(item), selectedGroup)
+  )
+  return Boolean(profile?.image?.models.some((model) => model.trim()))
+}
+
+function isPrototypeGenerationReady(settings: AppSettingsV1): boolean {
+  const runtime = resolveKunRuntimeSettings(settings)
+  if (!runtime.model.trim()) return false
+  if (runtime.apiKey.trim()) return true
+  const profile = getModelProviderProfile(settings, runtime.providerId)
+  return isClaude360ProviderId(profile.id) && profileCredentialReady(profile)
+}
+
+function claude360ProfileGroup(profile: Pick<ModelProviderProfileV1, 'id' | 'name'>): string {
+  const name = profile.name.trim()
+  if (name) return name
+  const id = profile.id.trim()
+  const lower = id.toLowerCase()
+  if (lower.startsWith('claude360:')) return id.slice('claude360:'.length)
+  if (lower.startsWith('claude360-')) return id.slice('claude360-'.length)
+  return id
 }
 
 export function createWriteSettingsActions({ set, get }: WriteSettingsActionContext): WriteSettingsActions {

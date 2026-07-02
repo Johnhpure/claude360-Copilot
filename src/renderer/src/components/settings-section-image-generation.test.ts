@@ -60,12 +60,12 @@ describe('ImageGenerationSettingsSection', () => {
 
     expect(html).toContain('Image generation')
     expect(html).toContain('Enables agent chats and Write infographics')
-    expect(html).toContain('Prefer GPT Image or Gemini image models for design drafts and infographics')
-    expect(html).toContain('value="https://images.example.com/v1"')
-    expect(html).toContain('value="sk-image"')
-    expect(html).toContain('value="image-model"')
-    expect(html).toContain('value="1536x1024"')
-    expect(html).toContain('value="240000"')
+    expect(html).not.toContain('Prefer GPT Image or Gemini image models for design drafts and infographics')
+    expect(html).not.toContain('value="https://images.example.com/v1"')
+    expect(html).not.toContain('value="sk-image"')
+    expect(html).not.toContain('value="image-model"')
+    expect(html).not.toContain('value="1536x1024"')
+    expect(html).not.toContain('value="240000"')
   })
 
   it('uses the media generation tab for image generation settings', () => {

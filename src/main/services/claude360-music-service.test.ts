@@ -250,6 +250,59 @@ describe('Claude360MusicService.fetchMusic', () => {
     expect(calls[0]).toMatchObject({ path: '/suno/fetch', body: { ids: ['T-9'] }, token: 'key-music-vip' })
   })
 
+  it('兼容上游音频和封面的多种字段名，避免成功歌曲被过滤或丢封面', async () => {
+    const service = new Claude360MusicService(
+      makeDeps({
+        apiClient: fakeApi({
+          fetch: () => ({
+            code: 'success',
+            data: [
+              {
+                task_id: 'T-alt',
+                action: 'MUSIC',
+                status: 'SUCCESS',
+                data: [
+                  { id: 'audioUrl', audioUrl: 'https://cdn/audio-url.mp3', imageUrl: 'https://cdn/image-url.png' },
+                  { id: 'url', url: 'https://cdn/url.mp3', coverUrl: 'https://cdn/cover-url.png' },
+                  { id: 'streamUrl', streamUrl: 'https://cdn/stream-url.mp3', artworkUrl: 'https://cdn/artwork-url.png' },
+                  { id: 'fileUrl', fileUrl: 'https://cdn/file-url.mp3', thumbnail: 'https://cdn/thumbnail.png' }
+                ]
+              }
+            ]
+          })
+        })
+      })
+    )
+
+    const result = await service.fetchMusic('T-alt')
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.task.songs).toEqual([
+        expect.objectContaining({
+          id: 'audioUrl',
+          audioUrl: 'https://cdn/audio-url.mp3',
+          imageUrl: 'https://cdn/image-url.png'
+        }),
+        expect.objectContaining({
+          id: 'url',
+          audioUrl: 'https://cdn/url.mp3',
+          imageUrl: 'https://cdn/cover-url.png'
+        }),
+        expect.objectContaining({
+          id: 'streamUrl',
+          audioUrl: 'https://cdn/stream-url.mp3',
+          imageUrl: 'https://cdn/artwork-url.png'
+        }),
+        expect.objectContaining({
+          id: 'fileUrl',
+          audioUrl: 'https://cdn/file-url.mp3',
+          imageUrl: 'https://cdn/thumbnail.png'
+        })
+      ])
+    }
+  })
+
   it('上游未知状态标记 unresolved，避免永久轮询', async () => {
     const service = new Claude360MusicService(
       makeDeps({

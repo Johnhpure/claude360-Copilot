@@ -630,10 +630,9 @@ describe('claude360 token/model/billing IPC handlers', () => {
       provider: { providers: Array<{ id: string }> }
       claude360: Record<string, unknown>
     }
-    // 架构收口：保留非 Claude360 的 deepseek provider，仅追加/替换 Claude360 自动 provider。
+    // 架构收口：刷新落盘只保留 Claude360 自动 provider，不再携带旧自定义/DeepSeek provider。
     expect(patch.provider.providers).toEqual([
-      expect.objectContaining({ id: 'deepseek' }),
-      { id: 'claude360:auto' }
+      expect.objectContaining({ id: 'claude360:auto', apiKey: '' })
     ])
     // 分组持久化：text 当前选择 auto 仍有效则保留；image/music 无分组保持空。
     expect(patch.claude360).toEqual({

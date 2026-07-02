@@ -1267,6 +1267,16 @@ describe('resolveClaude360SelectedGroup', () => {
     ).toBe('vip')
   })
 
+  it('keeps the current selection case-insensitively and returns the backend group spelling', async () => {
+    const { resolveClaude360SelectedGroup } = await import('./app-settings-provider')
+    expect(
+      resolveClaude360SelectedGroup('codex', [
+        { name: 'Auto', recommended: true },
+        { name: 'Codex', recommended: false }
+      ])
+    ).toBe('Codex')
+  })
+
   it('falls back to the recommended group when the current one is gone', async () => {
     const { resolveClaude360SelectedGroup } = await import('./app-settings-provider')
     expect(
@@ -1294,7 +1304,7 @@ describe('resolveClaude360SelectedGroup', () => {
 })
 
 describe('mergeClaude360ProviderProfiles', () => {
-  it('replaces only Claude360 auto profiles and preserves custom providers', async () => {
+  it('drops legacy custom providers and keeps only Claude360 profiles', async () => {
     const { mergeClaude360ProviderProfiles } = await import('./app-settings-provider')
     const existing = [
       { id: 'claude360-auto', name: 'stale', apiKey: '', baseUrl: '', models: [], modelProfiles: {} },
@@ -1304,6 +1314,33 @@ describe('mergeClaude360ProviderProfiles', () => {
       { id: 'claude360:auto', name: 'auto', apiKey: '', baseUrl: '', models: [], modelProfiles: {} }
     ]
     const merged = mergeClaude360ProviderProfiles(existing as never, fresh as never)
-    expect(merged.map((p) => p.id)).toEqual(['my-custom', 'claude360:auto'])
+    expect(merged.map((p) => p.id)).toEqual(['claude360:auto'])
+  })
+
+  it('preserves an existing Claude360 apiKeyRef for the same group case-insensitively', async () => {
+    const { mergeClaude360ProviderProfiles } = await import('./app-settings-provider')
+    const existing = [
+      {
+        id: 'claude360-codex',
+        name: 'codex',
+        apiKey: '',
+        apiKeyRef: 'claude360:api-key:42',
+        baseUrl: '',
+        models: ['old'],
+        modelProfiles: {}
+      }
+    ]
+    const fresh = [
+      { id: 'claude360:Codex', name: 'Codex', apiKey: '', baseUrl: '', models: ['gpt-5.5'], modelProfiles: {} }
+    ]
+    const merged = mergeClaude360ProviderProfiles(existing as never, fresh as never)
+    expect(merged).toHaveLength(1)
+    expect(merged[0]).toMatchObject({
+      id: 'claude360:Codex',
+      name: 'Codex',
+      apiKey: '',
+      apiKeyRef: 'claude360:api-key:42',
+      models: ['gpt-5.5']
+    })
   })
 })

@@ -65,14 +65,27 @@ export function emptyForm(): Claude360MusicCreateForm {
 }
 
 const round2 = (n: number): number => Math.round(n * 100) / 100
+const firstLine = (s: string): string => (s.split('\n')[0] || '').trim()
 
 export function buildSubmitPayload(form: Claude360MusicCreateForm): Claude360MusicSubmitPayload {
   const p: Claude360MusicSubmitPayload = { prompt: '', model: form.model }
 
   if (form.mode === 'oneshot') {
-    // 一句话生成：仅描述 + 非自定义模式，模型自动扩写风格与歌词。
-    p.custom_mode = false
-    p.prompt = form.description.trim()
+    // 简单模式：只填描述时由模型自动扩写；填歌词时按参考端语义进入自定义模式。
+    const description = form.description.trim()
+    const lyrics = form.lyrics.trim()
+    if (lyrics) {
+      p.custom_mode = true
+      p.prompt = lyrics
+      if (description) {
+        p.style = description
+        p.title = firstLine(description) || '未命名'
+      }
+    } else {
+      p.custom_mode = false
+      p.prompt = description
+    }
+    if (form.instrumental) p.instrumental = true
     return p
   }
 

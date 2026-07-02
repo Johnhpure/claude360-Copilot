@@ -48,8 +48,21 @@ export type Claude360MusicServiceDeps = {
 interface SunoRawSong {
   id: string
   audio_url?: string
+  audioUrl?: string
+  url?: string
+  streamUrl?: string
+  stream_url?: string
+  fileUrl?: string
+  file_url?: string
   image_url?: string
+  imageUrl?: string
+  coverUrl?: string
+  cover_url?: string
+  artworkUrl?: string
+  artwork_url?: string
+  thumbnail?: string
   model_name?: string
+  modelName?: string
   title?: string
   text?: string
   metadata?: { tags?: string; duration?: number }
@@ -73,16 +86,49 @@ const STATUS_MAP: Record<string, Claude360MusicTaskStatus> = {
   FAILURE: 'failure'
 }
 
+function firstNonEmptyString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value !== 'string') continue
+    const trimmed = value.trim()
+    if (trimmed) return trimmed
+  }
+  return undefined
+}
+
+function songAudioUrl(s: SunoRawSong): string | undefined {
+  return firstNonEmptyString(
+    s.audio_url,
+    s.audioUrl,
+    s.url,
+    s.streamUrl,
+    s.stream_url,
+    s.fileUrl,
+    s.file_url
+  )
+}
+
+function songImageUrl(s: SunoRawSong): string | undefined {
+  return firstNonEmptyString(
+    s.image_url,
+    s.imageUrl,
+    s.coverUrl,
+    s.cover_url,
+    s.artworkUrl,
+    s.artwork_url,
+    s.thumbnail
+  )
+}
+
 function mapSong(s: SunoRawSong): Claude360Song {
   return {
     id: s.id,
-    audioUrl: s.audio_url ?? '',
-    imageUrl: s.image_url,
+    audioUrl: songAudioUrl(s) ?? '',
+    imageUrl: songImageUrl(s),
     title: s.title ?? '未命名',
     text: s.text,
     duration: s.metadata?.duration ?? s.duration,
     tags: s.metadata?.tags,
-    modelName: s.model_name
+    modelName: firstNonEmptyString(s.model_name, s.modelName)
   }
 }
 
@@ -92,7 +138,7 @@ function parseTask(t: SunoRawTask): Claude360MusicFetchedTask {
     taskId: t.task_id,
     status: mapped ?? 'in_progress',
     failReason: t.fail_reason || undefined,
-    songs: (t.data ?? []).filter((s) => s.audio_url).map(mapSong),
+    songs: (t.data ?? []).filter((s) => Boolean(songAudioUrl(s))).map(mapSong),
     unresolved: mapped === undefined
   }
 }

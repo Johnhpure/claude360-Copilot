@@ -8,13 +8,13 @@ import type { ModelProviderProfileV1 } from '../../shared/app-settings-types'
 import type { Claude360ModelCache, Claude360TokenRef } from '../../shared/app-settings-claude360'
 import type { Claude360TokenPurpose } from '../../shared/claude360'
 import { Claude360ApiError } from './claude360-api-client'
-import { CLAUDE360_CLI_TOKEN_REF, claude360ApiKeyRef, type Claude360SecretStore } from './claude360-secret-store'
+import { CLAUDE360_CLI_TOKEN_REF, type Claude360SecretStore } from './claude360-secret-store'
 
 /**
  * Claude360 分组/模型同步服务（plan-03 Task 2）。
  * 按 `tool=codex|image|music` 拉分组（不硬编码分组名），按分组拉模型，
- * 确保各分组 Key，生成只读 provider profiles 与模型缓存。
- * 收口：profile 不携带明文 Key，只存 secret-store 引用（apiKeyRef）。
+ * 生成只读 provider profiles 与模型缓存。
+ * 收口：刷新无副作用，不创建分组 Key；执行任务时再按所选分组 ensure Key。
  */
 
 export type Claude360ApiClientPort = {
@@ -24,11 +24,8 @@ export type Claude360ApiClientPort = {
 export type Claude360ModelServiceDeps = {
   apiClient: Claude360ApiClientPort
   secretStore: Claude360SecretStore
-  /**
-   * 确保某分组对应用途的 Key 存在于 secret-store，并返回其 tokenRef（含 tokenId）。
-   * 明文不经此出口，profile 只保存由 tokenId 派生的 secret 引用。
-   */
-  ensureGroupRef: (group: string, purpose: Claude360TokenPurpose) => Promise<Claude360TokenRef>
+  /** @deprecated 刷新模型不再确保分组 Key；保留字段仅兼容旧调用方/测试注入。 */
+  ensureGroupRef?: (group: string, purpose: Claude360TokenPurpose) => Promise<Claude360TokenRef>
 }
 
 export type Claude360ModelSyncResult = {
@@ -178,11 +175,10 @@ export class Claude360ModelService {
     // 1) 拉分组（含 recommended/ratio/desc）。
     const { groupsByPurpose, purposeByGroup } = await this.fetchGroupsByPurpose(token)
 
-    // 2) 每个分组拉模型，标注图片模型。
+    // 2) 每个分组拉模型，标注图片模型。刷新只同步服务端状态，不创建 Key。
     const groupInputs: Claude360GroupModelsInput[] = []
-    const refsByGroup: Record<string, string> = {}
     const allModels: string[] = []
-    for (const [group, purpose] of purposeByGroup) {
+    for (const group of purposeByGroup.keys()) {
       const resp = await this.deps.apiClient.get<ModelsResponse>(
         `/api/cli/models?group=${encodeURIComponent(group)}`,
         token
@@ -193,12 +189,9 @@ export class Claude360ModelService {
         .map((id) => ({ id, isImage: isClaude360ImageModelId(id) }))
       groupInputs.push({ group, models })
       for (const m of models) if (!allModels.includes(m.id)) allModels.push(m.id)
-      // 3) 确保该分组 Key 已加密存入 secret-store，profile 只记引用（不落明文）。
-      const ref = await this.deps.ensureGroupRef(group, purpose)
-      refsByGroup[group] = claude360ApiKeyRef(ref.tokenId)
     }
 
-    const providerProfiles = buildClaude360ProviderProfiles(groupInputs, refsByGroup)
+    const providerProfiles = buildClaude360ProviderProfiles(groupInputs, {})
     const modelCache: Claude360ModelCache = {
       groups: [...purposeByGroup.keys()],
       models: allModels

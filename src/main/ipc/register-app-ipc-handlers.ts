@@ -1569,7 +1569,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('write:generate-infographic', async (_, payload: unknown) =>
     requestWriteInfographic(
       await store.load(),
-      parseIpcPayload('write:generate-infographic', writeInfographicPayloadSchema, payload)
+      parseIpcPayload('write:generate-infographic', writeInfographicPayloadSchema, payload),
+      { canvas: claude360CanvasService }
     )
   )
   ipcMain.handle('write:authorize-prototype', async (_, payload: unknown) => {

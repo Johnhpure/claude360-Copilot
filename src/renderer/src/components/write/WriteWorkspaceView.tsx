@@ -44,6 +44,7 @@ import { WriteWorkspaceToolbar } from './WriteWorkspaceToolbar'
 import { WriteInlineAgent } from './WriteInlineAgent'
 import { WriteWorkspaceDocumentPane } from './WriteWorkspaceDocumentPane'
 import { resolveWriteAgentPreset } from '../../write/agent-presets'
+import { ensureWriteTextGroupKey } from '../../write/write-group-key-ensure'
 import type { WriteEditorSelectionState, WriteMarkdownEditorHandle } from './WriteMarkdownEditor'
 import {
   INLINE_EDIT_RECENT_CONTEXT_CHARS,
@@ -372,6 +373,12 @@ export function WriteWorkspaceView({
       language: 'markdown',
       recentEdits
     })
+
+    const keyReady = await ensureWriteTextGroupKey({
+      feature: '写作',
+      model: inlineCompletion.model
+    })
+    if (!keyReady) return
 
     setInlineEditInFlight(true)
     try {

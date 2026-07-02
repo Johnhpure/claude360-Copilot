@@ -1,31 +1,40 @@
 import type { ReactElement } from 'react'
-import { Download, Loader2, Music4, Play, Trash2, XCircle } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import {
+  Copy,
+  Download,
+  Loader2,
+  MoreHorizontal,
+  Music4,
+  Pause,
+  Play,
+  RefreshCw,
+  Trash2,
+  XCircle
+} from 'lucide-react'
 import type { Claude360Song } from '@shared/claude360-music'
 import type { MusicGenTask } from '../../music/music-task-store'
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string
 
-// 歌曲副标题：优先展示有意义信息（曲风 tags / 时长），否则中性「已生成」文案；
-// 绝不把原始 audioUrl 作为可见文本暴露给用户。
-function songSubtitle(song: Claude360Song, t: TFn): string {
-  const parts: string[] = []
-  if (song.tags && song.tags.trim()) parts.push(song.tags.trim())
-  if (typeof song.duration === 'number' && song.duration > 0) {
-    const total = Math.round(song.duration)
-    const mm = Math.floor(total / 60)
-    const ss = String(total % 60).padStart(2, '0')
-    parts.push(`${mm}:${ss}`)
-  }
-  return parts.length > 0 ? parts.join(' · ') : t('musicSongReady')
-}
+type MusicFilter = 'all' | 'success' | 'generating' | 'failure'
 
-type Props = {
-  tasks: MusicGenTask[]
-  onPlay: (song: Claude360Song, queue: Claude360Song[]) => void
-  onDownload: (song: Claude360Song) => void
-  onRemove: (id: string) => void
-  t: TFn
-}
+type WorkCard =
+  | {
+      kind: 'song'
+      id: string
+      task: MusicGenTask
+      song: Claude360Song
+      status: 'success'
+    }
+  | {
+      kind: 'task'
+      id: string
+      task: MusicGenTask
+      status: Exclude<MusicGenTask['status'], 'success'>
+    }
+
+const FILTERS: readonly MusicFilter[] = ['all', 'success', 'generating', 'failure']
 
 const STATUS_LABEL_KEY: Record<MusicGenTask['status'], string> = {
   submitting: 'musicStatusSubmitting',
@@ -35,97 +44,460 @@ const STATUS_LABEL_KEY: Record<MusicGenTask['status'], string> = {
   failure: 'musicStatusFailure'
 }
 
-// 任务列表 + 成功歌曲卡片。纯展示：播放/下载/删除都通过回调注入。
-export function MusicTaskList({ tasks, onPlay, onDownload, onRemove, t }: Props): ReactElement {
-  if (tasks.length === 0) {
-    return (
-      <section data-testid="music-task-list" className="rounded-2xl border border-ds-border bg-ds-card p-6 text-center">
-        <Music4 className="mx-auto h-6 w-6 text-ds-faint" strokeWidth={1.5} />
-        <p className="mt-2 text-[13px] text-ds-faint">{t('musicTaskEmpty')}</p>
-      </section>
-    )
+const STATUS_CLASS: Record<MusicGenTask['status'], string> = {
+  submitting: 'bg-[#f5c542]/15 text-[#f5c542]',
+  queued: 'bg-[#f5c542]/15 text-[#f5c542]',
+  in_progress: 'bg-[#f5c542]/15 text-[#f5c542]',
+  success: 'bg-emerald-500/15 text-emerald-300',
+  failure: 'bg-red-500/15 text-red-300'
+}
+
+function isGenerating(status: MusicGenTask['status']): boolean {
+  return status === 'submitting' || status === 'queued' || status === 'in_progress'
+}
+
+function formatDuration(song: Claude360Song): string {
+  if (typeof song.duration === 'number' && song.duration > 0) {
+    const total = Math.round(song.duration)
+    const mm = Math.floor(total / 60)
+    const ss = String(total % 60).padStart(2, '0')
+    return `${mm}:${ss}`
   }
+  return ''
+}
+
+function formatCreatedAt(createdAt: number): string {
+  const date = new Date(createdAt)
+  if (!Number.isFinite(createdAt) || Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString(undefined, {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+function promptText(task: MusicGenTask): string {
+  const prompt = task.params.prompt?.trim()
+  if (prompt) return prompt
+  const style = task.params.style?.trim()
+  if (style) return style
+  return task.title
+}
+
+function fallbackTitle(task: MusicGenTask, t: TFn): string {
+  const text = promptText(task).replace(/\s+/g, ' ').trim()
+  if (!text) return t('musicUntitled')
+  return text.length > 18 ? `${text.slice(0, 18)}...` : text
+}
+
+function cardsFromTasks(tasks: MusicGenTask[]): WorkCard[] {
+  const cards: WorkCard[] = []
+  for (const task of tasks) {
+    if (task.status === 'success') {
+      cards.push(...task.songs.map((song): WorkCard => ({
+        kind: 'song' as const,
+        id: `song:${song.id}`,
+        task,
+        song,
+        status: 'success' as const
+      })))
+      continue
+    }
+    cards.push({ kind: 'task', id: `task:${task.id}`, task, status: task.status })
+  }
+  return cards
+}
+
+function cardMatchesFilter(card: WorkCard, filter: MusicFilter): boolean {
+  if (filter === 'all') return true
+  if (filter === 'success') return card.status === 'success'
+  if (filter === 'failure') return card.status === 'failure'
+  return card.status !== 'success' && isGenerating(card.status)
+}
+
+function filterLabel(filter: MusicFilter, t: TFn): string {
+  if (filter === 'success') return t('musicFilterSuccess')
+  if (filter === 'generating') return t('musicFilterGenerating')
+  if (filter === 'failure') return t('musicFilterFailure')
+  return t('musicFilterAll')
+}
+
+function cardTitle(card: WorkCard, t: TFn): string {
+  if (card.kind === 'song') return card.song.title || fallbackTitle(card.task, t)
+  return card.task.title || fallbackTitle(card.task, t)
+}
+
+function cardModel(card: WorkCard): string {
+  if (card.kind === 'song' && card.song.modelName?.trim()) return card.song.modelName.trim()
+  return String(card.task.params.model || '').trim()
+}
+
+function cardTags(card: WorkCard): string {
+  if (card.kind === 'song' && card.song.tags?.trim()) return card.song.tags.trim()
+  return card.task.params.style?.trim() ?? ''
+}
+
+function playableSongsForTask(task: MusicGenTask): Claude360Song[] {
+  return task.songs.filter((song) => Boolean(song.audioUrl.trim()))
+}
+
+function ActionButton({
+  label,
+  onClick,
+  disabled,
+  children
+}: {
+  label: string
+  onClick?: () => void
+  disabled?: boolean
+  children: ReactElement
+}): ReactElement {
   return (
-    <section data-testid="music-task-list" className="flex flex-col gap-3">
-      {tasks.map((task) => {
-        const inFlight = task.status === 'submitting' || task.status === 'queued' || task.status === 'in_progress'
-        const songs = task.songs
-        return (
-          <article key={task.id} className="rounded-2xl border border-ds-border bg-ds-card p-4">
-            <header className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2">
-                {inFlight ? <Loader2 className="h-4 w-4 animate-spin text-ds-muted" strokeWidth={1.75} /> : null}
-                {task.status === 'failure' ? <XCircle className="h-4 w-4 text-red-500" strokeWidth={1.75} /> : null}
-                <h3 className="min-w-0 truncate text-[13.5px] font-medium text-ds-ink">{task.title}</h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-md bg-ds-main px-2 py-0.5 text-[11px] text-ds-muted">
-                  {t(STATUS_LABEL_KEY[task.status])}
-                </span>
-                <button
-                  type="button"
-                  aria-label={t('musicRemoveTask')}
-                  onClick={() => onRemove(task.id)}
-                  className="text-ds-faint hover:text-ds-ink"
-                >
-                  <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-                </button>
-              </div>
-            </header>
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="grid h-8 w-8 place-items-center rounded-lg text-ds-muted transition hover:bg-white/[0.07] hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {children}
+    </button>
+  )
+}
 
-            {task.status === 'failure' && task.failReason ? (
-              <p className="mt-2 text-[12px] text-red-600 dark:text-red-300">{task.failReason}</p>
-            ) : null}
+function CoverPlaceholder({ active, testId = 'music-cover-placeholder' }: { active?: boolean; testId?: string }): ReactElement {
+  return (
+    <div
+      data-testid={testId}
+      className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_30%_20%,rgba(245,197,66,0.35),transparent_32%),linear-gradient(135deg,#191919,#050505_64%,#302611)]"
+    >
+      <Music4 className="h-9 w-9 text-white/60" strokeWidth={1.4} />
+      {active ? (
+        <span className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-end gap-1" aria-hidden="true">
+          <span className="h-3 w-1 rounded-full bg-[#f5c542] animate-pulse" />
+          <span className="h-5 w-1 rounded-full bg-[#f5c542] animate-pulse" />
+          <span className="h-4 w-1 rounded-full bg-[#f5c542] animate-pulse" />
+        </span>
+      ) : null}
+    </div>
+  )
+}
 
-            {songs.length > 0 ? (
-              <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {songs.map((song) => (
-                  <li
-                    key={song.id}
-                    data-testid="music-song-card"
-                    className="flex items-center gap-3 rounded-xl border border-ds-border bg-ds-main p-2"
+function MusicCoverImage({
+  src,
+  title,
+  active,
+  t
+}: {
+  src?: string
+  title: string
+  active?: boolean
+  t: TFn
+}): ReactElement {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) return <CoverPlaceholder active={active} />
+  return (
+    <img
+      src={src}
+      alt={t('musicCoverAlt', { title })}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+    />
+  )
+}
+
+type Props = {
+  tasks: MusicGenTask[]
+  currentSongId: string | null
+  playing: boolean
+  onPlay: (song: Claude360Song, queue: Claude360Song[]) => void
+  onPause: () => void
+  onDownload: (song: Claude360Song) => void
+  onRemoveTask: (id: string) => void
+  onRemoveSong: (id: string) => void
+  onClear: () => void
+  onCopyPrompt: (prompt: string) => void
+  onRegenerate: (task: MusicGenTask) => void
+  t: TFn
+}
+
+// 音乐作品宫格。纯 UI 状态（筛选/批量选择）留在组件内；生成、播放、删除等副作用由容器注入。
+export function MusicTaskList({
+  tasks,
+  currentSongId,
+  playing,
+  onPlay,
+  onPause,
+  onDownload,
+  onRemoveTask,
+  onRemoveSong,
+  onClear,
+  onCopyPrompt,
+  onRegenerate,
+  t
+}: Props): ReactElement {
+  const [filter, setFilter] = useState<MusicFilter>('all')
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Record<string, true>>({})
+
+  const allCards = useMemo(() => cardsFromTasks(tasks), [tasks])
+  const visibleCards = useMemo(() => allCards.filter((card) => cardMatchesFilter(card, filter)), [allCards, filter])
+  const selectedCount = Object.keys(selectedIds).length
+
+  const toggleSelectMode = (): void => {
+    setSelectMode((v) => !v)
+    if (selectMode) setSelectedIds({})
+  }
+
+  const toggleSelected = (id: string): void => {
+    setSelectedIds((prev) => {
+      if (prev[id]) {
+        const { [id]: _removed, ...next } = prev
+        return next
+      }
+      return { ...prev, [id]: true }
+    })
+  }
+
+  const removeSelected = (): void => {
+    for (const id of Object.keys(selectedIds)) {
+      if (id.startsWith('song:')) onRemoveSong(id.slice('song:'.length))
+      if (id.startsWith('task:')) onRemoveTask(id.slice('task:'.length))
+    }
+    setSelectedIds({})
+    setSelectMode(false)
+  }
+
+  return (
+    <section data-testid="music-task-list" className="flex min-h-0 flex-col gap-3">
+      <div
+        data-testid="music-works-toolbar"
+        className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-[#0b0b0b] px-3 py-2 shadow-[0_12px_32px_rgba(0,0,0,0.22)]"
+      >
+        <h2 className="text-[14px] font-semibold text-ds-ink">{t('musicWorksTitle')}</h2>
+        <span className="text-[12px] text-ds-muted">{t('musicWorksCount', { count: allCards.length })}</span>
+        <div className="ml-auto flex flex-wrap items-center gap-1" role="tablist">
+          {FILTERS.map((item) => (
+            <button
+              key={item}
+              type="button"
+              role="tab"
+              aria-selected={filter === item}
+              onClick={() => setFilter(item)}
+              className={`rounded-md px-2 py-1 text-[12px] transition ${
+                filter === item ? 'bg-white/[0.08] font-medium text-[#f5c542]' : 'text-ds-muted hover:text-ds-ink'
+              }`}
+            >
+              {filterLabel(item, t)}
+            </button>
+          ))}
+          <span className="mx-1 h-4 w-px bg-white/10" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={onClear}
+            className="rounded-md px-2 py-1 text-[12px] text-ds-muted transition hover:text-ds-ink"
+          >
+            {t('musicClearAll')}
+          </button>
+          {selectMode ? (
+            <>
+              <button
+                type="button"
+                disabled={selectedCount === 0}
+                onClick={removeSelected}
+                className="rounded-md px-2 py-1 text-[12px] text-red-300 transition hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {t('musicBatchDelete', { count: selectedCount })}
+              </button>
+              <button
+                type="button"
+                onClick={toggleSelectMode}
+                className="rounded-md px-2 py-1 text-[12px] text-ds-muted transition hover:text-ds-ink"
+              >
+                {t('musicBatchCancel')}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={toggleSelectMode}
+              className="rounded-md px-2 py-1 text-[12px] text-ds-muted transition hover:text-ds-ink"
+            >
+              {t('musicBatchSelect')}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {allCards.length === 0 ? (
+        <div
+          data-testid="music-works-empty"
+          className="flex min-h-[260px] flex-1 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#080808] px-6 text-center"
+        >
+          <div className="max-w-[280px]">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#f5c542]/12 text-[#f5c542]">
+              <Music4 className="h-6 w-6" strokeWidth={1.5} />
+            </div>
+            <p className="mt-3 text-[13px] leading-5 text-ds-muted">{t('musicWorksEmpty')}</p>
+          </div>
+        </div>
+      ) : visibleCards.length === 0 ? (
+        <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#080808] px-6 text-center text-[13px] text-ds-muted">
+          {t('musicFilterEmpty')}
+        </div>
+      ) : (
+        <div
+          data-testid="music-song-grid"
+          className="grid min-h-0 gap-3.5"
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}
+        >
+          {visibleCards.map((card) => {
+            const task = card.task
+            const isSong = card.kind === 'song'
+            const song = isSong ? card.song : null
+            const prompt = promptText(task)
+            const status = card.status
+            const isPlaying = Boolean(song && playing && currentSongId === song.id)
+            const title = cardTitle(card, t)
+            const model = cardModel(card)
+            const tags = cardTags(card)
+            const duration = song ? formatDuration(song) : ''
+            const createdAt = formatCreatedAt(task.createdAt)
+            const meta = [
+              model,
+              tags,
+              duration,
+              createdAt,
+              task.params.instrumental ? t('musicInstrumental') : ''
+            ].filter(Boolean)
+            const selected = Boolean(selectedIds[card.id])
+            const queue = playableSongsForTask(task)
+            const canPlay = Boolean(song?.audioUrl.trim())
+            return (
+              <article
+                key={card.id}
+                data-testid="music-work-card"
+                data-status={status}
+                data-playing={isPlaying ? 'true' : undefined}
+                className={`group flex min-h-0 flex-col overflow-hidden rounded-xl border bg-[#0b0b0b] transition ${
+                  isPlaying ? 'border-[#f5c542] shadow-[0_0_0_1px_rgba(245,197,66,0.35),0_18px_42px_rgba(0,0,0,0.36)]' : selected ? 'border-[#f5c542]/70 ring-2 ring-[#f5c542]/25' : 'border-white/10 hover:border-white/[0.18] hover:bg-[#101010]'
+                }`}
+              >
+                <div className="relative aspect-square overflow-hidden bg-black">
+                  <MusicCoverImage
+                    src={song?.imageUrl}
+                    title={title}
+                    active={isPlaying || isGenerating(status)}
+                    t={t}
+                  />
+                  <span
+                    className={`absolute left-2 top-2 rounded-md px-2 py-1 text-[11px] font-medium backdrop-blur ${STATUS_CLASS[status]}`}
                   >
-                    {song.imageUrl ? (
-                      <img
-                        src={song.imageUrl}
-                        alt={t('musicCoverAlt', { title: song.title })}
-                        loading="lazy"
-                        className="h-12 w-12 shrink-0 rounded-lg object-cover"
-                      />
-                    ) : (
-                      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-ds-card text-ds-faint">
-                        <Music4 className="h-5 w-5" strokeWidth={1.5} />
+                    {t(STATUS_LABEL_KEY[status])}
+                  </span>
+                  {isGenerating(status) ? (
+                    <span className="absolute inset-x-3 bottom-3 flex items-center justify-center gap-2 rounded-lg bg-black/55 px-3 py-2 text-[12px] text-white/85 backdrop-blur">
+                      <Loader2 className="h-4 w-4 animate-spin text-[#f5c542]" strokeWidth={1.75} />
+                      {t('musicWorkGenerating')}
+                    </span>
+                  ) : null}
+                  {isPlaying ? (
+                    <span className="absolute right-2 top-2 rounded-md bg-[#f5c542] px-2 py-1 text-[11px] font-semibold text-black">
+                      {t('musicPlaying')}
+                    </span>
+                  ) : null}
+                  {selectMode ? (
+                    <button
+                      type="button"
+                      aria-label={t('musicBatchToggle')}
+                      onClick={() => toggleSelected(card.id)}
+                      className={`absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-md border text-[11px] ${
+                        selected ? 'border-[#f5c542] bg-[#f5c542] text-black' : 'border-white/20 bg-black/45 text-transparent'
+                      }`}
+                    >
+                      ✓
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-1 flex-col gap-2 p-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-[13.5px] font-semibold text-ds-ink" title={title}>
+                      {title}
+                    </h3>
+                    <p className="mt-1 line-clamp-2 min-h-9 text-[12px] leading-[18px] text-ds-muted" title={prompt}>
+                      {prompt || t('musicPromptEmpty')}
+                    </p>
+                  </div>
+
+                  {status === 'failure' ? (
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/[0.08] px-2.5 py-2 text-[12px] leading-4 text-red-200">
+                      <div className="flex items-start gap-2">
+                        <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+                        <span>{task.failReason || t('musicStatusFailure')}</span>
                       </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12.5px] font-medium text-ds-ink">{song.title}</div>
-                      <div className="truncate text-[11px] text-ds-faint">{songSubtitle(song, t)}</div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        aria-label={t('musicPlay')}
-                        onClick={() => onPlay(song, songs)}
-                        className="grid h-8 w-8 place-items-center rounded-lg text-ds-muted hover:bg-ds-hover hover:text-ds-ink"
-                      >
-                        <Play className="h-4 w-4" strokeWidth={1.75} />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={t('musicDownload')}
-                        onClick={() => onDownload(song)}
-                        className="grid h-8 w-8 place-items-center rounded-lg text-ds-muted hover:bg-ds-hover hover:text-ds-ink"
-                      >
-                        <Download className="h-4 w-4" strokeWidth={1.75} />
-                      </button>
+                  ) : null}
+
+                  {song && !canPlay ? (
+                    <div
+                      data-testid="music-audio-missing"
+                      className="rounded-lg border border-[#f5c542]/20 bg-[#f5c542]/[0.08] px-2.5 py-2 text-[12px] leading-4 text-[#f5c542]"
+                    >
+                      {t('musicAudioMissing')}
                     </div>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </article>
-        )
-      })}
+                  ) : null}
+
+                  <p className="flex min-h-9 flex-wrap gap-x-2 gap-y-0.5 text-[11px] leading-4 text-ds-faint">
+                    {meta.map((item, index) => (
+                      <span key={`${item}-${index}`}>{item}</span>
+                    ))}
+                  </p>
+
+                  <div className="mt-auto flex items-center gap-0.5 pt-1">
+                    <ActionButton
+                      label={isPlaying ? t('musicPause') : t('musicPlay')}
+                      disabled={!canPlay}
+                      onClick={song && canPlay ? () => (isPlaying ? onPause() : onPlay(song, queue)) : undefined}
+                    >
+                      {isPlaying ? <Pause className="h-3.5 w-3.5" strokeWidth={1.75} /> : <Play className="h-3.5 w-3.5" strokeWidth={1.75} />}
+                    </ActionButton>
+                    <ActionButton
+                      label={t('musicDownload')}
+                      disabled={!canPlay}
+                      onClick={song ? () => onDownload(song) : undefined}
+                    >
+                      <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    </ActionButton>
+                    <ActionButton
+                      label={t('musicCopyPrompt')}
+                      disabled={!prompt}
+                      onClick={() => onCopyPrompt(prompt)}
+                    >
+                      <Copy className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    </ActionButton>
+                    <ActionButton label={status === 'failure' ? t('musicRetry') : t('musicRegenerate')} onClick={() => onRegenerate(task)}>
+                      <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    </ActionButton>
+                    <ActionButton
+                      label={t('musicDelete')}
+                      onClick={() => (song ? onRemoveSong(song.id) : onRemoveTask(task.id))}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    </ActionButton>
+                    <ActionButton label={t('musicMoreActions')}>
+                      <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    </ActionButton>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
     </section>
   )
 }

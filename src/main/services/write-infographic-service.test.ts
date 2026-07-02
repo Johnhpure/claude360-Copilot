@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AppSettingsV1 } from '../../shared/app-settings'
-import type { ImageGenClient, ImageGenEditRequest, ImageGenRequest } from '../../../kun/src/adapters/tool/image-gen-tool-provider.js'
+import type {
+  Claude360ImageEditPayload,
+  Claude360ImageGeneratePayload,
+  Claude360ImageResult
+} from '../../shared/claude360-canvas'
 import { buildWriteInfographicPrompt, requestWriteInfographic } from './write-infographic-service'
 
 let workspace: string
@@ -12,38 +16,94 @@ const PNG_BYTES = Buffer.from(
   'base64'
 )
 
-function settingsWithImageGen(overrides: Record<string, unknown> = {}): AppSettingsV1 {
+function settingsWithClaude360Image(overrides: { selectedImageGroup?: string; model?: string } = {}): AppSettingsV1 {
+  const group = overrides.selectedImageGroup ?? 'image-group'
+  const model = overrides.model ?? 'test-image-model'
   return {
-    agents: {
-      kun: {
-        imageGeneration: {
-          enabled: true,
-          baseUrl: 'https://images.example.test/v1',
-          apiKey: 'sk-image',
-          model: 'test-image-model',
-          defaultSize: '',
-          timeoutMs: 180000,
-          ...overrides
-        }
-      }
+    claude360: {
+      selectedImageGroup: group,
+      baseUrl: 'https://claude360.xyz'
+    },
+    provider: {
+      providers: group
+        ? [
+            {
+              id: `claude360:${group}`,
+              name: group,
+              apiKey: '',
+              apiKeyRef: 'claude360:api-key:7',
+              baseUrl: 'https://claude360.xyz',
+              models: [model],
+              modelProfiles: {},
+              image: {
+                protocol: 'openai-images',
+                baseUrl: 'https://claude360.xyz',
+                models: [model]
+              }
+            }
+          ]
+        : []
     }
   } as unknown as AppSettingsV1
 }
 
-function fakeClient(): ImageGenClient & { edits: ImageGenEditRequest[]; requests: ImageGenRequest[] } {
-  const requests: ImageGenRequest[] = []
-  const edits: ImageGenEditRequest[] = []
+type FakeCanvas = {
+  edits: Claude360ImageEditPayload[]
+  requests: Claude360ImageGeneratePayload[]
+  generateImages(request: Claude360ImageGeneratePayload): Promise<Claude360ImageResult>
+  editImage(request: Claude360ImageEditPayload): Promise<Claude360ImageResult>
+}
+
+function fakeCanvas(): FakeCanvas {
+  const requests: Claude360ImageGeneratePayload[] = []
+  const edits: Claude360ImageEditPayload[] = []
   return {
-    id: 'fake',
     edits,
     requests,
-    async generate(request) {
+    async generateImages(request) {
       requests.push(request)
-      return { data: Buffer.from('fake-png-bytes'), mimeType: 'image/png' }
+      return {
+        ok: true,
+        images: [{
+          id: 'img-1',
+          source: 'base64',
+          b64Json: Buffer.from('fake-png-bytes').toString('base64'),
+          mimeType: 'image/png',
+          prompt: request.prompt,
+          model: request.model,
+          createdAt: '2026-07-02T00:00:00.000Z'
+        }]
+      }
     },
-    async edit(request) {
+    async editImage(request) {
       edits.push(request)
-      return { data: Buffer.from('fake-edited-png-bytes'), mimeType: 'image/png' }
+      return {
+        ok: true,
+        images: [{
+          id: 'img-edit',
+          source: 'base64',
+          b64Json: Buffer.from('fake-edited-png-bytes').toString('base64'),
+          mimeType: 'image/png',
+          prompt: request.prompt,
+          model: request.model,
+          createdAt: '2026-07-02T00:00:00.000Z'
+        }]
+      }
+    }
+  }
+}
+
+function failingCanvas(message: string): FakeCanvas {
+  return {
+    edits: [],
+    requests: [],
+    async generateImages(request) {
+      this.requests.push(request)
+      return { ok: false, message }
+    },
+    async editImage(request) {
+      this.edits.push(request)
+      return { ok: false, message }
     }
   }
 }
@@ -59,8 +119,8 @@ describe('write infographic service', () => {
     rmSync(workspace, { recursive: true, force: true })
   })
 
-  it('rejects when the image provider is not configured', async () => {
-    const result = await requestWriteInfographic(settingsWithImageGen({ apiKey: '' }), {
+  it('rejects when no Claude360 image group is selected', async () => {
+    const result = await requestWriteInfographic(settingsWithClaude360Image({ selectedImageGroup: '' }), {
       text: 'some text',
       filePath: join(workspace, 'doc.md'),
       workspaceRoot: workspace
@@ -69,21 +129,21 @@ describe('write infographic service', () => {
   })
 
   it('rejects documents outside the write workspace', async () => {
-    const result = await requestWriteInfographic(settingsWithImageGen(), {
+    const result = await requestWriteInfographic(settingsWithClaude360Image(), {
       text: 'some text',
       filePath: '/tmp/elsewhere/doc.md',
       workspaceRoot: workspace
-    }, { client: fakeClient() })
+    }, { canvas: fakeCanvas() })
     expect(result).toMatchObject({ ok: false, message: expect.stringContaining('inside the write workspace') })
   })
 
   it('saves the infographic into the workspace img folder and returns a markdown-ready path', async () => {
-    const client = fakeClient()
-    const result = await requestWriteInfographic(settingsWithImageGen(), {
+    const client = fakeCanvas()
+    const result = await requestWriteInfographic(settingsWithClaude360Image(), {
       text: '季度营收增长 25%，主要来自海外市场。',
       filePath: join(workspace, 'notes', 'report.md'),
       workspaceRoot: workspace
-    }, { client })
+    }, { canvas: client })
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -100,12 +160,12 @@ describe('write infographic service', () => {
   })
 
   it('links the image without ../ when the document sits at the workspace root', async () => {
-    const client = fakeClient()
-    const result = await requestWriteInfographic(settingsWithImageGen(), {
+    const client = fakeCanvas()
+    const result = await requestWriteInfographic(settingsWithClaude360Image(), {
       text: 'root-level document',
       filePath: join(workspace, 'doc.md'),
       workspaceRoot: workspace
-    }, { client })
+    }, { canvas: client })
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -113,33 +173,25 @@ describe('write infographic service', () => {
     expect(result.absolutePath).toBe(join(workspace, 'img', result.fileName))
   })
 
-  it('prefers an explicit defaultSize over the portrait default', async () => {
-    const client = fakeClient()
-    const result = await requestWriteInfographic(settingsWithImageGen({ defaultSize: '1024x1536' }), {
-      text: 'fixed-size provider content',
+  it('uses the Claude360 image group model from settings', async () => {
+    const client = fakeCanvas()
+    const result = await requestWriteInfographic(settingsWithClaude360Image({ model: 'gpt-image-2' }), {
+      text: 'model selection content',
       filePath: join(workspace, 'doc.md'),
       workspaceRoot: workspace
-    }, { client })
+    }, { canvas: client })
 
     expect(result.ok).toBe(true)
-    expect(client.requests[0].size).toBe('1024x1536')
+    expect(client.requests[0].model).toBe('gpt-image-2')
   })
 
   it('surfaces provider failures as error results', async () => {
-    const failingClient: ImageGenClient = {
-      id: 'failing',
-      async generate() {
-        throw new Error('HTTP 400: unsupported size')
-      },
-      async edit() {
-        throw new Error('not used')
-      }
-    }
-    const result = await requestWriteInfographic(settingsWithImageGen(), {
+    const failingClient = failingCanvas('HTTP 400: unsupported size')
+    const result = await requestWriteInfographic(settingsWithClaude360Image(), {
       text: 'some text',
       filePath: join(workspace, 'doc.md'),
       workspaceRoot: workspace
-    }, { client: failingClient })
+    }, { canvas: failingClient })
     expect(result).toMatchObject({ ok: false, message: expect.stringContaining('unsupported size') })
   })
 
@@ -148,21 +200,16 @@ describe('write infographic service', () => {
     expect(prompt.length).toBeLessThan(7_000)
   })
 
-  it('keeps MiniMax prompts inside the provider prompt limit', async () => {
-    const client = fakeClient()
-    const result = await requestWriteInfographic(settingsWithImageGen({
-      protocol: 'minimax-image',
-      model: 'image-01'
-    }), {
-      text: `核心结论：${'增长、留存、转化、复购、风险。'.repeat(300)}`,
-      filePath: join(workspace, 'doc.md'),
-      workspaceRoot: workspace
-    }, { client })
-
-    expect(result.ok).toBe(true)
-    expect(client.requests[0].prompt.length).toBeLessThanOrEqual(1500)
-    expect(client.requests[0].prompt).toContain('polished infographic poster')
-    expect(client.requests[0].prompt).toContain('核心结论')
+  it('can fit prompts inside an explicit prompt limit', () => {
+    const prompt = buildWriteInfographicPrompt(
+      `核心结论：${'增长、留存、转化、复购、风险。'.repeat(300)}`,
+      '',
+      'infographic',
+      { maxPromptChars: 1500 }
+    )
+    expect(prompt.length).toBeLessThanOrEqual(1500)
+    expect(prompt).toContain('polished infographic poster')
+    expect(prompt).toContain('核心结论')
   })
 
   it('uses a custom prompt prefix when provided', () => {
@@ -176,9 +223,9 @@ describe('write infographic service', () => {
   })
 
   it('sends the configured write.selectionAssist.infographicPrompt to the provider', async () => {
-    const client = fakeClient()
+    const client = fakeCanvas()
     const settings = {
-      ...settingsWithImageGen(),
+      ...settingsWithClaude360Image(),
       write: {
         selectionAssist: {
           infographicPrompt: '用赛博朋克风格画一张信息图。',
@@ -190,21 +237,21 @@ describe('write infographic service', () => {
       text: '季度营收增长 25%',
       filePath: join(workspace, 'doc.md'),
       workspaceRoot: workspace
-    }, { client })
+    }, { canvas: client })
 
     expect(result.ok).toBe(true)
     expect(client.requests[0].prompt).toBe('用赛博朋克风格画一张信息图。\n\n季度营收增长 25%')
   })
 
   it('writes into a nested imageDir and keeps the relative link clean', async () => {
-    const client = fakeClient()
-    const result = await requestWriteInfographic(settingsWithImageGen(), {
+    const client = fakeCanvas()
+    const result = await requestWriteInfographic(settingsWithClaude360Image(), {
       text: '需求：支持扫码登录。',
       filePath: join(workspace, '.kunsdd', 'draft', 'dc040c2d', 'requirement.md'),
       workspaceRoot: workspace,
       imageDir: '.kunsdd/img',
       kind: 'design'
-    }, { client })
+    }, { canvas: client })
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -214,13 +261,13 @@ describe('write infographic service', () => {
   })
 
   it('uses the landscape default size and design prompt for kind=design', async () => {
-    const client = fakeClient()
-    const result = await requestWriteInfographic(settingsWithImageGen(), {
+    const client = fakeCanvas()
+    const result = await requestWriteInfographic(settingsWithClaude360Image(), {
       text: '需求内容',
       filePath: join(workspace, 'doc.md'),
       workspaceRoot: workspace,
       kind: 'design'
-    }, { client })
+    }, { canvas: client })
 
     expect(result.ok).toBe(true)
     expect(client.requests[0].size).toBe('1024x768')
@@ -229,27 +276,24 @@ describe('write infographic service', () => {
   })
 
   it('uses selected reference images for design drafts', async () => {
-    const client = fakeClient()
+    const client = fakeCanvas()
     const referencePath = join(workspace, '.kunsdd', 'requirements', 'draft-1', 'img', 'source.png')
     mkdirSync(dirname(referencePath), { recursive: true })
     writeFileSync(referencePath, PNG_BYTES)
 
-    const result = await requestWriteInfographic(settingsWithImageGen(), {
+    const result = await requestWriteInfographic(settingsWithClaude360Image(), {
       text: '根据参考图重绘一个更精致的旅行社区首页。',
       filePath: join(workspace, '.kunsdd', 'requirements', 'draft-1', 'requirement.md'),
       workspaceRoot: workspace,
       imageDir: '.kunsdd/requirements/draft-1/img',
       kind: 'design',
       referenceImagePath: referencePath
-    }, { client })
+    }, { canvas: client })
 
     expect(result.ok).toBe(true)
     expect(client.requests).toHaveLength(0)
     expect(client.edits).toHaveLength(1)
-    expect(client.edits[0].images[0]).toMatchObject({
-      name: 'source.png',
-      mimeType: 'image/png'
-    })
+    expect(client.edits[0].image).toBe(`data:image/png;base64,${PNG_BYTES.toString('base64')}`)
     expect(client.edits[0].prompt).toContain('旅行社区首页')
     if (!result.ok) return
     expect(result.relativePath).toMatch(/^img\/design-\d{14}-[0-9a-f]{4}\.png$/)
@@ -257,9 +301,9 @@ describe('write infographic service', () => {
   })
 
   it('prefers write.selectionAssist.designDraftPrompt for kind=design', async () => {
-    const client = fakeClient()
+    const client = fakeCanvas()
     const settings = {
-      ...settingsWithImageGen(),
+      ...settingsWithClaude360Image(),
       write: {
         selectionAssist: {
           infographicPrompt: '信息图提示词不该被用到。',
@@ -273,20 +317,20 @@ describe('write infographic service', () => {
       filePath: join(workspace, 'doc.md'),
       workspaceRoot: workspace,
       kind: 'design'
-    }, { client })
+    }, { canvas: client })
 
     expect(result.ok).toBe(true)
     expect(client.requests[0].prompt).toBe('画一张移动端高保真设计稿。\n\n扫码登录需求')
   })
 
   it('rejects an imageDir that escapes the workspace', async () => {
-    const client = fakeClient()
-    const result = await requestWriteInfographic(settingsWithImageGen(), {
+    const client = fakeCanvas()
+    const result = await requestWriteInfographic(settingsWithClaude360Image(), {
       text: 'some text',
       filePath: join(workspace, 'doc.md'),
       workspaceRoot: workspace,
       imageDir: '../outside'
-    }, { client })
+    }, { canvas: client })
 
     expect(result.ok).toBe(false)
     expect(existsSync(join(workspace, '..', 'outside'))).toBe(false)

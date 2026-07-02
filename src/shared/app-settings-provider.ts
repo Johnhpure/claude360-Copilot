@@ -53,6 +53,7 @@ import { normalizeModelEndpointFormat, type ModelEndpointFormat } from '../../ku
 import { DEFAULT_CLAUDE360_BASE_URL } from './app-settings-claude360'
 import { getKunRuntimeSettings } from './app-settings-kun'
 import { normalizeDeepseekBaseUrl } from './app-settings-normalizers'
+import { sameClaude360Group } from './claude360'
 import { DEFAULT_COMPOSER_MODEL_IDS } from './default-composer-models'
 import {
   TOKEN_PLAN_PROVIDER_ID_SUFFIX,
@@ -1325,22 +1326,43 @@ export function resolveClaude360SelectedGroup(
   groups: Claude360ToolGroupInfo[]
 ): string {
   const trimmed = (current ?? '').trim()
-  if (trimmed && groups.some((g) => g.name === trimmed)) return trimmed
+  const currentGroup = groups.find((g) => sameClaude360Group(g.name, trimmed))
+  if (currentGroup) return currentGroup.name
   const recommended = groups.find((g) => g.recommended)
   if (recommended) return recommended.name
   return groups[0]?.name ?? ''
 }
 
 /**
- * models:refresh 落盘 provider 时只替换 Claude360 自动生成的 provider，
- * 保留用户/迁移遗留的非 Claude360 自定义 provider，避免被整表覆盖丢失。
+ * models:refresh 落盘 provider 时只保留 Claude360 自动生成的 provider。
+ * 刷新阶段不创建 Key；若同一分组已有 apiKeyRef，则继承该引用。
  */
 export function mergeClaude360ProviderProfiles(
   existing: ModelProviderProfileV1[],
   claude360Profiles: ModelProviderProfileV1[]
 ): ModelProviderProfileV1[] {
-  const preserved = existing.filter((profile) => !isClaude360ProviderId(profile.id))
-  return [...preserved, ...claude360Profiles]
+  return claude360Profiles.map((profile) => {
+    const existingRef = existing.find((item) =>
+      isClaude360ProviderId(item.id) &&
+      sameClaude360Group(claude360ProfileGroup(item), claude360ProfileGroup(profile))
+    )?.apiKeyRef?.trim()
+    const apiKeyRef = existingRef || profile.apiKeyRef?.trim() || ''
+    return {
+      ...profile,
+      apiKey: '',
+      ...(apiKeyRef ? { apiKeyRef } : {})
+    }
+  })
+}
+
+function claude360ProfileGroup(profile: Pick<ModelProviderProfileV1, 'id' | 'name'>): string {
+  const name = profile.name?.trim()
+  if (name) return name
+  const id = profile.id.trim()
+  const lower = id.toLowerCase()
+  if (lower.startsWith('claude360:')) return id.slice('claude360:'.length)
+  if (lower.startsWith('claude360-')) return id.slice('claude360-'.length)
+  return id
 }
 
 export function buildClaude360ProviderProfiles(

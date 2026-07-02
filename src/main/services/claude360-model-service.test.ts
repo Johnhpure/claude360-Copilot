@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Claude360ModelService, type Claude360ApiClientPort } from './claude360-model-service'
 import { type Claude360SecretStore } from './claude360-secret-store'
-import type { Claude360TokenPurpose } from '../../shared/claude360'
 
 function fakeSecretStore(seed: Record<string, string> = { 'claude360:cli-token': 'cli-tok' }): Claude360SecretStore {
   const map = new Map<string, string>(Object.entries(seed))
@@ -29,8 +28,8 @@ function fakeApi(routes: Record<string, () => unknown>): Claude360ApiClientPort 
 }
 
 describe('Claude360ModelService.refreshGroupsAndModels', () => {
-  it('builds claude360:<group> profiles, image capability and a model cache', async () => {
-    const ensured: Array<[string, Claude360TokenPurpose]> = []
+  it('builds claude360:<group> profiles and never creates keys while refreshing models', async () => {
+    let ensureCalls = 0
     const service = new Claude360ModelService({
       apiClient: fakeApi({
         '/api/cli/groups?tool=codex': () => ({ groups: [{ name: 'auto' }, { name: 'vip' }] }),
@@ -42,8 +41,8 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
       }),
       secretStore: fakeSecretStore(),
       ensureGroupRef: async (group, purpose) => {
-        ensured.push([group, purpose])
-        return { tokenId: group === 'auto' ? 1 : group === 'vip' ? 2 : 3, name: `Claude360 Copilot / ${purpose}`, group }
+        ensureCalls++
+        throw new Error(`refresh must not ensure token for ${purpose}:${group}`)
       }
     })
 
@@ -55,9 +54,9 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
     const auto = result.providerProfiles.find((p) => p.id === 'claude360:auto')!
     expect(auto.baseUrl).toBe('https://claude360.xyz')
     expect(auto.endpointFormat).toBe('chat_completions')
-    // 明文不落 profile：apiKey 为空，改存 secret-store 引用 apiKeyRef。
+    // 刷新模型只同步 Claude360 分组/模型，不创建/揭示 Key；apiKeyRef 由执行前 tokens:ensure 回填。
     expect(auto.apiKey).toBe('')
-    expect(auto.apiKeyRef).toBe('claude360:api-key:1')
+    expect(auto.apiKeyRef).toBeUndefined()
     expect(auto.modelProfiles['claude-sonnet-4-6'].supportsToolCalling).toBe(true)
     expect(auto.image).toBeUndefined()
 
@@ -69,9 +68,7 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
     expect(result.modelCache.models).toContain('claude-sonnet-4-6')
     expect(result.modelCache.models).toContain('gemini-2.5-flash-image')
 
-    // image-group 用途为 image，codex 分组用途为 text
-    expect(ensured).toContainEqual(['image-group', 'image'])
-    expect(ensured).toContainEqual(['auto', 'text'])
+    expect(ensureCalls).toBe(0)
 
     // 分组清单按用途返回，供上层持久化 selectedTextGroup/Image/Music。
     expect(result.groupsByPurpose.text.map((g) => g.name).sort()).toEqual(['auto', 'vip'])
@@ -96,7 +93,9 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
         '/api/cli/models?group=music-group': () => ({ models: [{ id: 'suno-v4' }] })
       }),
       secretStore: fakeSecretStore(),
-      ensureGroupRef: async (group, purpose) => ({ tokenId: 1, name: purpose, group })
+      ensureGroupRef: async (group, purpose) => {
+        throw new Error(`refresh must not ensure token for ${purpose}:${group}`)
+      }
     })
 
     const result = await service.refreshGroupsAndModels()
@@ -122,7 +121,9 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
     const service = new Claude360ModelService({
       apiClient: fakeApi({}),
       secretStore: fakeSecretStore({}),
-      ensureGroupRef: async (group, purpose) => ({ tokenId: 1, name: purpose, group })
+      ensureGroupRef: async () => {
+        throw new Error('not used')
+      }
     })
     await expect(service.refreshGroupsAndModels()).rejects.toThrow(/未登录/)
   })
@@ -130,7 +131,6 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
 
 describe('Claude360ModelService.listGroups / listModelsByGroup', () => {
   it('lists groups with ratio/desc and has no side effects (never ensures keys)', async () => {
-    let ensureCalls = 0
     const service = new Claude360ModelService({
       apiClient: fakeApi({
         '/api/cli/groups?tool=codex': () => [{ name: 'auto', recommended: true, ratio: 1, desc: '自动分组' }],
@@ -143,9 +143,8 @@ describe('Claude360ModelService.listGroups / listModelsByGroup', () => {
         ]
       }),
       secretStore: fakeSecretStore(),
-      ensureGroupRef: async (group, purpose) => {
-        ensureCalls++
-        return { tokenId: 1, name: purpose, group }
+      ensureGroupRef: async () => {
+        throw new Error('listGroups must not ensure keys')
       }
     })
     const groups = await service.listGroups()
@@ -156,7 +155,6 @@ describe('Claude360ModelService.listGroups / listModelsByGroup', () => {
     ])
     expect(groups.image).toEqual([])
     // 纯拉取：绝不触发建 Key（无副作用）。
-    expect(ensureCalls).toBe(0)
   })
 
   it('lists models for a group and dedups ids', async () => {
@@ -165,7 +163,9 @@ describe('Claude360ModelService.listGroups / listModelsByGroup', () => {
         '/api/cli/models?group=vip': () => ({ models: [{ id: 'a' }, { id: 'a' }, { id: 'b' }, { id: '' }] })
       }),
       secretStore: fakeSecretStore(),
-      ensureGroupRef: async (group, purpose) => ({ tokenId: 1, name: purpose, group })
+      ensureGroupRef: async () => {
+        throw new Error('not used')
+      }
     })
     expect(await service.listModelsByGroup('vip')).toEqual(['a', 'b'])
   })
@@ -174,7 +174,9 @@ describe('Claude360ModelService.listGroups / listModelsByGroup', () => {
     const service = new Claude360ModelService({
       apiClient: fakeApi({}),
       secretStore: fakeSecretStore({}),
-      ensureGroupRef: async (group, purpose) => ({ tokenId: 1, name: purpose, group })
+      ensureGroupRef: async () => {
+        throw new Error('not used')
+      }
     })
     await expect(service.listGroups()).rejects.toThrow(/未登录/)
   })

@@ -276,9 +276,6 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                         value={writeInlineModelInherited ? '' : form.write.inlineCompletion.model}
                         options={writeInlineModelOptions}
                         defaultLabel={t('modelSelectDefaultOption', { model: writeInlineInheritDefault })}
-                        allowCustom
-                        customLabel={t('modelSelectCustomOption')}
-                        customPlaceholder={t('modelSelectCustomPlaceholder')}
                         selectClassName={selectControlClass}
                         onChange={(value) => {
                           const model = value.trim()

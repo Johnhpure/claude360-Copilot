@@ -73,20 +73,23 @@ export function MusicCreatePanel({
   const showDescriptionError = attempted && descriptionMissing
   const showLyricsError = attempted && lyricsMissing
   const vocalDisabled = !supportsVocalGender(form.model)
+  const descriptionCount = Math.min(form.description.length, 500)
 
   return (
     <section
       data-testid="music-create-panel"
-      className="flex min-h-0 flex-col gap-4 rounded-2xl border border-ds-border bg-ds-card p-4"
+      className="flex min-h-0 flex-col gap-4 rounded-[18px] border border-white/10 bg-[#090909] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)]"
     >
-      <div className="flex items-center gap-2">
-        <Music2 className="h-4 w-4 text-ds-muted" strokeWidth={1.75} />
-        <h2 className="text-[14px] font-semibold text-ds-ink">{t('musicCreateTitle')}</h2>
+      <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3">
+        <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#f5c542]/12 text-[#f5c542]">
+          <Music2 className="h-4 w-4" strokeWidth={1.75} />
+        </span>
+        <h2 className="text-[16px] font-semibold text-ds-ink">{t('musicCreateTitle')}</h2>
       </div>
 
-      {/* 模式 radiogroup：一句话生成 / 标准（已移除简单模式） */}
+      {/* 模式 radiogroup：简单 / 标准。 */}
       <div
-        className="inline-flex rounded-xl border border-ds-border bg-ds-main p-0.5"
+        className="grid grid-cols-2 rounded-xl border border-white/10 bg-black p-1"
         role="radiogroup"
         aria-label={t('musicModeLabel')}
       >
@@ -95,7 +98,7 @@ export function MusicCreatePanel({
           role="radio"
           aria-checked={isOneshot}
           onClick={() => onChange({ mode: 'oneshot' })}
-          className={`rounded-lg px-3 py-1.5 text-[12.5px] transition ${isOneshot ? 'bg-ds-card font-semibold text-ds-ink shadow-sm' : 'font-medium text-ds-muted'}`}
+          className={`rounded-lg px-3 py-2 text-[12.5px] transition ${isOneshot ? 'bg-[#202020] font-semibold text-[#f5c542] shadow-sm' : 'font-medium text-ds-muted hover:text-ds-ink'}`}
         >
           {t('musicModeOneshot')}
         </button>
@@ -104,62 +107,74 @@ export function MusicCreatePanel({
           role="radio"
           aria-checked={!isOneshot}
           onClick={() => onChange({ mode: 'standard' })}
-          className={`rounded-lg px-3 py-1.5 text-[12.5px] transition ${!isOneshot ? 'bg-ds-card font-semibold text-ds-ink shadow-sm' : 'font-medium text-ds-muted'}`}
+          className={`rounded-lg px-3 py-2 text-[12.5px] transition ${!isOneshot ? 'bg-[#202020] font-semibold text-[#f5c542] shadow-sm' : 'font-medium text-ds-muted hover:text-ds-ink'}`}
         >
           {t('musicModeStandard')}
         </button>
       </div>
 
-      {/* 模型选择 */}
-      <label className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
-        {t('musicModelLabel')}
-        <select
-          value={form.model}
-          onChange={(e) => onChange({ model: e.target.value as Claude360MusicCreateForm['model'] })}
-          className="rounded-lg border border-ds-border bg-ds-main px-2.5 py-1.5 text-[12.5px] text-ds-ink"
-        >
-          {MODELS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
       {isOneshot ? (
-        /* 一句话生成：仅一句话描述 */
-        <label className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
-          <span>
-            {t('musicOneshotLabel')}
-            <RequiredMark />
-          </span>
-          <textarea
-            value={form.description}
-            onChange={handleText('description')}
-            rows={3}
-            placeholder={t('musicOneshotPlaceholder')}
-            aria-required="true"
-            aria-invalid={showDescriptionError ? 'true' : undefined}
-            className={`resize-none rounded-lg border bg-ds-main px-2.5 py-2 text-[12.5px] text-ds-ink ${showDescriptionError ? 'border-ds-danger' : 'border-ds-border'}`}
-          />
-          <span className="text-[11px] text-ds-faint">{t('musicOneshotHint')}</span>
-          <FieldError message={showDescriptionError ? t('musicPromptRequired') : null} />
-        </label>
+        /* 简单模式：描述 + 可选歌词 */
+        <>
+          <label className="flex flex-col gap-1.5 text-[12.5px] text-ds-muted">
+            <span className="flex items-center justify-between">
+              <span>
+                {t('musicDescriptionLabel')}
+                <RequiredMark />
+              </span>
+              <span className="text-[11px] tabular-nums text-ds-faint">{descriptionCount} / 500</span>
+            </span>
+            <textarea
+              value={form.description}
+              maxLength={500}
+              onChange={handleText('description')}
+              rows={4}
+              placeholder={t('musicDescriptionPlaceholder')}
+              aria-required="true"
+              aria-invalid={showDescriptionError ? 'true' : undefined}
+              className={`resize-none rounded-xl border bg-black/70 px-3 py-2.5 text-[13px] leading-5 text-ds-ink outline-none transition placeholder:text-ds-faint focus:border-[#f5c542]/70 ${showDescriptionError ? 'border-ds-danger' : 'border-white/10'}`}
+            />
+            <FieldError message={showDescriptionError ? t('musicPromptRequired') : null} />
+          </label>
+
+          <label className="flex flex-col gap-1.5 text-[12.5px] text-ds-muted">
+            <span className="flex items-center justify-between gap-2">
+              <span>{t('musicLyricsLabel')}</span>
+              <button
+                type="button"
+                onClick={onOpenLyricsAssistant}
+                className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 text-[11.5px] text-ds-muted transition hover:border-[#f5c542]/40 hover:text-[#f5c542]"
+              >
+                <Wand2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                {t('musicLyricsAssistant')}
+              </button>
+            </span>
+            <textarea
+              value={form.lyrics}
+              disabled={form.instrumental}
+              onChange={handleText('lyrics')}
+              rows={5}
+              placeholder={t('musicLyricsPlaceholder')}
+              className="resize-none rounded-xl border border-white/10 bg-black/70 px-3 py-2.5 text-[13px] leading-5 text-ds-ink outline-none transition placeholder:text-ds-faint focus:border-[#f5c542]/70 disabled:cursor-not-allowed disabled:opacity-45"
+            />
+            <span className="text-[11px] text-ds-faint">{form.instrumental ? t('musicInstrumentalHint') : t('musicLyricsOptionalHint')}</span>
+          </label>
+        </>
       ) : (
         /* 标准模式 */
         <>
-          <label className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
+          <label className="flex flex-col gap-1.5 text-[12.5px] text-ds-muted">
             {t('musicTitleLabel')}
             <input
               value={form.title}
               onChange={handleText('title')}
               placeholder={t('musicTitlePlaceholder')}
-              className="rounded-lg border border-ds-border bg-ds-main px-2.5 py-1.5 text-[12.5px] text-ds-ink"
+              className="rounded-xl border border-white/10 bg-black/70 px-3 py-2 text-[13px] text-ds-ink outline-none placeholder:text-ds-faint focus:border-[#f5c542]/70"
             />
           </label>
 
           {/* 歌词 + AI 写词助手入口 */}
-          <label className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
+          <label className="flex flex-col gap-1.5 text-[12.5px] text-ds-muted">
             <span className="flex items-center justify-between">
               <span>
                 {t('musicLyricsLabel')}
@@ -168,7 +183,7 @@ export function MusicCreatePanel({
               <button
                 type="button"
                 onClick={onOpenLyricsAssistant}
-                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11.5px] text-ds-muted hover:text-ds-ink"
+                className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 text-[11.5px] text-ds-muted transition hover:border-[#f5c542]/40 hover:text-[#f5c542]"
               >
                 <Wand2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                 {t('musicLyricsAssistant')}
@@ -181,7 +196,7 @@ export function MusicCreatePanel({
               placeholder={t('musicLyricsPlaceholder')}
               aria-required={lyricsRequired ? 'true' : undefined}
               aria-invalid={showLyricsError ? 'true' : undefined}
-              className={`resize-none rounded-lg border bg-ds-main px-2.5 py-2 text-[12.5px] text-ds-ink ${showLyricsError ? 'border-ds-danger' : 'border-ds-border'}`}
+              className={`resize-none rounded-xl border bg-black/70 px-3 py-2.5 text-[13px] leading-5 text-ds-ink outline-none placeholder:text-ds-faint focus:border-[#f5c542]/70 ${showLyricsError ? 'border-ds-danger' : 'border-white/10'}`}
             />
             <FieldError message={showLyricsError ? t('musicPromptRequired') : null} />
           </label>
@@ -193,7 +208,7 @@ export function MusicCreatePanel({
               value={form.style}
               onChange={handleText('style')}
               placeholder={t('musicStylePlaceholder')}
-              className="rounded-lg border border-ds-border bg-ds-main px-2.5 py-1.5 text-[12.5px] text-ds-ink"
+              className="rounded-xl border border-white/10 bg-black/70 px-3 py-2 text-[13px] text-ds-ink outline-none placeholder:text-ds-faint focus:border-[#f5c542]/70"
             />
             <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('musicStylePresetsLabel')}>
               {STYLE_PRESETS.map((s) => {
@@ -206,8 +221,8 @@ export function MusicCreatePanel({
                     onClick={() => toggleStyle(s)}
                     className={`rounded-full border px-2.5 py-1 text-[11.5px] transition ${
                       active
-                        ? 'border-ds-accent bg-ds-accent-soft font-semibold text-ds-accent'
-                        : 'border-ds-border bg-ds-main text-ds-muted hover:text-ds-ink'
+                        ? 'border-[#f5c542]/60 bg-[#f5c542]/12 font-semibold text-[#f5c542]'
+                        : 'border-white/10 bg-black/50 text-ds-muted hover:text-ds-ink'
                     }`}
                   >
                     {s}
@@ -224,33 +239,12 @@ export function MusicCreatePanel({
               value={form.negativeTags}
               onChange={handleText('negativeTags')}
               placeholder={t('musicNegativeTagsPlaceholder')}
-              className="rounded-lg border border-ds-border bg-ds-main px-2.5 py-1.5 text-[12.5px] text-ds-ink"
+              className="rounded-xl border border-white/10 bg-black/70 px-3 py-2 text-[13px] text-ds-ink outline-none placeholder:text-ds-faint focus:border-[#f5c542]/70"
             />
           </label>
 
-          {/* 纯器乐 switch */}
-          <div className="flex items-center justify-between text-[12.5px] text-ds-muted">
-            <span>{t('musicInstrumental')}</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={form.instrumental}
-              aria-label={t('musicInstrumentalToggle')}
-              onClick={() => onChange({ instrumental: !form.instrumental })}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ease-out ${
-                form.instrumental ? 'bg-ds-accent' : 'bg-ds-faint'
-              }`}
-            >
-              <span
-                className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ease-out ${
-                  form.instrumental ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-
           {/* 高级参数（折叠）：第一排 vocal_gender → style_weight → weirdness → persona */}
-          <details className="overflow-hidden rounded-xl border border-ds-border bg-ds-main">
+          <details className="overflow-hidden rounded-xl border border-white/10 bg-black/55">
             <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[12.5px] font-medium text-ds-ink">
               <SlidersHorizontal className="h-3.5 w-3.5 text-ds-muted" strokeWidth={1.75} />
               {t('musicAdvancedTitle')}
@@ -268,7 +262,7 @@ export function MusicCreatePanel({
                   onChange={(e) =>
                     onChange({ vocalGender: e.target.value as Claude360MusicCreateForm['vocalGender'] })
                   }
-                  className="rounded-lg border border-ds-border bg-ds-card px-2 py-1 text-[12px] text-ds-ink disabled:opacity-50"
+                  className="rounded-lg border border-white/10 bg-[#111] px-2 py-1 text-[12px] text-ds-ink disabled:opacity-50"
                 >
                   <option value="">{t('musicVocalAuto')}</option>
                   <option value="f">{t('musicVocalFemale')}</option>
@@ -326,13 +320,50 @@ export function MusicCreatePanel({
                   value={form.personaId}
                   onChange={handleText('personaId')}
                   placeholder={t('musicPersonaPlaceholder')}
-                  className="rounded-lg border border-ds-border bg-ds-card px-2.5 py-1.5 text-[12px] text-ds-ink"
+                  className="rounded-lg border border-white/10 bg-[#111] px-2.5 py-1.5 text-[12px] text-ds-ink"
                 />
               </label>
             </div>
           </details>
         </>
       )}
+
+      {/* 纯器乐 switch */}
+      <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/55 px-3 py-2.5 text-[12.5px] text-ds-muted">
+        <span>{t('musicInstrumental')}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={form.instrumental}
+          aria-label={t('musicInstrumentalToggle')}
+          onClick={() => onChange({ instrumental: !form.instrumental })}
+          className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ease-out ${
+            form.instrumental ? 'bg-[#f5c542]' : 'bg-white/[0.18]'
+          }`}
+        >
+          <span
+            className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ease-out ${
+              form.instrumental ? 'translate-x-5' : 'translate-x-0'
+            }`}
+          />
+        </button>
+      </div>
+
+      {/* 模型选择 */}
+      <label className="flex flex-col gap-1.5 text-[12.5px] text-ds-muted">
+        {t('musicModelLabel')}
+        <select
+          value={form.model}
+          onChange={(e) => onChange({ model: e.target.value as Claude360MusicCreateForm['model'] })}
+          className="rounded-xl border border-white/10 bg-black/70 px-3 py-2 text-[12.5px] text-ds-ink outline-none focus:border-[#f5c542]/70"
+        >
+          {MODELS.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {errors.length > 0 ? (
         <ul className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-[12px] text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300">
@@ -346,15 +377,16 @@ export function MusicCreatePanel({
         type="button"
         onClick={onSubmit}
         disabled={submitting}
-        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-ds-ink px-4 py-2 text-[13px] font-semibold text-ds-main shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-[#f5c542] px-4 py-2.5 text-[13.5px] font-semibold text-black shadow-[0_14px_34px_rgba(245,197,66,0.22)] transition hover:bg-[#ffd866] disabled:cursor-not-allowed disabled:bg-[#5c512e] disabled:text-white/55 disabled:shadow-none"
       >
         {submitting ? (
           <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
         ) : (
           <Sparkles className="h-4 w-4" strokeWidth={1.75} />
         )}
-        {submitting ? t('musicGenerating') : t('musicGenerate')}
+        {submitting ? t('musicGenerating') : t('musicGenerateTwo')}
       </button>
+      <p className="text-center text-[11px] leading-4 text-ds-faint">{t('musicGenerateHint')}</p>
     </section>
   )
 }
