@@ -248,7 +248,7 @@ summary,
 }
 
 [data-theme='dark'] .write-codemirror-host > .cm-editor {
-  --write-selection-bg: rgba(111, 176, 232, 0.58);
+  --write-selection-bg: rgba(161, 161, 170, 0.45);
   --write-selection-text: #f8fbff;
 }
 
