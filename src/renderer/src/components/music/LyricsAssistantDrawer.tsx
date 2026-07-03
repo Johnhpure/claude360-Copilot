@@ -85,7 +85,7 @@ export function LyricsAssistantDrawer({
   return (
     <>
       <div
-        className="fixed inset-0 z-[200] bg-black/55 backdrop-blur-[2px]"
+        className="fixed inset-0 z-[200] bg-[rgba(15,20,34,0.55)] backdrop-blur-[2px]"
         onClick={onClose}
         aria-hidden="true"
       />

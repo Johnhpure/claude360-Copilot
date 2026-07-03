@@ -265,7 +265,10 @@ describe('Claude360MusicService.fetchMusic', () => {
                   { id: 'audioUrl', audioUrl: 'https://cdn/audio-url.mp3', imageUrl: 'https://cdn/image-url.png' },
                   { id: 'url', url: 'https://cdn/url.mp3', coverUrl: 'https://cdn/cover-url.png' },
                   { id: 'streamUrl', streamUrl: 'https://cdn/stream-url.mp3', artworkUrl: 'https://cdn/artwork-url.png' },
-                  { id: 'fileUrl', fileUrl: 'https://cdn/file-url.mp3', thumbnail: 'https://cdn/thumbnail.png' }
+                  { id: 'fileUrl', fileUrl: 'https://cdn/file-url.mp3', thumbnail: 'https://cdn/thumbnail.png' },
+                  { id: 'musicUrl', musicUrl: 'https://cdn/music-url.mp3', image: 'https://cdn/image.png' },
+                  { id: 'audio', audio: 'https://cdn/audio.mp3', cover: 'https://cdn/cover.png' },
+                  { id: 'streamAudioUrl', streamAudioUrl: 'https://cdn/stream-audio-url.mp3' }
                 ]
               }
             ]
@@ -298,8 +301,102 @@ describe('Claude360MusicService.fetchMusic', () => {
           id: 'fileUrl',
           audioUrl: 'https://cdn/file-url.mp3',
           imageUrl: 'https://cdn/thumbnail.png'
+        }),
+        expect.objectContaining({
+          id: 'musicUrl',
+          audioUrl: 'https://cdn/music-url.mp3',
+          imageUrl: 'https://cdn/image.png'
+        }),
+        expect.objectContaining({
+          id: 'audio',
+          audioUrl: 'https://cdn/audio.mp3',
+          imageUrl: 'https://cdn/cover.png'
+        }),
+        expect.objectContaining({
+          id: 'streamAudioUrl',
+          audioUrl: 'https://cdn/stream-audio-url.mp3'
         })
       ])
+    }
+  })
+
+  it('把接口返回的相对资源地址补全为 Claude360 baseUrl 下的完整 URL', async () => {
+    const service = new Claude360MusicService(
+      makeDeps({
+        readClaude360: async () => ({ ...settingsWithMusicGroup('music-vip'), baseUrl: 'https://claude360.xyz/app/' }),
+        apiClient: fakeApi({
+          fetch: () => ({
+            code: 'success',
+            data: [
+              {
+                task_id: 'T-relative',
+                action: 'MUSIC',
+                status: 'SUCCESS',
+                data: [
+                  { id: 'root', audio_url: '/suno/files/a.mp3', image_url: '/suno/files/a.png' },
+                  { id: 'plain', audio_url: 'media/b.mp3', image_url: 'media/b.png' },
+                  { id: 'protocol', audio_url: '//cdn.example/c.mp3', image_url: '//cdn.example/c.png' }
+                ]
+              }
+            ]
+          })
+        })
+      })
+    )
+
+    const result = await service.fetchMusic('T-relative')
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.task.songs).toEqual([
+        expect.objectContaining({
+          id: 'root',
+          audioUrl: 'https://claude360.xyz/suno/files/a.mp3',
+          imageUrl: 'https://claude360.xyz/suno/files/a.png'
+        }),
+        expect.objectContaining({
+          id: 'plain',
+          audioUrl: 'https://claude360.xyz/app/media/b.mp3',
+          imageUrl: 'https://claude360.xyz/app/media/b.png'
+        }),
+        expect.objectContaining({
+          id: 'protocol',
+          audioUrl: 'https://cdn.example/c.mp3',
+          imageUrl: 'https://cdn.example/c.png'
+        })
+      ])
+    }
+  })
+
+  it('把 Windows 本地资源路径转换为 Electron 可加载的 file URL', async () => {
+    const service = new Claude360MusicService(
+      makeDeps({
+        apiClient: fakeApi({
+          fetch: () => ({
+            code: 'success',
+            data: [
+              {
+                task_id: 'T-local',
+                action: 'MUSIC',
+                status: 'SUCCESS',
+                data: [
+                  { id: 'local', audio_url: 'C:\\Music\\song.mp3', image_url: 'D:\\Images\\cover.png' }
+                ]
+              }
+            ]
+          })
+        })
+      })
+    )
+
+    const result = await service.fetchMusic('T-local')
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.task.songs[0]).toMatchObject({
+        audioUrl: 'file:///C:/Music/song.mp3',
+        imageUrl: 'file:///D:/Images/cover.png'
+      })
     }
   })
 
@@ -345,5 +442,51 @@ describe('Claude360MusicService.fetchMusic', () => {
     )
     const result = await service.fetchMusic('T-9')
     expect(result).toMatchObject({ ok: false, retryable: true })
+  })
+})
+
+describe('Claude360MusicService.fetchMusicMedia', () => {
+  it('同源音频代理请求携带 music Key 并返回 base64 blob', async () => {
+    const calls: Array<{ url: string; headers?: HeadersInit }> = []
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), headers: init?.headers })
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { 'content-type': 'audio/mpeg' }
+      })
+    })
+    const service = new Claude360MusicService(
+      makeDeps({
+        readClaude360: async () => ({ ...settingsWithMusicGroup('music-vip'), baseUrl: 'https://claude360.xyz/app/' }),
+        fetchImpl
+      })
+    )
+
+    const result = await service.fetchMusicMedia('/suno/files/a.mp3')
+
+    expect(result).toEqual({
+      ok: true,
+      url: 'https://claude360.xyz/suno/files/a.mp3',
+      mimeType: 'audio/mpeg',
+      base64: 'AQID'
+    })
+    expect(calls[0]).toMatchObject({
+      url: 'https://claude360.xyz/suno/files/a.mp3',
+      headers: { Authorization: 'Bearer key-music-vip' }
+    })
+  })
+
+  it('跨域 CDN 音频代理请求不泄露 Authorization', async () => {
+    const calls: Array<{ url: string; headers?: HeadersInit }> = []
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), headers: init?.headers })
+      return new Response(new Uint8Array([1]), { status: 200 })
+    })
+    const service = new Claude360MusicService(makeDeps({ fetchImpl }))
+
+    const result = await service.fetchMusicMedia('https://cdn.example/a.mp3')
+
+    expect(result.ok).toBe(true)
+    expect(calls[0]).toMatchObject({ url: 'https://cdn.example/a.mp3', headers: {} })
   })
 })

@@ -45,11 +45,11 @@ const STATUS_LABEL_KEY: Record<MusicGenTask['status'], string> = {
 }
 
 const STATUS_CLASS: Record<MusicGenTask['status'], string> = {
-  submitting: 'bg-[#f5c542]/15 text-[#f5c542]',
-  queued: 'bg-[#f5c542]/15 text-[#f5c542]',
-  in_progress: 'bg-[#f5c542]/15 text-[#f5c542]',
-  success: 'bg-emerald-500/15 text-emerald-300',
-  failure: 'bg-red-500/15 text-red-300'
+  submitting: 'bg-accent-soft text-accent',
+  queued: 'bg-accent-soft text-accent',
+  in_progress: 'bg-accent-soft text-accent',
+  success: 'bg-ds-success-soft text-ds-success',
+  failure: 'bg-ds-danger-soft text-ds-danger'
 }
 
 function isGenerating(status: MusicGenTask['status']): boolean {
@@ -160,7 +160,7 @@ function ActionButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="grid h-8 w-8 place-items-center rounded-lg text-ds-muted transition hover:bg-white/[0.07] hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-40"
+      className="grid h-8 w-8 place-items-center rounded-lg text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </button>
@@ -171,14 +171,14 @@ function CoverPlaceholder({ active, testId = 'music-cover-placeholder' }: { acti
   return (
     <div
       data-testid={testId}
-      className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_30%_20%,rgba(245,197,66,0.35),transparent_32%),linear-gradient(135deg,#191919,#050505_64%,#302611)]"
+      className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_30%_20%,var(--ds-accent-soft),transparent_36%),linear-gradient(135deg,var(--ds-surface-subtle),var(--ds-bg-canvas))]"
     >
-      <Music4 className="h-9 w-9 text-white/60" strokeWidth={1.4} />
+      <Music4 className="h-9 w-9 text-ds-muted" strokeWidth={1.4} />
       {active ? (
         <span className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-end gap-1" aria-hidden="true">
-          <span className="h-3 w-1 rounded-full bg-[#f5c542] animate-pulse" />
-          <span className="h-5 w-1 rounded-full bg-[#f5c542] animate-pulse" />
-          <span className="h-4 w-1 rounded-full bg-[#f5c542] animate-pulse" />
+          <span className="h-3 w-1 rounded-full bg-accent animate-pulse" />
+          <span className="h-5 w-1 rounded-full bg-accent animate-pulse" />
+          <span className="h-4 w-1 rounded-full bg-accent animate-pulse" />
         </span>
       ) : null}
     </div>
@@ -275,7 +275,7 @@ export function MusicTaskList({
     <section data-testid="music-task-list" className="flex min-h-0 flex-col gap-3">
       <div
         data-testid="music-works-toolbar"
-        className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-[#0b0b0b] px-3 py-2 shadow-[0_12px_32px_rgba(0,0,0,0.22)]"
+        className="flex flex-wrap items-center gap-2 rounded-xl border border-ds-border bg-ds-card px-3 py-2 shadow-sm"
       >
         <h2 className="text-[14px] font-semibold text-ds-ink">{t('musicWorksTitle')}</h2>
         <span className="text-[12px] text-ds-muted">{t('musicWorksCount', { count: allCards.length })}</span>
@@ -288,13 +288,13 @@ export function MusicTaskList({
               aria-selected={filter === item}
               onClick={() => setFilter(item)}
               className={`rounded-md px-2 py-1 text-[12px] transition ${
-                filter === item ? 'bg-white/[0.08] font-medium text-[#f5c542]' : 'text-ds-muted hover:text-ds-ink'
+                filter === item ? 'bg-ds-hover font-medium text-ds-ink' : 'text-ds-muted hover:text-ds-ink'
               }`}
             >
               {filterLabel(item, t)}
             </button>
           ))}
-          <span className="mx-1 h-4 w-px bg-white/10" aria-hidden="true" />
+          <span className="mx-1 h-4 w-px bg-ds-border" aria-hidden="true" />
           <button
             type="button"
             onClick={onClear}
@@ -335,17 +335,17 @@ export function MusicTaskList({
       {allCards.length === 0 ? (
         <div
           data-testid="music-works-empty"
-          className="flex min-h-[260px] flex-1 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#080808] px-6 text-center"
+          className="flex min-h-[260px] flex-1 items-center justify-center rounded-2xl border border-dashed border-ds-border bg-ds-card px-6 text-center"
         >
           <div className="max-w-[280px]">
-            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#f5c542]/12 text-[#f5c542]">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-accent-soft text-accent">
               <Music4 className="h-6 w-6" strokeWidth={1.5} />
             </div>
             <p className="mt-3 text-[13px] leading-5 text-ds-muted">{t('musicWorksEmpty')}</p>
           </div>
         </div>
       ) : visibleCards.length === 0 ? (
-        <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#080808] px-6 text-center text-[13px] text-ds-muted">
+        <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-ds-border bg-ds-card px-6 text-center text-[13px] text-ds-muted">
           {t('musicFilterEmpty')}
         </div>
       ) : (
@@ -382,11 +382,11 @@ export function MusicTaskList({
                 data-testid="music-work-card"
                 data-status={status}
                 data-playing={isPlaying ? 'true' : undefined}
-                className={`group flex min-h-0 flex-col overflow-hidden rounded-xl border bg-[#0b0b0b] transition ${
-                  isPlaying ? 'border-[#f5c542] shadow-[0_0_0_1px_rgba(245,197,66,0.35),0_18px_42px_rgba(0,0,0,0.36)]' : selected ? 'border-[#f5c542]/70 ring-2 ring-[#f5c542]/25' : 'border-white/10 hover:border-white/[0.18] hover:bg-[#101010]'
+                className={`group flex min-h-0 flex-col overflow-hidden rounded-xl border bg-ds-card transition ${
+                  isPlaying ? 'border-accent ring-2 ring-accent/20 shadow-panel' : selected ? 'border-accent ring-2 ring-accent/20' : 'border-ds-border hover:border-accent hover:bg-ds-hover'
                 }`}
               >
-                <div className="relative aspect-square overflow-hidden bg-black">
+                <div className="relative aspect-square overflow-hidden bg-ds-main">
                   <MusicCoverImage
                     src={song?.imageUrl}
                     title={title}
@@ -399,13 +399,13 @@ export function MusicTaskList({
                     {t(STATUS_LABEL_KEY[status])}
                   </span>
                   {isGenerating(status) ? (
-                    <span className="absolute inset-x-3 bottom-3 flex items-center justify-center gap-2 rounded-lg bg-black/55 px-3 py-2 text-[12px] text-white/85 backdrop-blur">
-                      <Loader2 className="h-4 w-4 animate-spin text-[#f5c542]" strokeWidth={1.75} />
+                    <span className="absolute inset-x-3 bottom-3 flex items-center justify-center gap-2 rounded-lg border border-ds-border bg-ds-card px-3 py-2 text-[12px] text-ds-ink shadow-sm">
+                      <Loader2 className="h-4 w-4 animate-spin text-accent" strokeWidth={1.75} />
                       {t('musicWorkGenerating')}
                     </span>
                   ) : null}
                   {isPlaying ? (
-                    <span className="absolute right-2 top-2 rounded-md bg-[#f5c542] px-2 py-1 text-[11px] font-semibold text-black">
+                    <span className="absolute right-2 top-2 rounded-md bg-accent px-2 py-1 text-[11px] font-semibold text-white">
                       {t('musicPlaying')}
                     </span>
                   ) : null}
@@ -415,7 +415,7 @@ export function MusicTaskList({
                       aria-label={t('musicBatchToggle')}
                       onClick={() => toggleSelected(card.id)}
                       className={`absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-md border text-[11px] ${
-                        selected ? 'border-[#f5c542] bg-[#f5c542] text-black' : 'border-white/20 bg-black/45 text-transparent'
+                        selected ? 'border-accent bg-accent text-white' : 'border-ds-border bg-ds-card text-transparent'
                       }`}
                     >
                       ✓
@@ -445,7 +445,7 @@ export function MusicTaskList({
                   {song && !canPlay ? (
                     <div
                       data-testid="music-audio-missing"
-                      className="rounded-lg border border-[#f5c542]/20 bg-[#f5c542]/[0.08] px-2.5 py-2 text-[12px] leading-4 text-[#f5c542]"
+                      className="rounded-lg border border-ds-border bg-accent-soft px-2.5 py-2 text-[12px] leading-4 text-accent"
                     >
                       {t('musicAudioMissing')}
                     </div>

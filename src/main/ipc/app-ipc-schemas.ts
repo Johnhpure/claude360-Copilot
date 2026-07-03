@@ -755,6 +755,12 @@ export const claude360MusicFetchPayloadSchema = z
   })
   .strict()
 
+export const claude360MusicMediaBlobPayloadSchema = z
+  .object({
+    url: trimmedString(4096)
+  })
+  .strict()
+
 // Claude360 原生生图工作台 IPC payload（plan-06 Task 3）。
 // generate：prompt/model 必填，n∈[1,4]，size 在允许集合；
 // edit：image/prompt/model 必填，image 为 base64 或 dataURL 字符串（体量有界）。

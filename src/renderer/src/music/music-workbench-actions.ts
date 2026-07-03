@@ -9,6 +9,7 @@
 import type {
   Claude360MusicCreateForm,
   Claude360MusicFetchResult,
+  Claude360MusicMediaBlobResult,
   Claude360MusicSubmitPayload,
   Claude360MusicSubmitResult,
   Claude360Song
@@ -21,6 +22,7 @@ import { buildSubmitPayload, validateForm } from './suno-params'
 export type MusicWorkbenchApi = {
   claude360MusicSubmit: (payload: Claude360MusicSubmitPayload) => Promise<Claude360MusicSubmitResult>
   claude360MusicFetch: (taskId: string) => Promise<Claude360MusicFetchResult>
+  claude360MusicMediaBlob?: (url: string) => Promise<Claude360MusicMediaBlobResult>
   claude360TokensList: () => Promise<Claude360TokenListItem[]>
 }
 
@@ -139,13 +141,47 @@ export async function downloadSong(
 export type MusicPlaybackAudioElement = Pick<HTMLAudioElement, 'src' | 'volume' | 'currentTime' | 'play' | 'pause'>
 
 export type MusicPlaybackResult =
-  | { ok: true }
+  | { ok: true; sourceUrl: string; usedFallback: boolean }
   | { ok: false; reason: 'missing-url' }
   | { ok: false; reason: 'play-failed'; message: string }
+type MusicPlayFailed = Extract<MusicPlaybackResult, { reason: 'play-failed' }>
+
+export type MusicPlaybackOptions = {
+  resolvePlayableUrl?: (audioUrl: string, error: unknown) => Promise<string | null>
+  logError?: (message: string, detail: unknown) => void
+}
 
 function clampPlaybackVolume(volume: number): number {
   if (!Number.isFinite(volume)) return 0.8
   return Math.max(0, Math.min(1, volume))
+}
+
+function playbackErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function redactPlaybackUrl(value: string): string {
+  try {
+    const url = new URL(value)
+    url.search = ''
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return value
+  }
+}
+
+async function tryPlayAudio(audio: MusicPlaybackAudioElement): Promise<MusicPlayFailed | null> {
+  try {
+    await audio.play()
+    return null
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'play-failed',
+      message: playbackErrorMessage(error)
+    }
+  }
 }
 
 /**
@@ -155,7 +191,8 @@ function clampPlaybackVolume(volume: number): number {
 export async function playSongOnAudioElement(
   audio: MusicPlaybackAudioElement,
   song: Pick<Claude360Song, 'audioUrl'>,
-  volume: number
+  volume: number,
+  options: MusicPlaybackOptions = {}
 ): Promise<MusicPlaybackResult> {
   const audioUrl = song.audioUrl.trim()
   if (!audioUrl) return { ok: false, reason: 'missing-url' }
@@ -167,14 +204,29 @@ export async function playSongOnAudioElement(
   }
   audio.volume = clampPlaybackVolume(volume)
 
-  try {
-    await audio.play()
-    return { ok: true }
-  } catch (error) {
-    return {
-      ok: false,
-      reason: 'play-failed',
-      message: error instanceof Error ? error.message : String(error)
+  const directFailure = await tryPlayAudio(audio)
+  if (!directFailure) return { ok: true, sourceUrl: audioUrl, usedFallback: false }
+
+  options.logError?.('[claude360-music] audio.play failed', {
+    message: directFailure.message,
+    url: redactPlaybackUrl(audioUrl)
+  })
+
+  const fallbackUrl = await options.resolvePlayableUrl?.(audioUrl, new Error(directFailure.message))
+  if (fallbackUrl) {
+    audio.pause()
+    audio.src = fallbackUrl
+    audio.currentTime = 0
+    const fallbackFailure = await tryPlayAudio(audio)
+    if (!fallbackFailure) {
+      return { ok: true, sourceUrl: fallbackUrl, usedFallback: true }
     }
+    options.logError?.('[claude360-music] fallback audio.play failed', {
+      message: fallbackFailure.message,
+      url: redactPlaybackUrl(audioUrl),
+      fallbackUrl
+    })
+    return fallbackFailure
   }
+  return directFailure
 }

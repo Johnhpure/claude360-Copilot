@@ -1,8 +1,11 @@
+import { homedir } from 'node:os'
+import { pathToFileURL } from 'node:url'
 import type { Claude360SettingsV1 } from '../../shared/app-settings-claude360'
 import type { Claude360TokenPurpose } from '../../shared/claude360'
 import type {
   Claude360MusicFetchedTask,
   Claude360MusicFetchResult,
+  Claude360MusicMediaBlobResult,
   Claude360MusicSubmitPayload,
   Claude360MusicSubmitResult,
   Claude360MusicTaskStatus,
@@ -38,6 +41,7 @@ export type Claude360MusicApiClientPort = {
 export type Claude360MusicServiceDeps = {
   apiClient: Claude360MusicApiClientPort
   secretStore: Claude360SecretStore
+  fetchImpl?: typeof fetch
   /** 读 Claude360 settings（取 selectedMusicGroup）。 */
   readClaude360(): Claude360SettingsV1 | Promise<Claude360SettingsV1>
   /** 确保某分组对应用途的 Key 并返回明文（token service + secret store 提供）。 */
@@ -49,15 +53,24 @@ interface SunoRawSong {
   id: string
   audio_url?: string
   audioUrl?: string
+  music_url?: string
+  musicUrl?: string
+  audio?: string
   url?: string
+  sourceAudioUrl?: string
+  source_audio_url?: string
+  streamAudioUrl?: string
+  stream_audio_url?: string
   streamUrl?: string
   stream_url?: string
   fileUrl?: string
   file_url?: string
   image_url?: string
   imageUrl?: string
+  image?: string
   coverUrl?: string
   cover_url?: string
+  cover?: string
   artworkUrl?: string
   artwork_url?: string
   thumbnail?: string
@@ -86,44 +99,195 @@ const STATUS_MAP: Record<string, Claude360MusicTaskStatus> = {
   FAILURE: 'failure'
 }
 
-function firstNonEmptyString(...values: unknown[]): string | undefined {
-  for (const value of values) {
-    if (typeof value !== 'string') continue
+const DEFAULT_CLAUDE360_BASE_URL = 'https://claude360.xyz'
+const MAX_MEDIA_BLOB_BYTES = 80 * 1024 * 1024
+
+type PickedString = {
+  field: string
+  value: string
+}
+
+type MusicContext = {
+  apiKey: string
+  baseUrl: string
+}
+
+function stringFromUnknown(value: unknown): string | undefined {
+  if (typeof value === 'string') {
     const trimmed = value.trim()
     if (trimmed) return trimmed
   }
   return undefined
 }
 
-function songAudioUrl(s: SunoRawSong): string | undefined {
-  return firstNonEmptyString(
-    s.audio_url,
-    s.audioUrl,
-    s.url,
-    s.streamUrl,
-    s.stream_url,
-    s.fileUrl,
-    s.file_url
-  )
+function firstNonEmptyString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    const found = stringFromUnknown(value)
+    if (found) return found
+  }
+  return undefined
 }
 
-function songImageUrl(s: SunoRawSong): string | undefined {
-  return firstNonEmptyString(
-    s.image_url,
-    s.imageUrl,
-    s.coverUrl,
-    s.cover_url,
-    s.artworkUrl,
-    s.artwork_url,
-    s.thumbnail
-  )
+function pickString(candidates: Array<[string, unknown]>): PickedString | undefined {
+  for (const [field, value] of candidates) {
+    const found = stringFromUnknown(value)
+    if (found) return { field, value: found }
+  }
+  return undefined
 }
 
-function mapSong(s: SunoRawSong): Claude360Song {
+function pickSongAudio(s: SunoRawSong): PickedString | undefined {
+  return pickString([
+    ['audio_url', s.audio_url],
+    ['audioUrl', s.audioUrl],
+    ['music_url', s.music_url],
+    ['musicUrl', s.musicUrl],
+    ['audio', s.audio],
+    ['url', s.url],
+    ['sourceAudioUrl', s.sourceAudioUrl],
+    ['source_audio_url', s.source_audio_url],
+    ['streamAudioUrl', s.streamAudioUrl],
+    ['stream_audio_url', s.stream_audio_url],
+    ['streamUrl', s.streamUrl],
+    ['stream_url', s.stream_url],
+    ['fileUrl', s.fileUrl],
+    ['file_url', s.file_url]
+  ])
+}
+
+function pickSongImage(s: SunoRawSong): PickedString | undefined {
+  return pickString([
+    ['image_url', s.image_url],
+    ['imageUrl', s.imageUrl],
+    ['image', s.image],
+    ['coverUrl', s.coverUrl],
+    ['cover_url', s.cover_url],
+    ['cover', s.cover],
+    ['artworkUrl', s.artworkUrl],
+    ['artwork_url', s.artwork_url],
+    ['thumbnail', s.thumbnail]
+  ])
+}
+
+function safeBaseUrl(baseUrl: string): URL {
+  try {
+    return new URL(baseUrl.trim() || DEFAULT_CLAUDE360_BASE_URL)
+  } catch {
+    return new URL(DEFAULT_CLAUDE360_BASE_URL)
+  }
+}
+
+function windowsPathToFileUrl(value: string): string {
+  return `file:///${value.replace(/\\/g, '/').replace(/^([A-Za-z]):/, '$1:')}`
+}
+
+function uncPathToFileUrl(value: string): string {
+  return `file://${value.replace(/^\\\\/, '').replace(/\\/g, '/')}`
+}
+
+function isLikelyPosixFilePath(value: string): boolean {
+  return /^\/(?:Users|home|tmp|var|opt|Volumes)\//u.test(value)
+}
+
+function normalizeLocalPath(value: string): string | null {
+  if (/^[A-Za-z]:[\\/]/u.test(value)) return windowsPathToFileUrl(value)
+  if (value.startsWith('\\\\')) return uncPathToFileUrl(value)
+  if (value.startsWith('~/') || value === '~') {
+    const suffix = value === '~' ? '' : value.slice(2)
+    return pathToFileURL(`${homedir()}/${suffix}`).toString()
+  }
+  if (isLikelyPosixFilePath(value)) return pathToFileURL(value).toString()
+  return null
+}
+
+function normalizeResourceUrl(value: string | undefined, baseUrl: string): string | undefined {
+  if (!value) return undefined
+  const raw = value.trim()
+  if (!raw) return undefined
+  const local = normalizeLocalPath(raw)
+  if (local) return local
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(raw)) return raw
+
+  const base = safeBaseUrl(baseUrl)
+  if (raw.startsWith('//')) return `${base.protocol}${raw}`
+  try {
+    return new URL(raw, base).toString()
+  } catch {
+    return raw
+  }
+}
+
+function normalizedSongAudioUrl(s: SunoRawSong, baseUrl: string): string | undefined {
+  return normalizeResourceUrl(pickSongAudio(s)?.value, baseUrl)
+}
+
+function normalizedSongImageUrl(s: SunoRawSong, baseUrl: string): string | undefined {
+  return normalizeResourceUrl(pickSongImage(s)?.value, baseUrl)
+}
+
+function taskLogShape(task: SunoRawTask, baseUrl: string): unknown {
+  return {
+    taskId: task.task_id,
+    status: task.status,
+    songCount: task.data?.length ?? 0,
+    songs: (task.data ?? []).map((song) => {
+      const audio = pickSongAudio(song)
+      const image = pickSongImage(song)
+      return {
+        id: song.id,
+        keys: Object.keys(song).sort(),
+        audioField: audio?.field ?? null,
+        imageField: image?.field ?? null,
+        normalizedAudioUrl: redactUrl(normalizeResourceUrl(audio?.value, baseUrl)),
+        normalizedImageUrl: redactUrl(normalizeResourceUrl(image?.value, baseUrl))
+      }
+    })
+  }
+}
+
+function logFetchShape(taskId: string, rows: SunoRawTask[], baseUrl: string): void {
+  if (process.env.NODE_ENV === 'test') return
+  console.info('[claude360-music] /suno/fetch raw task shape', {
+    requestedTaskId: taskId,
+    taskCount: rows.length,
+    tasks: rows.map((task) => taskLogShape(task, baseUrl))
+  })
+}
+
+function redactUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  try {
+    const url = new URL(value)
+    url.search = ''
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return value
+  }
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function shouldAttachMusicToken(targetUrl: string, baseUrl: string): boolean {
+  try {
+    return new URL(targetUrl).origin === safeBaseUrl(baseUrl).origin
+  } catch {
+    return false
+  }
+}
+
+function mapSong(s: SunoRawSong, baseUrl: string): Claude360Song {
   return {
     id: s.id,
-    audioUrl: songAudioUrl(s) ?? '',
-    imageUrl: songImageUrl(s),
+    audioUrl: normalizedSongAudioUrl(s, baseUrl) ?? '',
+    imageUrl: normalizedSongImageUrl(s, baseUrl),
     title: s.title ?? '未命名',
     text: s.text,
     duration: s.metadata?.duration ?? s.duration,
@@ -132,13 +296,13 @@ function mapSong(s: SunoRawSong): Claude360Song {
   }
 }
 
-function parseTask(t: SunoRawTask): Claude360MusicFetchedTask {
+function parseTask(t: SunoRawTask, baseUrl: string): Claude360MusicFetchedTask {
   const mapped = STATUS_MAP[t.status]
   return {
     taskId: t.task_id,
     status: mapped ?? 'in_progress',
     failReason: t.fail_reason || undefined,
-    songs: (t.data ?? []).filter((s) => Boolean(songAudioUrl(s))).map(mapSong),
+    songs: (t.data ?? []).filter((s) => Boolean(normalizedSongAudioUrl(s, baseUrl))).map((s) => mapSong(s, baseUrl)),
     unresolved: mapped === undefined
   }
 }
@@ -162,28 +326,31 @@ export class Claude360MusicService {
     this.deps = deps
   }
 
-  /** 取 music 分组的 music Key；未登录/未选分组分别抛出可展示错误。 */
-  private async musicKey(): Promise<string> {
+  /** 取 music 分组的 music Key 与 baseUrl；未登录/未选分组分别抛出可展示错误。 */
+  private async musicContext(): Promise<MusicContext> {
     const settings = await this.deps.readClaude360()
     const group = (settings.selectedMusicGroup ?? '').trim()
     if (!group) {
       throw new Claude360ApiError('尚未选择音乐分组，请打开 设置 → 分组及 Key 选择 music 分组。')
     }
     // ensureGroupKey 内部会校验登录态（cli_token 缺失时抛「未登录」）。
-    return this.deps.ensureGroupKey(group, 'music')
+    return {
+      apiKey: await this.deps.ensureGroupKey(group, 'music'),
+      baseUrl: safeBaseUrl(settings.baseUrl).toString()
+    }
   }
 
   async submitMusic(input: Claude360MusicSubmitPayload): Promise<Claude360MusicSubmitResult> {
-    let apiKey: string
+    let context: MusicContext
     try {
-      apiKey = await this.musicKey()
+      context = await this.musicContext()
     } catch (error) {
       return { ok: false, message: errorMessage(error) }
     }
 
     let env: Claude360SunoRawEnvelope
     try {
-      env = await this.deps.apiClient.postSunoRaw('/suno/submit/music', input, apiKey)
+      env = await this.deps.apiClient.postSunoRaw('/suno/submit/music', input, context.apiKey)
     } catch (error) {
       // 网络/传输错误：可重试。
       return { ok: false, message: errorMessage(error), retryable: true }
@@ -201,16 +368,16 @@ export class Claude360MusicService {
       return { ok: false, message: 'taskId 不能为空' }
     }
 
-    let apiKey: string
+    let context: MusicContext
     try {
-      apiKey = await this.musicKey()
+      context = await this.musicContext()
     } catch (error) {
       return { ok: false, message: errorMessage(error) }
     }
 
     let env: Claude360SunoRawEnvelope
     try {
-      env = await this.deps.apiClient.postSunoRaw('/suno/fetch', { ids: [id] }, apiKey)
+      env = await this.deps.apiClient.postSunoRaw('/suno/fetch', { ids: [id] }, context.apiKey)
     } catch (error) {
       return { ok: false, message: errorMessage(error), retryable: true }
     }
@@ -220,6 +387,7 @@ export class Claude360MusicService {
     }
 
     const rows = Array.isArray(env.data) ? (env.data as SunoRawTask[]) : []
+    logFetchShape(id, rows, context.baseUrl)
     const raw = rows.find((t) => t?.task_id === id)
     if (!raw) {
       // 上游本次成功但未返回该任务（最常见的"尚未同步"）：作为可归约的 unresolved
@@ -227,7 +395,52 @@ export class Claude360MusicService {
       // 避免与网络错误混同被跳过而导致无限轮询(区别于上面 catch 的 retryable 网络失败)。
       return { ok: true, task: { taskId: id, status: 'in_progress', songs: [], unresolved: true } }
     }
-    return { ok: true, task: parseTask(raw) }
+    return { ok: true, task: parseTask(raw, context.baseUrl) }
+  }
+
+  async fetchMusicMedia(url: string): Promise<Claude360MusicMediaBlobResult> {
+    const raw = (url ?? '').trim()
+    if (!raw) return { ok: false, message: '音频地址不能为空' }
+
+    let context: MusicContext
+    try {
+      context = await this.musicContext()
+    } catch (error) {
+      return { ok: false, message: errorMessage(error) }
+    }
+
+    const normalized = normalizeResourceUrl(raw, context.baseUrl)
+    if (!normalized || !isHttpUrl(normalized)) {
+      return { ok: false, message: '音频地址不可播放' }
+    }
+
+    const headers: Record<string, string> = {}
+    if (shouldAttachMusicToken(normalized, context.baseUrl)) {
+      headers.Authorization = `Bearer ${context.apiKey}`
+    }
+
+    try {
+      const response = await (this.deps.fetchImpl ?? fetch)(normalized, { headers })
+      if (!response.ok) {
+        return {
+          ok: false,
+          message: `音频请求失败 (HTTP ${response.status})`,
+          retryable: response.status >= 500
+        }
+      }
+      const buffer = Buffer.from(await response.arrayBuffer())
+      if (buffer.byteLength > MAX_MEDIA_BLOB_BYTES) {
+        return { ok: false, message: '音频文件过大，无法直接播放' }
+      }
+      return {
+        ok: true,
+        url: normalized,
+        mimeType: response.headers.get('content-type') || 'audio/mpeg',
+        base64: buffer.toString('base64')
+      }
+    } catch (error) {
+      return { ok: false, message: errorMessage(error), retryable: true }
+    }
   }
 }
 

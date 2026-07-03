@@ -160,7 +160,7 @@ describe('playSongOnAudioElement', () => {
   it('用户点击播放时复用 audio，设置 src/音量并调用 play', async () => {
     const audio = fakeAudio()
     const result = await playSongOnAudioElement(audio, { audioUrl: 'https://cdn/a.mp3' }, 0.6)
-    expect(result).toEqual({ ok: true })
+    expect(result).toEqual({ ok: true, sourceUrl: 'https://cdn/a.mp3', usedFallback: false })
     expect(audio.src).toBe('https://cdn/a.mp3')
     expect(audio.currentTime).toBe(0)
     expect(audio.volume).toBe(0.6)
@@ -175,10 +175,38 @@ describe('playSongOnAudioElement', () => {
     expect(audio.volume).toBe(1)
   })
 
-  it('浏览器拒绝播放时返回 play-failed，供 UI 展示错误', async () => {
+  it('浏览器拒绝播放时记录真实错误并返回 play-failed，供 UI 展示错误', async () => {
     const audio = fakeAudio()
+    const logError = vi.fn()
     audio.play.mockRejectedValueOnce(new Error('NotAllowedError'))
-    const result = await playSongOnAudioElement(audio, { audioUrl: 'https://cdn/a.mp3' }, 0.8)
+    const result = await playSongOnAudioElement(audio, { audioUrl: 'https://cdn/a.mp3?sig=secret' }, 0.8, {
+      logError
+    })
     expect(result).toEqual({ ok: false, reason: 'play-failed', message: 'NotAllowedError' })
+    expect(logError).toHaveBeenCalledWith(
+      '[claude360-music] audio.play failed',
+      expect.objectContaining({
+        message: 'NotAllowedError',
+        url: 'https://cdn/a.mp3'
+      })
+    )
+  })
+
+  it('HTMLAudioElement 直连失败时可使用 fallback object URL 再播放', async () => {
+    const audio = fakeAudio()
+    const resolvePlayableUrl = vi.fn(async () => 'blob:music-a')
+    audio.play
+      .mockRejectedValueOnce(new Error('HTTP 401'))
+      .mockResolvedValueOnce(undefined)
+
+    const result = await playSongOnAudioElement(audio, { audioUrl: 'https://claude360.xyz/suno/a.mp3' }, 0.8, {
+      resolvePlayableUrl
+    })
+
+    expect(result).toEqual({ ok: true, sourceUrl: 'blob:music-a', usedFallback: true })
+    expect(resolvePlayableUrl).toHaveBeenCalledWith('https://claude360.xyz/suno/a.mp3', expect.any(Error))
+    expect(audio.src).toBe('blob:music-a')
+    expect(audio.currentTime).toBe(0)
+    expect(audio.play).toHaveBeenCalledTimes(2)
   })
 })

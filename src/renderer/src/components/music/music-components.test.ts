@@ -259,6 +259,28 @@ describe('MusicTaskList · 作品管理栏 + 宫格', () => {
     expect(html).toContain('musicClearAll')
     expect(html).toContain('musicBatchSelect')
   })
+
+  it('作品区复用 ds 主题 token，不输出黑金硬编码颜色', () => {
+    const task: MusicGenTask = {
+      id: 'x',
+      taskId: 't',
+      status: 'success',
+      createdAt: 1,
+      title: '我的创作',
+      params: { prompt: 'p', model: 'V5_5' },
+      songs: [song('a')]
+    }
+    const html = renderTasks([task], { currentSongId: 'a', playing: true })
+    expect(html).toContain('bg-ds-card')
+    expect(html).toContain('border-ds-border')
+    expect(html).toContain('text-ds-ink')
+    expect(html).not.toContain('#f5c542')
+    expect(html).not.toContain('#050505')
+    expect(html).not.toContain('#080808')
+    expect(html).not.toContain('#090909')
+    expect(html).not.toContain('#0b0b0b')
+    expect(html).not.toContain('bg-black')
+  })
 })
 
 describe('MusicPlayer · 播放器区', () => {

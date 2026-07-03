@@ -51,7 +51,7 @@ function PlayerCover({ song, t }: { song: Claude360Song; t: TFn }): ReactElement
   return (
     <div
       data-testid="music-player-cover-placeholder"
-      className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-black text-[#f5c542]"
+      className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-ds-border bg-ds-main text-accent"
     >
       <Music4 className="h-5 w-5" strokeWidth={1.5} />
     </div>
@@ -80,7 +80,7 @@ export function MusicPlayer({
     return (
       <footer
         data-testid="music-player"
-        className="rounded-2xl border border-white/10 bg-[#0b0b0b] px-4 py-3 text-center text-[12.5px] text-ds-faint"
+        className="rounded-2xl border border-ds-border bg-ds-card px-4 py-3 text-center text-[12.5px] text-ds-faint"
       >
         {t('musicPlayerEmpty')}
       </footer>
@@ -92,7 +92,7 @@ export function MusicPlayer({
   return (
     <footer
       data-testid="music-player"
-      className="flex flex-col gap-2.5 rounded-2xl border border-white/10 bg-[#0b0b0b] px-4 py-3 shadow-[0_18px_44px_rgba(0,0,0,0.26)]"
+      className="flex flex-col gap-2.5 rounded-2xl border border-ds-border bg-ds-card px-4 py-3 shadow-panel"
     >
       <div className="flex items-center gap-3">
         <PlayerCover song={current} t={t} />
@@ -116,7 +116,7 @@ export function MusicPlayer({
             type="button"
             aria-label={playing ? t('musicPause') : t('musicPlay')}
             onClick={onTogglePlay}
-            className="grid h-9 w-9 place-items-center rounded-full bg-[#f5c542] text-black shadow-[0_10px_24px_rgba(245,197,66,0.2)]"
+            className="grid h-9 w-9 place-items-center rounded-full bg-accent text-white shadow-sm transition hover:opacity-90"
           >
             {playing ? <Pause className="h-4 w-4" strokeWidth={2} /> : <Play className="h-4 w-4" strokeWidth={2} />}
           </button>

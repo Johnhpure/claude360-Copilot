@@ -78,10 +78,10 @@ export function MusicCreatePanel({
   return (
     <section
       data-testid="music-create-panel"
-      className="flex min-h-0 flex-col gap-4 rounded-[18px] border border-white/10 bg-[#090909] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)]"
+      className="flex min-h-0 flex-col gap-4 rounded-2xl border border-ds-border bg-ds-card p-4 shadow-panel"
     >
-      <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3">
-        <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#f5c542]/12 text-[#f5c542]">
+      <div className="flex items-center gap-2 border-b border-ds-border pb-3">
+        <span className="grid h-8 w-8 place-items-center rounded-xl bg-accent-soft text-accent">
           <Music2 className="h-4 w-4" strokeWidth={1.75} />
         </span>
         <h2 className="text-[16px] font-semibold text-ds-ink">{t('musicCreateTitle')}</h2>
@@ -89,7 +89,7 @@ export function MusicCreatePanel({
 
       {/* 模式 radiogroup：简单 / 标准。 */}
       <div
-        className="grid grid-cols-2 rounded-xl border border-white/10 bg-black p-1"
+        className="grid grid-cols-2 rounded-xl border border-ds-border bg-ds-main p-1"
         role="radiogroup"
         aria-label={t('musicModeLabel')}
       >
@@ -98,7 +98,7 @@ export function MusicCreatePanel({
           role="radio"
           aria-checked={isOneshot}
           onClick={() => onChange({ mode: 'oneshot' })}
-          className={`rounded-lg px-3 py-2 text-[12.5px] transition ${isOneshot ? 'bg-[#202020] font-semibold text-[#f5c542] shadow-sm' : 'font-medium text-ds-muted hover:text-ds-ink'}`}
+          className={`rounded-lg px-3 py-2 text-[12.5px] transition ${isOneshot ? 'bg-ds-card font-semibold text-accent shadow-sm' : 'font-medium text-ds-muted hover:text-ds-ink'}`}
         >
           {t('musicModeOneshot')}
         </button>
@@ -107,7 +107,7 @@ export function MusicCreatePanel({
           role="radio"
           aria-checked={!isOneshot}
           onClick={() => onChange({ mode: 'standard' })}
-          className={`rounded-lg px-3 py-2 text-[12.5px] transition ${!isOneshot ? 'bg-[#202020] font-semibold text-[#f5c542] shadow-sm' : 'font-medium text-ds-muted hover:text-ds-ink'}`}
+          className={`rounded-lg px-3 py-2 text-[12.5px] transition ${!isOneshot ? 'bg-ds-card font-semibold text-accent shadow-sm' : 'font-medium text-ds-muted hover:text-ds-ink'}`}
         >
           {t('musicModeStandard')}
         </button>
@@ -132,7 +132,7 @@ export function MusicCreatePanel({
               placeholder={t('musicDescriptionPlaceholder')}
               aria-required="true"
               aria-invalid={showDescriptionError ? 'true' : undefined}
-              className={`resize-none rounded-xl border bg-black/70 px-3 py-2.5 text-[13px] leading-5 text-ds-ink outline-none transition placeholder:text-ds-faint focus:border-[#f5c542]/70 ${showDescriptionError ? 'border-ds-danger' : 'border-white/10'}`}
+              className={`resize-none rounded-xl border bg-ds-main px-3 py-2.5 text-[13px] leading-5 text-ds-ink outline-none transition placeholder:text-ds-faint focus:border-accent ${showDescriptionError ? 'border-ds-danger' : 'border-ds-border'}`}
             />
             <FieldError message={showDescriptionError ? t('musicPromptRequired') : null} />
           </label>
@@ -143,7 +143,7 @@ export function MusicCreatePanel({
               <button
                 type="button"
                 onClick={onOpenLyricsAssistant}
-                className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 text-[11.5px] text-ds-muted transition hover:border-[#f5c542]/40 hover:text-[#f5c542]"
+                className="inline-flex h-7 items-center gap-1 rounded-lg border border-ds-border bg-ds-card px-2 text-[11.5px] text-ds-muted transition hover:border-accent hover:text-accent"
               >
                 <Wand2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                 {t('musicLyricsAssistant')}
@@ -155,7 +155,7 @@ export function MusicCreatePanel({
               onChange={handleText('lyrics')}
               rows={5}
               placeholder={t('musicLyricsPlaceholder')}
-              className="resize-none rounded-xl border border-white/10 bg-black/70 px-3 py-2.5 text-[13px] leading-5 text-ds-ink outline-none transition placeholder:text-ds-faint focus:border-[#f5c542]/70 disabled:cursor-not-allowed disabled:opacity-45"
+              className="resize-none rounded-xl border border-ds-border bg-ds-main px-3 py-2.5 text-[13px] leading-5 text-ds-ink outline-none transition placeholder:text-ds-faint focus:border-accent disabled:cursor-not-allowed disabled:opacity-45"
             />
             <span className="text-[11px] text-ds-faint">{form.instrumental ? t('musicInstrumentalHint') : t('musicLyricsOptionalHint')}</span>
           </label>
@@ -169,7 +169,7 @@ export function MusicCreatePanel({
               value={form.title}
               onChange={handleText('title')}
               placeholder={t('musicTitlePlaceholder')}
-              className="rounded-xl border border-white/10 bg-black/70 px-3 py-2 text-[13px] text-ds-ink outline-none placeholder:text-ds-faint focus:border-[#f5c542]/70"
+              className="rounded-xl border border-ds-border bg-ds-main px-3 py-2 text-[13px] text-ds-ink outline-none placeholder:text-ds-faint focus:border-accent"
             />
           </label>
 
@@ -183,7 +183,7 @@ export function MusicCreatePanel({
               <button
                 type="button"
                 onClick={onOpenLyricsAssistant}
-                className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 text-[11.5px] text-ds-muted transition hover:border-[#f5c542]/40 hover:text-[#f5c542]"
+                className="inline-flex h-7 items-center gap-1 rounded-lg border border-ds-border bg-ds-card px-2 text-[11.5px] text-ds-muted transition hover:border-accent hover:text-accent"
               >
                 <Wand2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                 {t('musicLyricsAssistant')}
@@ -196,7 +196,7 @@ export function MusicCreatePanel({
               placeholder={t('musicLyricsPlaceholder')}
               aria-required={lyricsRequired ? 'true' : undefined}
               aria-invalid={showLyricsError ? 'true' : undefined}
-              className={`resize-none rounded-xl border bg-black/70 px-3 py-2.5 text-[13px] leading-5 text-ds-ink outline-none placeholder:text-ds-faint focus:border-[#f5c542]/70 ${showLyricsError ? 'border-ds-danger' : 'border-white/10'}`}
+              className={`resize-none rounded-xl border bg-ds-main px-3 py-2.5 text-[13px] leading-5 text-ds-ink outline-none placeholder:text-ds-faint focus:border-accent ${showLyricsError ? 'border-ds-danger' : 'border-ds-border'}`}
             />
             <FieldError message={showLyricsError ? t('musicPromptRequired') : null} />
           </label>
@@ -208,7 +208,7 @@ export function MusicCreatePanel({
               value={form.style}
               onChange={handleText('style')}
               placeholder={t('musicStylePlaceholder')}
-              className="rounded-xl border border-white/10 bg-black/70 px-3 py-2 text-[13px] text-ds-ink outline-none placeholder:text-ds-faint focus:border-[#f5c542]/70"
+              className="rounded-xl border border-ds-border bg-ds-main px-3 py-2 text-[13px] text-ds-ink outline-none placeholder:text-ds-faint focus:border-accent"
             />
             <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('musicStylePresetsLabel')}>
               {STYLE_PRESETS.map((s) => {
@@ -221,8 +221,8 @@ export function MusicCreatePanel({
                     onClick={() => toggleStyle(s)}
                     className={`rounded-full border px-2.5 py-1 text-[11.5px] transition ${
                       active
-                        ? 'border-[#f5c542]/60 bg-[#f5c542]/12 font-semibold text-[#f5c542]'
-                        : 'border-white/10 bg-black/50 text-ds-muted hover:text-ds-ink'
+                        ? 'border-accent bg-accent-soft font-semibold text-accent'
+                        : 'border-ds-border bg-ds-main text-ds-muted hover:text-ds-ink'
                     }`}
                   >
                     {s}
@@ -239,12 +239,12 @@ export function MusicCreatePanel({
               value={form.negativeTags}
               onChange={handleText('negativeTags')}
               placeholder={t('musicNegativeTagsPlaceholder')}
-              className="rounded-xl border border-white/10 bg-black/70 px-3 py-2 text-[13px] text-ds-ink outline-none placeholder:text-ds-faint focus:border-[#f5c542]/70"
+              className="rounded-xl border border-ds-border bg-ds-main px-3 py-2 text-[13px] text-ds-ink outline-none placeholder:text-ds-faint focus:border-accent"
             />
           </label>
 
           {/* 高级参数（折叠）：第一排 vocal_gender → style_weight → weirdness → persona */}
-          <details className="overflow-hidden rounded-xl border border-white/10 bg-black/55">
+          <details className="overflow-hidden rounded-xl border border-ds-border bg-ds-main">
             <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[12.5px] font-medium text-ds-ink">
               <SlidersHorizontal className="h-3.5 w-3.5 text-ds-muted" strokeWidth={1.75} />
               {t('musicAdvancedTitle')}
@@ -262,7 +262,7 @@ export function MusicCreatePanel({
                   onChange={(e) =>
                     onChange({ vocalGender: e.target.value as Claude360MusicCreateForm['vocalGender'] })
                   }
-                  className="rounded-lg border border-white/10 bg-[#111] px-2 py-1 text-[12px] text-ds-ink disabled:opacity-50"
+                  className="rounded-lg border border-ds-border bg-ds-card px-2 py-1 text-[12px] text-ds-ink disabled:opacity-50"
                 >
                   <option value="">{t('musicVocalAuto')}</option>
                   <option value="f">{t('musicVocalFemale')}</option>
@@ -320,7 +320,7 @@ export function MusicCreatePanel({
                   value={form.personaId}
                   onChange={handleText('personaId')}
                   placeholder={t('musicPersonaPlaceholder')}
-                  className="rounded-lg border border-white/10 bg-[#111] px-2.5 py-1.5 text-[12px] text-ds-ink"
+                  className="rounded-lg border border-ds-border bg-ds-card px-2.5 py-1.5 text-[12px] text-ds-ink"
                 />
               </label>
             </div>
@@ -329,7 +329,7 @@ export function MusicCreatePanel({
       )}
 
       {/* 纯器乐 switch */}
-      <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/55 px-3 py-2.5 text-[12.5px] text-ds-muted">
+      <div className="flex items-center justify-between rounded-xl border border-ds-border bg-ds-main px-3 py-2.5 text-[12.5px] text-ds-muted">
         <span>{t('musicInstrumental')}</span>
         <button
           type="button"
@@ -338,7 +338,7 @@ export function MusicCreatePanel({
           aria-label={t('musicInstrumentalToggle')}
           onClick={() => onChange({ instrumental: !form.instrumental })}
           className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ease-out ${
-            form.instrumental ? 'bg-[#f5c542]' : 'bg-white/[0.18]'
+            form.instrumental ? 'bg-accent' : 'bg-ds-subtle'
           }`}
         >
           <span
@@ -355,7 +355,7 @@ export function MusicCreatePanel({
         <select
           value={form.model}
           onChange={(e) => onChange({ model: e.target.value as Claude360MusicCreateForm['model'] })}
-          className="rounded-xl border border-white/10 bg-black/70 px-3 py-2 text-[12.5px] text-ds-ink outline-none focus:border-[#f5c542]/70"
+          className="rounded-xl border border-ds-border bg-ds-main px-3 py-2 text-[12.5px] text-ds-ink outline-none focus:border-accent"
         >
           {MODELS.map((m) => (
             <option key={m.value} value={m.value}>
@@ -377,7 +377,7 @@ export function MusicCreatePanel({
         type="button"
         onClick={onSubmit}
         disabled={submitting}
-        className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-[#f5c542] px-4 py-2.5 text-[13.5px] font-semibold text-black shadow-[0_14px_34px_rgba(245,197,66,0.22)] transition hover:bg-[#ffd866] disabled:cursor-not-allowed disabled:bg-[#5c512e] disabled:text-white/55 disabled:shadow-none"
+        className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? (
           <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />

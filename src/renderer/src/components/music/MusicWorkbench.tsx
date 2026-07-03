@@ -40,6 +40,12 @@ type Props = {
   onToggleLeftSidebar: () => void
 }
 
+type PlaybackSource = {
+  songId: string
+  url: string
+  objectUrl?: string
+}
+
 function formFromTask(task: { title: string; params: MusicGenTask['params'] }): Claude360MusicCreateForm {
   const params = task.params
   const model = params.model as Claude360MusicCreateForm['model']
@@ -68,6 +74,15 @@ function formFromTask(task: { title: string; params: MusicGenTask['params'] }): 
     personaId: params.persona_id || '',
     personaModel: (params.persona_model || '') as Claude360MusicCreateForm['personaModel']
   }
+}
+
+function blobFromBase64(base64: string, mimeType: string): Blob {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return new Blob([bytes], { type: mimeType || 'audio/mpeg' })
 }
 
 // 音乐工作台容器：拥有表单 state 与副作用编排（提交 / 轮询 / 播放 / 下载）。
@@ -115,8 +130,45 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
   const current = currentSong({ queue, index: playIndex })
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const playbackSourceRef = useRef<PlaybackSource | null>(null)
   const api = (): MusicWorkbenchApi | null =>
     typeof window !== 'undefined' && window.kunGui ? (window.kunGui as unknown as MusicWorkbenchApi) : null
+
+  const rememberPlaybackSource = useCallback((songId: string, url: string, usedFallback: boolean): void => {
+    const previous = playbackSourceRef.current?.objectUrl
+    if (previous && previous !== url) URL.revokeObjectURL(previous)
+    playbackSourceRef.current = { songId, url, objectUrl: usedFallback ? url : undefined }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      const objectUrl = playbackSourceRef.current?.objectUrl
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      playbackSourceRef.current = null
+    }
+  }, [])
+
+  const resolvePlayableObjectUrl = useCallback(async (audioUrl: string, error: unknown): Promise<string | null> => {
+    const k = api()
+    if (!k?.claude360MusicMediaBlob) return null
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[claude360-music] direct audio playback failed; trying blob fallback', {
+      message,
+      url: audioUrl
+    })
+    try {
+      const result = await k.claude360MusicMediaBlob(audioUrl)
+      if (!result.ok) {
+        console.error('[claude360-music] blob fallback fetch failed', result)
+        return null
+      }
+      const blob = blobFromBase64(result.base64, result.mimeType)
+      return URL.createObjectURL(blob)
+    } catch (fallbackError) {
+      console.error('[claude360-music] blob fallback threw', fallbackError)
+      return null
+    }
+  }, [])
 
   // 拉取 text 分组的模型列表，供写词助手的文本模型下拉使用。
   useEffect(() => {
@@ -222,17 +274,28 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
         setPlaybackError(t('musicAudioPlayerUnavailable'))
         return
       }
-      void playSongOnAudioElement(el, song, volume).then((result) => {
+      void playSongOnAudioElement(el, song, volume, {
+        resolvePlayableUrl: resolvePlayableObjectUrl,
+        logError: (message, detail) => console.error(message, detail)
+      }).then((result) => {
         if (!result.ok) {
           pauseAction()
-          setPlaybackError(result.reason === 'missing-url' ? t('musicAudioMissing') : t('musicAudioPlayFailed'))
+          const message = result.reason === 'missing-url' ? t('musicAudioMissing') : t('musicAudioPlayFailed')
+          if (result.reason === 'play-failed') {
+            console.error('[claude360-music] audio playback failed', {
+              message: result.message,
+              audioUrl: song.audioUrl
+            })
+          }
+          setPlaybackError(message)
           return
         }
+        rememberPlaybackSource(song.id, result.sourceUrl, result.usedFallback)
         setPlaybackError(null)
         setQueue(q, start)
       })
     },
-    [pauseAction, setQueue, t, volume]
+    [pauseAction, rememberPlaybackSource, resolvePlayableObjectUrl, setQueue, t, volume]
   )
 
   const togglePlayerPlayback = useCallback((): void => {
@@ -245,16 +308,27 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
       setPlaybackError(t('musicAudioPlayerUnavailable'))
       return
     }
-    void playSongOnAudioElement(el, current, volume).then((result) => {
+    void playSongOnAudioElement(el, current, volume, {
+      resolvePlayableUrl: resolvePlayableObjectUrl,
+      logError: (message, detail) => console.error(message, detail)
+    }).then((result) => {
       if (!result.ok) {
         pauseAction()
-        setPlaybackError(result.reason === 'missing-url' ? t('musicAudioMissing') : t('musicAudioPlayFailed'))
+        const message = result.reason === 'missing-url' ? t('musicAudioMissing') : t('musicAudioPlayFailed')
+        if (result.reason === 'play-failed') {
+          console.error('[claude360-music] audio playback failed', {
+            message: result.message,
+            audioUrl: current.audioUrl
+          })
+        }
+        setPlaybackError(message)
         return
       }
+      rememberPlaybackSource(current.id, result.sourceUrl, result.usedFallback)
       setPlaybackError(null)
       playAction()
     })
-  }, [current, pauseAction, playAction, playing, t, togglePlayAction, volume])
+  }, [current, pauseAction, playAction, playing, rememberPlaybackSource, resolvePlayableObjectUrl, t, togglePlayAction, volume])
 
   // 把播放器 store 状态桥接到 <audio>：切歌换 src、按 playing 播放/暂停。
   useEffect(() => {
@@ -265,17 +339,45 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
       pauseAction()
       return
     }
-    if (el.src !== current.audioUrl) el.src = current.audioUrl
+    const remembered = playbackSourceRef.current?.songId === current.id ? playbackSourceRef.current.url : null
+    const sourceUrl = remembered ?? current.audioUrl
+    if (el.src !== sourceUrl) el.src = sourceUrl
     if (playing) {
       if (!el.paused) return
-      void el.play().catch(() => {
+      if (remembered) {
+        void el.play().catch((error) => {
+          pauseAction()
+          console.error('[claude360-music] remembered audio source failed', {
+            message: error instanceof Error ? error.message : String(error),
+            audioUrl: current.audioUrl,
+            sourceUrl
+          })
+          setPlaybackError(t('musicAudioPlayFailed'))
+        })
+        return
+      }
+      void playSongOnAudioElement(el, current, volume, {
+        resolvePlayableUrl: resolvePlayableObjectUrl,
+        logError: (message, detail) => console.error(message, detail)
+      }).then((result) => {
+        if (result.ok) {
+          rememberPlaybackSource(current.id, result.sourceUrl, result.usedFallback)
+          setPlaybackError(null)
+          return
+        }
         pauseAction()
+        if (result.reason === 'play-failed') {
+          console.error('[claude360-music] audio playback failed', {
+            message: result.message,
+            audioUrl: current.audioUrl
+          })
+        }
         setPlaybackError(t('musicAudioPlayFailed'))
       })
     } else {
       el.pause()
     }
-  }, [current, playing, pauseAction, t])
+  }, [current, playing, pauseAction, rememberPlaybackSource, resolvePlayableObjectUrl, t, volume])
 
   // 音量同步。
   useEffect(() => {
@@ -342,7 +444,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
   )
 
   return (
-    <div className="ds-drag flex h-full min-h-0 flex-col bg-[#050505]" data-testid="music-workbench">
+    <div className="ds-drag flex h-full min-h-0 flex-col bg-ds-main" data-testid="music-workbench">
       <div className="ds-stage-inset shrink-0">
         <header className="ds-topbar-surface relative z-10 mt-3 flex min-h-[46px] w-full items-stretch overflow-visible rounded-[24px]">
           <div className="grid w-full min-w-0 items-center gap-2.5 px-3 py-2 sm:px-4 md:pl-5 md:pr-2">
@@ -377,7 +479,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
 
         <section
           data-testid="music-works-pane"
-          className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:border-l lg:border-white/10 lg:pl-4"
+          className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:border-l lg:border-ds-border lg:pl-4"
         >
           <MusicTaskList
             tasks={tasks}
@@ -394,12 +496,12 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
             t={t}
           />
           {copyNotice ? (
-            <div className="self-center rounded-full border border-white/10 bg-[#111]/95 px-3 py-1.5 text-[12px] text-ds-ink shadow-[0_14px_32px_rgba(0,0,0,0.28)]">
+            <div className="self-center rounded-full border border-ds-border bg-ds-card px-3 py-1.5 text-[12px] text-ds-ink shadow-sm">
               {copyNotice}
             </div>
           ) : null}
           {playbackError ? (
-            <div className="self-center rounded-full border border-[#f5c542]/20 bg-[#1d1606]/95 px-3 py-1.5 text-[12px] text-[#f5c542] shadow-[0_14px_32px_rgba(0,0,0,0.28)]">
+            <div className="self-center rounded-full border border-ds-border bg-ds-danger-soft px-3 py-1.5 text-[12px] text-ds-danger shadow-sm">
               {playbackError}
             </div>
           ) : null}

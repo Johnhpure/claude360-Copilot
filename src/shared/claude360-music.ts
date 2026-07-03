@@ -104,3 +104,9 @@ export type Claude360MusicSubmitResult =
 export type Claude360MusicFetchResult =
   | { ok: true; task: Claude360MusicFetchedTask }
   | { ok: false; message: string; retryable?: boolean }
+
+// —— main → renderer 的音乐媒体代理结果（不含 API Key）——
+// 用于 HTMLAudioElement 无法携带鉴权 header 播放时，由 main 进程代取音频 blob。
+export type Claude360MusicMediaBlobResult =
+  | { ok: true; url: string; mimeType: string; base64: string }
+  | { ok: false; message: string; retryable?: boolean }

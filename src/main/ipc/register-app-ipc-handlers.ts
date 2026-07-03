@@ -80,6 +80,7 @@ import {
   claude360TokenStatsPayloadSchema,
   claude360MusicSubmitPayloadSchema,
   claude360MusicFetchPayloadSchema,
+  claude360MusicMediaBlobPayloadSchema,
   claude360CanvasGeneratePayloadSchema,
   claude360CanvasEditPayloadSchema,
   streamIdSchema,
@@ -793,6 +794,17 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         message: error instanceof Error ? error.message : String(error)
       })
       return { ok: false as const, message: '查询失败，请稍后重试', retryable: true as const }
+    }
+  })
+  ipcMain.handle('claude360:music:media-blob', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:music:media-blob', claude360MusicMediaBlobPayloadSchema, payload)
+    try {
+      return await claude360MusicService.fetchMusicMedia(req.url)
+    } catch (error) {
+      logError('claude360-music', 'fetchMusicMedia failed', {
+        message: error instanceof Error ? error.message : String(error)
+      })
+      return { ok: false as const, message: '音频加载失败，请稍后重试', retryable: true as const }
     }
   })
 

@@ -40,6 +40,7 @@ import type {
 } from './app-settings-claude360'
 import type {
   Claude360MusicFetchResult,
+  Claude360MusicMediaBlobResult,
   Claude360MusicSubmitPayload,
   Claude360MusicSubmitResult
 } from './claude360-music'
@@ -418,6 +419,8 @@ export type KunGuiApi = {
   claude360MusicSubmit: (payload: Claude360MusicSubmitPayload) => Promise<Claude360MusicSubmitResult>
   /** 查询音乐任务状态（main 调 /suno/fetch；taskId 非空）。 */
   claude360MusicFetch: (taskId: string) => Promise<Claude360MusicFetchResult>
+  /** 代取音乐媒体 blob（main 仅在同源时附带 music Key；renderer 不接触 Key）。 */
+  claude360MusicMediaBlob: (url: string) => Promise<Claude360MusicMediaBlobResult>
   /** 文本生图（main 用 image 分组 Key 调 /v1/images/generations；不下发 Key）。 */
   claude360CanvasGenerate: (payload: Claude360ImageGeneratePayload) => Promise<Claude360ImageResult>
   /** 单图编辑（main 用 image 分组 Key 走 multipart 调 /v1/images/edits；不下发 Key）。 */
