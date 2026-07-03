@@ -139,6 +139,13 @@ export function ArtworkGrid({
                 <img
                   src={src}
                   alt={t('canvasImageAlt', { prompt: artwork.prompt })}
+                  onError={() => {
+                    // 打印加载失败的真实 URL（截断 data URL），排查鉴权/CSP/字段映射问题。
+                    console.error('[claude360-canvas] artwork image load failed', {
+                      artworkId: artwork.id,
+                      src: src.startsWith('data:') ? `${src.slice(0, 64)}...` : src
+                    })
+                  }}
                   className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]"
                 />
               ) : artwork.status === 'pending' ? (

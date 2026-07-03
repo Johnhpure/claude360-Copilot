@@ -234,6 +234,77 @@ describe('Claude360CanvasService.generateImages', () => {
     expect(result.ok).toBe(false)
   })
 
+  it('body 同时带非空 message 与有效 data 图片时仍判成功（不按文案误判失败）', async () => {
+    // 回归：NewAPI 后台成功且有图片、但 body 带 message 文案 → 旧逻辑误判失败。
+    const service = new Claude360CanvasService(
+      makeDeps({
+        apiClient: fakeApi({
+          generate: () =>
+            ({ message: '本次生成消耗配额，请注意余额', data: [{ url: 'https://cdn/ok.png' }] }) as never
+        })
+      })
+    )
+    const result = await service.generateImages(generatePayload)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.images[0]).toMatchObject({ source: 'url', url: 'https://cdn/ok.png' })
+  })
+
+  it('兼容 images[] 容器与 b64 字段名', async () => {
+    const service = new Claude360CanvasService(
+      makeDeps({
+        apiClient: fakeApi({ generate: () => ({ images: [{ b64: validB64 }] }) as never })
+      })
+    )
+    const result = await service.generateImages(generatePayload)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.images[0]).toMatchObject({ source: 'base64', b64Json: validB64 })
+  })
+
+  it('兼容 output[].content[] 嵌套 image_url:{url}（Responses 风格）', async () => {
+    const service = new Claude360CanvasService(
+      makeDeps({
+        apiClient: fakeApi({
+          generate: () =>
+            ({
+              output: [{ content: [{ type: 'image_url', image_url: { url: 'https://cdn/nested.png' } }] }]
+            }) as never
+        })
+      })
+    )
+    const result = await service.generateImages(generatePayload)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.images[0]).toMatchObject({ source: 'url', url: 'https://cdn/nested.png' })
+  })
+
+  it('兼容 data URL 字符串结果并保留真实 mimeType', async () => {
+    const service = new Claude360CanvasService(
+      makeDeps({
+        apiClient: fakeApi({
+          generate: () => ({ data: [`data:image/webp;base64,${validB64}`] }) as never
+        })
+      })
+    )
+    const result = await service.generateImages(generatePayload)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.images[0]).toMatchObject({ source: 'base64', b64Json: validB64, mimeType: 'image/webp' })
+    }
+  })
+
+  it('data 与 images 并存同一 url 时去重为一张', async () => {
+    const service = new Claude360CanvasService(
+      makeDeps({
+        apiClient: fakeApi({
+          generate: () =>
+            ({ data: [{ url: 'https://cdn/same.png' }], images: [{ url: 'https://cdn/same.png' }] }) as never
+        })
+      })
+    )
+    const result = await service.generateImages(generatePayload)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.images).toHaveLength(1)
+  })
+
   it('网络失败返回 { ok:false, retryable:true }', async () => {
     const service = new Claude360CanvasService(
       makeDeps({

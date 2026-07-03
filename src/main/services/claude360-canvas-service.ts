@@ -52,10 +52,142 @@ export type Claude360CanvasServiceDeps = {
   ensureGroupKey: (group: string, purpose: Claude360TokenPurpose) => Promise<string>
 }
 
-// —— /v1/images/* 原始返回项（OpenAI-compatible）——
-interface OpenAIImageItem {
-  url?: string
-  b64_json?: string
+// —— /v1/images/* 原始返回的图片结果提取（多格式兼容）——
+//
+// 实测上游/中转不一定走标准 `data:[{url|b64_json}]`：还可能是 images[]、
+// output[].content[]（Responses 风格）、顶层 url / image_url / b64、data URL
+// 或裸 base64 串。这里做统一提取：**只要任一路径能解出可用图片就算成功**，
+// 不因 body 里同时带 message/warning 文案而误判失败。
+
+type ExtractedImage = { url?: string; b64?: string; mimeType?: string }
+
+const DATA_URL_IMAGE = /^data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/i
+
+/** 字符串 → 图片：data URL / http(s) URL / 长裸 base64（字符集+长度双重把关）。 */
+function extractFromString(value: string): ExtractedImage | null {
+  const raw = value.trim()
+  if (!raw) return null
+  const dataUrl = DATA_URL_IMAGE.exec(raw)
+  if (dataUrl) return { b64: dataUrl[2].replace(/\s+/g, ''), mimeType: dataUrl[1].toLowerCase() }
+  if (/^https?:\/\//i.test(raw)) return { url: raw }
+  if (raw.length > 256 && /^[A-Za-z0-9+/=\s]+$/.test(raw)) return { b64: raw.replace(/\s+/g, '') }
+  return null
+}
+
+/** 单条目 → 图片：string 直取；object 依次试 url/image_url(含嵌套 {url})/b64 系字段。 */
+function extractFromEntry(entry: unknown): ExtractedImage | null {
+  if (typeof entry === 'string') return extractFromString(entry)
+  if (!entry || typeof entry !== 'object') return null
+  const item = entry as Record<string, unknown>
+  for (const key of ['url', 'image_url', 'imageUrl', 'image', 'result']) {
+    const value = item[key]
+    if (typeof value === 'string') {
+      const found = extractFromString(value)
+      if (found) return found
+    }
+    // Responses/chat vision 风格：{ image_url: { url } }
+    if (value && typeof value === 'object') {
+      const nested = (value as Record<string, unknown>).url
+      if (typeof nested === 'string') {
+        const found = extractFromString(nested)
+        if (found) return found
+      }
+    }
+  }
+  for (const key of ['b64_json', 'b64', 'base64']) {
+    const value = item[key]
+    if (typeof value === 'string' && value.trim()) return { b64: value.trim().replace(/\s+/g, '') }
+  }
+  return null
+}
+
+/** 遍历所有已知容器路径收集图片：data[]/images[]/output[](含 content[])/result/顶层。 */
+function collectImages(env: Claude360ImagesRawEnvelope): ExtractedImage[] {
+  const record = env as Record<string, unknown>
+  const found: ExtractedImage[] = []
+  const pushEntry = (entry: unknown): void => {
+    const image = extractFromEntry(entry)
+    if (image) found.push(image)
+  }
+  const pushArrayEntry = (entry: unknown): void => {
+    const direct = extractFromEntry(entry)
+    if (direct) {
+      found.push(direct)
+      return
+    }
+    // Responses API 风格：output[].content[] 内才是图片分片。
+    const content = entry && typeof entry === 'object' ? (entry as Record<string, unknown>).content : undefined
+    if (Array.isArray(content)) {
+      for (const part of content) pushEntry(part)
+    }
+  }
+  for (const key of ['data', 'images', 'output', 'result']) {
+    const value = record[key]
+    if (Array.isArray(value)) {
+      for (const entry of value) pushArrayEntry(entry)
+    } else if (value !== undefined && value !== null) {
+      pushEntry(value)
+    }
+  }
+  // 容器路径全空时最后尝试顶层字段（{url} / {image_url} / {b64_json}）。
+  if (found.length === 0) pushEntry(record)
+  return dedupeImages(found)
+}
+
+/** 去重：同一 url / 同一 base64（前缀足够区分）只保留一张，避免 data+images 并存时重复。 */
+function dedupeImages(images: ExtractedImage[]): ExtractedImage[] {
+  const seen = new Set<string>()
+  const unique: ExtractedImage[] = []
+  for (const image of images) {
+    const key = image.url ?? `b64:${image.b64?.slice(0, 128)}:${image.b64?.length}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(image)
+  }
+  return unique
+}
+
+// —— 调试日志：完整打印真实响应结构（超长 base64 摘要化，字段名全量可见）——
+
+function summarizeForLog(value: unknown, depth = 0): unknown {
+  if (typeof value === 'string') {
+    // 长 base64（含 data URL 载荷）替换为长度摘要，避免几 MB 淹没控制台；
+    // URL / 普通文案含 ":/" 等字符不会被误伤。
+    if (value.length > 512 && /^(data:image\/[a-z0-9.+-]+;base64,)?[A-Za-z0-9+/=\s]+$/i.test(value)) {
+      return `<base64 length=${value.length}>`
+    }
+    return value
+  }
+  if (Array.isArray(value)) {
+    return depth > 6 ? '<max-depth>' : value.map((item) => summarizeForLog(item, depth + 1))
+  }
+  if (value && typeof value === 'object') {
+    if (depth > 6) return '<max-depth>'
+    const out: Record<string, unknown> = {}
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = summarizeForLog(item, depth + 1)
+    }
+    return out
+  }
+  return value
+}
+
+function logImagesShape(path: string, env: Claude360ImagesRawEnvelope, extracted: ExtractedImage[]): void {
+  if (process.env.NODE_ENV === 'test') return
+  // 按任务书要求打印完整真实响应（原始 body 结构 / 提取到的图片字段），不猜字段名。
+  // 仅 main 进程控制台，不入 renderer。
+  console.info(`[claude360-canvas] ${path} raw response`, JSON.stringify(summarizeForLog(env)))
+  console.info(
+    `[claude360-canvas] ${path} extracted images`,
+    JSON.stringify(
+      extracted.map((image) => ({
+        kind: image.url ? 'url' : 'base64',
+        url: image.url ?? null,
+        b64Length: image.b64?.length ?? null,
+        mimeType: image.mimeType ?? null
+      }))
+    )
+  )
 }
 
 /** 解出上游可展示错误信息（error.message / message / msg），已脱敏。 */
@@ -70,30 +202,28 @@ function envelopeError(env: Claude360ImagesRawEnvelope): string | null {
   return raw ? sanitizeClaude360Message(raw) : null
 }
 
-/** 归一化单张图片：优先 url，其次 b64_json；两者皆无则丢弃。 */
+/** 归一化单张图片：url 优先，base64 带真实 mimeType；两者皆无返回 null。 */
 function mapImage(
-  item: OpenAIImageItem,
+  item: ExtractedImage,
   meta: { prompt: string; model: string; createdAt: string }
 ): Claude360CanvasImage | null {
-  const url = typeof item.url === 'string' && item.url.trim() ? item.url.trim() : ''
-  const b64 = typeof item.b64_json === 'string' && item.b64_json.trim() ? item.b64_json.trim() : ''
-  if (url) {
+  if (item.url) {
     return {
       id: randomUUID(),
       source: 'url',
-      url,
-      mimeType: 'image/png',
+      url: item.url,
+      mimeType: item.mimeType ?? 'image/png',
       prompt: meta.prompt,
       model: meta.model,
       createdAt: meta.createdAt
     }
   }
-  if (b64) {
+  if (item.b64) {
     return {
       id: randomUUID(),
       source: 'base64',
-      b64Json: b64,
-      mimeType: 'image/png',
+      b64Json: item.b64,
+      mimeType: item.mimeType ?? 'image/png',
       prompt: meta.prompt,
       model: meta.model,
       createdAt: meta.createdAt
@@ -177,7 +307,7 @@ export class Claude360CanvasService {
       return { ok: false, message: errorMessage(error), retryable: true }
     }
 
-    return this.normalize(env, { prompt: input.prompt, model: input.model })
+    return this.normalize('/v1/images/generations', env, { prompt: input.prompt, model: input.model })
   }
 
   async editImage(input: Claude360ImageEditPayload): Promise<Claude360ImageResult> {
@@ -224,27 +354,34 @@ export class Claude360CanvasService {
       return { ok: false, message: errorMessage(error), retryable: true }
     }
 
-    return this.normalize(env, { prompt: input.prompt, model: input.model })
+    return this.normalize('/v1/images/edits', env, { prompt: input.prompt, model: input.model })
   }
 
-  /** 归一化上游 body 为结果：优先解 error；再取 data 数组归一化。 */
+  /**
+   * 归一化上游 body 为结果：**先提取图片，有任一可用图片即成功**；
+   * 只有在没有任何图片时才把 error/message 当失败原因——上游 200 成功响应
+   * 可能同时带非空 message/warning 文案，按文案先行判失败会把成功结果误判掉
+   * （NewAPI 后台已成功、软件内却显示失败的根因）。
+   */
   private normalize(
+    path: string,
     env: Claude360ImagesRawEnvelope,
     meta: { prompt: string; model: string }
   ): Claude360ImageResult {
+    const extracted = collectImages(env)
+    logImagesShape(path, env, extracted)
+    const createdAt = new Date().toISOString()
+    const images = extracted
+      .map((row) => mapImage(row, { ...meta, createdAt }))
+      .filter((img): img is Claude360CanvasImage => img !== null)
+    if (images.length > 0) {
+      return { ok: true, images }
+    }
     const upstreamError = envelopeError(env)
     if (upstreamError) {
       return { ok: false, message: upstreamError }
     }
-    const rows = Array.isArray(env.data) ? (env.data as OpenAIImageItem[]) : []
-    const createdAt = new Date().toISOString()
-    const images = rows
-      .map((row) => mapImage(row, { ...meta, createdAt }))
-      .filter((img): img is Claude360CanvasImage => img !== null)
-    if (images.length === 0) {
-      return { ok: false, message: '生成失败，未返回图片，请稍后重试' }
-    }
-    return { ok: true, images }
+    return { ok: false, message: '生成失败，未返回图片，请稍后重试' }
   }
 }
 

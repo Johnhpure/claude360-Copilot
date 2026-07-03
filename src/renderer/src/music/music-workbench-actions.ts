@@ -230,6 +230,9 @@ export type MusicPlaybackAudioElement = Pick<
 > & {
   /** 媒体元素错误（audio.error），播放失败时读 code 定位具体原因。 */
   readonly error?: MediaError | null
+  /** 网络/就绪状态（networkState/readyState），播放失败时一并打进日志。 */
+  readonly networkState?: number
+  readonly readyState?: number
 }
 
 export type MusicPlaybackResult =
@@ -282,11 +285,15 @@ async function tryPlayAudio(audio: MusicPlaybackAudioElement): Promise<MusicPlay
     return null
   } catch (error) {
     const mediaCode = audio.error?.code
-    const codeSuffix = mediaCode !== undefined ? ` (audio.error.code=${mediaCode} ${mediaErrorCodeName(mediaCode)})` : ''
+    const parts: string[] = []
+    if (mediaCode !== undefined) parts.push(`audio.error.code=${mediaCode} ${mediaErrorCodeName(mediaCode)}`)
+    if (audio.networkState !== undefined) parts.push(`networkState=${audio.networkState}`)
+    if (audio.readyState !== undefined) parts.push(`readyState=${audio.readyState}`)
+    const suffix = parts.length > 0 ? ` (${parts.join(', ')})` : ''
     return {
       ok: false,
       reason: 'play-failed',
-      message: `${playbackErrorMessage(error)}${codeSuffix}`
+      message: `${playbackErrorMessage(error)}${suffix}`
     }
   }
 }

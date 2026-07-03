@@ -163,6 +163,13 @@ export class Claude360ApiClient {
     init: RequestInit
   ): Promise<Claude360ImagesRawEnvelope> {
     const response = await this.fetchWithTimeout(`${this.baseUrl}${path}`, init)
+    if (process.env.NODE_ENV !== 'test') {
+      // 排查生图误判失败用：真实 HTTP status / content-type（body 由 canvas service 打印）。
+      console.info(
+        `[claude360-canvas] ${path} http response`,
+        JSON.stringify({ status: response.status, contentType: response.headers.get('content-type') })
+      )
+    }
 
     let parsed: unknown = null
     try {
