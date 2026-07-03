@@ -616,6 +616,11 @@ export function createThreadActions(
         groupForKey,
         {
           listTokens: () => window.kunGui.claude360TokensList(),
+          ensureUsableKey: async (g) => {
+            await window.kunGui.claude360TokensEnsure({ group: g, purpose: 'text' })
+            rendererRuntimeClient.invalidateSettings()
+            return true
+          },
           promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g)
         },
         {

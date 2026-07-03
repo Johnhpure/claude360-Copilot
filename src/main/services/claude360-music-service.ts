@@ -6,6 +6,7 @@ import type {
   Claude360MusicFetchedTask,
   Claude360MusicFetchResult,
   Claude360MusicMediaBlobResult,
+  Claude360MusicMediaProbeResult,
   Claude360MusicSubmitPayload,
   Claude360MusicSubmitResult,
   Claude360MusicTaskStatus,
@@ -234,36 +235,33 @@ function taskLogShape(task: SunoRawTask, baseUrl: string): unknown {
       const audio = pickSongAudio(song)
       const image = pickSongImage(song)
       return {
-        id: song.id,
+        songId: song.id,
         keys: Object.keys(song).sort(),
         audioField: audio?.field ?? null,
+        audioRawValue: audio?.value ?? null,
         imageField: image?.field ?? null,
-        normalizedAudioUrl: redactUrl(normalizeResourceUrl(audio?.value, baseUrl)),
-        normalizedImageUrl: redactUrl(normalizeResourceUrl(image?.value, baseUrl))
+        imageRawValue: image?.value ?? null,
+        normalizedAudioUrl: normalizeResourceUrl(audio?.value, baseUrl) ?? null,
+        normalizedImageUrl: normalizeResourceUrl(image?.value, baseUrl) ?? null,
+        rawItem: song
       }
     })
   }
 }
 
-function logFetchShape(taskId: string, rows: SunoRawTask[], baseUrl: string): void {
+function logFetchShape(taskId: string, env: Claude360SunoRawEnvelope, rows: SunoRawTask[], baseUrl: string): void {
   if (process.env.NODE_ENV === 'test') return
-  console.info('[claude360-music] /suno/fetch raw task shape', {
-    requestedTaskId: taskId,
-    taskCount: rows.length,
-    tasks: rows.map((task) => taskLogShape(task, baseUrl))
-  })
-}
-
-function redactUrl(value: string | undefined): string | undefined {
-  if (!value) return undefined
-  try {
-    const url = new URL(value)
-    url.search = ''
-    url.hash = ''
-    return url.toString()
-  } catch {
-    return value
-  }
+  // 调试日志按任务书要求打印完整真实返回（原始 response / 每首歌完整 item /
+  // 音频与封面字段原值及归一化结果），不猜字段名。仅 main 进程控制台，不入 renderer。
+  console.info('[claude360-music] /suno/fetch raw response', JSON.stringify(env))
+  console.info(
+    '[claude360-music] /suno/fetch parsed tasks',
+    JSON.stringify({
+      requestedTaskId: taskId,
+      taskCount: rows.length,
+      tasks: rows.map((task) => taskLogShape(task, baseUrl))
+    })
+  )
 }
 
 function isHttpUrl(value: string): boolean {
@@ -273,6 +271,18 @@ function isHttpUrl(value: string): boolean {
   } catch {
     return false
   }
+}
+
+/** 明确不是媒体本体的 content-type（错误页 / 错误 JSON），代取与探针都应拒绝。 */
+function isNonMediaContentType(contentType: string): boolean {
+  const normalized = contentType.trim().toLowerCase()
+  return normalized.startsWith('text/html') || normalized.startsWith('application/json')
+}
+
+/** 是否为 <audio> 可直接播放的音频类型（audio/* 或常见二进制流兜底）。 */
+function isPlayableAudioContentType(contentType: string): boolean {
+  const normalized = contentType.trim().toLowerCase()
+  return normalized.startsWith('audio/') || normalized.startsWith('application/octet-stream')
 }
 
 function shouldAttachMusicToken(targetUrl: string, baseUrl: string): boolean {
@@ -387,7 +397,7 @@ export class Claude360MusicService {
     }
 
     const rows = Array.isArray(env.data) ? (env.data as SunoRawTask[]) : []
-    logFetchShape(id, rows, context.baseUrl)
+    logFetchShape(id, env, rows, context.baseUrl)
     const raw = rows.find((t) => t?.task_id === id)
     if (!raw) {
       // 上游本次成功但未返回该任务（最常见的"尚未同步"）：作为可归约的 unresolved
@@ -428,6 +438,15 @@ export class Claude360MusicService {
           retryable: response.status >= 500
         }
       }
+      const contentType = response.headers.get('content-type') || ''
+      // 200 + HTML/JSON 说明拿到的是错误页/错误 JSON 而非媒体本体：
+      // 若照旧当音频回传，renderer 只会看到含糊的 play failed。这里直接给出明确原因。
+      if (isNonMediaContentType(contentType)) {
+        return {
+          ok: false,
+          message: `媒体地址返回的不是媒体内容 (content-type: ${contentType})，请检查字段映射或鉴权`
+        }
+      }
       const buffer = Buffer.from(await response.arrayBuffer())
       if (buffer.byteLength > MAX_MEDIA_BLOB_BYTES) {
         return { ok: false, message: '音频文件过大，无法直接播放' }
@@ -435,11 +454,72 @@ export class Claude360MusicService {
       return {
         ok: true,
         url: normalized,
-        mimeType: response.headers.get('content-type') || 'audio/mpeg',
+        mimeType: contentType || 'audio/mpeg',
         base64: buffer.toString('base64')
       }
     } catch (error) {
       return { ok: false, message: errorMessage(error), retryable: true }
+    }
+  }
+
+  /**
+   * 媒体可访问性探针（调试用）：只取 status / content-type，不取 body。
+   * 用于逐作品验证 coverUrl / audioUrl 是否存在、能否请求成功、类型是否可播放；
+   * 返回 401/403 或 text/html、application/json 即说明拿到的不是可播放媒体地址。
+   */
+  async probeMusicMedia(url: string): Promise<Claude360MusicMediaProbeResult> {
+    const raw = (url ?? '').trim()
+    if (!raw) return { ok: false, url: raw, message: '媒体地址为空' }
+
+    let context: MusicContext
+    try {
+      context = await this.musicContext()
+    } catch (error) {
+      return { ok: false, url: raw, message: errorMessage(error) }
+    }
+
+    const normalized = normalizeResourceUrl(raw, context.baseUrl)
+    if (!normalized || !isHttpUrl(normalized)) {
+      return { ok: false, url: normalized ?? raw, message: '非 http(s) 地址，无法探测' }
+    }
+
+    const headers: Record<string, string> = {}
+    if (shouldAttachMusicToken(normalized, context.baseUrl)) {
+      headers.Authorization = `Bearer ${context.apiKey}`
+    }
+    // 探针只要 status/content-type：请求首字节即可（支持 Range 的服务器返回 206，
+    // 不支持的返回 200 全量——下面仍会立即 cancel，最差与不带 Range 相同）。
+    headers.Range = 'bytes=0-1'
+
+    try {
+      const response = await (this.deps.fetchImpl ?? fetch)(normalized, { headers })
+      const contentType = response.headers.get('content-type') || ''
+      // 探针不消费 body（可能是几 MB 的音频），立刻取消流。
+      try {
+        await response.body?.cancel()
+      } catch {
+        // body 已被消费/不可取消时忽略。
+      }
+      if (!response.ok || isNonMediaContentType(contentType)) {
+        return {
+          ok: false,
+          url: normalized,
+          status: response.status,
+          contentType,
+          message: !response.ok
+            ? `请求失败 (HTTP ${response.status})`
+            : `返回的不是媒体内容 (content-type: ${contentType})`
+        }
+      }
+      return {
+        ok: true,
+        url: normalized,
+        status: response.status,
+        contentType,
+        playableAudio: isPlayableAudioContentType(contentType)
+      }
+    } catch (error) {
+      return { ok: false, url: normalized, message: errorMessage(error) }
     }
   }
 }

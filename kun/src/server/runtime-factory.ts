@@ -89,6 +89,7 @@ export type KunServeRuntimeOptions = {
   configPath?: string
   dataDir: string
   runtimeToken: string
+  providerId?: string
   apiKey: string
   baseUrl: string
   modelProxyUrl?: string
@@ -178,6 +179,7 @@ export async function createKunServeRuntime(
       ? { streamIdleTimeoutMs: options.runtime.streamIdleTimeoutMs }
       : {}
   const defaultModelClient = new CompatModelClient({
+    providerId: options.providerId,
     baseUrl: options.baseUrl,
     apiKey: options.apiKey,
     modelProxyUrl: options.modelProxyUrl,
@@ -205,6 +207,7 @@ export async function createKunServeRuntime(
     providerClients.set(
       trimmedId,
       new CompatModelClient({
+        providerId: trimmedId,
         baseUrl: provider.baseUrl ?? options.baseUrl ?? '',
         apiKey: provider.apiKey,
         modelProxyUrl: provider.modelProxyUrl ?? options.modelProxyUrl,

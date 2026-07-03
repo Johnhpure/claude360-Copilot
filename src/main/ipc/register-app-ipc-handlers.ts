@@ -81,6 +81,7 @@ import {
   claude360MusicSubmitPayloadSchema,
   claude360MusicFetchPayloadSchema,
   claude360MusicMediaBlobPayloadSchema,
+  claude360MusicMediaProbePayloadSchema,
   claude360CanvasGeneratePayloadSchema,
   claude360CanvasEditPayloadSchema,
   streamIdSchema,
@@ -712,14 +713,21 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       return p
     })
     console.info(
-      `[kun-gui] tokens:ensure group="${authoritativeGroup}" → token #${ref.tokenId}(group="${ref.group}") ` +
-        (changed ? 'apiKeyRef 已回填，重启运行时' : 'profile ref 无变化')
+      `[kun-gui] tokens:ensure group="${authoritativeGroup}" keyId=${ref.tokenId} tokenGroup="${ref.group}" ` +
+        (changed
+          ? 'apiKeyRef 已回填，重启运行时'
+          : ref.secretUpdated
+            ? 'profile ref 无变化但完整 Key 已刷新，重启运行时'
+            : 'profile ref 无变化')
     )
     if (changed) {
       await applySettingsPatch({ provider: { providers: updated } })
+    }
+    if (changed || ref.secretUpdated) {
       // 关键：kun 子进程的 provider Key 在 spawn 时一次性烘焙进子进程 config，运行中
       // 不会按请求重解 apiKeyRef；而 ref-only 变更不改变启动指纹、不会触发自动重启。
-      // 故 ref 变化（新建分组 Key / 换 Key）后必须显式重启运行时，否则「创建成功续跑」
+      // 故 ref 变化（新建分组 Key / 换 Key）或同 ref 的 secret-store 明文刚被 reveal/create 补写后
+      // 必须显式重启运行时，否则「创建成功续跑」或「补回完整 Key 续跑」
       // 的下一发仍带旧 Key/空 Key → 持续 401 且无自愈路径。
       // 重启失败不阻塞返回：Key 已建好，发送侧会得到可见错误，可重试。
       try {
@@ -805,6 +813,17 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         message: error instanceof Error ? error.message : String(error)
       })
       return { ok: false as const, message: '音频加载失败，请稍后重试', retryable: true as const }
+    }
+  })
+  ipcMain.handle('claude360:music:media-probe', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:music:media-probe', claude360MusicMediaProbePayloadSchema, payload)
+    try {
+      return await claude360MusicService.probeMusicMedia(req.url)
+    } catch (error) {
+      logError('claude360-music', 'probeMusicMedia failed', {
+        message: error instanceof Error ? error.message : String(error)
+      })
+      return { ok: false as const, url: req.url, message: '媒体探测失败' }
     }
   })
 

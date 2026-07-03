@@ -245,6 +245,7 @@ export const KunServeConfigSchema = z
     port: z.number().int().min(0).max(65_535).optional(),
     dataDir: z.string().min(1).optional(),
     runtimeToken: z.string().optional(),
+    providerId: z.string().optional(),
     apiKey: z.string().optional(),
     baseUrl: z.string().optional(),
     modelProxyUrl: z.string().optional(),

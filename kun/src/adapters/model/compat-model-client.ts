@@ -26,6 +26,8 @@ import { createProxyFetch } from './proxy-fetch.js'
  * OpenAI Responses or Anthropic Messages request/response shapes.
  */
 export type CompatModelClientConfig = {
+  /** GUI provider id used for diagnostics, e.g. `claude360-codex`. */
+  providerId?: string
   baseUrl: string
   apiKey: string
   model: string
@@ -143,6 +145,8 @@ type StreamReadResult =
   | { kind: 'error'; message: string }
 
 const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 45_000
+const CLAUDE360_KEY_INVALID_MESSAGE = '当前分组 Key 已失效，请重新创建。'
+type ApiKeyKind = 'missing' | 'masked' | 'reference' | 'identifier' | 'complete'
 // Anthropic Messages requires an explicit `max_tokens`. The old 4096 default
 // was far too small for reasoning models: their thinking tokens are drawn from
 // the SAME output budget, so a long think left almost nothing for the tool
@@ -263,6 +267,19 @@ export class CompatModelClient implements ModelClient {
       round.url = redactUrlForLog(url)
     }
     const headers = this.buildHeaders(stream, endpointFormat)
+    const authDiagnostics = this.authDiagnostics(headers)
+    if (this.isClaude360Request(request.providerId) && authDiagnostics.keyKind !== 'complete') {
+      this.logClaude360KeyUnavailable({
+        url,
+        endpointFormat,
+        configuredEndpointFormat,
+        model: requestModel,
+        providerId: request.providerId,
+        authDiagnostics
+      })
+      yield { kind: 'error', message: CLAUDE360_KEY_INVALID_MESSAGE, code: 'claude360_key_invalid' }
+      return
+    }
     let result = await this.postChatCompletion(url, headers, body, request.abortSignal)
     // Retry transient gateway failures (502/503/504) a few times before giving
     // up. These are upstream load-balancer hiccups (e.g. an ALB returning
@@ -317,7 +334,9 @@ export class CompatModelClient implements ModelClient {
           body: retryText,
           endpointFormat,
           configuredEndpointFormat,
-          model: requestModel
+          model: requestModel,
+          providerId: request.providerId,
+          authDiagnostics
         })
         const retryClassified = await this.classifyHttpError(response.status, retryText)
         yield {
@@ -333,7 +352,9 @@ export class CompatModelClient implements ModelClient {
         body: text,
         endpointFormat,
         configuredEndpointFormat,
-        model: requestModel
+        model: requestModel,
+        providerId: request.providerId,
+        authDiagnostics
       })
       const classified = await this.classifyHttpError(response.status, text)
       yield {
@@ -441,6 +462,12 @@ export class CompatModelClient implements ModelClient {
 
   private async classifyHttpError(status: number, text: string): Promise<{ message: string; code: string }> {
     const body = text
+    if (status === 401 && this.isClaude360Request()) {
+      return {
+        message: CLAUDE360_KEY_INVALID_MESSAGE,
+        code: 'claude360_key_invalid'
+      }
+    }
     if (status === 404) {
       const prefix = body ? `${body} ` : ''
       return {
@@ -477,18 +504,81 @@ export class CompatModelClient implements ModelClient {
     endpointFormat: ModelEndpointFormat
     configuredEndpointFormat: ModelEndpointFormat
     model: string
+    providerId?: string
+    authDiagnostics: ReturnType<CompatModelClient['authDiagnostics']>
   }): void {
+    const providerId = input.providerId?.trim() || this.config.providerId?.trim() || ''
+    const groupName = groupNameFromClaude360ProviderId(providerId)
     console.warn('[kun:model] model HTTP request failed', {
+      feature: this.isClaude360Request(providerId) ? 'Code' : undefined,
       provider: this.provider,
+      ...(providerId ? { providerId } : {}),
+      ...(groupName ? { groupId: providerId, groupName } : {}),
       status: input.status,
       model: input.model,
+      modelId: input.model,
+      modelName: input.model,
       configuredModel: this.config.model,
       baseUrl: redactUrlForLog(this.config.baseUrl),
       requestUrl: redactUrlForLog(input.url),
       endpointFormat: input.endpointFormat,
       configuredEndpointFormat: input.configuredEndpointFormat,
+      keyKind: input.authDiagnostics.keyKind,
+      keyPreview: input.authDiagnostics.keyPreview,
+      authorizationPresent: input.authDiagnostics.authorizationPresent,
       responseBody: summarizeForLog(input.body)
     })
+  }
+
+  private logClaude360KeyUnavailable(input: {
+    url: string
+    endpointFormat: ModelEndpointFormat
+    configuredEndpointFormat: ModelEndpointFormat
+    model: string
+    providerId?: string
+    authDiagnostics: ReturnType<CompatModelClient['authDiagnostics']>
+  }): void {
+    const providerId = input.providerId?.trim() || this.config.providerId?.trim() || ''
+    const groupName = groupNameFromClaude360ProviderId(providerId)
+    console.warn('[kun:model] Claude360 model request blocked before HTTP call', {
+      feature: 'Code',
+      ...(providerId ? { providerId, groupId: providerId } : {}),
+      ...(groupName ? { groupName } : {}),
+      model: input.model,
+      modelId: input.model,
+      modelName: input.model,
+      configuredModel: this.config.model,
+      baseUrl: redactUrlForLog(this.config.baseUrl),
+      requestUrl: redactUrlForLog(input.url),
+      endpointFormat: input.endpointFormat,
+      configuredEndpointFormat: input.configuredEndpointFormat,
+      keyKind: input.authDiagnostics.keyKind,
+      keyPreview: input.authDiagnostics.keyPreview,
+      authorizationPresent: input.authDiagnostics.authorizationPresent,
+      reason: 'Claude360 provider requires a complete local API key, not a masked key/ref/id.'
+    })
+  }
+
+  private authDiagnostics(headers: Record<string, string>): {
+    authorizationPresent: boolean
+    keyKind: ApiKeyKind
+    keyPreview: string
+  } {
+    const authorization = headers.Authorization ?? headers.authorization ?? ''
+    const xApiKey = headers['x-api-key'] ?? headers['X-API-Key'] ?? ''
+    const bearer = authorization.match(/^Bearer\s+(.+)$/i)?.[1] ?? ''
+    const key = bearer || xApiKey || this.config.apiKey
+    return {
+      authorizationPresent: Boolean(authorization.trim() || xApiKey.trim()),
+      keyKind: classifyApiKey(key),
+      keyPreview: previewSecret(key)
+    }
+  }
+
+  private isClaude360Request(providerId?: string): boolean {
+    return isClaude360BaseUrl(this.config.baseUrl) ||
+      isClaude360ProviderId(providerId) ||
+      isClaude360ProviderId(this.config.providerId)
   }
 
   private buildRequestBody(
@@ -1944,6 +2034,59 @@ function exactModelEndpointUrl(baseUrl: string): string {
   const query = trimmed.search(/[?#]/)
   if (query < 0) return trimmed.replace(/\/+$/, '')
   return `${trimmed.slice(0, query).replace(/\/+$/, '')}${trimmed.slice(query)}`
+}
+
+function classifyApiKey(value: string): ApiKeyKind {
+  const trimmed = value.trim()
+  if (!trimmed) return 'missing'
+  const lower = trimmed.toLowerCase()
+  if (
+    trimmed.includes('*') ||
+    trimmed.includes('…') ||
+    lower.includes('<redacted>') ||
+    lower.includes('[redacted]') ||
+    lower.includes('masked')
+  ) {
+    return 'masked'
+  }
+  if (lower.startsWith('claude360:') || lower.startsWith('key:') || lower.startsWith('ref:')) {
+    return 'reference'
+  }
+  if (/^\d+$/.test(trimmed)) return 'identifier'
+  return 'complete'
+}
+
+function previewSecret(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (trimmed.length <= 8) {
+    return `${trimmed.slice(0, 1)}...${trimmed.slice(-1)}`
+  }
+  return `${trimmed.slice(0, 4)}...${trimmed.slice(-4)}`
+}
+
+function isClaude360BaseUrl(baseUrl: string): boolean {
+  const trimmed = baseUrl.trim()
+  if (!trimmed) return false
+  try {
+    const host = new URL(trimmed).hostname.toLowerCase()
+    return host === 'claude360.xyz' || host.endsWith('.claude360.xyz')
+  } catch {
+    return /(^|\/\/|\.)claude360\.xyz(?::|\/|$)/i.test(trimmed)
+  }
+}
+
+function isClaude360ProviderId(providerId: string | undefined): boolean {
+  const normalized = providerId?.trim().toLowerCase() ?? ''
+  return normalized.startsWith('claude360:') || normalized.startsWith('claude360-')
+}
+
+function groupNameFromClaude360ProviderId(providerId: string): string {
+  const trimmed = providerId.trim()
+  const lower = trimmed.toLowerCase()
+  if (lower.startsWith('claude360:')) return trimmed.slice('claude360:'.length)
+  if (lower.startsWith('claude360-')) return trimmed.slice('claude360-'.length)
+  return ''
 }
 
 function redactUrlForLog(url: string): string {

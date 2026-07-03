@@ -489,4 +489,73 @@ describe('Claude360MusicService.fetchMusicMedia', () => {
     expect(result.ok).toBe(true)
     expect(calls[0]).toMatchObject({ url: 'https://cdn.example/a.mp3', headers: {} })
   })
+
+  it('200 但返回 HTML/JSON（错误页）时明确拒绝，不当音频回传', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response('{"error":"forbidden"}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    )
+    const service = new Claude360MusicService(makeDeps({ fetchImpl }))
+
+    const result = await service.fetchMusicMedia('https://cdn.example/a.mp3')
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toContain('content-type: application/json')
+  })
+})
+
+describe('Claude360MusicService.probeMusicMedia', () => {
+  it('可播放音频：返回 status/contentType/playableAudio=true，且不消费 body', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { 'content-type': 'audio/mpeg' }
+      })
+    )
+    const service = new Claude360MusicService(makeDeps({ fetchImpl }))
+
+    const result = await service.probeMusicMedia('https://cdn.example/a.mp3')
+
+    expect(result).toEqual({
+      ok: true,
+      url: 'https://cdn.example/a.mp3',
+      status: 200,
+      contentType: 'audio/mpeg',
+      playableAudio: true
+    })
+  })
+
+  it('封面图片：可访问但 playableAudio=false', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(new Uint8Array([1]), { status: 200, headers: { 'content-type': 'image/jpeg' } })
+    )
+    const service = new Claude360MusicService(makeDeps({ fetchImpl }))
+
+    const result = await service.probeMusicMedia('https://cdn.example/c.jpeg')
+
+    expect(result).toMatchObject({ ok: true, contentType: 'image/jpeg', playableAudio: false })
+  })
+
+  it('403 / text/html 均判定失败并带 status 与 contentType', async () => {
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL) =>
+      String(url).endsWith('/denied.mp3')
+        ? new Response('no', { status: 403, headers: { 'content-type': 'text/plain' } })
+        : new Response('<html></html>', { status: 200, headers: { 'content-type': 'text/html' } })
+    )
+    const service = new Claude360MusicService(makeDeps({ fetchImpl }))
+
+    const denied = await service.probeMusicMedia('https://cdn.example/denied.mp3')
+    expect(denied).toMatchObject({ ok: false, status: 403 })
+
+    const html = await service.probeMusicMedia('https://cdn.example/page.mp3')
+    expect(html).toMatchObject({ ok: false, status: 200, contentType: 'text/html' })
+  })
+
+  it('空地址 / 非 http(s) 地址直接拒绝', async () => {
+    const service = new Claude360MusicService(makeDeps({}))
+    await expect(service.probeMusicMedia('')).resolves.toMatchObject({ ok: false })
+    await expect(service.probeMusicMedia('javascript:alert(1)')).resolves.toMatchObject({ ok: false })
+  })
 })

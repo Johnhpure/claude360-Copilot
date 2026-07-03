@@ -10,11 +10,13 @@ import type {
   Claude360MusicCreateForm,
   Claude360MusicFetchResult,
   Claude360MusicMediaBlobResult,
+  Claude360MusicMediaProbeResult,
   Claude360MusicSubmitPayload,
   Claude360MusicSubmitResult,
   Claude360Song
 } from '@shared/claude360-music'
 import type { Claude360TokenListItem } from '@shared/claude360'
+import type { WorkspaceFileSaveAsPayload, WorkspaceFileSaveAsResult } from '@shared/workspace-file'
 import type { MusicTasksState } from './music-task-store'
 import { buildSubmitPayload, validateForm } from './suno-params'
 
@@ -23,6 +25,8 @@ export type MusicWorkbenchApi = {
   claude360MusicSubmit: (payload: Claude360MusicSubmitPayload) => Promise<Claude360MusicSubmitResult>
   claude360MusicFetch: (taskId: string) => Promise<Claude360MusicFetchResult>
   claude360MusicMediaBlob?: (url: string) => Promise<Claude360MusicMediaBlobResult>
+  claude360MusicMediaProbe?: (url: string) => Promise<Claude360MusicMediaProbeResult>
+  saveWorkspaceFileAs?: (payload: WorkspaceFileSaveAsPayload) => Promise<WorkspaceFileSaveAsResult>
   claude360TokensList: () => Promise<Claude360TokenListItem[]>
 }
 
@@ -93,52 +97,140 @@ export async function pollActiveTasksOnce(
   if (resolved.length > 0) store.applyFetched(resolved)
 }
 
-// —— 下载（迁移自 music-web download.ts；仅允许 http(s)，纵深防御）——
-export function isSafeHttpUrl(url: string): boolean {
-  try {
-    const u = new URL(url)
-    return u.protocol === 'http:' || u.protocol === 'https:'
-  } catch {
-    return false
-  }
+// —— 下载（主进程链路：media-blob 代取鉴权音频 → file:save-as 保存对话框）——
+// 旧实现 renderer 直接 fetch(audioUrl)，跨域/鉴权必失败后 window.open 兜底，
+// 表现为「点下载弹出新窗口的浏览器播放器」。现已彻底移除任何打开页面的路径。
+
+/** 由 content-type 推断音频扩展名；未知类型按 Suno 主流产物默认 mp3。 */
+export function audioExtensionFromMimeType(mimeType: string): string {
+  const normalized = (mimeType || '').trim().toLowerCase()
+  if (normalized.includes('wav')) return 'wav'
+  if (normalized.includes('ogg')) return 'ogg'
+  if (normalized.includes('flac')) return 'flac'
+  if (normalized.includes('mp4') || normalized.includes('m4a') || normalized.includes('aac')) return 'm4a'
+  return 'mp3'
 }
 
-export function safeSongFilename(title: string): string {
-  const base = (title?.trim() || '未命名').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80)
-  return `${base}.mp3`
+/**
+ * 下载文件名：`歌曲标题-YYYYMMDD-HHmm.<ext>`；无标题用 `music-<时间戳>.<ext>`。
+ * 过滤文件系统非法字符，标题限长防超长路径。
+ */
+export function songDownloadFilename(title: string, mimeType: string, now: Date = new Date()): string {
+  const ext = audioExtensionFromMimeType(mimeType)
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
+  const base = (title ?? '').trim().replace(/[\\/:*?"<>|]/g, '_').slice(0, 80)
+  if (!base) return `music-${now.getTime()}.${ext}`
+  return `${base}-${stamp}.${ext}`
 }
 
-export type DownloadDeps = {
-  fetch: typeof fetch
-  createObjectURL: (b: Blob) => string
-  revokeObjectURL: (u: string) => void
-  triggerDownload: (url: string, filename: string) => void
-  openFallback: (url: string) => void
-}
+export type DownloadSongResult =
+  | { ok: true; path: string }
+  | { ok: false; canceled?: boolean; message: string }
 
-/** 下载歌曲：成功用 blob 触发下载，失败回退到新标签打开；非法链接直接拒绝。 */
+/**
+ * 下载歌曲（只下载，绝不打开窗口/页面）：
+ * 1. main 经 media-blob 代取音频（同源自动附 music Key；content-type 为 HTML/JSON 时明确报错）；
+ * 2. 走 file:save-as 弹系统保存对话框写盘。
+ * 失败原因原样打进控制台并返回给 UI 展示。
+ */
 export async function downloadSong(
-  audioUrl: string,
-  title: string,
-  deps: DownloadDeps
-): Promise<'blob' | 'fallback' | 'invalid'> {
-  if (!isSafeHttpUrl(audioUrl)) return 'invalid'
-  const filename = safeSongFilename(title)
-  try {
-    const res = await deps.fetch(audioUrl)
-    if (!res.ok) throw new Error('bad status')
-    const blob = await res.blob()
-    const url = deps.createObjectURL(blob)
-    deps.triggerDownload(url, filename)
-    deps.revokeObjectURL(url)
-    return 'blob'
-  } catch {
-    deps.openFallback(audioUrl)
-    return 'fallback'
+  api: Pick<MusicWorkbenchApi, 'claude360MusicMediaBlob' | 'saveWorkspaceFileAs'>,
+  song: Pick<Claude360Song, 'audioUrl' | 'title'>,
+  log: (message: string, detail?: unknown) => void = (m, d) => console.error(m, d)
+): Promise<DownloadSongResult> {
+  const audioUrl = (song.audioUrl ?? '').trim()
+  if (!audioUrl) return { ok: false, message: '该作品没有可下载的音频地址' }
+  if (!api.claude360MusicMediaBlob || !api.saveWorkspaceFileAs) {
+    return { ok: false, message: '下载功能不可用' }
   }
+  log('[claude360-music] download start', { audioUrl, title: song.title })
+  let media: Claude360MusicMediaBlobResult
+  try {
+    media = await api.claude360MusicMediaBlob(audioUrl)
+  } catch (error) {
+    log('[claude360-music] download media fetch threw', error)
+    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+  }
+  if (!media.ok) {
+    log('[claude360-music] download media fetch failed', media)
+    return { ok: false, message: media.message }
+  }
+  const filename = songDownloadFilename(song.title, media.mimeType)
+  let saved: WorkspaceFileSaveAsResult
+  try {
+    saved = await api.saveWorkspaceFileAs({
+      suggestedName: filename,
+      dataBase64: media.base64,
+      mimeType: media.mimeType
+    })
+  } catch (error) {
+    log('[claude360-music] download save-as threw', error)
+    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+  }
+  if (!saved.ok) {
+    if (!saved.canceled) log('[claude360-music] download save-as failed', saved)
+    return { ok: false, canceled: saved.canceled, message: saved.message ?? '保存失败' }
+  }
+  return { ok: true, path: saved.path }
 }
 
-export type MusicPlaybackAudioElement = Pick<HTMLAudioElement, 'src' | 'volume' | 'currentTime' | 'play' | 'pause'>
+// —— 资源可访问性验证（临时调试：封面/音频逐项探测并打日志）——
+
+export type SongProbeReport = {
+  songId: string
+  title: string
+  coverUrl: string | null
+  cover: Claude360MusicMediaProbeResult | { skipped: true } | null
+  audioUrl: string | null
+  audio: Claude360MusicMediaProbeResult | { skipped: true } | null
+}
+
+/**
+ * 对一批成功歌曲验证 coverUrl / audioUrl：是否存在、能否请求成功、
+ * content-type 是否可播放（audio/*）。结果整体打一条 console 日志，
+ * 返回值供测试断言。探针失败不影响任何业务流程。
+ */
+export async function debugProbeSongs(
+  api: Pick<MusicWorkbenchApi, 'claude360MusicMediaProbe'>,
+  songs: Pick<Claude360Song, 'id' | 'title' | 'audioUrl' | 'imageUrl'>[],
+  log: (message: string, detail?: unknown) => void = (m, d) => console.info(m, d)
+): Promise<SongProbeReport[]> {
+  const probe = api.claude360MusicMediaProbe
+  const reports = await Promise.all(
+    songs.map(async (song): Promise<SongProbeReport> => {
+      const coverUrl = song.imageUrl?.trim() || null
+      const audioUrl = song.audioUrl?.trim() || null
+      const probeUrl = async (url: string | null): Promise<SongProbeReport['cover']> => {
+        if (!url) return null
+        if (!probe) return { skipped: true }
+        try {
+          return await probe(url)
+        } catch (error) {
+          return { ok: false, url, message: error instanceof Error ? error.message : String(error) }
+        }
+      }
+      return {
+        songId: song.id,
+        title: song.title,
+        coverUrl,
+        cover: await probeUrl(coverUrl),
+        audioUrl,
+        audio: await probeUrl(audioUrl)
+      }
+    })
+  )
+  log('[claude360-music] song media accessibility report', reports)
+  return reports
+}
+
+export type MusicPlaybackAudioElement = Pick<
+  HTMLAudioElement,
+  'src' | 'volume' | 'currentTime' | 'play' | 'pause'
+> & {
+  /** 媒体元素错误（audio.error），播放失败时读 code 定位具体原因。 */
+  readonly error?: MediaError | null
+}
 
 export type MusicPlaybackResult =
   | { ok: true; sourceUrl: string; usedFallback: boolean }
@@ -157,7 +249,20 @@ function clampPlaybackVolume(volume: number): number {
 }
 
 function playbackErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  if (error instanceof Error) return `${error.name}: ${error.message}`
+  return String(error)
+}
+
+/** MediaError.code → 可读名称（audio.error 的四种标准取值）。 */
+function mediaErrorCodeName(code: number | undefined): string | undefined {
+  if (code === undefined) return undefined
+  const names: Record<number, string> = {
+    1: 'MEDIA_ERR_ABORTED',
+    2: 'MEDIA_ERR_NETWORK',
+    3: 'MEDIA_ERR_DECODE',
+    4: 'MEDIA_ERR_SRC_NOT_SUPPORTED'
+  }
+  return names[code] ?? `MEDIA_ERR_${code}`
 }
 
 function redactPlaybackUrl(value: string): string {
@@ -176,10 +281,12 @@ async function tryPlayAudio(audio: MusicPlaybackAudioElement): Promise<MusicPlay
     await audio.play()
     return null
   } catch (error) {
+    const mediaCode = audio.error?.code
+    const codeSuffix = mediaCode !== undefined ? ` (audio.error.code=${mediaCode} ${mediaErrorCodeName(mediaCode)})` : ''
     return {
       ok: false,
       reason: 'play-failed',
-      message: playbackErrorMessage(error)
+      message: `${playbackErrorMessage(error)}${codeSuffix}`
     }
   }
 }

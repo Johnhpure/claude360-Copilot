@@ -110,3 +110,10 @@ export type Claude360MusicFetchResult =
 export type Claude360MusicMediaBlobResult =
   | { ok: true; url: string; mimeType: string; base64: string }
   | { ok: false; message: string; retryable?: boolean }
+
+// —— main → renderer 的媒体可访问性探针结果（调试用，不含 API Key）——
+// 只取 status / content-type 不取 body，用于排查「封面不显示 / 播放失败」时
+// 确认拿到的 URL 是否真的是可加载的图片 / 可播放的音频。
+export type Claude360MusicMediaProbeResult =
+  | { ok: true; url: string; status: number; contentType: string; playableAudio: boolean }
+  | { ok: false; url: string; message: string; status?: number; contentType?: string }

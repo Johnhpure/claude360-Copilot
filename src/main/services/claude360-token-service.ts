@@ -37,6 +37,13 @@ export type Claude360TokenServiceDeps = {
 
 export const CLAUDE360_TOKEN_NAME_PREFIX = 'Claude360 Copilot'
 
+export type Claude360EnsuredTokenRef = Claude360TokenRef & {
+  /** True when ensure wrote a full key value into secret-store during this call. */
+  secretUpdated: boolean
+  /** True when ensure had to create a new server-side token. */
+  tokenCreated: boolean
+}
+
 /**
  * tokenRefs 存储键：按 `purpose + group` 双维度隔离，避免同一 purpose 下
  * 不同分组（如 auto/text 与 vip/text）互相覆盖、复用到错误分组的 API Key。
@@ -85,7 +92,7 @@ export class Claude360TokenService {
   private readonly deps: Claude360TokenServiceDeps
   // 按 group|purpose 记录进行中的 ensureGroupToken，防止同一分组/用途首次并发触发
   // 重复 reveal / 重复 createToken（在中转站建出多把 token → 误计费/脏数据）。
-  private readonly ensureInflight = new Map<string, Promise<Claude360TokenRef>>()
+  private readonly ensureInflight = new Map<string, Promise<Claude360EnsuredTokenRef>>()
 
   constructor(deps: Claude360TokenServiceDeps) {
     this.deps = deps
@@ -137,7 +144,7 @@ export class Claude360TokenService {
   }
 
   /** 确保某用途有可用的分组 Key：已存且 secret 可读则复用；secret 缺失则 reveal；都没有则创建。 */
-  async ensureGroupToken(group: string, purpose: Claude360TokenPurpose): Promise<Claude360TokenRef> {
+  async ensureGroupToken(group: string, purpose: Claude360TokenPurpose): Promise<Claude360EnsuredTokenRef> {
     // in-flight 去重：同一 group|purpose 并发调用共用同一 Promise，避免重复建 token。
     // 键用归一化分组名，"Codex"/"codex" 两种来源的并发也能合并。
     const key = `${normalizeClaude360GroupKey(group)}|${purpose}`
@@ -153,7 +160,7 @@ export class Claude360TokenService {
   private async ensureGroupTokenUncached(
     group: string,
     purpose: Claude360TokenPurpose
-  ): Promise<Claude360TokenRef> {
+  ): Promise<Claude360EnsuredTokenRef> {
     const settings = await this.deps.readClaude360()
     const scopedKey = claude360TokenRefKey(purpose, group)
     // 读取顺序：优先 group-scoped ref（含历史大小写键兜底）；否则回退 legacy 扁平
@@ -169,7 +176,7 @@ export class Claude360TokenService {
         console.info(
           `[kun-gui] ensureGroupToken group="${group}" purpose=${purpose} → 复用本地 ref #${existing.tokenId}(group="${existing.group}")`
         )
-        return existing
+        return { ...existing, secretUpdated: false, tokenCreated: false }
       }
       // secret 缺失：尝试 reveal 补回；若 token 已被删除（reveal 失败），丢弃悬空 ref，
       // 落到下方重建流程，避免删 Key 后该分组永远 ensure 失败。
@@ -177,7 +184,7 @@ export class Claude360TokenService {
         const revealed = await this.revealToken(existing.tokenId)
         await this.deps.secretStore.saveSecret(claude360ApiKeyRef(existing.tokenId), revealed)
         await this.deps.writeClaude360({ tokenRefs: { [scopedKey]: existing } })
-        return existing
+        return { ...existing, secretUpdated: true, tokenCreated: false }
       } catch {
         // 悬空 ref：继续走下方重建（scopedKey 将被新 ref 覆盖）。
       }
@@ -204,6 +211,6 @@ export class Claude360TokenService {
       ref = await this.createToken(group, `${CLAUDE360_TOKEN_NAME_PREFIX} / ${purpose}`)
     }
     await this.deps.writeClaude360({ tokenRefs: { [scopedKey]: ref } })
-    return ref
+    return { ...ref, secretUpdated: true, tokenCreated: !match }
   }
 }

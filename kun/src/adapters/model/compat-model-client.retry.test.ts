@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { CompatModelClient } from './compat-model-client.js'
 import type { ModelRequest, ModelStreamChunk } from '../../ports/model-client.js'
 
@@ -94,5 +94,55 @@ describe('CompatModelClient transient gateway retry', () => {
 
     expect(calls).toBe(1)
     expect(chunks.some((c) => c.kind === 'error')).toBe(true)
+  })
+
+  it('maps Claude360 401 invalid-token responses to group-key guidance and logs masked diagnostics', async () => {
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({ message: 'Invalid token' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' }
+      })
+    ) as unknown as typeof fetch
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const client = new CompatModelClient({
+      providerId: 'claude360-codex',
+      baseUrl: 'https://claude360.xyz',
+      apiKey: 'sk-claude360-real-secret-123456',
+      model: 'gpt-5.5',
+      endpointFormat: 'chat_completions',
+      nonStreaming: true,
+      fetchImpl
+    })
+
+    try {
+      const chunks = await drain(client.stream({
+        ...request(),
+        providerId: 'claude360-codex',
+        model: 'gpt-5.5'
+      }))
+
+      expect(chunks).toContainEqual({
+        kind: 'error',
+        message: '当前分组 Key 已失效，请重新创建。',
+        code: 'claude360_key_invalid'
+      })
+      expect(warn).toHaveBeenCalledWith(
+        '[kun:model] model HTTP request failed',
+        expect.objectContaining({
+          feature: 'Code',
+          providerId: 'claude360-codex',
+          groupName: 'codex',
+          model: 'gpt-5.5',
+          baseUrl: expect.stringContaining('claude360.xyz'),
+          authorizationPresent: true,
+          keyKind: 'complete',
+          keyPreview: 'sk-c...3456',
+          responseBody: expect.stringContaining('Invalid token')
+        })
+      )
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('sk-claude360-real-secret-123456')
+    } finally {
+      warn.mockRestore()
+    }
   })
 })

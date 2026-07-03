@@ -105,6 +105,7 @@ export function buildKunServeArgs(input: {
   host: string
   port: number
   dataDir: string
+  providerId?: string
   baseUrl?: string
   modelProxyUrl?: string
   endpointFormat?: string
@@ -122,6 +123,7 @@ export function buildKunServeArgs(input: {
     String(input.port),
     '--data-dir',
     input.dataDir,
+    ...(input.providerId ? ['--provider-id', input.providerId] : []),
     ...(input.baseUrl ? ['--base-url', input.baseUrl] : []),
     ...(input.modelProxyUrl ? ['--model-proxy-url', input.modelProxyUrl] : []),
     ...(input.endpointFormat ? ['--endpoint-format', input.endpointFormat] : []),

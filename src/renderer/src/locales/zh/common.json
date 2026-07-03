@@ -144,6 +144,8 @@
   "musicPlay": "播放",
   "musicPause": "暂停",
   "musicDownload": "下载",
+  "musicDownloadSaved": "已保存到本地",
+  "musicDownloadFailed": "下载失败：{{message}}",
   "musicClose": "关闭",
   "musicCoverAlt": "{{title}} 封面",
   "musicPlayerEmpty": "选择一首歌曲开始播放。",

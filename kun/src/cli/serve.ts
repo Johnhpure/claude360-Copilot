@@ -78,6 +78,14 @@ export function parseServeOptions(
           : env.KUN_RUNTIME_TOKEN ??
             configServe.runtimeToken ??
             DEFAULT_SERVE_OPTIONS.runtimeToken,
+    providerId:
+      typeof raw['provider-id'] === 'string'
+        ? raw['provider-id']
+        : typeof raw.providerId === 'string'
+          ? raw.providerId
+          : env.KUN_PROVIDER_ID ??
+            configServe.providerId ??
+            DEFAULT_SERVE_OPTIONS.providerId,
     apiKey:
       typeof raw['api-key'] === 'string'
         ? raw['api-key']
@@ -168,6 +176,7 @@ Options:
   --port <port>            HTTP port (default ${DEFAULT_SERVE_PORT})
   --data-dir <path>        Root directory for threads, events, and usage
   --runtime-token <token>  Bearer token for /v1/* requests
+  --provider-id <id>       Default GUI provider id for diagnostics
   --api-key <key>          DeepSeek-compatible API key
   --base-url <url>         DeepSeek-compatible base URL
   --endpoint-format <f>    chat_completions | responses | messages

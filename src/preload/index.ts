@@ -106,6 +106,7 @@ const api = {
   claude360MusicSubmit: (payload) => ipcRenderer.invoke('claude360:music:submit', payload),
   claude360MusicFetch: (taskId) => ipcRenderer.invoke('claude360:music:fetch', { taskId }),
   claude360MusicMediaBlob: (url) => ipcRenderer.invoke('claude360:music:media-blob', { url }),
+  claude360MusicMediaProbe: (url) => ipcRenderer.invoke('claude360:music:media-probe', { url }),
   claude360CanvasGenerate: (payload) => ipcRenderer.invoke('claude360:canvas:generate', payload),
   claude360CanvasEdit: (payload) => ipcRenderer.invoke('claude360:canvas:edit', payload),
   getKunConfigFile: () =>

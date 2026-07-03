@@ -189,21 +189,47 @@ function MusicCoverImage({
   src,
   title,
   active,
+  resolveCover,
   t
 }: {
   src?: string
   title: string
   active?: boolean
+  /** 直连加载失败时的代理兜底（容器注入 media-blob → objectURL）；再失败才回占位图。 */
+  resolveCover?: (url: string) => Promise<string | null>
   t: TFn
 }): ReactElement {
-  const [failed, setFailed] = useState(false)
-  if (!src || failed) return <CoverPlaceholder active={active} />
+  // forSrc 绑定当前封面地址：src 变化（换卡片复用组件）时自动重置兜底状态。
+  // proxyUrl === null 表示代理也失败，回占位图。
+  const [fallback, setFallback] = useState<{ forSrc: string; proxyUrl: string | null } | null>(null)
+  const proxyUrl = fallback && fallback.forSrc === src ? fallback.proxyUrl : undefined
+  if (!src || proxyUrl === null) return <CoverPlaceholder active={active} />
+  const displaySrc = proxyUrl ?? src
+  const handleError = (): void => {
+    // 打印失败 URL，方便排查（鉴权/跨域/字段映射错误）。
+    if (proxyUrl) {
+      console.error('[claude360-music] cover proxy objectURL load failed', { coverUrl: src })
+      setFallback({ forSrc: src, proxyUrl: null })
+      return
+    }
+    console.error('[claude360-music] cover image load failed, trying media-blob proxy', { coverUrl: src })
+    if (!resolveCover) {
+      setFallback({ forSrc: src, proxyUrl: null })
+      return
+    }
+    resolveCover(src)
+      .then((url) => setFallback({ forSrc: src, proxyUrl: url }))
+      .catch((error) => {
+        console.error('[claude360-music] cover proxy fetch threw', { coverUrl: src, error })
+        setFallback({ forSrc: src, proxyUrl: null })
+      })
+  }
   return (
     <img
-      src={src}
+      src={displaySrc}
       alt={t('musicCoverAlt', { title })}
       loading="lazy"
-      onError={() => setFailed(true)}
+      onError={handleError}
       className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
     />
   )
@@ -221,6 +247,8 @@ type Props = {
   onClear: () => void
   onCopyPrompt: (prompt: string) => void
   onRegenerate: (task: MusicGenTask) => void
+  /** 封面直连失败时的代理兜底（media-blob → objectURL）。 */
+  resolveCover?: (url: string) => Promise<string | null>
   t: TFn
 }
 
@@ -237,6 +265,7 @@ export function MusicTaskList({
   onClear,
   onCopyPrompt,
   onRegenerate,
+  resolveCover,
   t
 }: Props): ReactElement {
   const [filter, setFilter] = useState<MusicFilter>('all')
@@ -391,6 +420,7 @@ export function MusicTaskList({
                     src={song?.imageUrl}
                     title={title}
                     active={isPlaying || isGenerating(status)}
+                    resolveCover={resolveCover}
                     t={t}
                   />
                   <span

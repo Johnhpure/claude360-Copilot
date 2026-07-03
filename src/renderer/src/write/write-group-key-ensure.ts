@@ -22,6 +22,11 @@ function defaultDeps(): EnsureWriteTextGroupKeyDeps | null {
   return {
     getSettings: () => rendererRuntimeClient.getSettings({ forceRefresh: true }),
     listTokens: () => window.kunGui.claude360TokensList(),
+    ensureUsableKey: async (group) => {
+      await window.kunGui.claude360TokensEnsure({ group, purpose: 'text' })
+      rendererRuntimeClient.invalidateSettings()
+      return true
+    },
     promptCreateAndEnsure: (group) => useGroupKeyPromptStore.getState().open(group),
     log: (message) => console.info(message)
   }

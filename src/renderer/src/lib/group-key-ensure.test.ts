@@ -36,6 +36,21 @@ describe('ensureGroupKeyForSelection', () => {
     expect(promptCreateAndEnsure).not.toHaveBeenCalled()
   })
 
+  it('silently ensures a matched existing key so the runtime receives a full local secret/ref', async () => {
+    const promptCreateAndEnsure = vi.fn()
+    const ensureUsableKey = vi.fn(async () => true)
+    const ok = await ensureGroupKeyForSelection('codex', {
+      listTokens: async () => [{ id: 42, group: 'Codex', name: 'settings-masked-key', status: 1 }],
+      promptCreateAndEnsure,
+      ensureUsableKey
+    } as Parameters<typeof ensureGroupKeyForSelection>[1] & {
+      ensureUsableKey: (group: string) => Promise<boolean>
+    })
+    expect(ok).toBe(true)
+    expect(ensureUsableKey).toHaveBeenCalledWith('codex')
+    expect(promptCreateAndEnsure).not.toHaveBeenCalled()
+  })
+
   it('prompts and returns the prompt result when the group has no key (confirm→true)', async () => {
     const promptCreateAndEnsure = vi.fn(async () => true)
     const ok = await ensureGroupKeyForSelection('vip', {

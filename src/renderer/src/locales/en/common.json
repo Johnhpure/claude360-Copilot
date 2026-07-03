@@ -144,6 +144,8 @@
   "musicPlay": "Play",
   "musicPause": "Pause",
   "musicDownload": "Download",
+  "musicDownloadSaved": "Saved to disk",
+  "musicDownloadFailed": "Download failed: {{message}}",
   "musicClose": "Close",
   "musicCoverAlt": "{{title}} cover",
   "musicPlayerEmpty": "Pick a song to start playback.",

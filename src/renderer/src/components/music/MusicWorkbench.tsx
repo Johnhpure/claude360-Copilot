@@ -21,6 +21,7 @@ import {
   useMusicPlayerStore
 } from '../../music/music-player-store'
 import {
+  debugProbeSongs,
   downloadSong,
   playSongOnAudioElement,
   pollActiveTasksOnce,
@@ -169,6 +170,53 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
       return null
     }
   }, [])
+
+  // 封面代理兜底产生的 objectURL 按 coverUrl 缓存复用（同一封面不重复代取、
+  // 不重复 createObjectURL 累积内存），卸载时统一 revoke。
+  const coverObjectUrlsRef = useRef<Map<string, string>>(new Map())
+  useEffect(() => {
+    const urls = coverObjectUrlsRef.current
+    return () => {
+      for (const url of urls.values()) URL.revokeObjectURL(url)
+      urls.clear()
+    }
+  }, [])
+
+  // 封面直连失败时经 main media-blob 代取（同源自动附 Key）转 objectURL。
+  const resolveCoverObjectUrl = useCallback(async (coverUrl: string): Promise<string | null> => {
+    const cached = coverObjectUrlsRef.current.get(coverUrl)
+    if (cached) return cached
+    const k = api()
+    if (!k?.claude360MusicMediaBlob) return null
+    try {
+      const result = await k.claude360MusicMediaBlob(coverUrl)
+      if (!result.ok) {
+        console.error('[claude360-music] cover blob proxy failed', { coverUrl, result })
+        return null
+      }
+      const objectUrl = URL.createObjectURL(blobFromBase64(result.base64, result.mimeType))
+      coverObjectUrlsRef.current.set(coverUrl, objectUrl)
+      return objectUrl
+    } catch (error) {
+      console.error('[claude360-music] cover blob proxy threw', { coverUrl, error })
+      return null
+    }
+  }, [])
+
+  // 调试探针：任务转 success 后对每首歌验证 coverUrl / audioUrl 可访问性与
+  // content-type（结果打控制台，不影响业务）。每首歌只探测一次。
+  const probedSongIdsRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const k = api()
+    if (!k) return
+    const pending = tasks
+      .filter((task) => task.status === 'success')
+      .flatMap((task) => task.songs)
+      .filter((song) => !probedSongIdsRef.current.has(song.id))
+    if (pending.length === 0) return
+    for (const song of pending) probedSongIdsRef.current.add(song.id)
+    void debugProbeSongs(k, pending)
+  }, [tasks])
 
   // 拉取 text 分组的模型列表，供写词助手的文本模型下拉使用。
   useEffect(() => {
@@ -391,27 +439,25 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
     setProgress(time, audioRef.current?.duration ?? duration)
   }, [duration, setProgress])
 
-  const handleDownload = useCallback((song: Claude360Song): void => {
-    void downloadSong(song.audioUrl, song.title, {
-      fetch: (...a: Parameters<typeof fetch>) => fetch(...a),
-      createObjectURL: (b) => URL.createObjectURL(b),
-      revokeObjectURL: (u) => URL.revokeObjectURL(u),
-      triggerDownload: (url, filename) => {
-        const a = document.createElement('a')
-        a.href = url
-        a.download = filename
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-      },
-      openFallback: (url) => window.open(url, '_blank', 'noopener')
-    })
-  }, [])
-
   const showCopyNotice = useCallback((message: string): void => {
     setCopyNotice(message)
     window.setTimeout(() => setCopyNotice(null), 1800)
   }, [])
+
+  // 下载：只下载、绝不打开窗口/页面。main 经 media-blob 代取鉴权音频 →
+  // file:save-as 弹系统保存对话框写盘；取消静默，失败给可见提示 + 控制台真实错误。
+  const handleDownload = useCallback((song: Claude360Song): void => {
+    const k = api()
+    if (!k) return
+    void downloadSong(k, song).then((result) => {
+      if (result.ok) {
+        showCopyNotice(t('musicDownloadSaved'))
+        return
+      }
+      if (result.canceled) return
+      showCopyNotice(t('musicDownloadFailed', { message: result.message }))
+    })
+  }, [showCopyNotice, t])
 
   const handleCopyPrompt = useCallback((prompt: string): void => {
     if (!navigator?.clipboard?.writeText) return
@@ -493,6 +539,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
             onClear={handleClearFinished}
             onCopyPrompt={handleCopyPrompt}
             onRegenerate={handleRegenerate}
+            resolveCover={resolveCoverObjectUrl}
             t={t}
           />
           {copyNotice ? (

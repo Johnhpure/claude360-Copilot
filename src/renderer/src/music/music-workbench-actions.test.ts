@@ -11,12 +11,13 @@ import type {
 } from '@shared/claude360-music'
 import { emptyForm } from './suno-params'
 import {
-  submitMusic,
-  pollActiveTasksOnce,
+  audioExtensionFromMimeType,
+  debugProbeSongs,
   downloadSong,
-  isSafeHttpUrl,
   playSongOnAudioElement,
-  safeSongFilename
+  pollActiveTasksOnce,
+  songDownloadFilename,
+  submitMusic
 } from './music-workbench-actions'
 
 function storeMock() {
@@ -107,35 +108,79 @@ describe('pollActiveTasksOnce', () => {
   })
 })
 
-describe('downloadSong', () => {
-  const deps = () => ({
-    fetch: vi.fn(async () => ({ ok: true, blob: async () => new Blob(['x']) }) as unknown as Response),
-    createObjectURL: vi.fn(() => 'blob:x'),
-    revokeObjectURL: vi.fn(),
-    triggerDownload: vi.fn(),
-    openFallback: vi.fn()
+describe('downloadSong（主进程链路，绝不打开窗口）', () => {
+  const song = { audioUrl: 'https://cdn/x.mp3', title: '我的歌' }
+  const okMedia = { ok: true as const, url: 'https://cdn/x.mp3', mimeType: 'audio/mpeg', base64: 'eA==' }
+
+  it('media-blob 代取成功 → save-as 保存成功', async () => {
+    const claude360MusicMediaBlob = vi.fn(async () => okMedia)
+    const saveWorkspaceFileAs = vi.fn(
+      async (_payload: { suggestedName?: string; dataBase64?: string; mimeType?: string }) =>
+        ({ ok: true as const, path: '/tmp/我的歌.mp3' })
+    )
+    const result = await downloadSong({ claude360MusicMediaBlob, saveWorkspaceFileAs }, song, vi.fn())
+    expect(result).toEqual({ ok: true, path: '/tmp/我的歌.mp3' })
+    expect(claude360MusicMediaBlob).toHaveBeenCalledWith('https://cdn/x.mp3')
+    const payload = saveWorkspaceFileAs.mock.calls[0]![0]
+    expect(payload.dataBase64).toBe('eA==')
+    expect(payload.mimeType).toBe('audio/mpeg')
+    expect(payload.suggestedName).toMatch(/^我的歌-\d{8}-\d{4}\.mp3$/)
   })
-  it('非法链接直接拒绝', async () => {
-    const d = deps()
-    await expect(downloadSong('javascript:alert(1)', 't', d)).resolves.toBe('invalid')
-    expect(d.fetch).not.toHaveBeenCalled()
+
+  it('media-blob 失败 → 返回失败并带原因，不触达 save-as', async () => {
+    const claude360MusicMediaBlob = vi.fn(async () => ({ ok: false as const, message: '音频请求失败 (HTTP 403)' }))
+    const saveWorkspaceFileAs = vi.fn()
+    const log = vi.fn()
+    const result = await downloadSong({ claude360MusicMediaBlob, saveWorkspaceFileAs }, song, log)
+    expect(result).toEqual({ ok: false, message: '音频请求失败 (HTTP 403)' })
+    expect(saveWorkspaceFileAs).not.toHaveBeenCalled()
+    expect(log).toHaveBeenCalled()
   })
-  it('http(s) 成功 → blob 下载', async () => {
-    const d = deps()
-    await expect(downloadSong('https://cdn/x.mp3', '我的歌', d)).resolves.toBe('blob')
-    expect(d.triggerDownload).toHaveBeenCalledWith('blob:x', '我的歌.mp3')
+
+  it('用户取消保存 → canceled 标记，不算错误', async () => {
+    const claude360MusicMediaBlob = vi.fn(async () => okMedia)
+    const saveWorkspaceFileAs = vi.fn(async () => ({ ok: false as const, canceled: true as const, message: 'Save cancelled.' }))
+    const result = await downloadSong({ claude360MusicMediaBlob, saveWorkspaceFileAs }, song, vi.fn())
+    expect(result).toEqual({ ok: false, canceled: true, message: 'Save cancelled.' })
   })
-  it('抓取失败 → fallback 新标签打开', async () => {
-    const d = deps()
-    d.fetch.mockRejectedValueOnce(new Error('net'))
-    await expect(downloadSong('https://cdn/x.mp3', 't', d)).resolves.toBe('fallback')
-    expect(d.openFallback).toHaveBeenCalledWith('https://cdn/x.mp3')
+
+  it('无音频地址 / 能力缺失时明确拒绝', async () => {
+    const deps = { claude360MusicMediaBlob: vi.fn(), saveWorkspaceFileAs: vi.fn() }
+    await expect(downloadSong(deps, { audioUrl: '  ', title: 't' }, vi.fn())).resolves.toMatchObject({ ok: false })
+    await expect(downloadSong({}, song, vi.fn())).resolves.toMatchObject({ ok: false, message: '下载功能不可用' })
+    expect(deps.claude360MusicMediaBlob).not.toHaveBeenCalled()
   })
-  it('isSafeHttpUrl / safeSongFilename 行为', () => {
-    expect(isSafeHttpUrl('https://a')).toBe(true)
-    expect(isSafeHttpUrl('data:x')).toBe(false)
-    expect(safeSongFilename('a/b:c')).toBe('a_b_c.mp3')
-    expect(safeSongFilename('')).toBe('未命名.mp3')
+
+  it('songDownloadFilename / audioExtensionFromMimeType 行为', () => {
+    const now = new Date(2026, 6, 3, 9, 5)
+    expect(songDownloadFilename('a/b:c', 'audio/mpeg', now)).toBe('a_b_c-20260703-0905.mp3')
+    expect(songDownloadFilename('', 'audio/wav', now)).toBe(`music-${now.getTime()}.wav`)
+    expect(audioExtensionFromMimeType('audio/mp4')).toBe('m4a')
+    expect(audioExtensionFromMimeType('')).toBe('mp3')
+  })
+})
+
+describe('debugProbeSongs（媒体可访问性探针）', () => {
+  it('逐首验证 cover/audio 并打一条汇总日志', async () => {
+    const claude360MusicMediaProbe = vi.fn(async (url: string) =>
+      url.endsWith('.jpeg')
+        ? { ok: true as const, url, status: 200, contentType: 'image/jpeg', playableAudio: false }
+        : { ok: false as const, url, status: 403, contentType: 'application/json', message: '请求失败 (HTTP 403)' }
+    )
+    const log = vi.fn()
+    const reports = await debugProbeSongs(
+      { claude360MusicMediaProbe },
+      [{ id: 's1', title: 'T', audioUrl: 'https://cdn/a.mp3', imageUrl: 'https://cdn/c.jpeg' }],
+      log
+    )
+    expect(reports[0].cover).toMatchObject({ ok: true, contentType: 'image/jpeg' })
+    expect(reports[0].audio).toMatchObject({ ok: false, status: 403 })
+    expect(log).toHaveBeenCalledTimes(1)
+  })
+
+  it('无探针能力 / 无 URL 时不炸', async () => {
+    const reports = await debugProbeSongs({}, [{ id: 's1', title: 'T', audioUrl: '', imageUrl: undefined }], vi.fn())
+    expect(reports[0]).toMatchObject({ cover: null, audio: null })
   })
 })
 
@@ -182,11 +227,11 @@ describe('playSongOnAudioElement', () => {
     const result = await playSongOnAudioElement(audio, { audioUrl: 'https://cdn/a.mp3?sig=secret' }, 0.8, {
       logError
     })
-    expect(result).toEqual({ ok: false, reason: 'play-failed', message: 'NotAllowedError' })
+    expect(result).toEqual({ ok: false, reason: 'play-failed', message: 'Error: NotAllowedError' })
     expect(logError).toHaveBeenCalledWith(
       '[claude360-music] audio.play failed',
       expect.objectContaining({
-        message: 'NotAllowedError',
+        message: 'Error: NotAllowedError',
         url: 'https://cdn/a.mp3'
       })
     )

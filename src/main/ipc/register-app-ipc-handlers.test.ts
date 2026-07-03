@@ -609,6 +609,46 @@ describe('claude360 token/model/billing IPC handlers', () => {
     expect(revealToken).not.toHaveBeenCalled()
   })
 
+  it('restarts runtime when ensure refreshes a missing local secret even if apiKeyRef is unchanged', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const current = settings()
+    current.provider.providers = [
+      {
+        id: 'claude360-codex',
+        name: 'Codex',
+        kind: 'http',
+        apiKey: '',
+        apiKeyRef: 'claude360:api-key:5',
+        baseUrl: 'https://claude360.xyz/v1',
+        endpointFormat: 'chat_completions',
+        models: ['gpt-5.5'],
+        modelProfiles: {}
+      }
+    ]
+    const store = { load: vi.fn(async () => current) }
+    const restartRuntime = vi.fn(async () => undefined)
+    const ensureGroupToken = vi.fn(async () => ({
+      tokenId: 5,
+      name: 'Manual Codex Key',
+      group: 'Codex',
+      secretUpdated: true
+    }))
+
+    registerAppIpcHandlers(
+      registerOptions({
+        store: store as never,
+        restartRuntime,
+        claude360TokenService: { listTokens: vi.fn(), ensureGroupToken, createToken: vi.fn(), revealToken: vi.fn() } as never
+      })
+    )
+
+    const handler = handlers.get('claude360:tokens:ensure')
+    await handler?.({}, { group: 'codex', purpose: 'text' })
+
+    expect(ensureGroupToken).toHaveBeenCalledWith('Codex', 'text')
+    expect(restartRuntime).toHaveBeenCalledTimes(1)
+  })
+
   it('models:refresh persists provider profiles and model cache', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const applySettingsPatch = vi.fn(async (_patch: unknown) => settings())

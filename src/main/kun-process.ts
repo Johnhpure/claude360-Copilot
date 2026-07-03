@@ -11,6 +11,7 @@ import {
   isKunRuntimeInsecure,
   getKunRuntimeSettings,
   getModelProviderSettings,
+  normalizeModelProviderId,
   resolveModelProviderProxyUrl,
   resolveKunRuntimeSettings,
   type ModelProviderModelProfileV1,
@@ -398,11 +399,19 @@ async function startKunChildOnce(
   lastResolvedBinary = resolution.command === process.execPath
     ? resolution.args.join(' ')
     : resolution.command
+  // Match provider ids after settings normalization, so `claude360:Codex` and
+  // `claude360-codex` describe the same selected runtime provider.
+  const runtimeProviderId = normalizeModelProviderId(getKunRuntimeSettings(settings).providerId)
+  const activeProvider = (getModelProviderSettings(settings).providers as ModelProviderProfileV1[]).find(
+    (provider) => normalizeModelProviderId(provider.id) === runtimeProviderId
+  )
+  const activeProviderKind = activeProvider?.kind
   const args = buildKunServeArgs({
     resolution,
     host: '127.0.0.1',
     port: runtime.port,
     dataDir,
+    providerId: activeProvider?.id ?? runtimeProviderId,
     baseUrl: runtime.baseUrl,
     modelProxyUrl: resolveModelProviderProxyUrl(settings),
     endpointFormat: runtime.endpointFormat,
@@ -424,10 +433,6 @@ async function startKunChildOnce(
   // When the runtime's own (default) provider is the Claude subscription, tell
   // the runtime so its dispatch routes default-provider turns (thread.providerId
   // absent or equal to it) to the embedded SDK instead of the HTTP default.
-  const activeProvider = (getModelProviderSettings(settings).providers as ModelProviderProfileV1[]).find(
-    (provider) => provider.id?.trim() === getKunRuntimeSettings(settings).providerId.trim()
-  )
-  const activeProviderKind = activeProvider?.kind
   // Resolve the runtime provider's key (main side). For claude360 providers the
   // persisted apiKey is empty and the real key lives behind apiKeyRef; fall back
   // to runtime.apiKey for legacy/manual providers that still carry it inline.

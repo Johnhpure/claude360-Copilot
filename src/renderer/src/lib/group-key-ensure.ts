@@ -43,6 +43,12 @@ export type GroupKeyEnsureDeps = {
   /** 拉取当前用户所有 Key（实时请求，不走缓存），用于检测该分组是否已有可用 Key。 */
   listTokens: () => Promise<{ group: string; id?: number; name?: string; status?: number }[]>
   /**
+   * 静默确保该分组 Key 已在本机可用：main 侧会 reveal/create、缓存完整 key，
+   * 并把 profile.apiKeyRef 回填给运行时。已有服务端 Key 也必须走这一步，
+   * 因为 settings 列表里的 maskedKey 不是可调用 secret。
+   */
+  ensureUsableKey?: (group: string) => Promise<boolean>
+  /**
    * 弹出"是否为该分组创建 Key"的优雅模态，用户确认时内部执行建 Key(ensure 回填 ref)，
    * 返回最终是否已就绪（true=已有/已建成功；false=用户取消或建失败）。
    */
@@ -99,9 +105,21 @@ export async function ensureGroupKeyForSelection(
   const matched = sameGroupTokens.find((t) => t.status === undefined || t.status === 1)
   if (matched) {
     log(
-      `${head} keys=${tokens.length} [${describeTokens(tokens)}] → 匹配到 #${matched.id ?? '?'} group="${matched.group}"，直接调用`
+      `${head} keys=${tokens.length} [${describeTokens(tokens)}] → 匹配到 #${matched.id ?? '?'} group="${matched.group}"，准备静默 ensure 完整 Key`
     )
-    return true
+    if (!deps.ensureUsableKey) return true
+    try {
+      const ready = await deps.ensureUsableKey(group)
+      log(`${head} matchedKeyId=${matched.id ?? '?'} ensureUsableKey=${ready ? 'ok' : 'failed'}`)
+      return ready
+    } catch (error) {
+      log(
+        `${head} matchedKeyId=${matched.id ?? '?'} ensureUsableKey 异常(${
+          error instanceof Error ? error.message : String(error)
+        }) → 中止本次调用`
+      )
+      return false
+    }
   }
   const reason =
     sameGroupTokens.length > 0
