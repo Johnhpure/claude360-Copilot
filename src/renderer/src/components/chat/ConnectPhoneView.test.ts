@@ -54,7 +54,7 @@ describe('ConnectPhoneView', () => {
       })
     )
 
-    expect(html).toContain('Use your phone to connect kun')
+    expect(html).toContain('Use your phone to connect Claude360 Copilot')
     expect(html).toContain('Generate authorization QR')
     expect(html).toContain('max-w-[760px]')
     expect(html).toContain('grid-cols-4')

@@ -4,8 +4,10 @@
 # 不同：本工作流是「手动触发、只产出安装包 artifact」的轻量构建，用于在 Linux
 # 本机无法产出 macOS 包时，借 GitHub 的 macOS/Windows runner 云端打包。
 #
-# - 触发：Actions 页面手动 Run workflow（workflow_dispatch）。
+# - 触发：Actions 页面手动 Run workflow（workflow_dispatch），或推 v* / win-v* tag。
 # - 产物：作为 workflow artifacts 上传，构建完在 run 页面下载，保留 14 天。
+#   tag 触发时 Windows 产物还会发布为 GitHub Release（tag 统一为 v<version>），
+#   供应用内更新（electron-updater GitHub provider）拉取 latest.yml。
 # - macOS 默认「无签名」（ad-hoc）：可安装，但首次打开需在「系统设置 → 隐私与
 #   安全性」放行（或右键→打开）。若已配置 Apple 签名 secret，设 mac_sign=true 走签名。
 # - 各平台原生模块（node-pty / better-sqlite3 / @computer-use/nut-js）在对应
@@ -33,7 +35,9 @@ on:
       - 'win-v*'
 
 permissions:
-  contents: read
+  # 需要 contents: write 才能用内置 GITHUB_TOKEN 创建/上传 GitHub Release
+  # （应用内更新的 electron-updater GitHub provider 从 Release 拉 latest.yml）。
+  contents: write
 
 concurrency:
   group: build-installers-${{ github.ref }}
@@ -170,3 +174,43 @@ jobs:
             dist/Claude360-Copilot-*-win-x64.exe
             dist/Claude360-Copilot-*-win-x64.exe.blockmap
             dist/Claude360-Copilot-*-win-x64.zip
+
+      # tag 触发时把安装包发布为 GitHub Release，应用内更新（electron-updater
+      # GitHub provider）从这里拉取 latest.yml。Release tag 必须是 v<semver>：
+      # provider 解析不了 win-v 前缀，因此 win-v* 触发也统一发布到 v<version>。
+      # 版本号含 "-"（如 0.1.3-test.12）标记为 prerelease，对应 frontier 通道。
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/win-v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME#win-}"
+          ver="${ver#v}"
+          tag="v${ver}"
+
+          assets=()
+          for f in dist/*.exe dist/*.exe.blockmap dist/*-win-*.zip dist/latest.yml; do
+            [[ -e "$f" ]] && assets+=("$f")
+          done
+          if [[ "${#assets[@]}" -eq 0 ]]; then
+            echo "::error::dist/ 中没有可发布的产物"
+            exit 1
+          fi
+
+          prerelease_args=()
+          if [[ "$ver" == *-* ]]; then
+            prerelease_args=(--prerelease)
+          fi
+
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$tag" "${assets[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$tag" \
+              --notes "Automated Windows build for ${tag}." \
+              "${prerelease_args[@]}"
+          fi

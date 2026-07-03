@@ -51,19 +51,14 @@ const hasNotaryToolCredentials = Boolean(
     (process.env.APPLE_API_KEY || process.env.APPLE_API_KEY_BASE64)
 )
 
-// R2 release prefix 维持旧值不动:线上老版本轮询的就是
-// `…/deepseek-gui/channels/<channel>/latest/`,prefix 一改老客户端就再也
-// 收不到更新。默认公开域名优先使用 kun-agent,运行时仍会兜底旧域名。
-const r2PublicBaseUrl = (process.env.R2_PUBLIC_BASE_URL || 'https://www.kun-agent.com/api/r2')
-  .trim()
-  .replace(/\/+$/, '')
-const r2ReleasePrefix = (process.env.R2_RELEASE_PREFIX || 'deepseek-gui')
-  .trim()
-  .replace(/^\/+|\/+$/g, '')
+// 应用内更新走 GitHub Releases:下方 publish 配置会写入产物的
+// resources/app-update.yml,electron-updater 据此从公开仓库拉取 latest.yml。
+// frontier 通道版本号为 semver prerelease(如 0.1.3-test.N),发布时标记 prerelease。
+const githubUpdateOwner = 'Johnhpure'
+const githubUpdateRepo = 'claude360-Copilot'
 const updateChannel = normalizeUpdateChannel(
   envWithLegacyFallback('KUN_UPDATE_CHANNEL', 'DEEPSEEK_GUI_UPDATE_CHANNEL') || 'stable'
 )
-const genericUpdateUrl = `${r2PublicBaseUrl}/${r2ReleasePrefix}/channels/${updateChannel}/latest/`
 const releaseAppVersion = (
   envWithLegacyFallback('KUN_APP_VERSION', 'DEEPSEEK_GUI_APP_VERSION') || ''
 ).trim()
@@ -149,8 +144,10 @@ module.exports = {
   artifactName: `Claude360-Copilot-${artifactVersion}-\${os}-\${arch}.\${ext}`,
   publish: [
     {
-      provider: 'generic',
-      url: genericUpdateUrl
+      provider: 'github',
+      owner: githubUpdateOwner,
+      repo: githubUpdateRepo,
+      releaseType: updateChannel === 'frontier' ? 'prerelease' : 'release'
     }
   ],
   beforePack: './scripts/before-pack.cjs',

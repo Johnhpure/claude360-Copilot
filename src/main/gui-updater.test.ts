@@ -93,11 +93,9 @@ function platformManifestName(): string {
   return 'latest.yml'
 }
 
-describe('checkGuiUpdate feed URL', () => {
-  it('prefers the kun-agent update feed when metadata is reachable', async () => {
+describe('checkGuiUpdate feed configuration', () => {
+  it('uses the GitHub provider for the stable channel without prereleases', async () => {
     process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES = '1'
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
-    vi.stubGlobal('fetch', fetchMock)
     updater.checkForUpdates.mockResolvedValue({
       updateInfo: { version: '0.2.0', releaseDate: '2026-06-06T00:00:00.000Z' },
       isUpdateAvailable: true
@@ -110,90 +108,145 @@ describe('checkGuiUpdate feed URL', () => {
       ok: true,
       latestVersion: '0.2.0',
       hasUpdate: true
+    })
+    expect(updater.allowPrerelease).toBe(false)
+    expect(updater.setFeedURL).toHaveBeenLastCalledWith({
+      provider: 'github',
+      owner: 'Johnhpure',
+      repo: 'claude360-Copilot'
+    })
+  })
+
+  it('enables prereleases on the frontier channel', async () => {
+    process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES = '1'
+    updater.checkForUpdates.mockResolvedValue({
+      updateInfo: { version: '0.1.3-test.12', releaseDate: '2026-06-06T00:00:00.000Z' },
+      isUpdateAvailable: true
+    })
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'frontier')
+
+    await expect(module.checkGuiUpdate('frontier')).resolves.toMatchObject({
+      ok: true,
+      latestVersion: '0.1.3-test.12',
+      hasUpdate: true
+    })
+    expect(updater.allowPrerelease).toBe(true)
+    expect(updater.setFeedURL).toHaveBeenLastCalledWith({
+      provider: 'github',
+      owner: 'Johnhpure',
+      repo: 'claude360-Copilot'
+    })
+  })
+
+  it('honors the KUN_UPDATE_URL escape hatch with a generic feed', async () => {
+    process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES = '1'
+    process.env.KUN_UPDATE_URL = 'https://updates.example.com/{channel}'
+    updater.checkForUpdates.mockResolvedValue({
+      updateInfo: { version: '0.2.0', releaseDate: '2026-06-06T00:00:00.000Z' },
+      isUpdateAvailable: true
+    })
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
+      ok: true,
+      latestVersion: '0.2.0',
+      hasUpdate: true
+    })
+    expect(updater.setFeedURL).toHaveBeenLastCalledWith({
+      provider: 'generic',
+      url: 'https://updates.example.com/stable/'
+    })
+  })
+})
+
+describe('checkGuiUpdate manual fallback', () => {
+  // checkForUpdates 返回 null 时走 checkManualUpdate 分支,
+  // 跨平台复现未签名 mac 构建的 manualOnly 检查路径。
+  it('reads the generic manifest when KUN_UPDATE_URL is set', async () => {
+    process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES = '1'
+    process.env.KUN_UPDATE_URL = 'https://updates.example.com/{channel}'
+    updater.checkForUpdates.mockResolvedValue(null)
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => 'version: 0.3.0\nreleaseDate: 2026-07-01T00:00:00.000Z\n'
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
+      ok: true,
+      latestVersion: '0.3.0',
+      hasUpdate: true,
+      manualOnly: true
     })
     expect(fetchMock).toHaveBeenCalledWith(
-      `https://www.kun-agent.com/api/r2/deepseek-gui/channels/stable/latest/${platformManifestName()}`,
-      expect.objectContaining({ method: 'HEAD' })
+      `https://updates.example.com/stable/${platformManifestName()}`,
+      expect.anything()
     )
-    expect(updater.setFeedURL).toHaveBeenLastCalledWith({
-      provider: 'generic',
-      url: 'https://www.kun-agent.com/api/r2/deepseek-gui/channels/stable/latest/'
-    })
   })
 
-  it('falls back to the bare kun-agent feed before the legacy feed', async () => {
+  it('reads GitHub releases metadata when no env override is set', async () => {
     process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES = '1'
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce({ ok: false, status: 404 })
-      .mockResolvedValueOnce({ ok: true })
-    vi.stubGlobal('fetch', fetchMock)
-    updater.checkForUpdates.mockResolvedValue({
-      updateInfo: { version: '0.2.0', releaseDate: '2026-06-06T00:00:00.000Z' },
-      isUpdateAvailable: true
+    updater.checkForUpdates.mockResolvedValue(null)
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { tag_name: 'v0.4.0-test.2', prerelease: true, draft: false, published_at: '2026-07-02T00:00:00.000Z' },
+        {
+          tag_name: 'v0.3.0',
+          prerelease: false,
+          draft: false,
+          published_at: '2026-07-01T00:00:00.000Z',
+          html_url: 'https://github.com/Johnhpure/claude360-Copilot/releases/tag/v0.3.0'
+        }
+      ]
     })
+    vi.stubGlobal('fetch', fetchMock)
 
     const module = await import('./gui-updater')
     module.initializeGuiUpdater(() => null, () => 'stable')
 
+    // stable 通道跳过 prerelease,取第一条正式 Release。
     await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
       ok: true,
-      latestVersion: '0.2.0',
-      hasUpdate: true
+      latestVersion: '0.3.0',
+      hasUpdate: true,
+      manualOnly: true,
+      releaseUrl: 'https://github.com/Johnhpure/claude360-Copilot/releases/tag/v0.3.0'
     })
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      `https://www.kun-agent.com/api/r2/deepseek-gui/channels/stable/latest/${platformManifestName()}`,
-      expect.objectContaining({ method: 'HEAD' })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.github.com/repos/Johnhpure/claude360-Copilot/releases?per_page=30',
+      expect.anything()
     )
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      `https://kun-agent.com/api/r2/deepseek-gui/channels/stable/latest/${platformManifestName()}`,
-      expect.objectContaining({ method: 'HEAD' })
-    )
-    expect(updater.setFeedURL).toHaveBeenLastCalledWith({
-      provider: 'generic',
-      url: 'https://kun-agent.com/api/r2/deepseek-gui/channels/stable/latest/'
-    })
   })
 
-  it('falls back to the legacy deepseek-gui feed when both kun-agent feeds are unavailable', async () => {
+  it('picks prereleases for the frontier channel and compares prerelease semver', async () => {
     process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES = '1'
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce({ ok: false, status: 404 })
-      .mockResolvedValueOnce({ ok: false, status: 404 })
-      .mockResolvedValueOnce({ ok: true })
-    vi.stubGlobal('fetch', fetchMock)
-    updater.checkForUpdates.mockResolvedValue({
-      updateInfo: { version: '0.2.0', releaseDate: '2026-06-06T00:00:00.000Z' },
-      isUpdateAvailable: true
+    appVersion = '0.4.0-test.1'
+    updater.checkForUpdates.mockResolvedValue(null)
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { tag_name: 'v0.4.0-test.2', prerelease: true, draft: false, published_at: '2026-07-02T00:00:00.000Z' },
+        { tag_name: 'v0.3.0', prerelease: false, draft: false, published_at: '2026-07-01T00:00:00.000Z' }
+      ]
     })
+    vi.stubGlobal('fetch', fetchMock)
 
     const module = await import('./gui-updater')
-    module.initializeGuiUpdater(() => null, () => 'stable')
+    module.initializeGuiUpdater(() => null, () => 'frontier')
 
-    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
+    await expect(module.checkGuiUpdate('frontier')).resolves.toMatchObject({
       ok: true,
-      latestVersion: '0.2.0',
-      hasUpdate: true
-    })
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      `https://www.kun-agent.com/api/r2/deepseek-gui/channels/stable/latest/${platformManifestName()}`,
-      expect.objectContaining({ method: 'HEAD' })
-    )
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      `https://kun-agent.com/api/r2/deepseek-gui/channels/stable/latest/${platformManifestName()}`,
-      expect.objectContaining({ method: 'HEAD' })
-    )
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
-      `https://deepseek-gui.com/api/r2/deepseek-gui/channels/stable/latest/${platformManifestName()}`,
-      expect.objectContaining({ method: 'HEAD' })
-    )
-    expect(updater.setFeedURL).toHaveBeenLastCalledWith({
-      provider: 'generic',
-      url: 'https://deepseek-gui.com/api/r2/deepseek-gui/channels/stable/latest/'
+      latestVersion: '0.4.0-test.2',
+      hasUpdate: true,
+      manualOnly: true
     })
   })
 })
@@ -293,7 +346,7 @@ describe('showPostUpdateReleaseNotes', () => {
         buttons: ['查看更新日志', '稍后']
       })
     )
-    expect(openExternal).toHaveBeenCalledWith('https://deepseek-gui.com/changelog')
+    expect(openExternal).toHaveBeenCalledWith('https://github.com/Johnhpure/claude360-Copilot/releases')
     expect(JSON.parse(mockedFiles.get(versionStatePath) ?? '{}')).toEqual({
       lastSeenVersion: '0.2.0'
     })
