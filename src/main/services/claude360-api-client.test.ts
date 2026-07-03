@@ -82,7 +82,7 @@ describe('Claude360ApiClient', () => {
     await expect(client.get('/x', 'tok-should-not-leak')).rejects.toThrow('请求超时，请稍后重试')
   })
 
-  it('applies the timeout to raw suno/images channels too', async () => {
+  it('applies the generic timeout to the raw suno channel too', async () => {
     const fetchImpl = vi.fn(
       (_url: string, init: RequestInit) =>
         new Promise<Response>((_resolve, reject) => {
@@ -97,5 +97,46 @@ describe('Claude360ApiClient', () => {
       timeoutMs: 20
     })
     await expect(client.postSunoRaw('/suno/submit/music', {}, 'tok')).rejects.toThrow('请求超时，请稍后重试')
+  })
+
+  it('images channel uses its own (longer) timeout instead of the generic one', async () => {
+    // 生图上游可长达 11 分钟+（实测 671s）：通用 timeoutMs 很短时，images 通道
+    // 不应被它掐断——40ms 后正常返回，而通用超时仅 20ms。
+    const fetchImpl = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError'))
+          )
+          setTimeout(() => resolve(jsonResponse({ data: [{ url: 'https://img.test/a.png' }] })), 40)
+        })
+    )
+    const client = new Claude360ApiClient({
+      baseUrl: 'https://x.test',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      timeoutMs: 20
+    })
+    await expect(client.postImagesRaw('/v1/images/generations', {}, 'tok')).resolves.toEqual({
+      data: [{ url: 'https://img.test/a.png' }]
+    })
+  })
+
+  it('images channel still aborts after imagesTimeoutMs with a neutral retryable message', async () => {
+    const fetchImpl = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError'))
+          )
+        })
+    )
+    const client = new Claude360ApiClient({
+      baseUrl: 'https://x.test',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      imagesTimeoutMs: 20
+    })
+    await expect(client.postImagesRaw('/v1/images/generations', {}, 'tok')).rejects.toThrow(
+      '请求超时，请稍后重试'
+    )
   })
 })

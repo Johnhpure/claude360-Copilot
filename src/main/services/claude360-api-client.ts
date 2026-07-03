@@ -27,6 +27,12 @@ export type Claude360ApiClientOptions = {
   fetchImpl?: typeof fetch
   /** 单次请求超时（毫秒），默认 120s；超时返回中性可重试错误，不泄露 url/header/body。 */
   timeoutMs?: number
+  /**
+   * 生图（/v1/images/*）单独超时（毫秒），默认 15 分钟：上游图片生成实测可达
+   * 11 分钟以上（671s），沿用通用 120s 会在 newapi 仍在处理时被客户端掐断，
+   * 表现为「软件报超时、后台其实成功」。
+   */
+  imagesTimeoutMs?: number
 }
 
 /**
@@ -59,21 +65,29 @@ export class Claude360ApiClient {
   private readonly baseUrl: string
   private readonly fetchImpl: typeof fetch
   private readonly timeoutMs: number
+  private readonly imagesTimeoutMs: number
 
   constructor(options: Claude360ApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '')
     this.fetchImpl = options.fetchImpl ?? fetch
     this.timeoutMs = options.timeoutMs && options.timeoutMs > 0 ? options.timeoutMs : 120_000
+    this.imagesTimeoutMs =
+      options.imagesTimeoutMs && options.imagesTimeoutMs > 0 ? options.imagesTimeoutMs : 900_000
   }
 
   /**
    * 统一带超时的 fetch：用 AbortController 在 timeoutMs 后中断请求。
    * 超时与网络错误都不透出原始错误（可能含 url/header）；超时给可重试中性提示，
    * 与其它网络错误区分，便于 UI 提示用户重试而非误判为格式/鉴权错误。
+   * timeoutMs 可按通道覆盖（生图走 imagesTimeoutMs）。
    */
-  private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  private async fetchWithTimeout(
+    url: string,
+    init: RequestInit,
+    timeoutMs: number = this.timeoutMs
+  ): Promise<Response> {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs)
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
     try {
       return await this.fetchImpl(url, { ...init, signal: controller.signal })
     } catch {
@@ -162,7 +176,8 @@ export class Claude360ApiClient {
     path: string,
     init: RequestInit
   ): Promise<Claude360ImagesRawEnvelope> {
-    const response = await this.fetchWithTimeout(`${this.baseUrl}${path}`, init)
+    // 生图上游耗时远超普通接口（实测 671s），用独立的更长超时。
+    const response = await this.fetchWithTimeout(`${this.baseUrl}${path}`, init, this.imagesTimeoutMs)
     if (process.env.NODE_ENV !== 'test') {
       // 排查生图误判失败用：真实 HTTP status / content-type（body 由 canvas service 打印）。
       console.info(
