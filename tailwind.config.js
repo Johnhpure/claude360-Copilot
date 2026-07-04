@@ -41,6 +41,8 @@ export default {
           faint: 'var(--ds-text-faint)',
           success: 'var(--ds-success)',
           'success-soft': 'var(--ds-success-soft)',
+          warning: 'var(--ds-warning)',
+          'warning-soft': 'var(--ds-warning-soft)',
           danger: 'var(--ds-danger)',
           'danger-soft': 'var(--ds-danger-soft)',
           'diff-added': 'var(--ds-diff-added)',
@@ -59,9 +61,10 @@ export default {
         panel: 'var(--ds-shadow-panel)'
       },
       borderRadius: {
-        xl: '14px',
-        '2xl': '18px',
-        '3xl': '22px'
+        /* Calm Blue radius 语义档:lg=标准卡 16 / xl=输入器与大卡 20 / 2xl=弹窗 24(base-shell.css --radius-*) */
+        xl: 'var(--radius-lg, 16px)',
+        '2xl': 'var(--radius-xl, 20px)',
+        '3xl': 'var(--radius-2xl, 24px)'
       }
     }
   },

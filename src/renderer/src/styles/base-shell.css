@@ -4,17 +4,50 @@
   --ds-collapsed-sidebar-titlebar-extra-inset: 0px;
   --ds-write-titlebar-extra-inset: 0px;
   --ds-ui-scale: 1;
+
+  /* Calm Blue 语义 token(主题无关):圆角 / 模糊 / 动效(消费点分别在阶段 2 / 阶段 6 铺开) */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-pill: 999px;
+  --blur-overlay: 20px;
+  --blur-toast: 12px;
+  --motion-fast: 120ms;
+  --motion-base: 220ms;
+  --motion-slow: 360ms;
+  --ease-oneui: cubic-bezier(0.22, 0.25, 0, 1);
+
+  /* Calm Blue 语义 token(亮色):蓝白底 + 纯白不透明卡 + 深一档同源蓝强调 */
+  --c360-bg: #f4f6fb;
+  --c360-bg-sidebar: #edf1f9;
+  --c360-surface: #ffffff;
+  --c360-surface-elevated: #ffffff;
+  --c360-border: rgba(35, 54, 89, 0.12);
+  --c360-text-primary: #1f2f4d;
+  --c360-text-secondary: #54678c;
+  --c360-accent: #0b6fd8;
+  --c360-accent-hover: #0a63c2;
+  --c360-accent-soft: rgba(11, 111, 216, 0.1);
+  --c360-success: #128a4a;
+  --c360-warning: #b97a0b;
+  --c360-error: #d6493f;
+  --c360-shadow-sm: 0 6px 20px rgba(20, 47, 95, 0.1);
+  --c360-shadow-overlay: 0 24px 64px rgba(20, 47, 95, 0.18);
+
   /* Kun 吉祥物配色:鲸蓝 #6ca2dd / 小鸟浅蓝 #85c1f1 / 奶油 #fff2db / 珊瑚 #f47464 / 藏青描边 #0e2f66 / 淡紫天光 #f9f8ff */
-  --bg-app: #f3f5fc;
-  --bg-sidebar: #eef2fa;
+  /* 旧基础 token 改为引用 Calm Blue 语义层(单一事实源,旧名保留供存量调用方渐进迁移) */
+  --bg-app: var(--c360-bg);
+  --bg-sidebar: var(--c360-bg-sidebar);
   --bg-canvas: #fafbff;
-  --surface-1: rgba(255, 255, 255, 0.9);
-  --surface-2: rgba(255, 255, 255, 0.98);
-  --surface-3: #ffffff;
-  --border-soft: rgba(20, 47, 95, 0.13);
+  --surface-1: var(--c360-surface);
+  --surface-2: var(--c360-surface-elevated);
+  --surface-3: var(--c360-surface-elevated);
+  --border-soft: var(--c360-border);
   --border-strong: rgba(20, 47, 95, 0.2);
-  --text-primary: #233659;
-  --text-secondary: #54678c;
+  --text-primary: var(--c360-text-primary);
+  --text-secondary: var(--c360-text-secondary);
   --text-tertiary: #8492b1;
   --text-placeholder: #93a1c0;
 
@@ -33,23 +66,24 @@
   --ds-text-faint: var(--text-tertiary);
   --ds-bubble-user: rgba(133, 193, 241, 0.2);
   --ds-bubble-user-fg: #233659;
-  --ds-accent: #3b82d8;
-  --ds-accent-soft: rgba(59, 130, 216, 0.15);
-  --ds-success: #128a4a;
-  --ds-danger: #d6493f;
-  --ds-diff-added: #128a4a;
+  --ds-accent: var(--c360-accent);
+  --ds-accent-hover: var(--c360-accent-hover);
+  --ds-accent-soft: var(--c360-accent-soft);
+  --ds-success: var(--c360-success);
+  --ds-warning: var(--c360-warning);
+  --ds-danger: var(--c360-error);
+  --ds-diff-added: var(--c360-success);
   --ds-diff-added-soft: rgba(18, 138, 74, 0.1);
-  --ds-diff-removed: #d6493f;
+  --ds-diff-removed: var(--c360-error);
   --ds-diff-removed-soft: rgba(214, 73, 63, 0.1);
   --ds-skill: #7a68e8;
   --ds-skill-soft: rgba(122, 104, 232, 0.13);
-  --ds-success-soft: rgba(17, 185, 129, 0.14);
-  --ds-warning-soft: rgba(240, 162, 63, 0.16);
-  --ds-danger-soft: rgba(244, 116, 100, 0.14);
-  --ds-shadow-shell: 0 12px 30px rgba(20, 47, 95, 0.08);
-  --ds-shadow-panel: 0 16px 44px rgba(20, 47, 95, 0.06);
-  --ds-shadow-composer: 0 18px 46px rgba(20, 47, 95, 0.1),
-    0 5px 16px rgba(20, 47, 95, 0.06);
+  --ds-success-soft: rgba(18, 138, 74, 0.12);
+  --ds-warning-soft: rgba(185, 122, 11, 0.14);
+  --ds-danger-soft: rgba(214, 73, 63, 0.12);
+  --ds-shadow-shell: var(--c360-shadow-sm);
+  --ds-shadow-panel: var(--c360-shadow-sm);
+  --ds-shadow-composer: var(--c360-shadow-sm);
   --ds-stage-gradient: linear-gradient(180deg, #fafbff 0%, #ffffff 100%);
   --ds-topbar-bg:
     linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 58%, rgba(255, 255, 255, 0.3) 100%);
@@ -89,7 +123,7 @@
   --ds-table-head-bg: rgba(242, 246, 252, 0.96);
   --ds-scrollbar-thumb: rgba(84, 103, 140, 0.24);
   --ds-scrollbar-thumb-hover: rgba(84, 103, 140, 0.34);
-  --ds-selection: rgba(59, 130, 216, 0.2);
+  --ds-selection: rgba(11, 111, 216, 0.2);
   --ds-cursor-spotlight-rgb: 133 193 241;
   --ds-cursor-spotlight-edge-rgb: 108 162 221;
   --ds-cursor-spotlight-dark-rgb: 161 161 170;
@@ -114,17 +148,33 @@
 }
 
 [data-theme='dark'] {
-  /* 曜石夜幕:近纯黑灰阶作底色,银灰细描边分层 */
-  --bg-app: #09090b;
-  --bg-sidebar: #0c0c0e;
+  /* 曜石夜幕:近纯黑灰阶作底色(obsidian 成果保留),Calm Blue 蓝强调回归 */
+  --c360-bg: #09090b;
+  --c360-bg-sidebar: #0c0c0e;
+  --c360-surface: #141416;
+  --c360-surface-elevated: #1c1c1f;
+  --c360-border: rgba(228, 228, 231, 0.1);
+  --c360-text-primary: #ededf0;
+  --c360-text-secondary: #a0a0a8;
+  --c360-accent: #3e91ff;
+  --c360-accent-hover: #5da5ff;
+  --c360-accent-soft: rgba(62, 145, 255, 0.16);
+  --c360-success: #2fb26a;
+  --c360-warning: #d99a2b;
+  --c360-error: #e5665c;
+  --c360-shadow-sm: 0 6px 20px rgba(0, 0, 0, 0.38);
+  --c360-shadow-overlay: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+  --bg-app: var(--c360-bg);
+  --bg-sidebar: var(--c360-bg-sidebar);
   --bg-canvas: #111113;
-  --surface-1: rgba(17, 17, 19, 0.92);
-  --surface-2: #18181b;
-  --surface-3: #1f1f23;
-  --border-soft: rgba(228, 228, 231, 0.1);
+  --surface-1: var(--c360-surface);
+  --surface-2: var(--c360-surface-elevated);
+  --surface-3: var(--c360-surface-elevated);
+  --border-soft: var(--c360-border);
   --border-strong: rgba(228, 228, 231, 0.16);
-  --text-primary: #fafafa;
-  --text-secondary: #b4b4bb;
+  --text-primary: var(--c360-text-primary);
+  --text-secondary: var(--c360-text-secondary);
   --text-tertiary: #8b8b93;
   --text-placeholder: #71717a;
 
@@ -141,25 +191,26 @@
   --ds-text: var(--text-primary);
   --ds-text-muted: var(--text-secondary);
   --ds-text-faint: var(--text-tertiary);
-  --ds-bubble-user: rgba(228, 228, 231, 0.08);
+  --ds-bubble-user: rgba(62, 145, 255, 0.14);
   --ds-bubble-user-fg: #fafafa;
-  --ds-accent: #a1a1aa;
-  --ds-accent-soft: rgba(161, 161, 170, 0.18);
-  --ds-success: #40c977;
-  --ds-danger: #f8736a;
-  --ds-diff-added: #40c977;
-  --ds-diff-added-soft: rgba(64, 201, 119, 0.16);
-  --ds-diff-removed: #f8736a;
-  --ds-diff-removed-soft: rgba(248, 115, 106, 0.16);
+  --ds-accent: var(--c360-accent);
+  --ds-accent-hover: var(--c360-accent-hover);
+  --ds-accent-soft: var(--c360-accent-soft);
+  --ds-success: var(--c360-success);
+  --ds-warning: var(--c360-warning);
+  --ds-danger: var(--c360-error);
+  --ds-diff-added: var(--c360-success);
+  --ds-diff-added-soft: rgba(47, 178, 106, 0.16);
+  --ds-diff-removed: var(--c360-error);
+  --ds-diff-removed-soft: rgba(229, 102, 92, 0.16);
   --ds-skill: #a89bf5;
   --ds-skill-soft: rgba(168, 155, 245, 0.16);
-  --ds-success-soft: rgba(64, 201, 119, 0.18);
-  --ds-warning-soft: rgba(242, 162, 63, 0.18);
-  --ds-danger-soft: rgba(248, 115, 106, 0.18);
-  --ds-shadow-shell: 0 38px 96px rgba(0, 0, 0, 0.55);
-  --ds-shadow-panel: 0 22px 58px rgba(0, 0, 0, 0.35);
-  --ds-shadow-composer: 0 28px 78px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(228, 228, 231, 0.06);
+  --ds-success-soft: rgba(47, 178, 106, 0.18);
+  --ds-warning-soft: rgba(217, 154, 43, 0.18);
+  --ds-danger-soft: rgba(229, 102, 92, 0.18);
+  --ds-shadow-shell: var(--c360-shadow-sm);
+  --ds-shadow-panel: var(--c360-shadow-sm);
+  --ds-shadow-composer: var(--c360-shadow-sm);
   --ds-stage-gradient:
     linear-gradient(180deg, #141416 0%, #111113 48%, #09090b 100%);
   --ds-topbar-bg:
@@ -195,7 +246,7 @@
   --ds-chip-hover: rgba(35, 35, 40, 0.98);
   --ds-chip-border: rgba(228, 228, 231, 0.1);
   --ds-chip-active:
-    linear-gradient(180deg, rgba(161, 161, 170, 0.2), rgba(161, 161, 170, 0.11));
+    linear-gradient(180deg, rgba(62, 145, 255, 0.2), rgba(62, 145, 255, 0.11));
   --ds-kbd-bg: rgba(24, 24, 27, 0.94);
   --ds-code-bg: #18181b;
   --ds-inline-code-bg: rgba(228, 228, 231, 0.07);
@@ -205,7 +256,7 @@
   --ds-table-head-bg: rgba(24, 24, 27, 0.94);
   --ds-scrollbar-thumb: rgba(161, 161, 170, 0.28);
   --ds-scrollbar-thumb-hover: rgba(196, 196, 202, 0.38);
-  --ds-selection: rgba(161, 161, 170, 0.26);
+  --ds-selection: rgba(62, 145, 255, 0.26);
   --ds-cursor-spotlight: rgb(var(--ds-cursor-spotlight-dark-rgb) / 0.2);
   --ds-cursor-spotlight-edge: rgb(var(--ds-cursor-spotlight-dark-edge-rgb) / 0.08);
   --ds-shadow-card-soft: 0 16px 42px rgba(0, 0, 0, 0.22);
@@ -533,16 +584,16 @@ html {
 
 /* Workbench-specific dark tuning: keep the layered near-black aligned with the obsidian palette. */
 [data-theme='dark'] .ds-workbench-shell {
-  --bg-app: #09090b;
-  --bg-sidebar: #0c0c0e;
+  --bg-app: var(--c360-bg);
+  --bg-sidebar: var(--c360-bg-sidebar);
   --bg-canvas: #111113;
-  --surface-1: rgba(17, 17, 19, 0.92);
-  --surface-2: #18181b;
-  --surface-3: #1f1f23;
-  --border-soft: rgba(228, 228, 231, 0.1);
+  --surface-1: var(--c360-surface);
+  --surface-2: var(--c360-surface-elevated);
+  --surface-3: var(--c360-surface-elevated);
+  --border-soft: var(--c360-border);
   --border-strong: rgba(228, 228, 231, 0.16);
-  --text-primary: #fafafa;
-  --text-secondary: #b4b4bb;
+  --text-primary: var(--c360-text-primary);
+  --text-secondary: var(--c360-text-secondary);
   --text-tertiary: #8b8b93;
   --text-placeholder: #71717a;
 
@@ -559,14 +610,13 @@ html {
   --ds-text: var(--text-primary);
   --ds-text-muted: var(--text-secondary);
   --ds-text-faint: var(--text-tertiary);
-  --ds-bubble-user: rgba(228, 228, 231, 0.06);
+  --ds-bubble-user: rgba(62, 145, 255, 0.12);
   --ds-bubble-user-fg: #ffffff;
-  --ds-accent-soft: rgba(161, 161, 170, 0.16);
-  --ds-selection: rgba(161, 161, 170, 0.22);
-  --ds-shadow-shell: 0 38px 96px rgba(0, 0, 0, 0.52);
-  --ds-shadow-panel: 0 22px 58px rgba(0, 0, 0, 0.3);
-  --ds-shadow-composer: 0 28px 78px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(228, 228, 231, 0.04);
+  --ds-accent-soft: var(--c360-accent-soft);
+  --ds-selection: rgba(62, 145, 255, 0.22);
+  --ds-shadow-shell: var(--c360-shadow-sm);
+  --ds-shadow-panel: var(--c360-shadow-sm);
+  --ds-shadow-composer: var(--c360-shadow-sm);
   --ds-stage-gradient: linear-gradient(180deg, #141416 0%, #101012 100%);
   --ds-topbar-bg:
     linear-gradient(180deg, rgba(24, 24, 27, 0.8) 0%, rgba(17, 17, 19, 0.64) 58%, rgba(11, 11, 13, 0.34) 100%);
@@ -596,7 +646,7 @@ html {
   --ds-chip-muted-bg: #18181b;
   --ds-chip-hover: rgba(35, 35, 40, 0.98);
   --ds-chip-border: rgba(228, 228, 231, 0.08);
-  --ds-chip-active: linear-gradient(180deg, rgba(161, 161, 170, 0.16), rgba(161, 161, 170, 0.08));
+  --ds-chip-active: linear-gradient(180deg, rgba(62, 145, 255, 0.16), rgba(62, 145, 255, 0.08));
   --ds-kbd-bg: rgba(24, 24, 27, 0.94);
   --ds-code-bg: #18181b;
   --ds-inline-code-bg: rgba(228, 228, 231, 0.06);
