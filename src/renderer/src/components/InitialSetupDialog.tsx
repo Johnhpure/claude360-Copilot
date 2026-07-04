@@ -200,7 +200,7 @@ export function InitialSetupDialog(): ReactElement {
   }
 
   const inputClass =
-    'w-full rounded-lg border border-ds-border bg-ds-card px-3 py-2 text-sm text-ds-strong outline-none focus:border-sky-400'
+    'w-full rounded-lg border border-ds-border bg-ds-card px-3 py-2 text-sm text-ds-strong outline-none focus:border-accent'
   const tabClass = (active: boolean): string =>
     `flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
       active ? 'bg-accent-soft text-accent' : 'text-ds-muted hover:bg-ds-hover'
@@ -287,7 +287,7 @@ export function InitialSetupDialog(): ReactElement {
               <button
                 type="submit"
                 disabled={busy}
-                className="mt-1 inline-flex items-center justify-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:opacity-60"
+                className="mt-1 inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ds-accent-hover)] disabled:opacity-60"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
                 {needs2fa ? t('claude360Login2faSubmit') : t('claude360LoginSubmit')}
@@ -308,7 +308,7 @@ export function InitialSetupDialog(): ReactElement {
                           .catch(() => undefined)
                       }
                     }}
-                    className="mt-3 inline-flex items-center justify-center gap-1.5 text-sm text-sky-600 hover:underline dark:text-sky-300"
+                    className="mt-3 inline-flex items-center justify-center gap-1.5 text-sm text-accent hover:underline"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                     {t('claude360LoginOpenBrowser')}
@@ -327,7 +327,7 @@ export function InitialSetupDialog(): ReactElement {
                       type="button"
                       disabled={busy}
                       onClick={() => void startDeviceAuth()}
-                      className="mt-2 text-sm text-sky-600 hover:underline disabled:opacity-60 dark:text-sky-300"
+                      className="mt-2 text-sm text-accent hover:underline disabled:opacity-60"
                     >
                       {t('claude360LoginDeviceRetry')}
                     </button>
@@ -338,7 +338,7 @@ export function InitialSetupDialog(): ReactElement {
                   type="button"
                   disabled={busy}
                   onClick={() => void startDeviceAuth()}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ds-accent-hover)] disabled:opacity-60"
                 >
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
                   {t('claude360LoginDeviceStart')}
@@ -349,7 +349,7 @@ export function InitialSetupDialog(): ReactElement {
           )}
 
           {error ? (
-            <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-600 dark:text-rose-300">{error}</p>
+            <p className="rounded-lg bg-ds-danger-soft px-3 py-2 text-sm text-ds-danger">{error}</p>
           ) : null}
         </div>
       </div>

@@ -36,9 +36,9 @@ export function TodoPanel({
 
   return (
     <aside
-      className={`ds-no-drag flex min-h-0 flex-col border-l border-ds-border-muted bg-white dark:bg-ds-canvas ${className}`}
+      className={`ds-no-drag flex min-h-0 flex-col border-l border-ds-border-muted bg-ds-card dark:bg-ds-canvas ${className}`}
     >
-      <div className="shrink-0 border-b border-ds-border-muted bg-white/92 dark:bg-ds-card">
+      <div className="shrink-0 border-b border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-surface-card)_92%,transparent)] dark:bg-ds-card">
         <div className="flex h-12 min-w-0 items-center gap-2 px-4">
           <button
             type="button"
@@ -59,7 +59,7 @@ export function TodoPanel({
             <button
               type="button"
               onClick={() => void clearActiveThreadTodos()}
-              className="rounded-full p-1.5 text-ds-faint transition hover:bg-ds-hover hover:text-red-600"
+              className="rounded-full p-1.5 text-ds-faint transition hover:bg-ds-hover hover:text-ds-danger"
               aria-label={t('todoClear')}
               title={t('todoClear')}
             >
@@ -136,9 +136,9 @@ function TodoRow({
           title={item.status === 'completed' ? t('todoMarkPending') : t('todoMarkCompleted')}
         >
           {item.status === 'completed' ? (
-            <CheckCircle2 className="h-[18px] w-[18px] text-emerald-600" strokeWidth={1.85} />
+            <CheckCircle2 className="h-[18px] w-[18px] text-ds-success" strokeWidth={1.85} />
           ) : item.status === 'in_progress' ? (
-            <PlayCircle className="h-[18px] w-[18px] text-amber-600" strokeWidth={1.85} />
+            <PlayCircle className="h-[18px] w-[18px] text-ds-warning" strokeWidth={1.85} />
           ) : (
             <Circle className="h-[18px] w-[18px]" strokeWidth={1.85} />
           )}

@@ -556,7 +556,7 @@ export function ConnectPhoneView({
                   ) : null}
 
                   {installQr.status === 'success' ? (
-                    <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-600 dark:text-emerald-300">
+                    <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-ds-success-soft px-3 py-1.5 text-[12px] font-semibold text-ds-success">
                       <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.9} />
                       {saving ? t('connectPhoneBinding') : t('clawAddImOfficialQrSuccess')}
                     </div>
@@ -564,7 +564,7 @@ export function ConnectPhoneView({
 
                   {installQr.status === 'error' ? (
                     <div className="mt-3 grid justify-items-center gap-2">
-                      <div className="max-w-[220px] text-center text-[12px] leading-5 text-red-600 dark:text-red-300">
+                      <div className="max-w-[220px] text-center text-[12px] leading-5 text-ds-danger">
                         {installQr.error || t('clawAddImOfficialQrFailed')}
                       </div>
                       {!hasExistingChannel ? (
@@ -1026,7 +1026,7 @@ export function ConnectPhoneSidebarPanel({
                     </span>
                     <span
                       className={`h-2 w-2 shrink-0 rounded-full ${
-                        disabled ? 'bg-ds-faint' : 'bg-emerald-400'
+                        disabled ? 'bg-ds-faint' : 'bg-ds-success'
                       }`}
                     />
                   </button>
@@ -1069,7 +1069,7 @@ export function ConnectPhoneSidebarPanel({
         {connectedChannel ? (
           <div className="mt-3 rounded-[14px] border border-ds-border bg-ds-card px-3 py-3 shadow-sm">
             <div className="flex items-start gap-2.5">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-emerald-500/12 text-emerald-600 dark:text-emerald-300">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-ds-success-soft text-ds-success">
                 <CheckCircle2 className="h-4 w-4" strokeWidth={1.9} />
               </span>
               <span className="min-w-0 flex-1">
@@ -1096,7 +1096,7 @@ export function ConnectPhoneSidebarPanel({
                 type="button"
                 onClick={() => void disconnectChannel()}
                 disabled={disconnecting}
-                className="inline-flex min-h-[30px] w-full items-center justify-center gap-1.5 rounded-[8px] border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[12.5px] font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/15"
+                className="inline-flex min-h-[30px] w-full items-center justify-center gap-1.5 rounded-[8px] border border-ds-danger-soft bg-ds-danger-soft px-2.5 py-1.5 text-[12.5px] font-medium text-ds-danger transition hover:bg-[color-mix(in_srgb,var(--ds-danger)_18%,transparent)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {disconnecting ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.8} />
@@ -1107,7 +1107,7 @@ export function ConnectPhoneSidebarPanel({
               </button>
             </div>
             {disconnectError ? (
-              <div className="mt-2 rounded-[8px] bg-red-500/10 px-2.5 py-2 text-[12px] leading-relaxed text-red-600 dark:text-red-300">
+              <div className="mt-2 rounded-[8px] bg-ds-danger-soft px-2.5 py-2 text-[12px] leading-relaxed text-ds-danger">
                 {disconnectError}
               </div>
             ) : null}
@@ -1178,7 +1178,7 @@ export function ConnectPhoneSidebarPanel({
               ) : null}
 
               {installQr.status === 'success' ? (
-                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-600 dark:text-emerald-300">
+                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-ds-success-soft px-3 py-1.5 text-[12px] font-semibold text-ds-success">
                   <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.9} />
                   {saving ? t('connectPhoneBinding') : t('clawAddImOfficialQrSuccess')}
                 </div>
@@ -1186,7 +1186,7 @@ export function ConnectPhoneSidebarPanel({
 
               {installQr.status === 'error' ? (
                 <div className="mt-3 grid justify-items-center gap-2">
-                  <div className="max-w-[220px] text-center text-[12px] leading-5 text-red-600 dark:text-red-300">
+                  <div className="max-w-[220px] text-center text-[12px] leading-5 text-ds-danger">
                     {installQr.error || t('clawAddImOfficialQrFailed')}
                   </div>
                   {!hasExistingChannel ? (

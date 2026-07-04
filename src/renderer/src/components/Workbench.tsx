@@ -2779,7 +2779,7 @@ export function Workbench(): ReactElement {
                 </div>
                 <div className="chat-topbar-actions flex min-w-0 flex-wrap items-center justify-end gap-2 self-center">
                   {busy ? (
-                    <span className="inline-flex shrink-0 rounded-full bg-amber-500/16 px-2.5 py-1 text-[11.5px] font-semibold text-amber-950 dark:text-amber-100">
+                    <span className="inline-flex shrink-0 rounded-full bg-ds-warning-soft px-2.5 py-1 text-[11.5px] font-semibold text-ds-warning">
                       {t('running')}
                     </span>
                   ) : null}

@@ -114,8 +114,8 @@ export function ClawSidebarContent({
                         disabled
                           ? 'bg-ds-faint'
                           : running || channel.threadId.trim()
-                            ? 'bg-emerald-400'
-                            : 'bg-amber-400'
+                            ? 'bg-ds-success'
+                            : 'bg-ds-warning'
                       }`}
                       />
                     }

@@ -1826,7 +1826,7 @@ export function FloatingComposer({
                     >
                       <span
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] ${
-                          active && !command.disabled ? 'bg-white text-accent shadow-sm dark:bg-ds-card' : 'bg-ds-hover text-ds-muted'
+                          active && !command.disabled ? 'bg-ds-card text-accent shadow-sm' : 'bg-ds-hover text-ds-muted'
                         }`}
                       >
                         {command.icon}
@@ -1891,7 +1891,7 @@ export function FloatingComposer({
                     >
                       <span
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] ${
-                          active ? 'bg-white text-accent shadow-sm dark:bg-ds-card' : 'bg-ds-hover text-ds-muted'
+                          active ? 'bg-ds-card text-accent shadow-sm' : 'bg-ds-hover text-ds-muted'
                         }`}
                       >
                         {isDirectory ? (

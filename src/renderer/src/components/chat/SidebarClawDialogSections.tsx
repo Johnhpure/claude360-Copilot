@@ -71,7 +71,7 @@ export function ClawManageSelection({ ctx }: { ctx: Record<string, any> }): Reac
                                 type="button"
                                 onClick={() => void handleDeleteChannel(channel)}
                                 disabled={busy}
-                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ds-faint transition hover:bg-red-500/10 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-red-300"
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ds-faint transition hover:bg-ds-danger-soft hover:text-ds-danger disabled:cursor-not-allowed disabled:opacity-50"
                                 title={t('clawDeleteIm')}
                                 aria-label={t('clawDeleteIm')}
                               >
@@ -164,7 +164,7 @@ export function ClawConfigureOverview({ ctx }: { ctx: Record<string, any> }): Re
                             active
                               ? 'bg-accent-soft text-accent'
                               : completed
-                                ? 'bg-emerald-500/12 text-emerald-600'
+                                ? 'bg-ds-success-soft text-ds-success'
                                 : 'bg-ds-subtle text-ds-faint'
                           }`}>
                             {completed ? <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.9} /> : index + 1}
@@ -264,7 +264,7 @@ export function ClawConfigureOverview({ ctx }: { ctx: Record<string, any> }): Re
                 </div>
 
                 {error ? (
-                  <div className="mt-5 flex items-start gap-2 rounded-[20px] bg-red-500/10 px-4 py-3 text-[12.5px] leading-5 text-red-600 dark:text-red-300">
+                  <div className="mt-5 flex items-start gap-2 rounded-[20px] bg-ds-danger-soft px-4 py-3 text-[12.5px] leading-5 text-ds-danger">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.9} />
                     <span>{error}</span>
                   </div>
@@ -292,7 +292,7 @@ export function ClawDialogFooter({ ctx }: { ctx: Record<string, any> }): ReactEl
                 type="button"
                 onClick={() => void handleDeleteChannel(existingChannel)}
                 disabled={busy}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2 text-[13px] font-medium text-red-600 shadow-sm transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-300"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-ds-danger-soft bg-ds-danger-soft px-4 py-2 text-[13px] font-medium text-ds-danger shadow-sm transition hover:bg-[color-mix(in_srgb,var(--ds-danger)_18%,transparent)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Trash2 className="h-4 w-4" strokeWidth={1.9} />
                 {t('clawDeleteIm')}

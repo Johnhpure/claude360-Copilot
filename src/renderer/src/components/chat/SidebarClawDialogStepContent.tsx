@@ -322,14 +322,14 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                           </div>
                         ) : null}
                         {requiresOfficialInstall && installQr.status === 'success' ? (
-                          <div className="mt-2 flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11.5px] font-medium text-emerald-600 dark:text-emerald-300">
+                          <div className="mt-2 flex items-center gap-1.5 rounded-full bg-ds-success-soft px-2.5 py-1 text-[11.5px] font-medium text-ds-success">
                             <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.9} />
                             {t('clawAddImOfficialQrSuccess')}
                           </div>
                         ) : null}
                         {requiresOfficialInstall && installQr.status === 'error' ? (
                           <div className="mt-3 grid justify-items-center gap-2">
-                            <div className="max-w-[220px] text-center text-[11.5px] leading-4 text-red-600 dark:text-red-300">
+                            <div className="max-w-[220px] text-center text-[11.5px] leading-4 text-ds-danger">
                               {installQr.error || t('clawAddImOfficialQrFailed')}
                             </div>
                             <button
@@ -505,7 +505,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                                 className="inline-flex items-center gap-2 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] font-medium text-ds-ink shadow-sm transition hover:bg-ds-hover"
                               >
                                 {copied ? (
-                                  <CheckCircle2 className="h-4 w-4 text-emerald-500" strokeWidth={1.9} />
+                                  <CheckCircle2 className="h-4 w-4 text-ds-success" strokeWidth={1.9} />
                                 ) : (
                                   <Copy className="h-4 w-4 text-ds-faint" strokeWidth={1.9} />
                                 )}

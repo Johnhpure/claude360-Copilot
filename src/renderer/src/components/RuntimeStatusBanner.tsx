@@ -34,11 +34,11 @@ export function RuntimeStatusBanner(): ReactElement | null {
     ? 'border-ds-warning-soft bg-ds-warning-soft'
     : 'border-accent-soft bg-accent-soft'
   const iconClass = recoveredWithRollback
-    ? 'text-amber-700 dark:text-amber-300'
-    : 'text-sky-700 dark:text-sky-300'
+    ? 'text-ds-warning'
+    : 'text-accent'
   const textClass = recoveredWithRollback
-    ? 'text-amber-950 dark:text-amber-100'
-    : 'text-sky-950 dark:text-sky-100'
+    ? 'text-ds-warning'
+    : 'text-accent'
   return (
     <div
       className={`ds-no-drag shrink-0 border-b ${bannerClass}`}
@@ -64,7 +64,7 @@ export function RuntimeStatusBanner(): ReactElement | null {
           <button
             type="button"
             aria-label={t('runtimeStatusDismiss')}
-            className="inline-flex shrink-0 items-center rounded-md p-1 text-amber-900/70 transition hover:bg-amber-100/70 dark:text-amber-100/80 dark:hover:bg-amber-900/40"
+            className="inline-flex shrink-0 items-center rounded-md p-1 text-ds-warning transition hover:bg-ds-warning-soft"
             onClick={() => setDismissedAt(status.at)}
           >
             <X className="h-3.5 w-3.5" strokeWidth={2} />

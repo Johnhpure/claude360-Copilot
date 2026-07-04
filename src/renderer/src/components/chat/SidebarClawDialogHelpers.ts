@@ -82,7 +82,7 @@ export const CLAW_ADD_PROVIDER_OPTIONS: ClawAddProviderOption[] = [
   {
     id: 'feishu',
     label: 'Feishu / Lark',
-    toneClass: 'bg-sky-500/12 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200',
+    toneClass: 'bg-sky-500/12 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200', // token-exempt: IM 提供商品牌色（Feishu/WeChat/Telegram）
     connectionMode: 'official-install-qr',
     credentialHints: ['feishu.appId', 'feishu.appSecret'],
     guideStepKeys: [
@@ -94,7 +94,7 @@ export const CLAW_ADD_PROVIDER_OPTIONS: ClawAddProviderOption[] = [
   {
     id: 'weixin',
     label: 'WeChat',
-    toneClass: 'bg-emerald-500/12 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200',
+    toneClass: 'bg-emerald-500/12 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200', // token-exempt: IM 提供商品牌色（Feishu/WeChat/Telegram）
     connectionMode: 'official-install-qr',
     credentialHints: ['weixin.accountId'],
     guideStepKeys: [
@@ -106,7 +106,7 @@ export const CLAW_ADD_PROVIDER_OPTIONS: ClawAddProviderOption[] = [
   {
     id: 'telegram',
     label: 'Telegram',
-    toneClass: 'bg-sky-500/12 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200',
+    toneClass: 'bg-sky-500/12 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200', // token-exempt: IM 提供商品牌色（Feishu/WeChat/Telegram）
     connectionMode: 'telegram-token',
     credentialHints: ['telegram.botToken'],
     guideStepKeys: [

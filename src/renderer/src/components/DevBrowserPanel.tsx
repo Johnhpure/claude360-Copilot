@@ -415,7 +415,7 @@ export function DevBrowserPanel({
           <button
             type="button"
             onClick={resetPreview}
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ds-faint transition hover:bg-white hover:text-ds-ink dark:hover:bg-white/10"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink dark:hover:bg-white/10"
             aria-label={t('browserNewTab')}
             title={t('browserNewTab')}
           >
@@ -438,7 +438,7 @@ export function DevBrowserPanel({
               type="button"
               onClick={goBack}
               disabled={!canNavigateBack}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ds-faint transition hover:bg-white hover:text-ds-ink disabled:cursor-default disabled:opacity-35 dark:hover:bg-white/10"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-default disabled:opacity-35 dark:hover:bg-white/10"
               aria-label={t('browserBack')}
               title={t('browserBack')}
             >
@@ -448,7 +448,7 @@ export function DevBrowserPanel({
               type="button"
               onClick={goForward}
               disabled={!canNavigateForward}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ds-faint transition hover:bg-white hover:text-ds-ink disabled:cursor-default disabled:opacity-35 dark:hover:bg-white/10"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-default disabled:opacity-35 dark:hover:bg-white/10"
               aria-label={t('browserForward')}
               title={t('browserForward')}
             >
@@ -458,7 +458,7 @@ export function DevBrowserPanel({
               type="button"
               onClick={reload}
               disabled={!activeUrl}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ds-faint transition hover:bg-white hover:text-ds-ink disabled:cursor-default disabled:opacity-35 dark:hover:bg-white/10"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-default disabled:opacity-35 dark:hover:bg-white/10"
               aria-label={t('browserReload')}
               title={t('browserReload')}
             >
@@ -470,7 +470,7 @@ export function DevBrowserPanel({
             </button>
           </div>
 
-          <div className="flex h-8 min-w-[7rem] flex-1 items-center gap-2 rounded-full border border-ds-border-muted bg-ds-surface-subtle px-3 text-ds-muted transition focus-within:border-ds-border-strong focus-within:bg-white dark:bg-white/[0.07] dark:focus-within:bg-white/10">
+          <div className="flex h-8 min-w-[7rem] flex-1 items-center gap-2 rounded-full border border-ds-border-muted bg-ds-surface-subtle px-3 text-ds-muted transition focus-within:border-ds-border-strong focus-within:bg-ds-card dark:bg-white/[0.07] dark:focus-within:bg-white/10">
             <Globe2 className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
             <input
               value={draftUrl}
@@ -494,7 +494,7 @@ export function DevBrowserPanel({
               type="button"
               onClick={() => setAutoFollow((value) => !value)}
               className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition hover:bg-ds-hover ${
-                autoFollow ? 'text-sky-500 dark:text-sky-300' : 'text-ds-faint hover:text-ds-ink'
+                autoFollow ? 'text-accent' : 'text-ds-faint hover:text-ds-ink'
               }`}
               aria-label={t('browserAutoFollow')}
               aria-pressed={autoFollow}
@@ -548,7 +548,7 @@ export function DevBrowserPanel({
       </div>
 
       {loadError ? (
-        <div className="shrink-0 border-b border-red-200/70 bg-red-50/85 px-3 py-2 text-[11px] leading-5 text-red-800 dark:border-red-900/50 dark:bg-red-950/35 dark:text-red-100">
+        <div className="shrink-0 border-b border-ds-danger-soft bg-ds-danger-soft px-3 py-2 text-[11px] leading-5 text-ds-danger">
           {loadError}
         </div>
       ) : null}
@@ -556,7 +556,7 @@ export function DevBrowserPanel({
       <div className="relative min-h-0 flex-1 bg-white dark:bg-ds-canvas">
         {!activeUrl ? (
           <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-            <Globe2 className="h-16 w-16 text-zinc-400 dark:text-zinc-500" strokeWidth={1.45} />
+            <Globe2 className="h-16 w-16 text-ds-faint" strokeWidth={1.45} />
             <div className="mt-7 text-[14px] font-semibold text-ds-ink">
               {t('browserEmptyTitle')}
             </div>

@@ -118,7 +118,7 @@ export function ChangeInspector({
                       >
                         <FileEdit
                           className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
-                            b.status === 'error' ? 'text-red-700' : 'text-ds-muted'
+                            b.status === 'error' ? 'text-ds-danger' : 'text-ds-muted'
                           }`}
                           strokeWidth={1.75}
                         />
@@ -138,7 +138,7 @@ export function ChangeInspector({
                           ) : null}
                         </div>
                         {b.status === 'running' ? (
-                          <span className="rounded-full bg-amber-200/40 px-2 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-700/30 dark:text-amber-100">
+                          <span className="rounded-full bg-ds-warning-soft px-2 py-0.5 text-[10px] font-medium text-ds-warning">
                             {t('inspectorStatusRunning')}
                           </span>
                         ) : null}

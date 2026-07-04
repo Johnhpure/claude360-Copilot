@@ -524,7 +524,7 @@ function RowActions({
           type="button"
           onClick={onDelete}
           title={t('agentsView.delete', 'Delete')}
-          className="rounded p-1.5 text-ds-muted hover:bg-ds-subtle hover:text-red-500"
+          className="rounded p-1.5 text-ds-muted hover:bg-ds-subtle hover:text-ds-danger"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -595,7 +595,7 @@ function ModelSelect({
   const triggerCls = stretch
     ? 'flex h-9 w-full items-center justify-between rounded-md border border-ds-border bg-[var(--ds-surface-elevated)] pl-3 pr-2.5 text-sm text-ds-heading disabled:opacity-50'
     : `flex h-8 w-[132px] items-center justify-between gap-1 rounded-[9px] border bg-[var(--ds-surface-elevated)] pl-3 pr-2 text-[12px] font-semibold disabled:opacity-50 ${
-        small ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900/60 dark:text-emerald-300' : 'border-ds-border text-accent'
+        small ? 'border-ds-success-soft text-ds-success' : 'border-ds-border text-accent'
       }`
 
   return (

@@ -71,35 +71,35 @@ const TOOL_PERMISSION_OPTIONS: Array<{
     labelKey: 'toolPermissionAlwaysAsk',
     descriptionKey: 'toolPermissionAlwaysAskDesc',
     Icon: Hand,
-    iconClass: 'border-sky-400/30 bg-sky-500/10 text-sky-700 dark:text-sky-200'
+    iconClass: 'border-sky-400/30 bg-sky-500/10 text-sky-700 dark:text-sky-200' // token-exempt: agent 类型身份标注色（内容色）
   },
   {
     value: 'read-only',
     labelKey: 'toolPermissionReadOnly',
     descriptionKey: 'toolPermissionReadOnlyDesc',
     Icon: Eye,
-    iconClass: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+    iconClass: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200' // token-exempt: agent 类型身份标注色（内容色）
   },
   {
     value: 'sensitive-ask',
     labelKey: 'toolPermissionSensitiveAsk',
     descriptionKey: 'toolPermissionSensitiveAskDesc',
     Icon: ShieldQuestion,
-    iconClass: 'border-amber-400/35 bg-amber-500/10 text-amber-700 dark:text-amber-200'
+    iconClass: 'border-amber-400/35 bg-amber-500/10 text-amber-700 dark:text-amber-200' // token-exempt: agent 类型身份标注色（内容色）
   },
   {
     value: 'workspace-write',
     labelKey: 'toolPermissionWorkspaceWrite',
     descriptionKey: 'toolPermissionWorkspaceWriteDesc',
     Icon: FolderPen,
-    iconClass: 'border-indigo-400/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-200'
+    iconClass: 'border-indigo-400/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-200' // token-exempt: agent 类型身份标注色（内容色）
   },
   {
     value: 'bypass',
     labelKey: 'toolPermissionBypass',
     descriptionKey: 'toolPermissionBypassDesc',
     Icon: LockKeyholeOpen,
-    iconClass: 'border-orange-400/35 bg-orange-500/10 text-orange-700 dark:text-orange-200'
+    iconClass: 'border-orange-400/35 bg-orange-500/10 text-orange-700 dark:text-orange-200' // token-exempt: agent 类型身份标注色（内容色）
   }
 ]
 

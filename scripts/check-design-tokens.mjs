@@ -8,6 +8,8 @@
  *   B literal-color   ts/tsx 中的 #hex / rgb() / hsl() 字面量（UI 色必须走 token）
  *   C literal-duration ts/tsx 中的 duration-{N}（必须 duration-[var(--motion-*)]）
  *   D raw-easing      css 中游离 cubic-bezier(（必须 --ease-* token 或 ease-exempt 演出区间）
+ *   E palette-class   ts/tsx 中 Tailwind 内置调色板类（bg-zinc-100 等，UI 框架色必须走 ds-token；
+ *                     阶段8 收网——合法内容标注色以行级 token-exempt 注明）
  *
  * 用法：
  *   node scripts/check-design-tokens.mjs            # 违规 exit 1（质量门）
@@ -38,6 +40,12 @@ const INCLUDED_SCOPES = [
 
 /** 测试文件不审计（断言里合法出现旧类名/色值）。 */
 const EXEMPT_FILE = [/\.test\.[tj]sx?$/, /__tests__\//]
+
+/**
+ * 规则 E 的文件级豁免：终端面板浮层与 xterm 画布固定配色绑定（文件内区域注释已说明），
+ * 不随主题 token 反转；其余文件的调色板类一律行级 token-exempt 或修复。
+ */
+const PALETTE_EXEMPT_FILE = [/components\/terminal\/TerminalPanel\.tsx$/]
 
 const isReport = process.argv.includes('--report')
 
@@ -70,6 +78,9 @@ const RE_FUNC_COLOR = /(?:\b|[_(,])(?:rgba?|hsla?)\(/
 const RE_DURATION = /\bduration-\d+\b/
 // D：css 游离缓动
 const RE_BEZIER = /cubic-bezier\(/
+// E：Tailwind 内置调色板类（UI 框架色必须走 ds-*/accent；white/black 与 /alpha 遮罩不在此列）
+const RE_PALETTE_CLASS =
+  /\b(?:bg|text|border|ring|from|to|via|divide|shadow|fill|stroke|outline|decoration|caret)-(?:gray|slate|zinc|neutral|stone|blue|sky|indigo|red|green|amber|yellow|purple|pink|rose|teal|cyan|emerald|lime|orange|fuchsia|violet)-\d{2,3}\b/
 
 const isCommentLine = (line) => {
   const t = line.trim()
@@ -115,6 +126,9 @@ for (const file of walk(SRC)) {
     if (RE_ALPHA_ON_VAR.test(line)) push(rel, i, 'alpha-on-var', line)
     if (RE_HEX.test(line) || RE_FUNC_COLOR.test(line)) push(rel, i, 'literal-color', line)
     if (RE_DURATION.test(line)) push(rel, i, 'literal-duration', line)
+    if (RE_PALETTE_CLASS.test(line) && !PALETTE_EXEMPT_FILE.some((re) => re.test(rel))) {
+      push(rel, i, 'palette-class', line)
+    }
   })
 }
 

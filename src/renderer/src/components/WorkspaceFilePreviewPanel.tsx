@@ -153,7 +153,7 @@ function ResolvedPreviewImage({
   if (loadError) {
     return (
       <span
-        className="inline-flex max-w-full items-center rounded-lg border border-red-200/70 bg-red-50/80 px-2 py-1 text-[12px] text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
+        className="inline-flex max-w-full items-center rounded-lg border border-ds-danger-soft bg-ds-danger-soft px-2 py-1 text-[12px] text-ds-danger"
         title={loadError}
       >
         {alt || src || 'Image could not be loaded'}
@@ -437,7 +437,7 @@ export function WorkspaceFilePreviewPanel({
             aria-label={copied ? t('copySuccess') : t('filePreviewCopyContent')}
           >
             {copied ? (
-              <Check className="h-4 w-4 text-emerald-600" strokeWidth={2} />
+              <Check className="h-4 w-4 text-ds-success" strokeWidth={2} />
             ) : (
               <Copy className="h-4 w-4" strokeWidth={1.75} />
             )}
@@ -574,7 +574,7 @@ export function WorkspaceFilePreviewPanel({
             )}
           </div>
         ) : (
-          <div className="flex flex-1 items-center justify-center px-6 text-center text-[12px] leading-6 text-red-700 dark:text-red-300">
+          <div className="flex flex-1 items-center justify-center px-6 text-center text-[12px] leading-6 text-ds-danger">
             {result?.message ?? t('filePreviewFailed')}
           </div>
         )}

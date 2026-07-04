@@ -15,7 +15,7 @@ export function DevPreviewLaunchCard({
   const { t } = useTranslation('common')
   return (
     <div className="flex min-h-[72px] w-full items-center gap-3 rounded-[18px] border border-ds-border-muted bg-ds-card px-4 py-3 shadow-[var(--c360-shadow-sm)]">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-sky-400/20 bg-sky-500/10 text-sky-500 dark:border-sky-300/20 dark:bg-sky-300/10 dark:text-sky-300">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent-soft bg-accent-soft text-accent">
         <Globe2 className="h-5 w-5" strokeWidth={1.9} />
       </div>
       <div className="min-w-0 flex-1">
@@ -34,7 +34,7 @@ export function DevPreviewLaunchCard({
       </div>
       {opened ? (
         <div className="inline-flex h-9 min-w-0 max-w-[12rem] items-center gap-1.5 rounded-full border border-ds-border-muted bg-ds-surface-subtle px-3 text-[12.5px] font-semibold text-ds-ink dark:bg-white/[0.08]">
-          <Check className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-300" strokeWidth={2} />
+          <Check className="h-3.5 w-3.5 text-ds-success" strokeWidth={2} />
           <span className="min-w-0 truncate">{t('devPreviewCardOpened')}</span>
         </div>
       ) : (

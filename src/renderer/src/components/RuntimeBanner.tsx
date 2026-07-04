@@ -69,7 +69,7 @@ export function RuntimeBanner({
               {hasDetail ? (
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[12px] font-medium text-amber-900/80 transition hover:bg-amber-50/70 dark:text-amber-100 dark:hover:bg-amber-900/30"
+                  className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[12px] font-medium text-ds-warning transition hover:bg-ds-warning-soft"
                   onClick={() => setDetailsOpen((value) => !value)}
                 >
                   {detailsOpen ? (
@@ -84,14 +84,14 @@ export function RuntimeBanner({
                 <>
                   <button
                     type="button"
-                    className="rounded-lg border border-amber-300/70 bg-white px-3 py-1 text-[12px] font-medium text-amber-950 transition hover:bg-amber-100/80 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100 dark:hover:bg-amber-900/40"
+                    className="rounded-lg border border-ds-warning-soft bg-ds-card px-3 py-1 text-[12px] font-medium text-ds-warning transition hover:bg-ds-warning-soft"
                     onClick={onRetryConnection}
                   >
                     {t('retryConnection')}
                   </button>
                   <button
                     type="button"
-                    className="rounded-lg px-3 py-1 text-[12px] font-medium text-amber-900/80 transition hover:bg-amber-50/70 dark:text-amber-100 dark:hover:bg-amber-900/30"
+                    className="rounded-lg px-3 py-1 text-[12px] font-medium text-ds-warning transition hover:bg-ds-warning-soft"
                     onClick={onOpenSettings}
                   >
                     {t('openSettings')}
@@ -101,15 +101,15 @@ export function RuntimeBanner({
             </div>
           </div>
           {cleanedLogPath ? (
-            <div className="flex min-w-0 flex-wrap items-center gap-2 text-[12px] leading-5 text-amber-900/80 dark:text-amber-100/85">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 text-[12px] leading-5 text-ds-warning">
               <span className="font-medium">{t('runtimeErrorLogPath')}</span>
-              <code className="min-w-0 max-w-full break-all rounded-md bg-white/70 px-2 py-0.5 font-mono text-[12px] text-amber-950 dark:bg-amber-950/30 dark:text-amber-100">
+              <code className="min-w-0 max-w-full break-all rounded-md bg-ds-card px-2 py-0.5 font-mono text-[12px] text-ds-ink">
                 {cleanedLogPath}
               </code>
               {onOpenLogDir ? (
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px] font-medium text-amber-900/85 transition hover:bg-amber-50/70 dark:text-amber-100 dark:hover:bg-amber-900/30"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px] font-medium text-ds-warning transition hover:bg-ds-warning-soft"
                   onClick={() => void openLogDir()}
                 >
                   <FolderOpen className="h-3.5 w-3.5" strokeWidth={2} />
@@ -117,26 +117,26 @@ export function RuntimeBanner({
                 </button>
               ) : null}
               {logOpenError ? (
-                <span className="text-red-700 dark:text-red-300">{logOpenError}</span>
+                <span className="text-ds-danger">{logOpenError}</span>
               ) : null}
             </div>
           ) : null}
           {hasDetail && detailsOpen ? (
-            <div className="rounded-lg border border-amber-300/60 bg-white/70 p-3 dark:border-amber-800/50 dark:bg-amber-950/25">
+            <div className="rounded-lg border border-ds-warning-soft bg-ds-card p-3">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="text-[12px] font-semibold text-amber-950 dark:text-amber-100">
+                <span className="text-[12px] font-semibold text-ds-warning">
                   {t('runtimeErrorTechnicalDetails')}
                 </span>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-amber-900/80 transition hover:bg-amber-100/70 dark:text-amber-100 dark:hover:bg-amber-900/40"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-ds-warning transition hover:bg-ds-warning-soft"
                   onClick={() => void copyDetails()}
                 >
                   <Copy className="h-3.5 w-3.5" strokeWidth={2} />
                   {copied ? t('copySuccess') : t('copyDetails')}
                 </button>
               </div>
-              <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-5 text-amber-950 dark:text-amber-100">
+              <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-5 text-ds-ink">
                 {detailText}
               </pre>
             </div>

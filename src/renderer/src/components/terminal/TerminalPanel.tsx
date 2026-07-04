@@ -687,7 +687,7 @@ export function TerminalPanel({ className = '', workspaceRoot, onCollapse, heigh
           <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
             <div>
               <div className="text-[13px] font-semibold text-red-400">{t('terminalUnavailable')}</div>
-              <div className="mt-2 max-w-sm text-[12px] leading-5 text-zinc-400">{error}</div>
+              <div className="mt-2 max-w-sm text-[12px] leading-5 text-white/55">{error}</div>
               <button
                 type="button"
                 onClick={() => void handleRestart()}

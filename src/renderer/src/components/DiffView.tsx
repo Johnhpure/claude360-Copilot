@@ -17,16 +17,17 @@ type ParsedDiff = {
   hunkOffset: number
 }
 
+// token-exempt: 文件类型徽章为内容标注色（不随主题反转的领域语义色），非 UI 框架色。
 const LANG_BADGES: Array<{ test: RegExp; label: string; tone: string }> = [
-  { test: /\.tsx?$/i, label: 'TS', tone: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300' },
-  { test: /\.jsx?$/i, label: 'JS', tone: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300' },
-  { test: /\.json$/i, label: 'JSON', tone: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300' },
-  { test: /\.(css|scss|less)$/i, label: 'CSS', tone: 'bg-pink-100 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300' },
-  { test: /\.md$/i, label: 'MD', tone: 'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300' },
-  { test: /\.py$/i, label: 'PY', tone: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' },
-  { test: /\.html?$/i, label: 'HTML', tone: 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300' },
-  { test: /\.ya?ml$/i, label: 'YML', tone: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300' },
-  { test: /\.sh$/i, label: 'SH', tone: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300' }
+  { test: /\.tsx?$/i, label: 'TS', tone: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300' }, // token-exempt: 文件类型内容标注色
+  { test: /\.jsx?$/i, label: 'JS', tone: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300' }, // token-exempt: 文件类型内容标注色
+  { test: /\.json$/i, label: 'JSON', tone: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300' }, // token-exempt: 文件类型内容标注色
+  { test: /\.(css|scss|less)$/i, label: 'CSS', tone: 'bg-pink-100 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300' }, // token-exempt: 文件类型内容标注色
+  { test: /\.md$/i, label: 'MD', tone: 'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300' }, // token-exempt: 文件类型内容标注色
+  { test: /\.py$/i, label: 'PY', tone: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' }, // token-exempt: 文件类型内容标注色
+  { test: /\.html?$/i, label: 'HTML', tone: 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300' }, // token-exempt: 文件类型内容标注色
+  { test: /\.ya?ml$/i, label: 'YML', tone: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300' }, // token-exempt: 文件类型内容标注色
+  { test: /\.sh$/i, label: 'SH', tone: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300' } // token-exempt: 文件类型内容标注色
 ]
 
 function parseDiff(patch: string, override?: string): ParsedDiff {
@@ -60,9 +61,9 @@ function parseDiff(patch: string, override?: string): ParsedDiff {
 }
 
 function badgeFor(name: string | null): { label: string; tone: string } {
-  if (!name) return { label: 'TXT', tone: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300' }
+  if (!name) return { label: 'TXT', tone: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300' } // token-exempt: 文件类型内容标注色
   for (const b of LANG_BADGES) if (b.test.test(name)) return { label: b.label, tone: b.tone }
-  return { label: 'TXT', tone: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300' }
+  return { label: 'TXT', tone: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300' } // token-exempt: 文件类型内容标注色
 }
 
 /**

@@ -233,7 +233,7 @@ export function SessionHeader({ compact = false, className = '' }: Props): React
         </div>
       )}
       {busy ? (
-        <span className="ml-auto shrink-0 rounded-full bg-amber-500/18 px-3 py-1.5 text-[12.5px] font-semibold text-amber-950 dark:text-amber-100">
+        <span className="ml-auto shrink-0 rounded-full bg-ds-warning-soft px-3 py-1.5 text-[12.5px] font-semibold text-ds-warning">
           {t('running')}
         </span>
       ) : null}

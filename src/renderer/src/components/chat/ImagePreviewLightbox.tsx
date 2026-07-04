@@ -78,7 +78,7 @@ export function ImagePreviewLightbox({
       disabled={!canDownload}
       aria-label={resolvedDownloadLabel}
       title={resolvedDownloadLabel}
-      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-zinc-700 shadow-[var(--c360-shadow-overlay)] transition hover:bg-zinc-50 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-800"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-ds-elevated text-ds-ink shadow-[var(--c360-shadow-overlay)] transition hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-50"
     >
       <Download className="h-5 w-5" strokeWidth={1.9} />
     </button>
@@ -88,7 +88,7 @@ export function ImagePreviewLightbox({
       download={downloadName || resolvedTitle}
       aria-label={resolvedDownloadLabel}
       title={resolvedDownloadLabel}
-      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-zinc-700 shadow-[var(--c360-shadow-overlay)] transition hover:bg-zinc-50 hover:text-zinc-950 dark:bg-zinc-100 dark:text-zinc-800"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-ds-elevated text-ds-ink shadow-[var(--c360-shadow-overlay)] transition hover:bg-ds-hover"
     >
       <Download className="h-5 w-5" strokeWidth={1.9} />
     </a>
@@ -96,7 +96,7 @@ export function ImagePreviewLightbox({
 
   return createPortal(
     <div
-      className="ds-no-drag fixed inset-0 z-[1100] bg-zinc-950/82 text-white backdrop-blur-[var(--blur-overlay)]"
+      className="ds-no-drag fixed inset-0 z-[1100] bg-black/80 text-white backdrop-blur-[var(--blur-overlay)]"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -114,7 +114,7 @@ export function ImagePreviewLightbox({
           onClick={onClose}
           aria-label={closeLabel}
           title={closeLabel}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-zinc-700 shadow-[var(--c360-shadow-overlay)] transition hover:bg-zinc-50 hover:text-zinc-950 dark:bg-zinc-100 dark:text-zinc-800"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-ds-elevated text-ds-ink shadow-[var(--c360-shadow-overlay)] transition hover:bg-ds-hover"
         >
           <X className="h-5 w-5" strokeWidth={2} />
         </button>
@@ -130,14 +130,14 @@ export function ImagePreviewLightbox({
           />
         </div>
       </div>
-      <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center overflow-hidden rounded-full bg-white text-zinc-700 shadow-[var(--c360-shadow-overlay)] dark:bg-zinc-100 dark:text-zinc-800">
+      <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center overflow-hidden rounded-full bg-ds-elevated text-ds-ink shadow-[var(--c360-shadow-overlay)]">
         <button
           type="button"
           onClick={() => setZoom((value) => clampZoom(value - ZOOM_STEP))}
           disabled={zoom <= MIN_ZOOM}
           aria-label={t('imagePreviewZoomOut')}
           title={t('imagePreviewZoomOut')}
-          className="inline-flex h-10 w-11 items-center justify-center transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-45"
+          className="inline-flex h-10 w-11 items-center justify-center transition hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-45"
         >
           <Minus className="h-4 w-4" strokeWidth={2} />
         </button>
@@ -146,7 +146,7 @@ export function ImagePreviewLightbox({
           onClick={() => setZoom(1)}
           aria-label={t('imagePreviewResetZoom')}
           title={t('imagePreviewResetZoom')}
-          className="h-10 min-w-16 px-3 text-[13px] font-semibold transition hover:bg-zinc-100"
+          className="h-10 min-w-16 px-3 text-[13px] font-semibold transition hover:bg-ds-hover"
         >
           {zoomPercent}
         </button>
@@ -156,7 +156,7 @@ export function ImagePreviewLightbox({
           disabled={zoom >= MAX_ZOOM}
           aria-label={t('imagePreviewZoomIn')}
           title={t('imagePreviewZoomIn')}
-          className="inline-flex h-10 w-11 items-center justify-center transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-45"
+          className="inline-flex h-10 w-11 items-center justify-center transition hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-45"
         >
           <Plus className="h-4 w-4" strokeWidth={2} />
         </button>
