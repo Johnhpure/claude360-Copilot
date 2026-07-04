@@ -551,10 +551,10 @@ export function TerminalPanel({ className = '', workspaceRoot, onCollapse, heigh
 
   return (
     <aside
-      className={`ds-no-drag ds-surface-strong flex min-h-0 flex-col overflow-hidden border-t border-ds-border-muted text-ds-ink shadow-[0_-18px_60px_rgba(20,47,95,0.08)] dark:bg-[rgba(21,29,49,0.98)] dark:shadow-[0_-24px_70px_rgba(2,6,16,0.2)] ${className}`}
+      className={`ds-no-drag ds-surface-strong flex min-h-0 flex-col overflow-hidden border-t border-ds-border-muted text-ds-ink shadow-[var(--c360-shadow-sm)] ${className}`}
       style={height ? { height } : undefined}
     >
-      <div className="flex h-11 shrink-0 items-center border-b border-ds-border-muted bg-ds-card/92 text-ds-ink backdrop-blur-xl dark:bg-[rgba(24,33,54,0.92)]">
+      <div className="flex h-11 shrink-0 items-center border-b border-ds-border-muted bg-ds-card text-ds-ink">
         <div
           className="flex min-w-0 flex-1 items-end gap-1 overflow-x-auto px-3 pt-2"
           role="tablist"
@@ -567,9 +567,9 @@ export function TerminalPanel({ className = '', workspaceRoot, onCollapse, heigh
             return (
               <div
                 key={tab.id}
-                className={`group flex h-8 max-w-[220px] shrink-0 items-center rounded-t-[10px] text-[13px] font-medium transition ${
+                className={`group flex h-8 max-w-[220px] shrink-0 items-center rounded-t-[var(--radius-md)] text-[13px] font-medium transition-colors duration-[var(--motion-fast)] ${
                   active
-                    ? 'ds-surface-strong border border-b-transparent border-ds-border-muted text-ds-ink shadow-sm dark:bg-[rgba(38,49,76,0.96)]'
+                    ? 'border border-b-transparent border-ds-border-muted bg-ds-elevated text-ds-ink'
                     : 'text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
                 }`}
                 onContextMenu={(event) => openTabContextMenu(event, tab.id)}
@@ -619,7 +619,7 @@ export function TerminalPanel({ className = '', workspaceRoot, onCollapse, heigh
                       event.stopPropagation()
                       handleCloseTab(tab.id)
                     }}
-                    className="mr-2 rounded-full p-0.5 text-ds-faint opacity-0 transition hover:bg-ds-hover hover:text-ds-ink group-hover:opacity-100"
+                    className="mr-2 rounded-full p-0.5 text-ds-faint opacity-0 transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink group-hover:opacity-100"
                   >
                     <X className="h-3.5 w-3.5" strokeWidth={1.8} />
                   </button>
@@ -631,7 +631,7 @@ export function TerminalPanel({ className = '', workspaceRoot, onCollapse, heigh
             type="button"
             onClick={handleNewTab}
             disabled={tabs.length >= MAX_RENDERER_TABS}
-            className="mb-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-40"
+            className="mb-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ds-faint transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-40"
             aria-label={t('terminalNewTab')}
             title={t('terminalNewTab')}
           >
@@ -642,7 +642,7 @@ export function TerminalPanel({ className = '', workspaceRoot, onCollapse, heigh
           <button
             type="button"
             onClick={() => void handleRestart()}
-            className="rounded-full p-1.5 text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
+            className="rounded-full p-1.5 text-ds-faint transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
             aria-label={t('terminalRestart')}
             title={t('terminalRestart')}
           >
@@ -651,7 +651,7 @@ export function TerminalPanel({ className = '', workspaceRoot, onCollapse, heigh
           <button
             type="button"
             onClick={onCollapse}
-            className="rounded-full p-1.5 text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
+            className="rounded-full p-1.5 text-ds-faint transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
             aria-label={t('rightPanelCollapse')}
             title={t('rightPanelCollapse')}
           >
@@ -673,12 +673,16 @@ export function TerminalPanel({ className = '', workspaceRoot, onCollapse, heigh
         ) : null}
       </div>
 
+      {/* token-exempt: 终端主体为白名单(决策 D5)——画布背景取自 xterm 主题解析结果
+          (terminalBackground 内联样式),独立于应用主题 token。 */}
       <div
         ref={terminalBodyRef}
-        className="ds-surface-strong relative min-h-0 flex-1 overflow-hidden px-5 py-4 dark:bg-[rgba(21,29,49,0.98)]"
+        className="ds-surface-strong relative min-h-0 flex-1 overflow-hidden px-5 py-4"
         style={terminalBackground ? { backgroundColor: terminalBackground } : undefined}
       >
         <div ref={containerRef} className="h-full w-full" key={activeTab?.id} />
+        {/* token-exempt: 以下覆盖层浮在 xterm 画布(非应用主题背景)之上,
+            white/red 系类名与终端配色绑定,不随主题 token 反转(决策 D5 白名单)。 */}
         {error ? (
           <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
             <div>
@@ -733,7 +737,7 @@ function TerminalTabContextMenu({
     <div
       role="menu"
       aria-label={t('terminalTabMenuTitle')}
-      className="ds-no-drag fixed z-[1000] min-w-[196px] rounded-lg border border-ds-border bg-ds-card/98 p-1 text-[13px] text-ds-ink shadow-[0_18px_48px_rgba(2,6,16,0.28)] backdrop-blur-xl dark:bg-ds-card"
+      className="ds-no-drag fixed z-[1000] min-w-[196px] rounded-[var(--radius-md)] border border-ds-border bg-ds-elevated p-1 text-[13px] text-ds-ink shadow-[var(--c360-shadow-overlay)] backdrop-blur-[var(--blur-overlay)]"
       style={{ left: state.x, top: state.y }}
       onPointerDown={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
@@ -779,9 +783,9 @@ function TerminalTabContextMenuItem({
       role="menuitem"
       disabled={disabled}
       onClick={onClick}
-      className={`flex min-h-[30px] w-full items-center gap-2 rounded-md px-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`flex min-h-[30px] w-full items-center gap-2 rounded-md px-2 text-left transition-colors duration-[var(--motion-fast)] disabled:cursor-not-allowed disabled:opacity-50 ${
         danger
-          ? 'text-red-600 hover:bg-red-500/10 dark:text-red-300'
+          ? 'text-ds-danger hover:bg-ds-danger-soft'
           : 'text-ds-ink hover:bg-[var(--ds-sidebar-row-hover)]'
       }`}
     >

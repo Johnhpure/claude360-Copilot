@@ -53,9 +53,11 @@ const FRAMEWORK_ICONS: Record<string, LucideIcon> = {
 }
 
 const STAGE_ACCENT: Record<Extract<SddWorkflowStage, 'discover' | 'structure' | 'risk'>, string> = {
-  discover: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
-  structure: 'bg-violet-500/10 text-violet-600 dark:text-violet-300',
-  risk: 'bg-amber-500/10 text-amber-600 dark:text-amber-300'
+  // 阶段强调色映射到功能 token（discover=success / structure=accent / risk=warning），
+  // 色相恒定、明度随主题（父任务 design 原则7）。
+  discover: 'bg-ds-success-soft text-ds-success',
+  structure: 'bg-accent-soft text-accent',
+  risk: 'bg-ds-warning-soft text-ds-warning'
 }
 
 type Props = {
@@ -142,9 +144,9 @@ export function SddAssistantPanel({
 
   return (
     <aside
-      className={`sdd-assistant-panel ds-no-drag flex min-h-0 flex-col border-l border-ds-border-muted bg-white backdrop-blur-xl dark:bg-ds-canvas ${busy ? 'is-busy' : ''} ${className}`}
+      className={`sdd-assistant-panel ds-no-drag flex min-h-0 flex-col border-l border-ds-border-muted bg-ds-card dark:bg-ds-canvas ${busy ? 'is-busy' : ''} ${className}`}
     >
-      <div className="sdd-assistant-header shrink-0 border-b border-ds-border-muted bg-white/92 dark:bg-ds-card">
+      <div className="sdd-assistant-header shrink-0 border-b border-ds-border-muted bg-ds-card">
         <div className="flex h-12 min-w-0 items-center gap-2 px-4">
           <SidebarTitlebarToggleButton
             onClick={onCollapse}
@@ -154,7 +156,7 @@ export function SddAssistantPanel({
           >
             <PanelRightClose className="h-4 w-4" strokeWidth={1.75} />
           </SidebarTitlebarToggleButton>
-          <div className="sdd-assistant-title-pill flex min-w-0 flex-1 items-center gap-2 rounded-[12px] bg-ds-surface-subtle px-3 py-1.5 dark:bg-white/8">
+          <div className="sdd-assistant-title-pill flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] bg-ds-subtle px-3 py-1.5">
             <Sparkles className="sdd-assistant-sparkle h-4 w-4 shrink-0 text-accent" strokeWidth={1.8} />
             <span className="min-w-0 truncate text-[13px] font-medium text-ds-ink">
               {t('sddAssistant')}
@@ -172,13 +174,13 @@ export function SddAssistantPanel({
           </button>
         </div>
         <div className="min-w-0 px-4 pb-3">
-          <div className="truncate rounded-full border border-ds-border-muted bg-ds-surface-subtle px-3 py-1.5 text-[11.5px] font-medium text-ds-muted dark:bg-white/6">
+          <div className="truncate rounded-full border border-ds-border-muted bg-ds-subtle px-3 py-1.5 text-[11.5px] font-medium text-ds-muted">
             {draft.relativePath}
           </div>
         </div>
       </div>
 
-      <div className="sdd-assistant-body min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-ds-main/45 dark:bg-transparent">
+      <div className="sdd-assistant-body min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         {hasTimeline ? (
           <div className="sdd-assistant-timeline">
             <MessageTimeline
@@ -194,8 +196,8 @@ export function SddAssistantPanel({
           </div>
         ) : (
           <div className="sdd-assistant-empty flex min-h-full flex-col justify-end px-5 py-5">
-            <div className="sdd-assistant-empty-card mb-auto rounded-[20px] border border-ds-border bg-ds-card/95 p-4 shadow-sm">
-              <div className="sdd-assistant-empty-icon flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+            <div className="sdd-assistant-empty-card mb-auto rounded-2xl border border-ds-border bg-ds-card p-4 shadow-[var(--c360-shadow-sm)]">
+              <div className="sdd-assistant-empty-icon flex h-11 w-11 items-center justify-center rounded-2xl bg-accent-soft text-accent">
                 <FileQuestion className="h-5 w-5" strokeWidth={1.9} />
               </div>
               <h3 className="mt-4 text-[18px] font-semibold text-ds-ink">
@@ -224,7 +226,7 @@ export function SddAssistantPanel({
                           key={framework.id}
                           type="button"
                           onClick={() => onApplyFramework(framework.id)}
-                          className="sdd-assistant-action flex items-center gap-3 rounded-2xl border border-ds-border bg-ds-card px-3 py-3 text-left transition hover:border-accent/25 hover:bg-ds-hover"
+                          className="sdd-assistant-action flex items-center gap-3 rounded-2xl border border-ds-border bg-ds-card px-3 py-3 text-left transition-colors duration-[var(--motion-fast)] hover:border-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] hover:bg-ds-hover"
                         >
                           <span
                             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${STAGE_ACCENT[group.stage]}`}
@@ -250,7 +252,7 @@ export function SddAssistantPanel({
         )}
       </div>
 
-      <div className="sdd-assistant-composer shrink-0 border-t border-ds-border-muted bg-white/92 px-4 pb-4 pt-3 dark:bg-ds-card">
+      <div className="sdd-assistant-composer shrink-0 border-t border-ds-border-muted bg-ds-card px-4 pb-4 pt-3">
         <FloatingComposer
           variant="compact"
           workspaceRootOverride={draft.workspaceRoot}

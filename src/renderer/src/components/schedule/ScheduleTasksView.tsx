@@ -48,6 +48,7 @@ import {
   expandHomePathForSettingsUse
 } from '../../lib/settings-home-paths'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
+import { Button, Card, EmptyState, ErrorState, LoadingState, Select } from '../ui'
 import { ScheduleDefaultsDialog } from './ScheduleDefaultsDialog'
 
 type Props = {
@@ -373,10 +374,11 @@ function formatDateTime(value: string, fallback: string): string {
 }
 
 function statusTone(status: ScheduledTaskV1['lastStatus']): string {
-  if (status === 'queued') return 'bg-sky-500/15 text-sky-800 dark:text-sky-100'
-  if (status === 'running') return 'bg-amber-500/15 text-amber-900 dark:text-amber-100'
-  if (status === 'success') return 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-100'
-  if (status === 'error') return 'bg-red-500/15 text-red-700 dark:text-red-100'
+  // 状态色全部走功能 token（色相恒定、小面积原则，父任务 design 原则7）。
+  if (status === 'queued') return 'bg-accent-soft text-accent'
+  if (status === 'running') return 'bg-ds-warning-soft text-ds-warning'
+  if (status === 'success') return 'bg-ds-success-soft text-ds-success'
+  if (status === 'error') return 'bg-ds-danger-soft text-ds-danger'
   return 'bg-ds-subtle text-ds-muted'
 }
 
@@ -609,7 +611,7 @@ export function ScheduleTasksView({
   return (
     <div className="ds-drag flex h-full min-h-0 flex-col bg-ds-main">
       <div className="ds-stage-inset shrink-0">
-        <header className="ds-topbar-surface relative z-10 mt-3 flex min-h-[46px] w-full items-stretch overflow-visible rounded-[24px]">
+        <header className="ds-topbar-surface relative z-10 mt-3 flex min-h-[46px] w-full items-stretch overflow-visible rounded-3xl">
           <div className="grid w-full min-w-0 items-center gap-2.5 px-3 py-2 sm:px-4 md:pl-5 md:pr-2">
             <div
               className={`flex min-w-0 items-center gap-2.5 ${
@@ -636,36 +638,32 @@ export function ScheduleTasksView({
               {t('scheduleSubtitle')}
             </p>
             <div className="flex items-center gap-2">
-              <select
+              <Select
                 value={filter}
-                onChange={(event) => setFilter(event.target.value as TaskFilter)}
-                className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink shadow-sm outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/25"
-              >
-                {SCHEDULE_FILTERS.map((item) => (
-                  <option key={item} value={item}>{t(`scheduleFilter_${item}`)}</option>
-                ))}
-              </select>
+                options={SCHEDULE_FILTERS.map((item) => ({
+                  value: item,
+                  label: t(`scheduleFilter_${item}`)
+                }))}
+                onChange={(value) => setFilter(value)}
+                className="w-36"
+              />
               <button
                 type="button"
                 onClick={() => setSettingsDialogOpen(true)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-ds-border bg-ds-card text-ds-muted shadow-sm transition hover:bg-ds-hover hover:text-ds-ink"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-ds-border bg-ds-card text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
                 title={t('scheduleDefaultsTitle')}
                 aria-label={t('scheduleDefaultsTitle')}
               >
                 <MoreHorizontal className="h-4 w-4" strokeWidth={1.8} />
               </button>
-              <button
-                type="button"
-                onClick={openCreateDialog}
-                className="inline-flex items-center gap-2 rounded-xl bg-ds-userbubble px-4 py-2 text-[13px] font-semibold text-ds-userbubbleFg shadow-sm transition hover:opacity-90"
-              >
+              <Button onClick={openCreateDialog}>
                 <Plus className="h-4 w-4" strokeWidth={2} />
                 {t('scheduleNewTask')}
-              </button>
+              </Button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-ds-border bg-ds-card px-4 py-3">
+          <Card unpadded className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <Clock3 className="h-4 w-4 shrink-0 text-ds-muted" strokeWidth={1.75} />
               <span className="min-w-0 text-[14px] text-ds-ink">
@@ -680,21 +678,22 @@ export function ScheduleTasksView({
                 onChange={(event) => void toggleKeepAwake(event.target.checked)}
                 className="sr-only"
               />
-              <span className={`relative h-5 w-9 rounded-full transition ${schedule?.keepAwake ? 'bg-ds-ink' : 'bg-ds-border-strong'}`}>
-                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${schedule?.keepAwake ? 'left-[18px]' : 'left-0.5'}`} />
+              <span className={`relative h-5 w-9 rounded-[var(--radius-pill)] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-oneui)] ${schedule?.keepAwake ? 'bg-accent' : 'bg-ds-faint'}`}>
+                <span className={`absolute top-0.5 h-4 w-4 rounded-[var(--radius-pill)] bg-white shadow-[var(--c360-shadow-sm)] transition-[left] duration-[var(--motion-fast)] ease-[var(--ease-oneui)] ${schedule?.keepAwake ? 'left-[18px]' : 'left-0.5'}`} />
               </span>
             </label>
-          </div>
+          </Card>
 
           {loading ? (
-            <div className="py-20 text-center text-[14px] text-ds-faint">{t('loading')}</div>
+            <LoadingState label={t('loading')} />
           ) : error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
-              {error}
-            </div>
+            <ErrorState title={error} />
           ) : visibleTasks.length === 0 ? (
-            <div className="flex min-h-[340px] items-center justify-center text-[13px] text-ds-faint">
-              {tasks.length === 0 ? t('scheduleEmpty') : t('scheduleFilterEmpty')}
+            <div className="flex min-h-[340px] items-center justify-center">
+              <EmptyState
+                icon={CalendarClock}
+                title={tasks.length === 0 ? t('scheduleEmpty') : t('scheduleFilterEmpty')}
+              />
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -712,10 +711,7 @@ export function ScheduleTasksView({
                   : ''
                 const modelLabel = providerLabel ? `${providerLabel} / ${task.model}` : task.model
                 return (
-                  <div
-                    key={task.id}
-                    className="rounded-xl border border-ds-border bg-ds-card px-4 py-4 shadow-sm"
-                  >
+                  <Card key={task.id} unpadded className="px-4 py-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 items-center gap-2">
@@ -739,7 +735,7 @@ export function ScheduleTasksView({
                           <button
                             type="button"
                             onClick={() => onOpenThread?.(lastThreadId)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
                             title={t('scheduleOpenLastThread')}
                             aria-label={t('scheduleOpenLastThread')}
                           >
@@ -750,7 +746,7 @@ export function ScheduleTasksView({
                           type="button"
                           onClick={() => void runTask(task.id)}
                           disabled={busy}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-45"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-45"
                           title={t('scheduleRunNow')}
                           aria-label={t('scheduleRunNow')}
                         >
@@ -759,7 +755,7 @@ export function ScheduleTasksView({
                         <button
                           type="button"
                           onClick={() => openEditDialog(task)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
                           title={t('scheduleEditTask')}
                           aria-label={t('scheduleEditTask')}
                         >
@@ -768,7 +764,7 @@ export function ScheduleTasksView({
                         <button
                           type="button"
                           onClick={() => void deleteTask(task.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-muted transition hover:bg-red-500/10 hover:text-red-600"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger"
                           title={t('scheduleDeleteTask')}
                           aria-label={t('scheduleDeleteTask')}
                         >
@@ -781,14 +777,14 @@ export function ScheduleTasksView({
                             onChange={(event) => void updateTask(task.id, { enabled: event.target.checked })}
                             className="sr-only"
                           />
-                          <span className={`relative h-5 w-9 rounded-full transition ${task.enabled ? 'bg-ds-ink' : 'bg-ds-border-strong'}`}>
-                            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${task.enabled ? 'left-[18px]' : 'left-0.5'}`} />
+                          <span className={`relative h-5 w-9 rounded-[var(--radius-pill)] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-oneui)] ${task.enabled ? 'bg-accent' : 'bg-ds-faint'}`}>
+                            <span className={`absolute top-0.5 h-4 w-4 rounded-[var(--radius-pill)] bg-white shadow-[var(--c360-shadow-sm)] transition-[left] duration-[var(--motion-fast)] ease-[var(--ease-oneui)] ${task.enabled ? 'left-[18px]' : 'left-0.5'}`} />
                           </span>
                         </label>
                       </div>
                     </div>
                     {task.lastMessage ? (
-                      <div className="mt-3 rounded-lg border border-ds-border-muted bg-ds-main/45 px-3 py-2.5">
+                      <div className="mt-3 rounded-lg border border-ds-border-muted bg-ds-subtle px-3 py-2.5">
                         <div className="mb-1.5 flex min-w-0 items-center justify-between gap-2">
                           <span className="min-w-0 truncate text-[12px] font-semibold text-ds-faint">
                             {task.lastStatus === 'error'
@@ -801,7 +797,7 @@ export function ScheduleTasksView({
                             <button
                               type="button"
                               onClick={() => toggleResultPreview(task.id)}
-                              className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
+                              className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
                               aria-expanded={expandedResultTaskIds.has(task.id)}
                             >
                               {expandedResultTaskIds.has(task.id) ? (
@@ -824,7 +820,7 @@ export function ScheduleTasksView({
                         </div>
                       </div>
                     ) : null}
-                  </div>
+                  </Card>
                 )
               })}
             </div>
@@ -965,7 +961,7 @@ function ScheduleTaskDialog({
 
   return (
     <div
-      className="ds-no-drag fixed inset-0 z-[90] flex items-center justify-center bg-black/58 px-4 py-2"
+      className="ds-no-drag fixed inset-0 z-[90] flex items-center justify-center bg-black/45 px-4 py-2 backdrop-blur-[var(--blur-overlay)]"
       onMouseDown={onClose}
     >
       <form
@@ -977,7 +973,7 @@ function ScheduleTaskDialog({
           onSubmit()
         }}
         onMouseDown={(event) => event.stopPropagation()}
-        className="flex max-h-[calc(100vh-1rem)] w-full max-w-[760px] flex-col overflow-hidden rounded-[22px] border border-white/55 bg-ds-card shadow-[0_30px_90px_rgba(20,47,95,0.28)] dark:border-white/10"
+        className="flex max-h-[calc(100vh-1rem)] w-full max-w-[760px] flex-col overflow-hidden rounded-3xl border border-ds-border bg-ds-elevated shadow-[var(--c360-shadow-overlay)]"
       >
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-ds-border-muted px-6 py-3">
           <div className="min-w-0">
@@ -988,7 +984,7 @@ function ScheduleTaskDialog({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
             aria-label={t('close')}
             title={t('close')}
           >
@@ -1010,7 +1006,7 @@ function ScheduleTaskDialog({
                     maxLength={50}
                     onChange={(event) => updateDraft({ title: event.target.value })}
                     placeholder={t('scheduleTaskNamePlaceholder')}
-                    className="h-10 w-full rounded-xl border border-ds-border bg-ds-main/55 px-3 pr-14 text-[14px] text-ds-ink outline-none transition placeholder:text-ds-faint focus:border-accent/45 focus:ring-2 focus:ring-accent/15"
+                    className="h-10 w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 pr-14 text-[14px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] placeholder:text-ds-faint focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                   />
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-ds-faint">
                     {draft.title.length}/50
@@ -1026,7 +1022,7 @@ function ScheduleTaskDialog({
                     maxLength={8_000}
                     onChange={(event) => updateDraft({ prompt: event.target.value })}
                     placeholder={t('scheduleTaskPromptPlaceholder')}
-                    className="min-h-[108px] w-full resize-y rounded-xl border border-ds-border bg-ds-main/55 px-3 py-3 pb-8 text-[14px] leading-6 text-ds-ink outline-none transition placeholder:text-ds-faint focus:border-accent/45 focus:ring-2 focus:ring-accent/15"
+                    className="min-h-[108px] w-full resize-y rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 py-3 pb-8 text-[14px] leading-6 text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] placeholder:text-ds-faint focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                   />
                   <span className="pointer-events-none absolute bottom-3 right-3 text-[12px] text-ds-faint">
                     {promptCount}/8000
@@ -1079,7 +1075,7 @@ function ScheduleTaskDialog({
                           </option>
                         ))}
                       </select>
-                      <div className="pointer-events-none flex h-10 w-full items-center gap-3 rounded-xl border border-ds-border bg-ds-main/55 px-3 pr-10 text-[14px] text-ds-ink outline-none transition peer-focus:border-accent/45 peer-focus:ring-2 peer-focus:ring-accent/15">
+                      <div className="pointer-events-none flex h-10 w-full items-center gap-3 rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 pr-10 text-[14px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] peer-focus:border-accent peer-focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]">
                         <span className="min-w-0 flex-1 truncate">
                           {selectedImDisplayChannel ? clawChannelDisplayName(selectedImDisplayChannel) : ''}
                         </span>
@@ -1104,7 +1100,7 @@ function ScheduleTaskDialog({
                     <select
                       value={modelSelection.providerId}
                       onChange={(event) => updateModelProvider(event.target.value)}
-                      className="h-10 w-full rounded-xl border border-ds-border bg-ds-main/55 px-3 text-[14px] text-ds-ink outline-none transition focus:border-accent/45 focus:ring-2 focus:ring-accent/15"
+                      className="h-10 w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 text-[14px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                     >
                       {modelProviders.map((provider) => (
                         <option key={provider.providerId} value={provider.providerId}>
@@ -1119,7 +1115,7 @@ function ScheduleTaskDialog({
                     <select
                       value={modelSelection.model}
                       onChange={(event) => updateModel(event.target.value)}
-                      className="h-10 w-full rounded-xl border border-ds-border bg-ds-main/55 px-3 text-[14px] text-ds-ink outline-none transition focus:border-accent/45 focus:ring-2 focus:ring-accent/15"
+                      className="h-10 w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 text-[14px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                     >
                       {selectedModelIds.map((model) => (
                         <option key={model} value={model}>{model}</option>
@@ -1181,7 +1177,7 @@ function ScheduleTaskDialog({
                       type="datetime-local"
                       value={dateTimeLocalValueFromIso(draft.schedule.atTime)}
                       onChange={(event) => updateSchedule({ atTime: isoFromDateTimeLocalValue(event.target.value) })}
-                      className="h-10 w-full rounded-xl border border-ds-border bg-ds-main/55 px-3 text-[14px] text-ds-ink outline-none transition focus:border-accent/45 focus:ring-2 focus:ring-accent/15"
+                      className="h-10 w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 text-[14px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                     />
                   </label>
                 ) : draft.schedule.kind === 'interval' ? (
@@ -1193,11 +1189,11 @@ function ScheduleTaskDialog({
                       max={10080}
                       value={draft.schedule.everyMinutes}
                       onChange={(event) => updateSchedule({ everyMinutes: Number(event.target.value) })}
-                      className="h-10 w-full rounded-xl border border-ds-border bg-ds-main/55 px-3 text-[14px] text-ds-ink outline-none transition focus:border-accent/45 focus:ring-2 focus:ring-accent/15"
+                      className="h-10 w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 text-[14px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                     />
                   </label>
                 ) : (
-                  <div className="flex min-h-10 items-center rounded-xl bg-ds-subtle px-3 text-[13px] text-ds-muted">
+                  <div className="flex min-h-10 items-center rounded-[var(--radius-md)] bg-ds-subtle px-3 text-[13px] text-ds-muted">
                     {t('scheduleManualHint')}
                   </div>
                 )}
@@ -1217,12 +1213,12 @@ function ScheduleTaskDialog({
                       onChange={(event) =>
                         updateDraft({ workspaceRoot: expandHomePathForSettingsUse(event.target.value) })}
                       placeholder={t('scheduleWorkspacePlaceholder')}
-                      className="h-10 w-full rounded-xl border border-ds-border bg-ds-main/55 px-3 text-[14px] text-ds-ink outline-none transition placeholder:text-ds-faint focus:border-accent/45 focus:ring-2 focus:ring-accent/15"
+                      className="h-10 w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 text-[14px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] placeholder:text-ds-faint focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                     />
                     <button
                       type="button"
                       onClick={onPickWorkspace}
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-ds-border bg-ds-card px-3 text-[13px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 text-[13px] font-medium text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
                     >
                       <FolderOpen className="h-4 w-4" strokeWidth={1.75} />
                       {draft.workspaceRoot.trim() ? t('changeWorkspace') : t('selectWorkspace')}
@@ -1235,15 +1231,15 @@ function ScheduleTaskDialog({
                   <button
                     type="button"
                     onClick={() => updateDraft({ enabled: !draft.enabled })}
-                    className="flex h-10 items-center justify-between gap-3 rounded-xl border border-ds-border bg-ds-main/55 px-3 text-[13px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
+                    className="flex h-10 items-center justify-between gap-3 rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 text-[13px] font-medium text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
                     aria-pressed={draft.enabled}
                   >
                     <span className="inline-flex min-w-0 items-center gap-2">
                       <Power className="h-4 w-4 shrink-0" strokeWidth={1.8} />
                       <span className="truncate">{t('scheduleTaskEnabled')}</span>
                     </span>
-                    <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${draft.enabled ? 'bg-ds-ink' : 'bg-ds-border-strong'}`}>
-                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${draft.enabled ? 'left-[18px]' : 'left-0.5'}`} />
+                    <span className={`relative h-5 w-9 shrink-0 rounded-[var(--radius-pill)] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-oneui)] ${draft.enabled ? 'bg-accent' : 'bg-ds-faint'}`}>
+                      <span className={`absolute top-0.5 h-4 w-4 rounded-[var(--radius-pill)] bg-white shadow-[var(--c360-shadow-sm)] transition-[left] duration-[var(--motion-fast)] ease-[var(--ease-oneui)] ${draft.enabled ? 'left-[18px]' : 'left-0.5'}`} />
                     </span>
                   </button>
                 </div>
@@ -1257,7 +1253,7 @@ function ScheduleTaskDialog({
                     max={100}
                     value={draft.priority ?? 0}
                     onChange={(event) => updateDraft({ priority: Number(event.target.value) })}
-                    className="h-10 w-full rounded-xl border border-ds-border bg-ds-main/55 px-3 text-[14px] text-ds-ink outline-none transition focus:border-accent/45 focus:ring-2 focus:ring-accent/15"
+                    className="h-10 w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 text-[14px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                   />
                 </label>
                 <div className="grid gap-2">
@@ -1265,12 +1261,12 @@ function ScheduleTaskDialog({
                   <button
                     type="button"
                     onClick={() => updateDraft({ useWorktree: !draft.useWorktree })}
-                    className="flex h-10 items-center justify-between gap-3 rounded-xl border border-ds-border bg-ds-main/55 px-3 text-[13px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
+                    className="flex h-10 items-center justify-between gap-3 rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 text-[13px] font-medium text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
                     aria-pressed={Boolean(draft.useWorktree)}
                   >
                     <span>{t('scheduleTaskUseWorktree')}</span>
-                    <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${draft.useWorktree ? 'bg-ds-ink' : 'bg-ds-border-strong'}`}>
-                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${draft.useWorktree ? 'left-[18px]' : 'left-0.5'}`} />
+                    <span className={`relative h-5 w-9 shrink-0 rounded-[var(--radius-pill)] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-oneui)] ${draft.useWorktree ? 'bg-accent' : 'bg-ds-faint'}`}>
+                      <span className={`absolute top-0.5 h-4 w-4 rounded-[var(--radius-pill)] bg-white shadow-[var(--c360-shadow-sm)] transition-[left] duration-[var(--motion-fast)] ease-[var(--ease-oneui)] ${draft.useWorktree ? 'left-[18px]' : 'left-0.5'}`} />
                     </span>
                   </button>
                 </div>
@@ -1278,7 +1274,7 @@ function ScheduleTaskDialog({
               {tasks.some((task) => task.id !== draft.id) ? (
                 <div className="grid gap-2">
                   <FieldLabel>{t('scheduleTaskDependencies')}</FieldLabel>
-                  <div className="grid max-h-32 gap-2 overflow-y-auto rounded-xl border border-ds-border bg-ds-main/35 p-3 sm:grid-cols-2">
+                  <div className="grid max-h-32 gap-2 overflow-y-auto rounded-[var(--radius-md)] border border-ds-border bg-ds-subtle p-3 sm:grid-cols-2">
                     {tasks.filter((task) => task.id !== draft.id).map((task) => {
                       const selected = (draft.dependsOn ?? []).includes(task.id)
                       return (
@@ -1303,35 +1299,24 @@ function ScheduleTaskDialog({
           </div>
 
           {error ? (
-            <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+            <div className="mt-5 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft px-3 py-2 text-[13px] text-ds-danger">
               {error}
             </div>
           ) : null}
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-ds-border-muted bg-ds-card px-6 py-3">
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="inline-flex h-8 items-center gap-2 rounded-xl px-3 text-[13px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
-          >
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-ds-border-muted bg-ds-elevated px-6 py-3">
+          <Button variant="ghost" size="sm" onClick={onOpenSettings}>
             <MoreHorizontal className="h-4 w-4" strokeWidth={1.8} />
             {t('scheduleAdvancedSettings')}
-          </button>
+          </Button>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-8 rounded-xl border border-ds-border bg-ds-card px-4 text-[13px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
-            >
+            <Button variant="secondary" size="sm" onClick={onClose}>
               {t('cancel')}
-            </button>
-            <button
-              type="submit"
-              className="h-8 rounded-xl bg-ds-userbubble px-5 text-[13px] font-semibold text-ds-userbubbleFg transition hover:opacity-90"
-            >
+            </Button>
+            <Button type="submit" size="sm">
               {t('confirm')}
-            </button>
+            </Button>
           </div>
         </div>
       </form>
@@ -1371,7 +1356,7 @@ function FieldLabel({
   return (
     <span className="flex min-h-5 items-center gap-1 text-[13px] font-medium text-ds-ink">
       <span className="min-w-0 truncate">{children}</span>
-      {required ? <span className="text-red-500">*</span> : null}
+      {required ? <span className="text-ds-danger">*</span> : null}
     </span>
   )
 }
@@ -1392,12 +1377,12 @@ function SegmentButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`h-9 min-w-0 rounded-xl border px-2.5 text-[12.5px] font-semibold transition ${
+      className={`h-9 min-w-0 rounded-[var(--radius-md)] border px-2.5 text-[12.5px] font-semibold transition-colors duration-[var(--motion-fast)] ${
         selected
-          ? 'border-accent/45 bg-accent/10 text-ds-ink shadow-sm'
+          ? 'border-[color-mix(in_srgb,var(--ds-accent)_45%,transparent)] bg-accent-soft text-accent'
           : disabled
             ? 'cursor-not-allowed border-ds-border bg-ds-subtle text-ds-faint opacity-60'
-            : 'border-ds-border bg-ds-main/55 text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
+            : 'border-ds-border bg-ds-card text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
       }`}
     >
       <span className="block truncate">{children}</span>
@@ -1415,7 +1400,7 @@ function ScheduleTimePicker({
   t: (key: string, values?: Record<string, unknown>) => string
 }): ReactElement {
   const [hour, minute] = splitTimeOfDay(value)
-  const selectClass = 'h-10 w-full rounded-xl border border-ds-border bg-ds-main/55 px-3 text-[14px] text-ds-ink outline-none transition focus:border-accent/45 focus:ring-2 focus:ring-accent/15'
+  const selectClass = 'h-10 w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 text-[14px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]'
 
   return (
     <div className="grid grid-cols-2 gap-2">

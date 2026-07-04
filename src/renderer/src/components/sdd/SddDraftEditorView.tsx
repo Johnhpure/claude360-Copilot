@@ -118,6 +118,9 @@ function SddDesignContextBar({
   // The native color swatch can only represent 6-digit hex. When the user has
   // typed a non-hex value (oklch/named), don't let the swatch silently clobber
   // it — keep the text field as the source of truth for those.
+  // token-exempt: this hex is the swatch's content default (user brand color
+  // input value), not a UI framework color — native <input type="color">
+  // requires a concrete hex and cannot read CSS variables.
   const colorInputValue = isHexBrandColor ? brandColor : '#3b82d8'
   const swatchEditable = brandColor === '' || isHexBrandColor
   const toggleTone = (value: string): void => {
@@ -131,13 +134,13 @@ function SddDesignContextBar({
   ].filter(Boolean) as string[]
   const summary = summaryParts.length > 0 ? summaryParts.join(' · ') : t('sddDesignContextEmpty')
   const chipClass = (active: boolean): string =>
-    `rounded-full border px-2.5 py-1 text-[12px] transition-colors ${
+    `rounded-full border px-2.5 py-1 text-[12px] transition-colors duration-[var(--motion-fast)] ${
       active
-        ? 'border-accent bg-accent/12 text-accent'
-        : 'border-ds-border-muted bg-ds-main/40 text-ds-muted hover:text-ds-ink'
+        ? 'border-accent bg-accent-soft text-accent'
+        : 'border-ds-border-muted text-ds-muted hover:text-ds-ink'
     }`
   return (
-    <div className="mt-2 rounded-[14px] border border-ds-border-muted bg-ds-card/70">
+    <div className="mt-2 rounded-xl border border-ds-border-muted bg-ds-card">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -186,7 +189,7 @@ function SddDesignContextBar({
                 value={brandColor}
                 placeholder={t('sddDesignBrandColorPlaceholder')}
                 onChange={(e) => onChange({ brandColor: e.target.value })}
-                className="h-7 flex-1 rounded-lg border border-ds-border-muted bg-ds-main/40 px-2 text-[12px] text-ds-ink outline-none focus:border-accent"
+                className="h-7 flex-1 rounded-lg border border-ds-border-muted bg-ds-card px-2 text-[12px] text-ds-ink outline-none focus:border-accent"
               />
               {brandColor ? (
                 <button
@@ -278,7 +281,7 @@ export function SddAssistantToggleButton({
       type="button"
       onClick={onToggleAssistant}
       className={`ds-sidebar-toggle-button ${
-        assistantOpen ? 'border-ds-border-strong bg-white/70 text-ds-ink dark:bg-white/10' : ''
+        assistantOpen ? 'bg-accent-soft text-accent' : ''
       }`}
       title={label}
       aria-label={label}
@@ -1067,7 +1070,7 @@ export function SddDraftEditorView({
   return (
     <section className="sdd-draft-shell ds-no-drag flex min-h-0 min-w-0 flex-1 flex-col px-3 sm:px-4 md:px-6 lg:px-8">
       <div className="ds-stage-inset -mx-3 shrink-0 sm:-mx-4 md:-mx-6 lg:-mx-8">
-        <header className="sdd-draft-topbar ds-topbar-surface relative z-10 mt-3 flex min-h-[56px] w-full items-stretch overflow-visible rounded-[18px]">
+        <header className="sdd-draft-topbar ds-topbar-surface relative z-10 mt-3 flex min-h-[56px] w-full items-stretch overflow-visible rounded-2xl">
           <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 sm:px-4 md:pl-5 md:pr-2">
             <div
               className={`flex min-w-0 items-center gap-2.5 ${
@@ -1081,7 +1084,7 @@ export function SddDraftEditorView({
                   ariaLabel={t('sidebarExpand')}
                 />
               ) : null}
-              <span className="sdd-draft-file-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+              <span className="sdd-draft-file-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
                 <FileText className="h-4 w-4" strokeWidth={1.9} />
               </span>
               <div className="min-w-0 flex-1 leading-none">
@@ -1099,12 +1102,12 @@ export function SddDraftEditorView({
                 aria-live="polite"
                 className={`sdd-status-pill inline-flex min-w-[72px] items-center justify-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-semibold ${
                   readOnly
-                    ? 'is-upgrading bg-sky-500/12 text-sky-700 dark:text-sky-300'
+                    ? 'is-upgrading bg-accent-soft text-accent'
                     : saveStatus === 'error'
-                      ? 'bg-red-500/12 text-red-600 dark:text-red-300'
+                      ? 'bg-ds-danger-soft text-ds-danger'
                       : saveStatus === 'dirty'
-                        ? 'bg-amber-500/12 text-amber-700 dark:text-amber-300'
-                        : 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300'
+                        ? 'bg-ds-warning-soft text-ds-warning'
+                        : 'bg-ds-success-soft text-ds-success'
                 }`}
               >
                 {readOnly || saveStatus === 'saving' ? (
@@ -1136,7 +1139,7 @@ export function SddDraftEditorView({
                 type="button"
                 onClick={onNext}
                 disabled={nextDisabled || readOnly}
-                className="sdd-next-button inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-[13px] font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45"
+                className="sdd-next-button inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-[13px] font-semibold text-white transition-colors duration-[var(--motion-fast)] hover:bg-[var(--c360-accent-hover)] disabled:cursor-not-allowed disabled:opacity-45"
               >
                 {readOnly ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
@@ -1166,7 +1169,7 @@ export function SddDraftEditorView({
 
       <div ref={editorPaneRef} className="min-h-0 min-w-0 flex-1 overflow-hidden pb-3 pt-2">
         <div
-          className={`sdd-editor-card relative h-full min-h-0 overflow-hidden rounded-[18px] border border-ds-border bg-ds-card/88 shadow-[0_20px_56px_rgba(20,47,95,0.06)] ${
+          className={`sdd-editor-card relative h-full min-h-0 overflow-hidden rounded-2xl border border-ds-border bg-ds-card shadow-[var(--c360-shadow-sm)] ${
             upgrading ? 'is-upgrading' : ''
           }`}
         >
@@ -1259,13 +1262,13 @@ export function SddDraftEditorView({
       ) : null}
 
       {error ? (
-        <div className="sdd-error-toast pointer-events-none fixed bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border border-red-200/70 bg-red-50/92 px-4 py-2 text-[13px] text-red-700 shadow-[0_14px_32px_rgba(20,47,95,0.12)] dark:border-red-900/60 dark:bg-red-950/84 dark:text-red-200">
+        <div className="sdd-error-toast pointer-events-none fixed bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border border-ds-border bg-ds-elevated px-4 py-2 text-[13px] text-ds-danger shadow-[var(--c360-shadow-overlay)]">
           {error}
         </div>
       ) : null}
       {notice ? (
         <div
-          className="pointer-events-none fixed left-1/2 z-40 -translate-x-1/2 rounded-full border border-emerald-200/80 bg-emerald-50/92 px-4 py-2 text-[13px] text-emerald-700 shadow-[0_14px_32px_rgba(20,47,95,0.12)] dark:border-emerald-900/60 dark:bg-emerald-950/84 dark:text-emerald-200"
+          className="pointer-events-none fixed left-1/2 z-40 -translate-x-1/2 rounded-full border border-ds-border bg-ds-elevated px-4 py-2 text-[13px] text-ds-success shadow-[var(--c360-shadow-overlay)]"
           style={{ bottom: error ? 68 : 20 }}
         >
           {notice.message}
