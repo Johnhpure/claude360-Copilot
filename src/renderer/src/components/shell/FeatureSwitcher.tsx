@@ -23,12 +23,12 @@ type FeatureSwitcherProps = {
 }
 
 const containerClass =
-  'mb-1.5 flex flex-row gap-1 rounded-[var(--radius-sm)] bg-[color-mix(in_srgb,var(--ds-sidebar-field-bg)_72%,transparent)] p-0.5 shadow-[inset_0_0_0_1px_var(--ds-sidebar-row-ring)]'
+  'mb-1.5 flex flex-row gap-1 rounded-[var(--radius-sm)] bg-[color-mix(in_srgb,var(--ds-sidebar-field-bg)_72%,transparent)] p-0.5 shadow-[inset_0_0_0_1px_var(--ds-sidebar-divider)]'
 
 const tabClass = (active: boolean): string =>
   `group inline-flex min-h-[28px] flex-1 min-w-0 items-center justify-center gap-1.5 rounded-[calc(var(--radius-sm)-2px)] px-2 py-0.5 text-[13px] outline-none transition-[background-color,color,box-shadow] duration-[var(--motion-fast)] focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--ds-accent)_40%,transparent)] ${
     active
-      ? 'bg-ds-elevated font-medium text-ds-ink shadow-sm'
+      ? 'bg-ds-elevated font-medium text-ds-ink shadow-[var(--ds-shadow-chip),inset_0_0_0_1px_color-mix(in_srgb,var(--ds-accent)_28%,transparent)]'
       : 'font-normal text-ds-muted hover:text-ds-ink'
   }`
 

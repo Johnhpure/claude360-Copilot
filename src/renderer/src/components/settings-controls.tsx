@@ -118,7 +118,7 @@ export function SettingsCard({
 }): ReactElement {
   return (
     <section
-      className={`rounded-xl border border-ds-border bg-ds-card ${className}`}
+      className={`rounded-2xl border border-ds-border bg-ds-card shadow-[var(--ds-shadow-card-soft)] ${className}`}
     >
       <div className="border-b border-ds-border-muted px-5 py-4">
         <h2 className="text-[16px] font-semibold text-ds-ink">{title}</h2>

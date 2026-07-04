@@ -123,14 +123,14 @@ export function SidebarCommandRow({
             : footer
               ? 'text-ds-muted hover:bg-[var(--ds-sidebar-row-hover)] hover:text-ds-ink'
               : accent
-                ? 'text-ds-ink hover:bg-[var(--ds-sidebar-row-hover)]'
+                ? 'bg-[image:var(--ds-accent-gradient)] font-medium text-white shadow-[var(--ds-accent-gradient-glow)] hover:brightness-110'
                 : 'text-ds-muted hover:bg-[var(--ds-sidebar-row-hover)] hover:text-ds-ink'
       )}
     >
       <span
         className={cx(
           'flex h-5 w-5 shrink-0 items-center justify-center',
-          accent ? 'text-ds-ink' : footer ? 'text-ds-faint' : 'text-ds-muted'
+          accent ? 'text-white' : footer ? 'text-ds-faint' : 'text-ds-muted'
         )}
       >
         {icon}
@@ -349,8 +349,8 @@ export function SidebarTreeRow({
         <span
           aria-hidden
           className={cx(
-            'absolute bottom-1 left-0 top-1 w-[2px] rounded-full transition',
-            active ? 'bg-transparent opacity-0' : 'bg-transparent opacity-0'
+            'absolute bottom-1.5 left-0 top-1.5 w-[3px] rounded-full transition',
+            active ? 'bg-accent opacity-100' : 'bg-transparent opacity-0'
           )}
         />
       ) : null}

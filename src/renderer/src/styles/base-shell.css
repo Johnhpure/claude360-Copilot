@@ -43,6 +43,10 @@
   --c360-error: #d6493f;
   --c360-shadow-sm: 0 6px 20px rgba(20, 47, 95, 0.1);
   --c360-shadow-overlay: 0 24px 64px rgba(20, 47, 95, 0.18);
+  /* 主 CTA / AI 激活态专用渐变(阶段9,Stitch Celestial Horizon):cyan 仅作渐变端点,
+     不得单独用于交互强调(accent 唯一蓝约束不变,暗色端点见 dark 块覆写) */
+  --ds-accent-gradient: linear-gradient(135deg, #0b6fd8 0%, #0aa9d8 100%);
+  --ds-accent-gradient-glow: 0 4px 14px rgba(10, 169, 216, 0.24);
 
   /* Kun 吉祥物配色:鲸蓝 #6ca2dd / 小鸟浅蓝 #85c1f1 / 奶油 #fff2db / 珊瑚 #f47464 / 藏青描边 #0e2f66 / 淡紫天光 #f9f8ff */
   /* 旧基础 token 改为引用 Calm Blue 语义层(单一事实源,旧名保留供存量调用方渐进迁移) */
@@ -134,8 +138,8 @@
   --ds-selection: rgba(11, 111, 216, 0.2);
   --ds-cursor-spotlight-rgb: 133 193 241;
   --ds-cursor-spotlight-edge-rgb: 108 162 221;
-  --ds-cursor-spotlight-dark-rgb: 161 161 170;
-  --ds-cursor-spotlight-dark-edge-rgb: 228 228 231;
+  --ds-cursor-spotlight-dark-rgb: 148 164 192;
+  --ds-cursor-spotlight-dark-edge-rgb: 196 208 228;
   --ds-cursor-spotlight: rgb(var(--ds-cursor-spotlight-rgb) / 0.28);
   --ds-cursor-spotlight-edge: rgb(var(--ds-cursor-spotlight-edge-rgb) / 0.1);
   --ds-shadow-card-soft: 0 10px 28px rgba(20, 47, 95, 0.06);
@@ -156,51 +160,53 @@
 }
 
 [data-theme='dark'] {
-  /* 曜石夜幕:近纯黑灰阶作底色(obsidian 成果保留),Calm Blue 蓝强调回归 */
-  --c360-bg: #09090b;
-  --c360-bg-sidebar: #0c0c0e;
-  --c360-surface: #141416;
-  --c360-surface-elevated: #1c1c1f;
-  --c360-border: rgba(228, 228, 231, 0.1);
-  --c360-text-primary: #ededf0;
-  --c360-text-secondary: #a0a0a8;
-  --c360-accent: #3e91ff;
-  --c360-accent-hover: #5da5ff;
-  --c360-accent-soft: rgba(62, 145, 255, 0.16);
+  /* 深空蓝黑(阶段9,Stitch Celestial Horizon):五层蓝灰阶表面 + Indigo/Cyan 强调,替代旧 obsidian 无彩灰 */
+  --c360-bg: #10131a;
+  --c360-bg-sidebar: #0b0e14;
+  --c360-surface: #191c22;
+  --c360-surface-elevated: #22252d;
+  --c360-border: rgba(225, 226, 235, 0.09);
+  --c360-text-primary: #e1e2eb;
+  --c360-text-secondary: #c1c6d6;
+  --c360-accent: #3d8bff;
+  --c360-accent-hover: #5fa3ff;
+  --c360-accent-soft: rgba(61, 139, 255, 0.16);
   --c360-success: #2fb26a;
   --c360-warning: #d99a2b;
   --c360-error: #e5665c;
-  --c360-shadow-sm: 0 6px 20px rgba(0, 0, 0, 0.38);
-  --c360-shadow-overlay: 0 24px 64px rgba(0, 0, 0, 0.55);
+  --c360-shadow-sm: 0 12px 32px rgba(0, 0, 0, 0.35);
+  --c360-shadow-overlay: 0 24px 56px rgba(0, 0, 0, 0.5);
+  --ds-accent-gradient: linear-gradient(135deg, #3d8bff 0%, #14d1ff 100%);
+  --ds-accent-gradient-glow: 0 4px 14px rgba(20, 209, 255, 0.2);
 
   --bg-app: var(--c360-bg);
   --bg-sidebar: var(--c360-bg-sidebar);
-  --bg-canvas: #111113;
+  --bg-canvas: #0e1117;
   --surface-1: var(--c360-surface);
   --surface-2: var(--c360-surface-elevated);
   --surface-3: var(--c360-surface-elevated);
   --border-soft: var(--c360-border);
-  --border-strong: rgba(228, 228, 231, 0.16);
+  --border-strong: rgba(225, 226, 235, 0.15);
   --text-primary: var(--c360-text-primary);
   --text-secondary: var(--c360-text-secondary);
-  --text-tertiary: #8b8b93;
-  --text-placeholder: #71717a;
+  --text-tertiary: #8b919f;
+  --text-placeholder: #6d7482;
 
   --ds-bg-main: var(--bg-app);
   --ds-bg-sidebar: var(--bg-sidebar);
   --ds-bg-canvas: var(--bg-canvas);
   --ds-surface-card: var(--surface-1);
   --ds-surface-elevated: var(--surface-2);
-  --ds-surface-subtle: #18181b;
-  --ds-surface-hover: rgba(228, 228, 231, 0.08);
+  --ds-surface-subtle: #1d2026;
+  --ds-surface-hover: rgba(196, 205, 224, 0.08);
   --ds-border: var(--border-soft);
-  --ds-border-muted: rgba(228, 228, 231, 0.08);
+  --ds-border-muted: rgba(196, 205, 224, 0.08);
   --ds-border-strong: var(--border-strong);
   --ds-text: var(--text-primary);
   --ds-text-muted: var(--text-secondary);
   --ds-text-faint: var(--text-tertiary);
-  --ds-bubble-user: rgba(62, 145, 255, 0.14);
-  --ds-bubble-user-fg: #fafafa;
+  --ds-bubble-user: rgba(61, 139, 255, 0.14);
+  --ds-bubble-user-fg: #f4f6fb;
   --ds-accent: var(--c360-accent);
   --ds-accent-hover: var(--c360-accent-hover);
   --ds-accent-soft: var(--c360-accent-soft);
@@ -220,56 +226,57 @@
   --ds-shadow-panel: var(--c360-shadow-sm);
   --ds-shadow-composer: var(--c360-shadow-sm);
   --ds-stage-gradient:
-    linear-gradient(180deg, #141416 0%, #111113 48%, #09090b 100%);
+    linear-gradient(180deg, #191c22 0%, #12151c 48%, #0e1117 100%);
   --ds-topbar-bg:
-    linear-gradient(180deg, rgba(24, 24, 27, 0.86) 0%, rgba(17, 17, 19, 0.7) 58%, rgba(11, 11, 13, 0.42) 100%);
+    linear-gradient(180deg, rgba(25, 28, 34, 0.86) 0%, rgba(18, 21, 28, 0.7) 58%, rgba(12, 15, 21, 0.42) 100%);
   --ds-topbar-shadow:
     0 18px 44px rgba(0, 0, 0, 0.24),
-    inset 0 1px 0 rgba(228, 228, 231, 0.06);
+    inset 0 1px 0 rgba(196, 205, 224, 0.06);
   --ds-sidebar-gradient:
-    linear-gradient(180deg, rgba(19, 19, 21, 0.96) 0%, rgba(14, 14, 16, 0.94) 48%, rgba(10, 10, 12, 0.96) 100%);
+    linear-gradient(180deg, rgba(16, 19, 26, 0.97) 0%, rgba(12, 15, 21, 0.95) 48%, rgba(9, 12, 18, 0.97) 100%);
   --ds-sidebar-haze:
-    radial-gradient(circle at 58% -12%, rgba(161, 161, 170, 0.14), transparent 36%),
-    linear-gradient(180deg, rgba(228, 228, 231, 0.04), rgba(228, 228, 231, 0) 28%);
-  --ds-sidebar-border: rgba(228, 228, 231, 0.1);
+    radial-gradient(circle at 58% -12%, rgba(61, 139, 255, 0.1), transparent 38%),
+    radial-gradient(circle at 12% 108%, rgba(20, 209, 255, 0.05), transparent 30%),
+    linear-gradient(180deg, rgba(196, 205, 224, 0.04), rgba(196, 205, 224, 0) 28%);
+  --ds-sidebar-border: rgba(196, 205, 224, 0.1);
   --ds-sidebar-shadow:
     0 24px 64px rgba(0, 0, 0, 0.42),
     0 4px 18px rgba(0, 0, 0, 0.28);
-  --ds-sidebar-row-hover: rgba(228, 228, 231, 0.07);
-  --ds-sidebar-row-active: rgba(228, 228, 231, 0.1);
-  --ds-sidebar-row-ring: rgba(228, 228, 231, 0.08);
-  --ds-sidebar-field-bg: rgba(228, 228, 231, 0.05);
-  --ds-sidebar-field-focus: rgba(228, 228, 231, 0.08);
-  --ds-sidebar-divider: rgba(228, 228, 231, 0.1);
+  --ds-sidebar-row-hover: rgba(196, 205, 224, 0.07);
+  --ds-sidebar-row-active: rgba(61, 139, 255, 0.14);
+  --ds-sidebar-row-ring: rgba(61, 139, 255, 0.22);
+  --ds-sidebar-field-bg: rgba(196, 205, 224, 0.05);
+  --ds-sidebar-field-focus: rgba(196, 205, 224, 0.08);
+  --ds-sidebar-divider: rgba(196, 205, 224, 0.1);
   --ds-card-soft:
-    linear-gradient(180deg, rgba(24, 24, 27, 0.94), rgba(16, 16, 18, 0.9));
+    linear-gradient(180deg, rgba(29, 32, 38, 0.94), rgba(18, 21, 28, 0.9));
   --ds-card-strong:
-    linear-gradient(180deg, rgba(31, 31, 35, 0.98), rgba(19, 19, 22, 0.96));
-  --ds-card-muted: rgba(24, 24, 27, 0.86);
-  --ds-card-ghost: rgba(11, 11, 13, 0.72);
+    linear-gradient(180deg, rgba(36, 40, 48, 0.98), rgba(22, 25, 32, 0.96));
+  --ds-card-muted: rgba(25, 28, 34, 0.86);
+  --ds-card-ghost: rgba(12, 15, 21, 0.72);
   --ds-card-hover:
-    linear-gradient(180deg, rgba(39, 39, 44, 0.98), rgba(24, 24, 28, 0.96));
-  --ds-chip-bg: rgba(24, 24, 27, 0.94);
-  --ds-chip-muted-bg: #18181b;
-  --ds-chip-hover: rgba(35, 35, 40, 0.98);
-  --ds-chip-border: rgba(228, 228, 231, 0.1);
+    linear-gradient(180deg, rgba(44, 48, 58, 0.98), rgba(28, 32, 40, 0.96));
+  --ds-chip-bg: rgba(25, 28, 34, 0.94);
+  --ds-chip-muted-bg: #1d2026;
+  --ds-chip-hover: rgba(38, 42, 51, 0.98);
+  --ds-chip-border: rgba(196, 205, 224, 0.1);
   --ds-chip-active:
-    linear-gradient(180deg, rgba(62, 145, 255, 0.2), rgba(62, 145, 255, 0.11));
-  --ds-kbd-bg: rgba(24, 24, 27, 0.94);
-  --ds-code-bg: #18181b;
-  --ds-inline-code-bg: rgba(228, 228, 231, 0.07);
-  --ds-inline-code-hover-bg: rgba(161, 161, 170, 0.2);
-  --ds-pre-bg: #101012;
-  --ds-code-block-bg: #0e0e10;
-  --ds-table-head-bg: rgba(24, 24, 27, 0.94);
-  --ds-scrollbar-thumb: rgba(161, 161, 170, 0.28);
-  --ds-scrollbar-thumb-hover: rgba(196, 196, 202, 0.38);
-  --ds-selection: rgba(62, 145, 255, 0.26);
+    linear-gradient(180deg, rgba(61, 139, 255, 0.2), rgba(61, 139, 255, 0.11));
+  --ds-kbd-bg: rgba(25, 28, 34, 0.94);
+  --ds-code-bg: #191c22;
+  --ds-inline-code-bg: rgba(196, 205, 224, 0.07);
+  --ds-inline-code-hover-bg: rgba(139, 145, 159, 0.2);
+  --ds-pre-bg: #12151c;
+  --ds-code-block-bg: #0f1218;
+  --ds-table-head-bg: rgba(25, 28, 34, 0.94);
+  --ds-scrollbar-thumb: rgba(139, 145, 159, 0.3);
+  --ds-scrollbar-thumb-hover: rgba(170, 178, 194, 0.4);
+  --ds-selection: rgba(61, 139, 255, 0.26);
   --ds-cursor-spotlight: rgb(var(--ds-cursor-spotlight-dark-rgb) / 0.2);
   --ds-cursor-spotlight-edge: rgb(var(--ds-cursor-spotlight-dark-edge-rgb) / 0.08);
   --ds-shadow-card-soft: 0 16px 42px rgba(0, 0, 0, 0.22);
   --ds-shadow-card-strong: 0 22px 56px rgba(0, 0, 0, 0.3);
-  --ds-shadow-chip: inset 0 1px 0 rgba(228, 228, 231, 0.05);
+  --ds-shadow-chip: inset 0 1px 0 rgba(196, 205, 224, 0.06);
 }
 
 [data-theme='dark'] .ds-composer-shell::before {
@@ -277,18 +284,19 @@
 }
 
 [data-theme='dark'] .ds-composer-shell::after {
-  border-color: color-mix(in srgb, var(--ds-text) 9%, transparent);
+  border-color: color-mix(in srgb, var(--ds-text) 12%, transparent);
 }
 
 [data-theme='dark'] body::before {
-  background: linear-gradient(180deg, #09090b 0%, #111113 100%);
+  background: linear-gradient(180deg, #10131a 0%, #12151c 100%);
 }
 
 [data-theme='dark'] body::after {
   background:
-    radial-gradient(circle at 76% -12%, rgba(161, 161, 170, 0.1), transparent 38%),
-    linear-gradient(180deg, rgba(228, 228, 231, 0.04), transparent 24%),
-    linear-gradient(120deg, rgba(228, 228, 231, 0.03), transparent 35%, rgba(228, 228, 231, 0.02) 72%, transparent);
+    radial-gradient(circle at 76% -12%, rgba(61, 139, 255, 0.08), transparent 40%),
+    radial-gradient(circle at 18% 112%, rgba(20, 209, 255, 0.04), transparent 34%),
+    linear-gradient(180deg, rgba(196, 205, 224, 0.04), transparent 24%),
+    linear-gradient(120deg, rgba(196, 205, 224, 0.03), transparent 35%, rgba(196, 205, 224, 0.02) 72%, transparent);
   opacity: 0.85;
 }
 
@@ -590,83 +598,83 @@ html {
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-/* Workbench-specific dark tuning: keep the layered near-black aligned with the obsidian palette. */
+/* Workbench-specific dark tuning: keep the layered deep-space palette aligned with the Celestial Horizon tiers (p9). */
 [data-theme='dark'] .ds-workbench-shell {
   --bg-app: var(--c360-bg);
   --bg-sidebar: var(--c360-bg-sidebar);
-  --bg-canvas: #111113;
+  --bg-canvas: #0e1117;
   --surface-1: var(--c360-surface);
   --surface-2: var(--c360-surface-elevated);
   --surface-3: var(--c360-surface-elevated);
   --border-soft: var(--c360-border);
-  --border-strong: rgba(228, 228, 231, 0.16);
+  --border-strong: rgba(225, 226, 235, 0.15);
   --text-primary: var(--c360-text-primary);
   --text-secondary: var(--c360-text-secondary);
-  --text-tertiary: #8b8b93;
-  --text-placeholder: #71717a;
+  --text-tertiary: #8b919f;
+  --text-placeholder: #6d7482;
 
   --ds-bg-main: var(--bg-app);
   --ds-bg-sidebar: var(--bg-sidebar);
   --ds-bg-canvas: var(--bg-canvas);
   --ds-surface-card: var(--surface-1);
   --ds-surface-elevated: var(--surface-2);
-  --ds-surface-subtle: #18181b;
-  --ds-surface-hover: rgba(228, 228, 231, 0.08);
+  --ds-surface-subtle: #1d2026;
+  --ds-surface-hover: rgba(196, 205, 224, 0.08);
   --ds-border: var(--border-soft);
-  --ds-border-muted: rgba(228, 228, 231, 0.06);
+  --ds-border-muted: rgba(196, 205, 224, 0.06);
   --ds-border-strong: var(--border-strong);
   --ds-text: var(--text-primary);
   --ds-text-muted: var(--text-secondary);
   --ds-text-faint: var(--text-tertiary);
-  --ds-bubble-user: rgba(62, 145, 255, 0.12);
+  --ds-bubble-user: rgba(61, 139, 255, 0.12);
   --ds-bubble-user-fg: #ffffff;
   --ds-accent-soft: var(--c360-accent-soft);
-  --ds-selection: rgba(62, 145, 255, 0.22);
+  --ds-selection: rgba(61, 139, 255, 0.22);
   --ds-shadow-shell: var(--c360-shadow-sm);
   --ds-shadow-panel: var(--c360-shadow-sm);
   --ds-shadow-composer: var(--c360-shadow-sm);
-  --ds-stage-gradient: linear-gradient(180deg, #141416 0%, #101012 100%);
+  --ds-stage-gradient: linear-gradient(180deg, #191c22 0%, #12151c 100%);
   --ds-topbar-bg:
-    linear-gradient(180deg, rgba(24, 24, 27, 0.8) 0%, rgba(17, 17, 19, 0.64) 58%, rgba(11, 11, 13, 0.34) 100%);
+    linear-gradient(180deg, rgba(25, 28, 34, 0.8) 0%, rgba(18, 21, 28, 0.64) 58%, rgba(12, 15, 21, 0.34) 100%);
   --ds-topbar-shadow:
     0 18px 42px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(228, 228, 231, 0.05);
+    inset 0 1px 0 rgba(196, 205, 224, 0.05);
   --ds-sidebar-gradient:
-    linear-gradient(180deg, rgba(19, 19, 21, 0.96) 0%, rgba(14, 14, 16, 0.94) 48%, rgba(10, 10, 12, 0.96) 100%);
+    linear-gradient(180deg, rgba(16, 19, 26, 0.96) 0%, rgba(12, 15, 21, 0.94) 48%, rgba(9, 12, 18, 0.96) 100%);
   --ds-sidebar-haze:
-    radial-gradient(circle at 58% -12%, rgba(161, 161, 170, 0.12), transparent 36%),
-    linear-gradient(180deg, rgba(228, 228, 231, 0.03), rgba(228, 228, 231, 0) 28%);
-  --ds-sidebar-border: rgba(228, 228, 231, 0.08);
+    radial-gradient(circle at 58% -12%, rgba(61, 139, 255, 0.09), transparent 38%),
+    linear-gradient(180deg, rgba(196, 205, 224, 0.03), rgba(196, 205, 224, 0) 28%);
+  --ds-sidebar-border: rgba(196, 205, 224, 0.08);
   --ds-sidebar-shadow:
     0 24px 64px rgba(0, 0, 0, 0.42),
     0 4px 18px rgba(0, 0, 0, 0.28);
-  --ds-sidebar-row-hover: rgba(228, 228, 231, 0.06);
-  --ds-sidebar-row-active: rgba(228, 228, 231, 0.09);
-  --ds-sidebar-field-bg: rgba(228, 228, 231, 0.04);
-  --ds-sidebar-field-focus: rgba(228, 228, 231, 0.07);
-  --ds-sidebar-divider: rgba(228, 228, 231, 0.08);
-  --ds-card-soft: rgba(17, 17, 19, 0.88);
-  --ds-card-strong: rgba(24, 24, 27, 0.96);
-  --ds-card-muted: rgba(24, 24, 27, 0.82);
-  --ds-card-ghost: rgba(11, 11, 13, 0.62);
-  --ds-card-hover: rgba(35, 35, 40, 0.98);
-  --ds-chip-bg: rgba(24, 24, 27, 0.94);
-  --ds-chip-muted-bg: #18181b;
-  --ds-chip-hover: rgba(35, 35, 40, 0.98);
-  --ds-chip-border: rgba(228, 228, 231, 0.08);
-  --ds-chip-active: linear-gradient(180deg, rgba(62, 145, 255, 0.16), rgba(62, 145, 255, 0.08));
-  --ds-kbd-bg: rgba(24, 24, 27, 0.94);
-  --ds-code-bg: #18181b;
-  --ds-inline-code-bg: rgba(228, 228, 231, 0.06);
-  --ds-inline-code-hover-bg: rgba(161, 161, 170, 0.18);
-  --ds-pre-bg: #101012;
-  --ds-code-block-bg: #0e0e10;
-  --ds-table-head-bg: rgba(24, 24, 27, 0.94);
-  --ds-scrollbar-thumb: rgba(170, 170, 170, 0.26);
-  --ds-scrollbar-thumb-hover: rgba(200, 200, 200, 0.36);
+  --ds-sidebar-row-hover: rgba(196, 205, 224, 0.06);
+  --ds-sidebar-row-active: rgba(61, 139, 255, 0.13);
+  --ds-sidebar-field-bg: rgba(196, 205, 224, 0.04);
+  --ds-sidebar-field-focus: rgba(196, 205, 224, 0.07);
+  --ds-sidebar-divider: rgba(196, 205, 224, 0.08);
+  --ds-card-soft: rgba(18, 21, 28, 0.88);
+  --ds-card-strong: rgba(25, 28, 34, 0.96);
+  --ds-card-muted: rgba(25, 28, 34, 0.82);
+  --ds-card-ghost: rgba(12, 15, 21, 0.62);
+  --ds-card-hover: rgba(38, 42, 51, 0.98);
+  --ds-chip-bg: rgba(25, 28, 34, 0.94);
+  --ds-chip-muted-bg: #1d2026;
+  --ds-chip-hover: rgba(38, 42, 51, 0.98);
+  --ds-chip-border: rgba(196, 205, 224, 0.08);
+  --ds-chip-active: linear-gradient(180deg, rgba(61, 139, 255, 0.16), rgba(61, 139, 255, 0.08));
+  --ds-kbd-bg: rgba(25, 28, 34, 0.94);
+  --ds-code-bg: #191c22;
+  --ds-inline-code-bg: rgba(196, 205, 224, 0.06);
+  --ds-inline-code-hover-bg: rgba(139, 145, 159, 0.18);
+  --ds-pre-bg: #12151c;
+  --ds-code-block-bg: #0f1218;
+  --ds-table-head-bg: rgba(25, 28, 34, 0.94);
+  --ds-scrollbar-thumb: rgba(139, 145, 159, 0.28);
+  --ds-scrollbar-thumb-hover: rgba(170, 178, 194, 0.38);
   --ds-shadow-card-soft: 0 16px 42px rgba(0, 0, 0, 0.2);
   --ds-shadow-card-strong: 0 22px 56px rgba(0, 0, 0, 0.28);
-  --ds-shadow-chip: inset 0 1px 0 rgba(228, 228, 231, 0.05);
+  --ds-shadow-chip: inset 0 1px 0 rgba(196, 205, 224, 0.05);
 }
 
 body {
@@ -790,11 +798,12 @@ pre {
 }
 
 .ds-composer-shell:focus-within {
-  /* 阶段3（§4.1）：输入器聚焦 = accent 描边 + 柔性外发光，全应用视觉锚点 */
+  /* 阶段9(Stitch):聚焦 = accent 描边 + 2px indigo 光圈 + 柔性外发光,全应用视觉锚点 */
   border-color: var(--ds-accent);
   box-shadow:
     var(--ds-shadow-composer),
-    0 0 0 3px var(--ds-accent-soft);
+    0 0 0 2px color-mix(in srgb, var(--ds-accent) 45%, transparent),
+    0 0 24px color-mix(in srgb, var(--ds-accent) 12%, transparent);
 }
 
 .ds-composer-shell textarea::-webkit-scrollbar-thumb {

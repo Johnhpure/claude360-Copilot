@@ -245,7 +245,6 @@ export function Sidebar({
               onClick={runtimeReady ? onNewRequirement : undefined}
               disabled={!runtimeReady}
               disabledHint={t('runtimeActionNeedsConnection')}
-              variant="accent"
             />
           </>
         ) : null}
