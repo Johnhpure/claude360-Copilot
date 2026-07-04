@@ -284,6 +284,10 @@ const modelProviderPatchSchema = z.object({
     id: z.string().trim().min(1).max(64).optional(),
     name: z.string().trim().min(1).max(80).optional(),
     apiKey: z.string().max(MAX_BODY_BYTES).optional(),
+    // Secret-store 引用（claude360:api-key:<tokenId>）。settings:get 会把它下发
+    // renderer（无明文），SettingsView 全量 snapshot 保存时原样往返；此前 strict
+    // 键清单漏收该键导致任意设置页保存报 Unrecognized key: "apiKeyRef"。
+    apiKeyRef: z.string().trim().max(256).optional(),
     baseUrl: z.string().trim().max(MAX_URL_LENGTH).optional(),
     endpointFormat: modelEndpointFormatSchema.optional(),
     kind: z.enum(['http', 'agent-sdk']).optional(),

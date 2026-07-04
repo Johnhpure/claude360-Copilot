@@ -220,6 +220,36 @@ describe('app-ipc-schemas', () => {
     expect(payload.disabledSkillIds).toEqual(['test-skill-08'])
   })
 
+  it('accepts a provider round-trip carrying apiKeyRef (full-snapshot save from SettingsView)', () => {
+    // settings:get 会把 Claude360 provider 的 secret-store 引用下发 renderer，
+    // SettingsView 全量 snapshot 保存时原样回传——strict 键清单必须收录该键，
+    // 否则任意设置页保存都会报 Unrecognized key: "apiKeyRef"（回归守护）。
+    const payload = settingsPatchSchema.parse({
+      provider: {
+        providers: [
+          {
+            id: 'claude360:默认分组',
+            name: '默认分组',
+            apiKey: '',
+            apiKeyRef: ' claude360:api-key:3f6e0f0a-1111-2222-3333-444455556666 ',
+            baseUrl: 'https://api.claude360.example/v1',
+            endpointFormat: 'chat_completions',
+            models: ['claude-sonnet-4-6']
+          }
+        ]
+      }
+    })
+
+    expect(payload.provider?.providers?.[0]?.apiKeyRef).toBe(
+      'claude360:api-key:3f6e0f0a-1111-2222-3333-444455556666'
+    )
+    expect(() =>
+      settingsPatchSchema.parse({
+        provider: { providers: [{ apiKeyRef: 'x'.repeat(257) }] }
+      })
+    ).toThrow()
+  })
+
   it('rejects low local service ports', () => {
     expect(() => settingsPatchSchema.parse({
       agents: { kun: { port: 9999 } }
