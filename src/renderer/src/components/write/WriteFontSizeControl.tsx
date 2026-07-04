@@ -47,7 +47,7 @@ export function WriteFontSizeControl(): ReactElement {
 
   return (
     <div
-      className="flex items-center gap-0.5 rounded-xl border border-ds-border-muted bg-white/68 px-1 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:bg-white/[0.06] dark:shadow-none"
+      className="flex items-center gap-0.5 rounded-xl border border-ds-border-muted bg-ds-card px-1 py-0.5 shadow-[var(--ds-shadow-chip)]"
       role="group"
       aria-label={t('writeFontSizeControl')}
     >

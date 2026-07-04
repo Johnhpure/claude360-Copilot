@@ -1373,7 +1373,7 @@ function MessageBubbleImpl({
           <AssistantMarkdown text={block.text} streaming={streaming} />
         </div>
         {!streaming ? (
-          <div className="mt-1 flex min-h-5 min-w-0 items-center justify-between gap-3 text-[11.5px] text-ds-faint opacity-0 transition duration-150 group-hover/message:opacity-100">
+          <div className="mt-1 flex min-h-5 min-w-0 items-center justify-between gap-3 text-[11.5px] text-ds-faint opacity-0 transition duration-[var(--motion-fast)] group-hover/message:opacity-100">
             <span className="min-w-0 truncate">{createdAtLabel ?? ''}</span>
             <div className="flex shrink-0 items-center gap-1.5">
               {rollbackAction ? (

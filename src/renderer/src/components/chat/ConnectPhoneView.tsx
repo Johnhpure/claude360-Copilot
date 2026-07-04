@@ -188,7 +188,7 @@ function surfaceButtonClass(extra = ''): string {
 function connectPhoneTargetIcon(provider: ClawImProvider, className = 'h-4 w-4'): ReactElement {
   if (provider === 'telegram') {
     return (
-      <span className={`inline-flex shrink-0 items-center justify-center rounded-full bg-[#27A7E7] text-white ${className}`}>
+      <span className={`inline-flex shrink-0 items-center justify-center rounded-full bg-[#27A7E7] text-white ${className}`}>{/* token-exempt: Telegram brand blue */}
         <Send className="h-[65%] w-[65%] -translate-x-[6%]" strokeWidth={2.4} />
       </span>
     )
@@ -458,11 +458,11 @@ export function ConnectPhoneView({
             <h1 className="text-[28px] font-semibold tracking-normal text-ds-ink">
               {t('connectPhoneTitle')}
             </h1>
-            <p className="mx-auto mt-2 max-w-[460px] text-[14px] leading-6 text-[#9299a3] dark:text-white/40">
+            <p className="mx-auto mt-2 max-w-[460px] text-[14px] leading-6 text-ds-faint">
               {t('connectPhoneSubtitle')}
             </p>
 
-            <div className="mx-auto mt-7 grid w-full max-w-[760px] grid-cols-4 gap-2 rounded-full bg-[#f0f1ef] p-2 shadow-inner dark:bg-white/[0.08]">
+            <div className="mx-auto mt-7 grid w-full max-w-[760px] grid-cols-4 gap-2 rounded-full bg-ds-subtle p-2 shadow-inner">
               {CONNECT_PHONE_TARGETS.map((item) => {
                 const active = target === item
                 const provider = connectPhoneProviderForTarget(item)
@@ -474,7 +474,7 @@ export function ConnectPhoneView({
                     className={`inline-flex h-10 w-full min-w-0 items-center justify-center gap-2.5 rounded-full px-4 text-[13px] font-semibold whitespace-nowrap transition ${
                       active
                         ? 'bg-white text-ds-ink shadow-sm dark:bg-white/[0.14] dark:text-white'
-                        : 'text-[#727985] hover:text-ds-ink dark:hover:text-white'
+                        : 'text-ds-muted hover:text-ds-ink'
                     }`}
                     aria-pressed={active}
                   >
@@ -486,8 +486,8 @@ export function ConnectPhoneView({
             </div>
 
             {target === 'telegram' ? (
-              <div className="mx-auto mt-9 flex w-full max-w-[400px] flex-col items-center rounded-[14px] border border-[#ececea] bg-white p-6 shadow-[0_18px_38px_rgba(32,37,43,0.05)]">
-                <span className="flex h-14 w-14 items-center justify-center rounded-[18px] bg-[#26A5E4]/10">
+              <div className="mx-auto mt-9 flex w-full max-w-[400px] flex-col items-center rounded-[14px] border border-ds-border-muted bg-white p-6 shadow-[var(--c360-shadow-sm)]">
+                <span className="flex h-14 w-14 items-center justify-center rounded-[18px] bg-[#26A5E4]/10">{/* token-exempt: Telegram brand blue soft */}
                   <ClawProviderLogo provider="telegram" className="h-8 w-8" />
                 </span>
                 <div className="mt-4 text-center text-[15px] font-semibold text-ds-ink">
@@ -513,10 +513,10 @@ export function ConnectPhoneView({
               </div>
             ) : (
               <>
-                <div className="mx-auto mt-9 flex h-[226px] w-[226px] flex-col items-center justify-center rounded-[14px] border border-[#ececea] bg-white p-3 shadow-[0_18px_38px_rgba(32,37,43,0.05)]">
+                <div className="mx-auto mt-9 flex h-[226px] w-[226px] flex-col items-center justify-center rounded-[14px] border border-ds-border-muted bg-white p-3 shadow-[var(--c360-shadow-sm)]">
                   {installQr.status === 'idle' ? (
                     <div className="grid justify-items-center gap-4">
-                      <div className="flex h-20 w-20 items-center justify-center rounded-[18px] bg-[#f3f4f2] text-[#9aa2ad]">
+                      <div className="flex h-20 w-20 items-center justify-center rounded-[18px] bg-[#f3f4f2] text-[#9aa2ad]">{/* token-exempt: fixed-white QR card content */}
                         <QrCode className="h-9 w-9" strokeWidth={1.7} />
                       </div>
                       <button
@@ -550,7 +550,7 @@ export function ConnectPhoneView({
                   ) : null}
 
                   {installQr.status === 'showing' ? (
-                    <div className="mt-3 text-center text-[12px] text-[#8d95a1]">
+                    <div className="mt-3 text-center text-[12px] text-[#8d95a1]">{/* token-exempt: fixed-white QR card content */}
                       {t('clawAddImOfficialQrTimeLeft', { seconds: installQr.timeLeft })}
                     </div>
                   ) : null}
@@ -581,8 +581,8 @@ export function ConnectPhoneView({
                   ) : null}
                 </div>
 
-                <div className="mt-4 text-center text-[12.5px] leading-5 text-[#a1a7af]">
-                  <div className="inline-flex items-center justify-center gap-1.5 font-medium text-[#68707c] dark:text-white/55">
+                <div className="mt-4 text-center text-[12.5px] leading-5 text-ds-faint">
+                  <div className="inline-flex items-center justify-center gap-1.5 font-medium text-ds-muted">
                     <ClawProviderLogo provider={targetProvider} className="h-4 w-4" />
                     {t(targetProvider === 'weixin' ? 'connectPhoneScanHintWeixin' : 'connectPhoneScanHint')}
                   </div>
@@ -601,62 +601,66 @@ export function ConnectPhoneView({
           </div>
         </div>
 
+        {/* ---- 手机样机插画（内容/领域色块）----
+          * 写实手机 + IM 聊天界面预览插画，配色绑定固定浅色画布（模拟真机截图），
+          * 不随主题反转、不映射 UI token（参照 spec --wip-* 信息图插画色先例），
+          * 逐行 token-exempt 标记；是否升级为集中变量块由主会话裁决。 */}
         <div className="hidden min-h-0 items-stretch justify-center lg:flex">
-          <div className="flex h-full max-h-[860px] w-full items-center justify-center rounded-[24px] border border-white/70 bg-[#98cef0] px-8 py-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_22px_48px_rgba(71,117,151,0.12)]">
-            <div className="relative aspect-[0.54] h-[min(80vh,720px)] min-h-[560px] rounded-[48px] border-[7px] border-[#151718] bg-[#151718] shadow-[0_26px_52px_rgba(26,38,50,0.22)]">
-              <div className="absolute -left-[11px] top-[156px] h-10 w-[5px] rounded-l-full bg-[#25282c]" />
-              <div className="absolute -left-[11px] top-[216px] h-12 w-[5px] rounded-l-full bg-[#25282c]" />
-              <div className="absolute -right-[11px] top-[210px] h-20 w-[5px] rounded-r-full bg-[#25282c]" />
+          <div className="flex h-full max-h-[860px] w-full items-center justify-center rounded-[24px] border border-white/70 bg-[#98cef0] px-8 py-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_22px_48px_rgba(71,117,151,0.12)]">{/* token-exempt: phone mockup */}
+            <div className="relative aspect-[0.54] h-[min(80vh,720px)] min-h-[560px] rounded-[48px] border-[7px] border-[#151718] bg-[#151718] shadow-[0_26px_52px_rgba(26,38,50,0.22)]">{/* token-exempt: phone mockup */}
+              <div className="absolute -left-[11px] top-[156px] h-10 w-[5px] rounded-l-full bg-[#25282c]" />{/* token-exempt: phone mockup */}
+              <div className="absolute -left-[11px] top-[216px] h-12 w-[5px] rounded-l-full bg-[#25282c]" />{/* token-exempt: phone mockup */}
+              <div className="absolute -right-[11px] top-[210px] h-20 w-[5px] rounded-r-full bg-[#25282c]" />{/* token-exempt: phone mockup */}
               <div className="absolute left-1/2 top-[13px] z-20 h-[30px] w-[92px] -translate-x-1/2 rounded-full bg-black" />
-              <div className="absolute right-[74px] top-[20px] z-30 h-3 w-3 rounded-full bg-[#151a1f]" />
-              <div className="flex h-full flex-col overflow-hidden rounded-[40px] bg-[#fffefa]">
-                <div className="flex h-[54px] shrink-0 items-end justify-between px-6 pb-2 text-[#111827]">
+              <div className="absolute right-[74px] top-[20px] z-30 h-3 w-3 rounded-full bg-[#151a1f]" />{/* token-exempt: phone mockup */}
+              <div className="flex h-full flex-col overflow-hidden rounded-[40px] bg-[#fffefa]">{/* token-exempt: phone mockup */}
+                <div className="flex h-[54px] shrink-0 items-end justify-between px-6 pb-2 text-[#111827]">{/* token-exempt: phone mockup */}
                   <span className="text-[13px] font-semibold">9:41</span>
                   <span className="flex items-center gap-1.5">
                     <Wifi className="h-4 w-4" strokeWidth={2} />
                     <Battery className="h-4 w-4" strokeWidth={2} />
                   </span>
                 </div>
-                <div className="relative flex h-12 shrink-0 items-center justify-between border-b border-[#f0f1ef] px-4 text-[#111827]">
+                <div className="relative flex h-12 shrink-0 items-center justify-between border-b border-[#f0f1ef] px-4 text-[#111827]">{/* token-exempt: phone mockup */}
                   <ChevronLeft className="h-6 w-6" strokeWidth={1.8} />
                   <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1.5 text-[14px] font-semibold">
                     <span>kun</span>
-                    <span className="rounded-[4px] bg-[#eee7ff] px-1.5 py-0.5 text-[10px] font-semibold text-[#8b5cf6]">AI</span>
+                    <span className="rounded-[4px] bg-[#eee7ff] px-1.5 py-0.5 text-[10px] font-semibold text-[#8b5cf6]">AI</span>{/* token-exempt: phone mockup */}
                   </div>
                   <MoreHorizontal className="h-5 w-5" strokeWidth={2} />
                 </div>
-                <div className="min-h-0 flex-1 bg-[#fffefa] px-5 pt-6">
+                <div className="min-h-0 flex-1 bg-[#fffefa] px-5 pt-6">{/* token-exempt: phone mockup */}
                   <div className="ml-auto flex max-w-[248px] items-start gap-2">
-                    <div className="rounded-[8px] bg-[#d6ebfb] px-4 py-3 text-left text-[13px] font-medium leading-5 text-[#1f2937]">
+                    <div className="rounded-[8px] bg-[#d6ebfb] px-4 py-3 text-left text-[13px] font-medium leading-5 text-[#1f2937]">{/* token-exempt: phone mockup */}
                       {t('connectPhonePreviewUser')}
                     </div>
-                    <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f6d75d] text-[12px] font-bold text-[#695000]">
+                    <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f6d75d] text-[12px] font-bold text-[#695000]">{/* token-exempt: phone mockup */}
                       K
                     </div>
                   </div>
                   <div className="mt-5 flex max-w-[274px] items-start gap-2">
-                    <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#dbeafe] bg-[#f1f7fd] text-[12px] font-bold text-[#2563eb]">
+                    <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#dbeafe] bg-[#f1f7fd] text-[12px] font-bold text-[#2563eb]">{/* token-exempt: phone mockup */}
                       K
                     </span>
-                    <div className="overflow-hidden rounded-[8px] border border-[#dfe6e9] bg-[#fffefa] text-left shadow-sm">
-                      <div className="flex items-center gap-2 bg-[#d2f5db] px-3 py-2">
-                        <span className="text-[12px] font-semibold text-[#15803d]">kun</span>
-                        <span className="rounded-[4px] bg-[#bff0cf] px-1.5 py-0.5 text-[10px] font-semibold text-[#15803d]">
+                    <div className="overflow-hidden rounded-[8px] border border-[#dfe6e9] bg-[#fffefa] text-left shadow-sm">{/* token-exempt: phone mockup */}
+                      <div className="flex items-center gap-2 bg-[#d2f5db] px-3 py-2">{/* token-exempt: phone mockup */}
+                        <span className="text-[12px] font-semibold text-[#15803d]">kun</span>{/* token-exempt: phone mockup */}
+                        <span className="rounded-[4px] bg-[#bff0cf] px-1.5 py-0.5 text-[10px] font-semibold text-[#15803d]">{/* token-exempt: phone mockup */}
                           {t('connectPhonePreviewDone')}
                         </span>
                       </div>
-                      <div className="px-3 py-3 text-[13px] font-medium leading-5 text-[#3f4147]">
+                      <div className="px-3 py-3 text-[13px] font-medium leading-5 text-[#3f4147]">{/* token-exempt: phone mockup */}
                         {t('connectPhonePreviewAssistant')}
                       </div>
                     </div>
                   </div>
                 </div>
-                <div className="shrink-0 bg-[#f3f4f2] px-3 pb-3 pt-2">
-                  <div className="mb-2 flex h-10 items-center gap-2 rounded-[7px] bg-[#fffefa] px-3 text-[13px] text-[#a3a3a3] shadow-sm">
+                <div className="shrink-0 bg-[#f3f4f2] px-3 pb-3 pt-2">{/* token-exempt: phone mockup */}
+                  <div className="mb-2 flex h-10 items-center gap-2 rounded-[7px] bg-[#fffefa] px-3 text-[13px] text-[#a3a3a3] shadow-sm">{/* token-exempt: phone mockup */}
                     <span className="flex-1">{t('connectPhonePreviewInput')}</span>
-                    <Maximize2 className="h-4 w-4 text-[#777]" strokeWidth={1.8} />
+                    <Maximize2 className="h-4 w-4 text-[#777]" strokeWidth={1.8} />{/* token-exempt: phone mockup */}
                   </div>
-                  <div className="flex h-8 items-center justify-between px-1 text-[#70757a]">
+                  <div className="flex h-8 items-center justify-between px-1 text-[#70757a]">{/* token-exempt: phone mockup */}
                     <Smile className="h-5 w-5" strokeWidth={1.8} />
                     <AtSign className="h-5 w-5" strokeWidth={1.8} />
                     <Mic className="h-5 w-5" strokeWidth={1.8} />
@@ -943,7 +947,7 @@ export function ConnectPhoneSidebarPanel({
     <div className="ds-no-drag flex min-h-0 flex-1 flex-col gap-3 px-2 pt-2">
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="mb-2 flex items-center justify-between px-1">
-          <span className="text-[12px] font-medium uppercase tracking-[0.08em] text-[#9aa5b5] dark:text-white/35">
+          <span className="text-[12px] font-medium uppercase tracking-[0.08em] text-ds-faint">
             {t('clawSidebarIm')}
           </span>
           <span className="flex items-center gap-1">
@@ -973,7 +977,7 @@ export function ConnectPhoneSidebarPanel({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-0.5 pb-2">
           {sortedChannels.length === 0 ? (
-            <div className="mx-1 rounded-[14px] border border-dashed border-ds-border-muted bg-ds-main/35 px-3 py-4">
+            <div className="mx-1 rounded-[14px] border border-dashed border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-bg-main)_35%,transparent)] px-3 py-4">
               <p className="text-[13.5px] font-medium text-ds-muted">{t('clawNoImTitle')}</p>
               <p className="mt-1 text-[12px] leading-5 text-ds-faint">
                 {t('clawNoImSub')}
@@ -1003,13 +1007,13 @@ export function ConnectPhoneSidebarPanel({
                     onClick={() => setTarget(providerTarget)}
                     className={`group flex min-h-[64px] w-full items-center gap-2 rounded-[12px] border px-2.5 py-2 text-left transition ${
                       active
-                        ? 'border-accent/20 bg-accent/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.62)]'
-                        : 'border-transparent hover:border-ds-border hover:bg-ds-hover/70'
+                        ? 'border-[color-mix(in_srgb,var(--ds-accent)_20%,transparent)] bg-accent-soft shadow-[inset_0_1px_0_color-mix(in_srgb,white_62%,transparent)]'
+                        : 'border-transparent hover:border-ds-border hover:bg-[color-mix(in_srgb,var(--ds-surface-hover)_70%,transparent)]'
                     } ${disabled ? 'opacity-55' : ''}`}
                     title={disabled ? t('clawImDisabledSidebar') : channel.label}
                   >
                     <MessageSquare className="h-4 w-4 shrink-0 text-ds-faint" strokeWidth={1.75} />
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-ds-card/75">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[color-mix(in_srgb,var(--ds-surface-card)_75%,transparent)]">
                       <ClawProviderLogo provider={channel.provider} className="h-5 w-5" />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -1033,8 +1037,8 @@ export function ConnectPhoneSidebarPanel({
         </div>
       </div>
 
-      <div className="mx-1 shrink-0 border-t border-ds-border-muted/70 pt-3">
-        <div className="mb-3 flex items-center gap-2 px-1 text-[12px] font-semibold text-[#9aa5b5] dark:text-white/40">
+      <div className="mx-1 shrink-0 border-t border-[color-mix(in_srgb,var(--ds-border-muted)_70%,transparent)] pt-3">
+        <div className="mb-3 flex items-center gap-2 px-1 text-[12px] font-semibold text-ds-faint">
           <ClawProviderLogo provider={targetProvider} className="h-4 w-4" />
           <span>{t('claw')}</span>
         </div>
@@ -1050,7 +1054,7 @@ export function ConnectPhoneSidebarPanel({
                 onClick={() => setTarget(item)}
                 className={`inline-flex min-h-[32px] min-w-0 items-center justify-center gap-1.5 rounded-[10px] px-2 text-[10.5px] font-semibold whitespace-nowrap transition ${
                   active
-                    ? 'bg-accent/10 text-accent'
+                    ? 'bg-accent-soft text-accent'
                     : 'text-ds-faint hover:bg-ds-hover hover:text-ds-ink'
                 }`}
                 aria-pressed={active}
@@ -1083,7 +1087,7 @@ export function ConnectPhoneSidebarPanel({
               <button
                 type="button"
                 onClick={onOpenSettings}
-                className="inline-flex min-h-[30px] w-full items-center justify-center gap-1.5 rounded-[8px] border border-ds-border bg-ds-main/55 px-2.5 py-1.5 text-[12.5px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
+                className="inline-flex min-h-[30px] w-full items-center justify-center gap-1.5 rounded-[8px] border border-ds-border bg-[color-mix(in_srgb,var(--ds-bg-main)_55%,transparent)] px-2.5 py-1.5 text-[12.5px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
               >
                 <Settings className="h-3.5 w-3.5" strokeWidth={1.8} />
                 {t('clawSettings')}
@@ -1111,7 +1115,7 @@ export function ConnectPhoneSidebarPanel({
         ) : (
           target === 'telegram' ? (
             <div className="mt-3 flex flex-col items-center rounded-[14px] border border-ds-border bg-ds-card px-3 py-4 shadow-sm">
-              <span className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-[#26A5E4]/10">
+              <span className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-[#26A5E4]/10">{/* token-exempt: Telegram brand blue soft */}
                 <ClawProviderLogo provider="telegram" className="h-6 w-6" />
               </span>
               <div className="mt-3 text-center text-[12.5px] font-semibold text-ds-ink">
@@ -1131,10 +1135,10 @@ export function ConnectPhoneSidebarPanel({
             </div>
           ) : (
             <div className="mt-3 flex flex-col items-center rounded-[14px] border border-ds-border bg-ds-card px-3 py-4 shadow-sm">
-              <div className="flex h-[156px] w-full items-center justify-center rounded-[10px] border border-[#ececea] bg-white p-2">
+              <div className="flex h-[156px] w-full items-center justify-center rounded-[10px] border border-ds-border-muted bg-white p-2">
                 {installQr.status === 'idle' ? (
                   <div className="grid justify-items-center gap-3">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-[14px] bg-[#f3f4f2] text-[#9aa2ad]">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-[14px] bg-[#f3f4f2] text-[#9aa2ad]">{/* token-exempt: fixed-white QR card content */}
                       <QrCode className="h-7 w-7" strokeWidth={1.7} />
                     </div>
                     <button
@@ -1168,7 +1172,7 @@ export function ConnectPhoneSidebarPanel({
               </div>
 
               {installQr.status === 'showing' ? (
-                <div className="mt-3 text-center text-[12px] text-[#8d95a1]">
+                <div className="mt-3 text-center text-[12px] text-ds-faint">
                   {t('clawAddImOfficialQrTimeLeft', { seconds: installQr.timeLeft })}
                 </div>
               ) : null}
@@ -1198,8 +1202,8 @@ export function ConnectPhoneSidebarPanel({
                 </div>
               ) : null}
 
-              <div className="mt-4 text-center text-[12px] leading-5 text-[#8d95a1]">
-                <div className="inline-flex items-center justify-center gap-1.5 font-medium text-[#68707c] dark:text-white/55">
+              <div className="mt-4 text-center text-[12px] leading-5 text-ds-faint">
+                <div className="inline-flex items-center justify-center gap-1.5 font-medium text-ds-muted">
                   <ClawProviderLogo provider={targetProvider} className="h-4 w-4" />
                   {clawInstallTargetLabel(t, target)}
                 </div>

@@ -18,6 +18,14 @@
   --motion-base: 220ms;
   --motion-slow: 360ms;
   --ease-oneui: cubic-bezier(0.22, 0.25, 0, 1);
+  /* ---- 领域动效缓动集中管理块（p6 起，lint 豁免 --ease- 定义行） ----
+   * UI 交互动效一律 var(--ease-oneui) + motion 三档；此处仅收敛复用≥2 次的
+   * 「装饰演出缓动」。逐帧编排段（work-logo/printer/dive）用 ease-exempt
+   * 区间标记豁免，演出节奏时长（1.15s/2.9s 等）属演出设计随 keyframes 保留。 */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1); /* 快出缓停：sdd 系入场/扫光 */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* 弹簧回弹：翻转卡 */
+  --ease-standard-decel: cubic-bezier(0.4, 0, 0.2, 1); /* 匀减速：不确定进度扫动 */
+  --ease-sonar: cubic-bezier(0.25, 0.46, 0.45, 0.94); /* 声呐扩散 */
 
   /* Calm Blue 语义 token(亮色):蓝白底 + 纯白不透明卡 + 深一档同源蓝强调 */
   --c360-bg: #f4f6fb;
@@ -866,15 +874,15 @@ pre {
 
 .ds-transition {
   transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    opacity 0.15s ease,
-    transform 0.15s ease;
+    background-color var(--motion-fast) var(--ease-oneui),
+    border-color var(--motion-fast) var(--ease-oneui),
+    box-shadow var(--motion-fast) var(--ease-oneui),
+    opacity var(--motion-fast) linear,
+    transform var(--motion-fast) var(--ease-oneui);
 }
 
 .sdd-draft-shell {
-  animation: sdd-soft-enter 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: sdd-soft-enter 180ms var(--ease-out-soft);
 }
 
 .sdd-draft-topbar,
@@ -885,16 +893,16 @@ pre {
 }
 
 .sdd-draft-topbar {
-  animation: sdd-slide-down 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: sdd-slide-down 180ms var(--ease-out-soft) both;
 }
 
 .sdd-draft-file-icon,
 .sdd-assistant-empty-icon,
 .sdd-assistant-title-pill {
   transition:
-    background-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+    background-color var(--motion-fast) var(--ease-oneui),
+    box-shadow var(--motion-fast) var(--ease-oneui),
+    transform var(--motion-fast) var(--ease-oneui);
 }
 
 .sdd-draft-topbar:hover .sdd-draft-file-icon,
@@ -905,10 +913,10 @@ pre {
 
 .sdd-status-pill {
   transition:
-    background-color 180ms ease,
-    color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
+    background-color var(--motion-fast) var(--ease-oneui),
+    color var(--motion-fast) var(--ease-oneui),
+    box-shadow var(--motion-fast) var(--ease-oneui),
+    transform var(--motion-fast) var(--ease-oneui);
 }
 
 .sdd-status-pill.is-upgrading {
@@ -918,10 +926,10 @@ pre {
 .sdd-next-button {
   box-shadow: 0 10px 22px rgba(59, 130, 216, 0.2);
   transition:
-    box-shadow 160ms ease,
-    filter 160ms ease,
-    opacity 160ms ease,
-    transform 160ms ease;
+    box-shadow var(--motion-fast) var(--ease-oneui),
+    filter var(--motion-fast) var(--ease-oneui),
+    opacity var(--motion-fast) linear,
+    transform var(--motion-fast) var(--ease-oneui);
 }
 
 .sdd-next-button:not(:disabled):hover {
@@ -934,16 +942,16 @@ pre {
 }
 
 .sdd-next-button svg {
-  transition: transform 160ms ease;
+  transition: transform var(--motion-fast) var(--ease-oneui);
 }
 
 .sdd-editor-card {
-  animation: sdd-card-rise 220ms cubic-bezier(0.22, 1, 0.36, 1) 40ms both;
+  animation: sdd-card-rise var(--motion-base) var(--ease-out-soft) 40ms both;
   transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    filter 180ms ease,
-    transform 180ms ease;
+    border-color var(--motion-fast) var(--ease-oneui),
+    box-shadow var(--motion-fast) var(--ease-oneui),
+    filter var(--motion-fast) var(--ease-oneui),
+    transform var(--motion-fast) var(--ease-oneui);
 }
 
 .sdd-editor-card.is-upgrading {
@@ -969,24 +977,24 @@ pre {
   width: 46%;
   border-radius: 999px;
   background: linear-gradient(90deg, transparent, var(--ds-accent), transparent);
-  animation: sdd-progress-sweep 1.12s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: sdd-progress-sweep 1.12s var(--ease-standard-decel) infinite;
 }
 
 .sdd-error-toast {
-  animation: sdd-toast-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: sdd-toast-in 180ms var(--ease-out-soft);
 }
 
 .sdd-assistant-panel {
-  animation: sdd-panel-enter 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: sdd-panel-enter var(--motion-base) var(--ease-out-soft);
   box-shadow: -16px 0 38px rgba(20, 47, 95, 0.035);
 }
 
 .sdd-assistant-header,
 .sdd-assistant-composer {
   transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease;
+    background-color var(--motion-fast) var(--ease-oneui),
+    border-color var(--motion-fast) var(--ease-oneui),
+    box-shadow var(--motion-fast) var(--ease-oneui);
 }
 
 .sdd-assistant-panel.is-busy .sdd-assistant-header {
@@ -994,7 +1002,7 @@ pre {
 }
 
 .sdd-assistant-sparkle {
-  transition: transform 180ms ease;
+  transition: transform var(--motion-fast) var(--ease-oneui);
 }
 
 .sdd-assistant-panel.is-busy .sdd-assistant-sparkle {
@@ -1006,7 +1014,7 @@ pre {
 }
 
 .sdd-assistant-timeline {
-  animation: sdd-soft-enter 180ms ease-out;
+  animation: sdd-soft-enter 180ms var(--ease-out-soft);
 }
 
 /*
@@ -1028,7 +1036,7 @@ pre {
 
 .sdd-assistant-empty-card,
 .sdd-assistant-action {
-  animation: sdd-card-rise 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: sdd-card-rise var(--motion-base) var(--ease-out-soft) both;
 }
 
 .sdd-assistant-action:nth-child(1) {
@@ -1041,10 +1049,10 @@ pre {
 
 .sdd-assistant-action {
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+    background-color var(--motion-fast) var(--ease-oneui),
+    border-color var(--motion-fast) var(--ease-oneui),
+    box-shadow var(--motion-fast) var(--ease-oneui),
+    transform var(--motion-fast) var(--ease-oneui);
 }
 
 .sdd-assistant-action:hover {
@@ -1162,7 +1170,7 @@ pre {
   line-height: 0;
   overflow: visible;
   transform: translateZ(0);
-  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.28s var(--ease-spring);
 }
 
 /* 悬停放大展示,移走缩回(transform 不参与布局,只会浮在邻近内容上方) */
@@ -1683,6 +1691,7 @@ pre {
   animation-delay: var(--work-logo-shadow-delay);
 }
 
+/* ease-exempt: work-logo 巡游演出编排(逐帧缓动属演出设计) */
 .ds-work-logo.is-active .ds-work-logo-track {
   animation: ds-work-logo-path var(--work-logo-duration) cubic-bezier(0.42, 0, 0.2, 1) infinite;
   animation-delay: var(--work-logo-track-delay);
@@ -1707,6 +1716,8 @@ pre {
   will-change: opacity, transform;
 }
 
+/* /ease-exempt */
+
 /* 快攻:小碎步颠跑,前倾,落地压缩 */
 
 /* 喝奶茶:惬意慢摇,中途仰头嘬一口 */
@@ -1721,7 +1732,7 @@ pre {
 
 /* ---------- Kun Crew · subagent call card ---------- */
 .ds-subagent-mount {
-  animation: ds-subagent-mount 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+  animation: ds-subagent-mount var(--motion-base) var(--ease-oneui);
 }
 @keyframes ds-subagent-mount {
   from {
@@ -1855,6 +1866,7 @@ pre {
   }
 }
 
+/* ease-exempt: work-logo 巡游路径逐帧编排(演出设计) */
 @keyframes ds-work-logo-path {
   0% {
     transform: translate3d(var(--work-logo-path-start), 0) rotate(3.6deg);
@@ -1880,6 +1892,8 @@ pre {
     transform: translate3d(var(--work-logo-path-start), 0) rotate(3.6deg);
   }
 }
+
+/* /ease-exempt */
 
 @keyframes ds-work-logo-body {
   0% {
@@ -2308,6 +2322,7 @@ pre {
   padding: 0.65rem 0.85rem;
 }
 
+/* ease-exempt: 媒体打印机揭示演出(1.15s 编排节奏) */
 .ds-media-printer-reveal {
   animation: ds-media-printer-reveal 1.15s cubic-bezier(0.2, 0.72, 0.16, 1) both;
   clip-path: inset(0 0 100% 0 round 8px);
@@ -2330,6 +2345,8 @@ pre {
   top: 0;
   z-index: 2;
 }
+
+/* /ease-exempt */
 
 @keyframes ds-media-printer-reveal {
   0% {
@@ -2418,7 +2435,7 @@ pre {
       transparent 100%
     );
   opacity: 0.72;
-  transition: opacity 160ms ease;
+  transition: opacity var(--motion-fast) linear;
   pointer-events: none;
 }
 
@@ -2441,9 +2458,9 @@ pre {
     );
   box-shadow: 0 0 10px color-mix(in srgb, var(--ds-sidebar-divider) 20%, transparent);
   transition:
-    background 160ms ease,
-    box-shadow 160ms ease,
-    opacity 160ms ease;
+    background var(--motion-fast) var(--ease-oneui),
+    box-shadow var(--motion-fast) var(--ease-oneui),
+    opacity var(--motion-fast) linear;
   pointer-events: none;
 }
 
@@ -2530,9 +2547,9 @@ pre {
   white-space: nowrap;
   text-align: center;
   transition:
-    background 140ms ease,
-    color 140ms ease,
-    transform 140ms ease;
+    background var(--motion-fast) var(--ease-oneui),
+    color var(--motion-fast) var(--ease-oneui),
+    transform var(--motion-fast) var(--ease-oneui);
 }
 
 .timeline-jump-rail-button:hover,
@@ -2936,7 +2953,7 @@ pre {
 }
 
 .ds-runtime-wake-shell::before {
-  animation: ds-runtime-wake-sweep 3.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  animation: ds-runtime-wake-sweep 3.6s var(--ease-out-soft) infinite;
   background: linear-gradient(
     112deg,
     transparent 0%,
@@ -3255,11 +3272,11 @@ pre {
 }
 
 .ds-runtime-wake-sonar.is-one {
-  animation: ds-runtime-wake-sonar 2.9s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+  animation: ds-runtime-wake-sonar 2.9s var(--ease-sonar) infinite;
 }
 
 .ds-runtime-wake-sonar.is-two {
-  animation: ds-runtime-wake-sonar 2.9s cubic-bezier(0.25, 0.46, 0.45, 0.94) 1.45s infinite;
+  animation: ds-runtime-wake-sonar 2.9s var(--ease-sonar) 1.45s infinite;
 }
 
 /* 深海气泡:从画布底部(模拟输入框后)缓缓上浮 */
@@ -3482,6 +3499,7 @@ pre {
   --work-logo-waterline-peak-opacity: 0.85;
 }
 
+/* ease-exempt: work-logo 潜水/冲刺/冲浪演出编排(逐帧缓动属演出设计) */
 .ds-work-logo.ds-work-logo-mode-dive.is-active .ds-work-logo-track {
   animation-name: ds-work-logo-dive-path;
   animation-timing-function: cubic-bezier(0.45, 0, 0.3, 1);
@@ -3600,6 +3618,8 @@ pre {
   }
 }
 
+/* /ease-exempt */
+
 /* ---------- Kun 形象状态:打招呼(欢迎) / 睡觉(待唤醒) / 坐着(空状态) ---------- */
 
 .ds-kun-state {
@@ -3608,7 +3628,7 @@ pre {
   align-items: center;
   justify-content: center;
   line-height: 0;
-  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.28s var(--ease-spring);
 }
 
 .ds-kun-state:hover {

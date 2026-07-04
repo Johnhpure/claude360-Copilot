@@ -7,7 +7,7 @@ export function ClawManageSelection({ ctx }: { ctx: Record<string, any> }): Reac
   const { busy, editableChannels, enterManageConfigure, handleDeleteChannel, loadingConfig, mode, onDeleteChannel, providerListTitle, selectedChannelId, t } = ctx
 
   return (
-                  <div className="rounded-[24px] border border-ds-border-muted bg-ds-main/45 p-5">
+                  <div className="rounded-[24px] border border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-bg-main)_45%,transparent)] p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ds-faint">
@@ -39,7 +39,7 @@ export function ClawManageSelection({ ctx }: { ctx: Record<string, any> }): Reac
                             key={channel.id}
                             className={`flex min-h-[82px] min-w-0 items-center gap-2 rounded-2xl border px-3 py-3 transition ${
                               active
-                                ? 'border-accent/55 bg-accent/10 text-ds-ink shadow-sm ring-2 ring-accent/10'
+                                ? 'border-[color-mix(in_srgb,var(--ds-accent)_55%,transparent)] bg-accent-soft text-ds-ink shadow-sm ring-2 ring-[color-mix(in_srgb,var(--ds-accent)_10%,transparent)]'
                                 : 'border-ds-border bg-ds-card text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
                             }`}
                           >
@@ -91,7 +91,7 @@ export function ClawConfigureOverview({ ctx }: { ctx: Record<string, any> }): Re
 
   return (
     <>
-                <div className="rounded-[24px] border border-ds-border-muted bg-ds-main/45 p-5">
+                <div className="rounded-[24px] border border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-bg-main)_45%,transparent)] p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     {mode === 'edit' ? (
                       <div className="flex min-w-0 items-start gap-3">
@@ -156,13 +156,13 @@ export function ClawConfigureOverview({ ctx }: { ctx: Record<string, any> }): Re
                           onClick={() => setActiveStep(step.id)}
                           className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-medium transition ${
                             active
-                              ? 'border-accent/30 bg-accent/10 text-accent'
+                              ? 'border-[color-mix(in_srgb,var(--ds-accent)_30%,transparent)] bg-accent-soft text-accent'
                               : 'border-ds-border bg-ds-card text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
                           }`}
                         >
                           <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${
                             active
-                              ? 'bg-accent/15 text-accent'
+                              ? 'bg-accent-soft text-accent'
                               : completed
                                 ? 'bg-emerald-500/12 text-emerald-600'
                                 : 'bg-ds-subtle text-ds-faint'
@@ -177,7 +177,7 @@ export function ClawConfigureOverview({ ctx }: { ctx: Record<string, any> }): Re
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-ds-border-muted bg-ds-main/45 p-5">
+                <div className="rounded-[24px] border border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-bg-main)_45%,transparent)] p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       <span
@@ -222,7 +222,7 @@ export function ClawConfigureOverview({ ctx }: { ctx: Record<string, any> }): Re
 
                   {mode === 'edit' ? (
                     <div className="mt-5 grid gap-3 xl:grid-cols-3">
-                      <div className="rounded-2xl border border-ds-border-muted bg-ds-card/85 px-4 py-3">
+                      <div className="rounded-2xl border border-ds-border-muted bg-ds-card px-4 py-3">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ds-faint">
                           {t('clawAddImSummaryConnection')}
                         </div>
@@ -233,7 +233,7 @@ export function ClawConfigureOverview({ ctx }: { ctx: Record<string, any> }): Re
                           {t('clawAddImConnectionMethod')}
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-ds-border-muted bg-ds-card/85 px-4 py-3">
+                      <div className="rounded-2xl border border-ds-border-muted bg-ds-card px-4 py-3">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ds-faint">
                           {t('clawAddImSummaryCredentials')}
                         </div>
@@ -248,7 +248,7 @@ export function ClawConfigureOverview({ ctx }: { ctx: Record<string, any> }): Re
                           {credentialStatusText}
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-ds-border-muted bg-ds-card/85 px-4 py-3">
+                      <div className="rounded-2xl border border-ds-border-muted bg-ds-card px-4 py-3">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ds-faint">
                           {t('clawAddImSummaryEndpoint')}
                         </div>
@@ -277,7 +277,7 @@ export function ClawDialogFooter({ ctx }: { ctx: Record<string, any> }): ReactEl
   const { activeStepConfig, activeStepIndex, atLastStep, busy, existingChannel, goToPreviousStep, handleDeleteChannel, handlePrimaryAction, isManageSelection, mode, navigationDisabled, noEditableChannel, onClose, onDeleteChannel, primaryActionLabel, selectedChannelId, submitDisabled, t } = ctx
 
   return (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ds-border-muted/60 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color-mix(in_srgb,var(--ds-border-muted)_60%,transparent)] px-5 py-4">
           <div className="text-[12px] leading-5 text-ds-faint">
             {isManageSelection
               ? t('clawManageImFooterHint')

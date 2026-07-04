@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from 'react'
-import { ChevronLeft, ChevronRight, Loader2, Minus, Plus, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Minus, Plus, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { ErrorState, LoadingState } from '../ui'
 import {
   GlobalWorkerOptions,
   TextLayer,
@@ -730,13 +731,12 @@ export function WritePdfViewer({
         onScroll={schedulePageSync}
       >
         {loading ? (
-          <div className="flex h-full min-h-[320px] items-center justify-center gap-2 text-[13px] text-ds-muted">
-            <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.9} />
-            {t('writePdfLoading')}
+          <div className="mx-auto flex h-full min-h-[320px] max-w-[640px] flex-col justify-center">
+            <LoadingState lines={4} label={t('writePdfLoading')} />
           </div>
         ) : error ? (
-          <div className="flex h-full min-h-[320px] items-center justify-center text-[13px] text-ds-danger">
-            {t('writePdfLoadFailed', { message: error })}
+          <div className="flex h-full min-h-[320px] items-center justify-center">
+            <ErrorState title={t('writePdfLoadFailed', { message: error })} />
           </div>
         ) : pdfDocument ? (
           <div className="mx-auto flex w-max max-w-full flex-col items-center gap-5">

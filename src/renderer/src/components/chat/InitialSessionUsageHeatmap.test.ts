@@ -7,6 +7,7 @@ import type { ModelUsageState } from '../../hooks/use-model-usage'
 import {
   InitialSessionUsageHeatmapView,
   USAGE_HEATMAP_CONTRAST_COLORS,
+  USAGE_HEATMAP_INTENSITY_CLASSES,
   usageHeatmapIntensityLevel
 } from './InitialSessionUsageHeatmap'
 
@@ -86,27 +87,6 @@ function render(
       ...props
     })
   )
-}
-
-function luminance(hex: string): number {
-  const [r, g, b] = hex
-    .replace('#', '')
-    .match(/.{2}/g)!
-    .map((part) => {
-      const channel = Number.parseInt(part, 16) / 255
-      return channel <= 0.03928
-        ? channel / 12.92
-        : ((channel + 0.055) / 1.055) ** 2.4
-    })
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b
-}
-
-function contrast(a: string, b: string): number {
-  const left = luminance(a)
-  const right = luminance(b)
-  const lighter = Math.max(left, right)
-  const darker = Math.min(left, right)
-  return (lighter + 0.05) / (darker + 0.05)
 }
 
 describe('InitialSessionUsageHeatmap', () => {
@@ -257,10 +237,20 @@ describe('InitialSessionUsageHeatmap', () => {
     expect(usageHeatmapIntensityLevel({ totalTokens: 0, turns: 0 }, 0, 6)).toBe(0)
   })
 
-  it('keeps visible non-zero intensity colors in light and dark themes', () => {
-    for (const item of USAGE_HEATMAP_CONTRAST_COLORS.filter((entry) => entry.level > 0)) {
-      expect(contrast(item.light, '#ffffff')).toBeGreaterThan(1.5)
-      expect(contrast(item.dark, '#181818')).toBeGreaterThan(1.5)
+  it('keeps a strictly increasing accent ramp so intensity levels stay distinguishable', () => {
+    for (let index = 1; index < USAGE_HEATMAP_CONTRAST_COLORS.length; index += 1) {
+      expect(USAGE_HEATMAP_CONTRAST_COLORS[index].accentMixPercent).toBeGreaterThan(
+        USAGE_HEATMAP_CONTRAST_COLORS[index - 1].accentMixPercent
+      )
+    }
+  })
+
+  it('keeps the intensity ramp contract in sync with the rendered classes', () => {
+    for (const { level, accentMixPercent } of USAGE_HEATMAP_CONTRAST_COLORS) {
+      if (level === 0) continue
+      expect(USAGE_HEATMAP_INTENSITY_CLASSES[level]).toContain(
+        accentMixPercent === 100 ? 'bg-accent' : `var(--ds-accent)_${accentMixPercent}%`
+      )
     }
   })
 })

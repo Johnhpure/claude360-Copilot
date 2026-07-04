@@ -37,28 +37,43 @@ const USAGE_RANGE_DAYS: Record<UsageRangeKey, number> = {
   '7d': 7
 }
 const USAGE_RANGE_KEYS: UsageRangeKey[] = ['all', '90d', '30d', '7d']
-const MODEL_USAGE_COLORS = ['#4f83df', '#6b99e5', '#8db3ed', '#b8cff6']
+// Data-viz ramp (usage bars / stacked breakdown): single-hue accent gradient via
+// color-mix so both themes derive from --ds-accent (light #0b6fd8 / dark #3e91ff).
+const MODEL_USAGE_COLORS = [
+  'var(--ds-accent)',
+  'color-mix(in srgb, var(--ds-accent) 72%, var(--ds-surface-subtle))',
+  'color-mix(in srgb, var(--ds-accent) 48%, var(--ds-surface-subtle))',
+  'color-mix(in srgb, var(--ds-accent) 28%, var(--ds-surface-subtle))'
+]
 const MODEL_USAGE_BREAKDOWN_COLORS = {
-  cachedInput: '#9bd8ff',
-  uncachedInput: '#62aaf8',
-  output: '#245fd7'
+  cachedInput: 'color-mix(in srgb, var(--ds-accent) 32%, var(--ds-surface-subtle))',
+  uncachedInput: 'color-mix(in srgb, var(--ds-accent) 62%, var(--ds-surface-subtle))',
+  output: 'var(--ds-accent)'
 } as const
 const EMPTY_DAILY_USAGE_BUCKETS: DailyUsageBucket[] = []
 
+// Heatmap intensity ramp: accent color-mix over --ds-surface-subtle. Both vars are
+// theme-adaptive (light: pale->deep blue on #eaf0f9; dark: dim->bright blue on
+// #18181b), so no dark: forks are needed and levels stay distinguishable.
 export const USAGE_HEATMAP_INTENSITY_CLASSES = [
   'border-ds-border-muted bg-ds-subtle',
-  'border-emerald-400 bg-emerald-500 dark:border-emerald-400/35 dark:bg-emerald-700',
-  'border-teal-400 bg-teal-500 dark:border-teal-300/40 dark:bg-teal-600',
-  'border-cyan-600 bg-cyan-600 dark:border-cyan-300/50 dark:bg-cyan-400',
-  'border-blue-700 bg-blue-700 dark:border-blue-300/60 dark:bg-blue-400'
+  'border-[color-mix(in_srgb,var(--ds-accent)_28%,var(--ds-surface-subtle))] bg-[color-mix(in_srgb,var(--ds-accent)_28%,var(--ds-surface-subtle))]',
+  'border-[color-mix(in_srgb,var(--ds-accent)_50%,var(--ds-surface-subtle))] bg-[color-mix(in_srgb,var(--ds-accent)_50%,var(--ds-surface-subtle))]',
+  'border-[color-mix(in_srgb,var(--ds-accent)_74%,var(--ds-surface-subtle))] bg-[color-mix(in_srgb,var(--ds-accent)_74%,var(--ds-surface-subtle))]',
+  'border-accent bg-accent'
 ]
 
+/**
+ * Intensity-ramp contract consumed by tests: the accent mix percent per level
+ * must stay strictly increasing so adjacent levels remain distinguishable in
+ * both themes (level 4 renders the full accent token).
+ */
 export const USAGE_HEATMAP_CONTRAST_COLORS = [
-  { level: 0, light: '#f5f7fb', dark: '#2a2a2a' },
-  { level: 1, light: '#10b981', dark: '#047857' },
-  { level: 2, light: '#14b8a6', dark: '#0d9488' },
-  { level: 3, light: '#0891b2', dark: '#22d3ee' },
-  { level: 4, light: '#1d4ed8', dark: '#60a5fa' }
+  { level: 0, accentMixPercent: 0 },
+  { level: 1, accentMixPercent: 28 },
+  { level: 2, accentMixPercent: 50 },
+  { level: 3, accentMixPercent: 74 },
+  { level: 4, accentMixPercent: 100 }
 ] as const
 
 function calendarWeeks(buckets: CalendarCell[]): CalendarWeek[] {
@@ -278,9 +293,9 @@ function PreviewCalendar({ mode }: { mode: Exclude<UsageViewMode, 'populated'> }
                     ? 'animate-pulse border-ds-border-muted bg-ds-subtle'
                     : patterned
                       ? strong
-                        ? 'border-accent/35 bg-accent/35 dark:border-accent/45 dark:bg-accent/30'
-                        : 'border-accent/18 bg-accent/16 dark:border-accent/25 dark:bg-accent/16'
-                      : 'border-ds-border-muted bg-ds-subtle/70'
+                        ? 'border-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)] bg-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)]'
+                        : 'border-[color-mix(in_srgb,var(--ds-accent)_18%,transparent)] bg-[color-mix(in_srgb,var(--ds-accent)_16%,transparent)]'
+                      : 'border-ds-border-muted bg-ds-subtle'
                 return <span key={cell} className={`h-[13px] w-[13px] rounded-[3px] border ${className}`} />
               })}
             </span>
@@ -328,8 +343,8 @@ function WarmupStatePanel({
         <div
           className={`mb-3 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[12px] font-semibold ${
             mode === 'error'
-              ? 'border-amber-300/35 bg-amber-50/70 text-amber-900 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100'
-              : 'border-accent/15 bg-accent/8 text-accent'
+              ? 'border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft text-ds-warning'
+              : 'border-[color-mix(in_srgb,var(--ds-accent)_15%,transparent)] bg-accent-soft text-accent'
           }`}
         >
           {icon}
@@ -518,7 +533,7 @@ function ModelUsagePanel({
         <div className="relative min-w-0" onMouseLeave={() => setActiveDayIndex(null)}>
           {activeDay && activeBreakdown ? (
             <div
-              className={`pointer-events-none absolute top-0 z-20 w-[min(18rem,calc(100vw-4rem))] max-w-full rounded-[18px] border border-ds-border bg-ds-card/98 p-3 shadow-[0_18px_46px_rgba(20,47,95,0.12)] backdrop-blur-xl ${tooltipTransformClass}`}
+              className={`pointer-events-none absolute top-0 z-20 w-[min(18rem,calc(100vw-4rem))] max-w-full rounded-[18px] border border-ds-border bg-[var(--ds-card-strong)] p-3 shadow-[var(--c360-shadow-overlay)] backdrop-blur-[var(--blur-overlay)] ${tooltipTransformClass}`}
               style={{ left: `${tooltipAnchorPercent}%` }}
             >
               <div className="flex items-start justify-between gap-3">
@@ -579,7 +594,7 @@ function ModelUsagePanel({
               <div key={`${bucket.date}-${index}`} className="relative grid min-w-0 grid-rows-[1fr_auto] gap-2">
                 {active ? (
                   <span
-                    className="pointer-events-none absolute bottom-5 left-1/2 top-0 z-0 w-px -translate-x-1/2 border-l border-dashed border-accent/35"
+                    className="pointer-events-none absolute bottom-5 left-1/2 top-0 z-0 w-px -translate-x-1/2 border-l border-dashed border-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)]"
                     aria-hidden
                   />
                 ) : null}
@@ -590,11 +605,11 @@ function ModelUsagePanel({
                   onMouseEnter={() => setActiveDayIndex(index)}
                   onFocus={() => setActiveDayIndex(index)}
                   onClick={() => setActiveDayIndex(index)}
-                  className="relative z-[1] flex min-h-[112px] items-end rounded-[10px] px-1 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:ring-offset-2 focus:ring-offset-ds-bg"
+                  className="relative z-[1] flex min-h-[112px] items-end rounded-[10px] px-1 focus:outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--ds-accent)_40%,transparent)] focus:ring-offset-2 focus:ring-offset-ds-bg"
                 >
                   <span
-                    className={`flex w-full flex-col-reverse overflow-hidden rounded-t-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,0.36)] transition ${
-                      active ? 'ring-1 ring-accent/18' : ''
+                    className={`flex w-full flex-col-reverse overflow-hidden rounded-t-[6px] shadow-[var(--ds-shadow-chip)] transition ${
+                      active ? 'ring-1 ring-[color-mix(in_srgb,var(--ds-accent)_18%,transparent)]' : ''
                     }`}
                     style={{ height: `${barHeight}px` }}
                   >
@@ -674,7 +689,7 @@ function UsageHeroToggle({
   return (
     <button
       type="button"
-      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent/20 bg-[radial-gradient(circle_at_34%_26%,rgba(91,128,255,0.20),transparent_46%),rgba(255,255,255,0.82)] text-accent shadow-[0_12px_28px_rgba(88,105,150,0.16)] backdrop-blur transition hover:-translate-y-0.5 hover:border-accent/35 hover:bg-white hover:text-ds-ink focus:outline-none focus:ring-2 focus:ring-accent/35 focus:ring-offset-2 focus:ring-offset-ds-bg dark:bg-white/[0.08] dark:shadow-[0_16px_34px_rgba(0,0,0,0.28)]"
+      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--ds-accent)_20%,transparent)] bg-[var(--ds-surface-card)] bg-[image:radial-gradient(circle_at_34%_26%,color-mix(in_srgb,var(--ds-accent)_20%,transparent),transparent_46%)] text-accent shadow-[var(--c360-shadow-sm)] transition hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)] hover:text-ds-ink focus:outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)] focus:ring-offset-2 focus:ring-offset-ds-bg"
       onClick={onToggle}
       aria-label={label}
       title={label}
@@ -722,7 +737,7 @@ function CollapsedCalendarCard({ onExpand }: { onExpand: () => void }): ReactEle
 
 function UsagePanelCard({ children }: { children: ReactElement }): ReactElement {
   return (
-    <div className="w-full min-w-0 rounded-[28px] border border-ds-border-muted bg-ds-card/82 p-4 shadow-[0_18px_48px_rgba(86,103,136,0.08)] dark:bg-white/[0.045] sm:p-5">
+    <div className="w-full min-w-0 rounded-[28px] border border-ds-border-muted bg-ds-card p-4 shadow-[var(--c360-shadow-sm)] sm:p-5">
       {children}
     </div>
   )

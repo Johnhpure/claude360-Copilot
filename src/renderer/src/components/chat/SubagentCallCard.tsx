@@ -196,19 +196,22 @@ function useElapsed(
   return mmss(now - start)
 }
 
+// 五态圆盘底/描边：功能色 color-mix 白底同语义浅化（queued/running=accent、done=success、
+// failed=danger、awaiting=warning），色相恒定、档位可辨（Calm Blue 强约束3）。
 const DISC_BG: Record<CardStatus, string> = {
-  queued: 'radial-gradient(circle at 50% 36%,#fff 0%,#eef4fb 80%)',
-  running: 'radial-gradient(circle at 50% 36%,#fff 0%,#e3eefb 82%)',
-  done: 'radial-gradient(circle at 50% 36%,#fff 0%,#e4f5ee 82%)',
-  failed: 'radial-gradient(circle at 50% 36%,#fff 0%,#fbe6e4 82%)',
-  'awaiting-permission': 'radial-gradient(circle at 50% 36%,#fff 0%,#fbf0df 82%)'
+  queued: 'radial-gradient(circle at 50% 36%,white 0%,color-mix(in srgb,var(--ds-accent) 8%,white) 80%)',
+  running: 'radial-gradient(circle at 50% 36%,white 0%,color-mix(in srgb,var(--ds-accent) 14%,white) 82%)',
+  done: 'radial-gradient(circle at 50% 36%,white 0%,color-mix(in srgb,var(--ds-success) 14%,white) 82%)',
+  failed: 'radial-gradient(circle at 50% 36%,white 0%,color-mix(in srgb,var(--ds-danger) 14%,white) 82%)',
+  'awaiting-permission':
+    'radial-gradient(circle at 50% 36%,white 0%,color-mix(in srgb,var(--ds-warning) 14%,white) 82%)'
 }
 const DISC_RING: Record<CardStatus, string> = {
-  queued: 'inset 0 0 0 1px rgba(188,214,245,0.7)',
-  running: 'inset 0 0 0 1px var(--ds-accent, #3b82d8)',
-  done: 'inset 0 0 0 1px #8fd9bf',
-  failed: 'inset 0 0 0 1px #efa8a2',
-  'awaiting-permission': 'inset 0 0 0 1px #e8c486'
+  queued: 'inset 0 0 0 1px color-mix(in srgb,var(--ds-accent) 26%,white)',
+  running: 'inset 0 0 0 1px var(--ds-accent)',
+  done: 'inset 0 0 0 1px color-mix(in srgb,var(--ds-success) 45%,white)',
+  failed: 'inset 0 0 0 1px color-mix(in srgb,var(--ds-danger) 45%,white)',
+  'awaiting-permission': 'inset 0 0 0 1px color-mix(in srgb,var(--ds-warning) 45%,white)'
 }
 
 function StatusDot({ status }: { status: CardStatus }): ReactElement {
@@ -228,7 +231,7 @@ function StatusDot({ status }: { status: CardStatus }): ReactElement {
     )
   }
   if (status === 'queued') {
-    return <span className={`${ring} bg-ds-faint/60`} />
+    return <span className={`${ring} bg-[color-mix(in_srgb,var(--ds-text-faint)_60%,transparent)]`} />
   }
   if (status === 'awaiting-permission') {
     return <span className={`${ring} bg-ds-warning`} />
@@ -243,7 +246,7 @@ function StatusPill({ status, t }: { status: CardStatus; t: (k: string) => strin
     case 'queued':
       return <span className={`${base} bg-ds-card-muted text-ds-muted`}>{t('subagentStatusQueued')}</span>
     case 'running':
-      return <span className={`${base} bg-accent/10 text-accent`}>{t('subagentStatusRunning')}</span>
+      return <span className={`${base} bg-accent-soft text-accent`}>{t('subagentStatusRunning')}</span>
     case 'done':
       return (
         <span className={`${base} text-ds-success bg-ds-success-soft`}>{t('subagentStatusDone')}</span>
@@ -273,7 +276,7 @@ function LaneHairline({ status, animate }: { status: CardStatus; animate: boolea
         {animate ? (
           <span className="ds-subagent-lane-sweep absolute top-0 h-full w-2/5 rounded-[2px]" />
         ) : (
-          <span className="absolute inset-y-0 left-0 w-1/3 bg-accent/60" />
+          <span className="absolute inset-y-0 left-0 w-1/3 bg-[color-mix(in_srgb,var(--ds-accent)_60%,transparent)]" />
         )}
       </div>
     )
@@ -299,7 +302,7 @@ function LaneHairline({ status, animate }: { status: CardStatus; animate: boolea
         className="absolute inset-0 opacity-60"
         style={{
           backgroundImage:
-            'repeating-linear-gradient(45deg,#dd9444 0 6px,transparent 6px 12px)'
+            'repeating-linear-gradient(45deg,var(--ds-warning) 0 6px,transparent 6px 12px)'
         }}
       />
     </div>
@@ -326,9 +329,10 @@ function AvatarDisc({
   const size = compact ? 'h-9 w-9' : 'h-11 w-11'
   const inner = compact ? 'h-[31px] w-[31px]' : 'h-9 w-9'
   // Hash-tint for same-pose custom agents — applied to the wrapper gradient only.
+  // token-exempt: per-agent identity hue is hash-derived content color, not a theme token
   const bg =
     hue !== null && status !== 'failed' && status !== 'done'
-      ? `radial-gradient(circle at 50% 36%,#fff 0%,hsl(${hue} 60% 94%) 82%)`
+      ? `radial-gradient(circle at 50% 36%,white 0%,hsl(${hue} 60% 94%) 82%)` // token-exempt: identity hue
       : DISC_BG[status]
   return (
     <span
@@ -346,7 +350,7 @@ function AvatarDisc({
 function MetaChip({ children, title }: { children: React.ReactNode; title?: string }): ReactElement {
   return (
     <span
-      className="rounded-[7px] border border-ds-border-muted bg-ds-card-muted/45 px-2 py-[3px] text-[10.5px] text-ds-muted"
+      className="rounded-[7px] border border-ds-border-muted bg-[var(--ds-card-muted)] px-2 py-[3px] text-[10.5px] text-ds-muted"
       title={title}
     >
       {children}
@@ -426,8 +430,11 @@ export function SubagentCallCard({
 
   const shellClass = inGroup
     ? 'overflow-hidden border-t border-ds-border-muted first:border-t-0'
-    : 'ds-subagent-mount overflow-hidden rounded-[20px] border border-ds-border bg-ds-card/80 shadow-[0_16px_40px_rgba(86,103,136,0.08)] backdrop-blur-xl'
-  const failBorder = !inGroup && status === 'failed' ? ' border-ds-danger/60' : ''
+    : 'ds-subagent-mount overflow-hidden rounded-[20px] border border-ds-border bg-ds-card shadow-[var(--c360-shadow-sm)]'
+  const failBorder =
+    !inGroup && status === 'failed'
+      ? ' border-[color-mix(in_srgb,var(--ds-danger)_60%,transparent)]'
+      : ''
 
   return (
     <section
@@ -451,7 +458,7 @@ export function SubagentCallCard({
           }
         }}
         className={`flex items-center gap-3 px-4 ${compact ? 'py-2.5' : 'py-3'} text-left ${
-          hasBody ? 'cursor-pointer transition hover:bg-ds-hover/30' : ''
+          hasBody ? 'cursor-pointer transition hover:bg-ds-hover' : ''
         }`}
       >
         <AvatarDisc poseId={poseId} status={status} hue={hue} compact={compact} animate={animate} />
@@ -481,7 +488,7 @@ export function SubagentCallCard({
               e.stopPropagation()
               openChild()
             }}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ds-faint transition hover:bg-accent/10 hover:text-accent"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ds-faint transition hover:bg-accent-soft hover:text-accent"
             aria-label={t('subagentOpenSession')}
             title={t('subagentOpenSession')}
           >
@@ -495,14 +502,17 @@ export function SubagentCallCard({
             <ChevronRight className="h-4 w-4 shrink-0 text-ds-faint" strokeWidth={1.8} />
           )
         ) : (
-          <ChevronRight className="h-4 w-4 shrink-0 text-ds-faint/40" strokeWidth={1.8} />
+          <ChevronRight
+            className="h-4 w-4 shrink-0 text-[color-mix(in_srgb,var(--ds-text-faint)_40%,transparent)]"
+            strokeWidth={1.8}
+          />
         )}
       </div>
 
       <LaneHairline status={status} animate={animate} />
 
       {expanded ? (
-        <div className="border-t border-ds-border-muted/70 px-4 py-3.5">
+        <div className="border-t border-ds-border-muted px-4 py-3.5">
           {detail.error?.trim() ? (
             <pre className="whitespace-pre-wrap break-words rounded-[10px] border border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-danger-soft px-3 py-2.5 font-mono text-[12px] leading-5 text-ds-danger">
               {detail.error}
@@ -602,12 +612,12 @@ export function SubagentGroup({ blocks }: { blocks: ChatBlock[] }): ReactElement
   if (done > 0) summaryParts.push(t('subagentSwarmDone', { count: done }))
 
   return (
-    <section className="ds-subagent-mount overflow-hidden rounded-[20px] border border-ds-border bg-ds-card/80 shadow-[0_16px_40px_rgba(86,103,136,0.08)] backdrop-blur-xl">
+    <section className="ds-subagent-mount overflow-hidden rounded-[20px] border border-ds-border bg-ds-card shadow-[var(--c360-shadow-sm)]">
       <button
         type="button"
         onClick={() => setCollapsed((v) => !v)}
         aria-expanded={!collapsed}
-        className="flex w-full items-center gap-3 border-b border-ds-border-muted bg-gradient-to-b from-ds-card to-ds-card-muted/40 px-4 py-3 text-left transition hover:bg-ds-hover/30"
+        className="flex w-full items-center gap-3 border-b border-ds-border-muted bg-gradient-to-b from-ds-card to-[color-mix(in_srgb,var(--ds-card-muted)_40%,transparent)] px-4 py-3 text-left transition hover:bg-ds-hover"
       >
         {anyRunning && !reducedMotion ? (
           <Loader2 className="h-4 w-4 shrink-0 animate-spin text-accent" strokeWidth={2.2} />
@@ -629,7 +639,8 @@ export function SubagentGroup({ blocks }: { blocks: ChatBlock[] }): ReactElement
               className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-ds-card"
               style={{
                 marginLeft: i === 0 ? 0 : -8,
-                background: 'radial-gradient(circle at 50% 36%,#fff,#eef4fb)'
+                background:
+                  'radial-gradient(circle at 50% 36%,white,color-mix(in srgb,var(--ds-accent) 8%,white))'
               }}
             >
               <AgentKun id={pose} className="h-5 w-5" />

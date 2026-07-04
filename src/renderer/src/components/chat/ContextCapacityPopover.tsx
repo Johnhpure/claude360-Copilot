@@ -3,12 +3,15 @@ import { useTranslation } from 'react-i18next'
 import type { ContextCapacity, ContextCategoryKey } from '../../lib/context-capacity'
 import { formatCompactNumber, formatPercent } from '../../hooks/use-thread-usage'
 
+// 分类图例色（数据可视化）：按「色相就近」映射到既有 token 保持五段互辨——
+// tools=accent 蓝、system=skill 紫、skills=success 绿、messages=danger 红、
+// other=warning 橙。功能色在此仅借色相区分类目，不承载成功/失败语义。
 const CATEGORY_COLORS: Record<ContextCategoryKey, string> = {
-  tools: '#3b82d8',
-  system: '#8b7be8',
-  skills: '#1d9e75',
-  messages: '#e0673a',
-  other: '#d8910d'
+  tools: 'var(--ds-accent)',
+  system: 'var(--ds-skill)',
+  skills: 'var(--ds-success)',
+  messages: 'var(--ds-danger)',
+  other: 'var(--ds-warning)'
 }
 
 const CATEGORY_ORDER: ContextCategoryKey[] = ['tools', 'system', 'skills', 'messages', 'other']
@@ -16,8 +19,8 @@ const CATEGORY_ORDER: ContextCategoryKey[] = ['tools', 'system', 'skills', 'mess
 const WARN_RATIO = 0.75
 
 function stateColor(usedRatio: number, thresholdRatio: number): string {
-  if (usedRatio >= thresholdRatio) return '#d9544e'
-  if (usedRatio >= WARN_RATIO) return '#d9920f'
+  if (usedRatio >= thresholdRatio) return 'var(--ds-danger)'
+  if (usedRatio >= WARN_RATIO) return 'var(--ds-warning)'
   return 'var(--ds-accent)'
 }
 
@@ -47,7 +50,7 @@ export function ContextCapacityPopover({ capacity, thresholdRatio = 0.9 }: Props
 
   return (
     <div
-      className="ds-context-capacity w-[300px] rounded-2xl border border-ds-border-muted bg-ds-card p-3.5 text-ds-ink shadow-[0_14px_34px_rgba(20,47,95,0.16)]"
+      className="ds-context-capacity w-[300px] rounded-2xl border border-ds-border-muted bg-ds-card p-3.5 text-ds-ink shadow-[var(--c360-shadow-overlay)]"
       role="dialog"
       aria-label={t('contextCapacityTitle')}
     >

@@ -426,8 +426,8 @@ function FocusModeToggle({
       onClick={onToggle}
       className={`group inline-flex h-8 w-[112px] shrink-0 items-center justify-between overflow-hidden rounded-[10px] border px-2.5 text-[12px] font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] ${
         enabled
-          ? 'border-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)] bg-[var(--ds-sidebar-row-active)] text-[#1f1f1f] shadow-[0_1px_3px_rgba(20,47,95,0.07),inset_0_0_0_1px_var(--ds-sidebar-row-ring),inset_0_1px_0_rgba(255,255,255,0.72)] dark:text-white'
-          : 'border-[var(--ds-sidebar-divider)] bg-[var(--ds-sidebar-field-bg)] text-[#5c6675] shadow-[inset_0_1px_0_rgba(255,255,255,0.46)] hover:bg-[var(--ds-sidebar-row-hover)] hover:text-[#1f2733] dark:text-white/62 dark:shadow-none dark:hover:text-white'
+          ? 'border-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)] bg-[var(--ds-sidebar-row-active)] text-ds-ink shadow-[inset_0_0_0_1px_var(--ds-sidebar-row-ring),var(--ds-shadow-chip)] dark:text-white'
+          : 'border-[var(--ds-sidebar-divider)] bg-[var(--ds-sidebar-field-bg)] text-ds-muted shadow-[var(--ds-shadow-chip)] hover:bg-[var(--ds-sidebar-row-hover)] hover:text-ds-ink dark:text-white/62 dark:shadow-none dark:hover:text-white'
       }`}
     >
       <span className="flex min-w-0 items-center gap-1.5">
@@ -437,13 +437,13 @@ function FocusModeToggle({
       <span
         className={`relative h-4 w-7 shrink-0 rounded-full transition ${
           enabled
-            ? 'bg-accent shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]'
+            ? 'bg-accent shadow-[inset_0_0_0_1px_var(--ds-border-muted)]'
             : 'bg-[color-mix(in_srgb,var(--ds-text-faint)_38%,transparent)] shadow-[inset_0_0_0_1px_var(--ds-border-muted)]'
         }`}
         aria-hidden="true"
       >
         <span
-          className={`absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-white shadow-[0_1px_3px_rgba(20,47,95,0.24)] transition-transform ${
+          className={`absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-white shadow-[var(--c360-shadow-sm)] transition-transform ${
             enabled ? 'translate-x-3' : 'translate-x-0'
           }`}
         />

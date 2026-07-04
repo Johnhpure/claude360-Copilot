@@ -82,7 +82,7 @@ function SideChatComposer({
   }
 
   return (
-    <div className="rounded-[10px] border border-ds-border-muted bg-ds-card/80 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.42)] dark:bg-white/[0.045]">
+    <div className="rounded-[10px] border border-ds-border-muted bg-ds-card px-2 py-1.5 shadow-[var(--ds-shadow-chip)] dark:bg-white/[0.045]">
       <div className="flex items-end gap-1.5">
         <textarea
           value={value}
@@ -116,7 +116,7 @@ function SideMessageBubble({ block }: { block: ChatBlock }): ReactElement | null
   if (block.kind === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[86%] rounded-[14px] bg-ds-card px-3 py-2 text-[13px] leading-5 text-ds-ink shadow-[0_6px_18px_rgba(20,47,95,0.06)]">
+        <div className="max-w-[86%] rounded-[14px] bg-ds-card px-3 py-2 text-[13px] leading-5 text-ds-ink shadow-[var(--c360-shadow-sm)]">
           <div className="ds-markdown whitespace-pre-wrap break-words">{block.text}</div>
         </div>
       </div>
@@ -136,7 +136,7 @@ function SideMessageBubble({ block }: { block: ChatBlock }): ReactElement | null
   }
   if (block.kind === 'reasoning') {
     return (
-      <div className="rounded-[12px] border border-ds-border-muted bg-ds-card/55 px-2.5 py-2 text-[12px] leading-5 text-ds-muted">
+      <div className="rounded-[12px] border border-ds-border-muted bg-ds-card px-2.5 py-2 text-[12px] leading-5 text-ds-muted">
         <div className="ds-markdown">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.text}</ReactMarkdown>
         </div>
@@ -145,7 +145,7 @@ function SideMessageBubble({ block }: { block: ChatBlock }): ReactElement | null
   }
   if (block.kind === 'tool') {
     return (
-      <div className="flex items-center gap-2 rounded-full border border-ds-border-muted bg-ds-card/70 px-3 py-1.5 text-[12px] text-ds-muted">
+      <div className="flex items-center gap-2 rounded-full border border-ds-border-muted bg-ds-card px-3 py-1.5 text-[12px] text-ds-muted">
         <Wrench className="h-3 w-3 shrink-0" strokeWidth={1.9} />
         <span className="min-w-0 flex-1 truncate">
           {block.summary || block.toolKind || 'tool'}
@@ -158,21 +158,21 @@ function SideMessageBubble({ block }: { block: ChatBlock }): ReactElement | null
   }
   if (block.kind === 'approval' || block.kind === 'compaction') {
     return (
-      <div className="rounded-full border border-ds-border-muted bg-ds-card/60 px-3 py-1.5 text-[12px] text-ds-muted">
+      <div className="rounded-full border border-ds-border-muted bg-ds-card px-3 py-1.5 text-[12px] text-ds-muted">
         {block.summary}
       </div>
     )
   }
   if (block.kind === 'user_input') {
     return (
-      <div className="rounded-full border border-ds-border-muted bg-ds-card/60 px-3 py-1.5 text-[12px] text-ds-muted">
+      <div className="rounded-full border border-ds-border-muted bg-ds-card px-3 py-1.5 text-[12px] text-ds-muted">
         {block.questions.map((q) => q.question).join(' · ') || 'user input'}
       </div>
     )
   }
   if (block.kind === 'system') {
     return (
-      <div className="rounded-[12px] border border-ds-border-muted bg-ds-card/55 px-3 py-2 text-[12px] text-ds-muted">
+      <div className="rounded-[12px] border border-ds-border-muted bg-ds-card px-3 py-2 text-[12px] text-ds-muted">
         {block.text}
       </div>
     )
@@ -321,7 +321,7 @@ export function SideConversationPanel({
       <button
         type="button"
         onClick={() => setMinimized(false)}
-        className={`ds-side-chat-mini ds-no-drag fixed bottom-[112px] z-40 flex h-11 items-center gap-2 rounded-full border border-ds-border-muted bg-ds-card/94 px-3 text-ds-muted shadow-[0_16px_42px_rgba(20,47,95,0.18)] backdrop-blur-xl transition hover:bg-ds-card hover:text-ds-ink ${className ?? ''}`}
+        className={`ds-side-chat-mini ds-no-drag fixed bottom-[112px] z-40 flex h-11 items-center gap-2 rounded-full border border-ds-border-muted bg-ds-card px-3 text-ds-muted shadow-[var(--c360-shadow-sm)] transition hover:text-ds-ink ${className ?? ''}`}
         style={rightStyle}
         aria-label={t('sidePanelExpand')}
         title={t('sidePanelExpand')}
@@ -337,7 +337,7 @@ export function SideConversationPanel({
 
   return (
     <aside
-      className={`ds-side-chat ds-no-drag fixed bottom-[112px] z-40 flex max-h-[min(520px,calc(100vh-180px))] w-[min(360px,calc(100vw-24px))] flex-col overflow-hidden rounded-[14px] border border-ds-border bg-ds-card/96 text-ds-ink shadow-[0_22px_64px_rgba(20,47,95,0.2)] backdrop-blur-xl dark:bg-ds-card/96 dark:shadow-[0_24px_72px_rgba(0,0,0,0.46)] ${className ?? ''}`}
+      className={`ds-side-chat ds-no-drag fixed bottom-[112px] z-40 flex max-h-[min(520px,calc(100vh-180px))] w-[min(360px,calc(100vw-24px))] flex-col overflow-hidden rounded-[14px] border border-ds-border bg-ds-card text-ds-ink shadow-[var(--c360-shadow-overlay)] ${className ?? ''}`}
       style={rightStyle}
       aria-label={t('sidePanelTitle')}
     >
@@ -362,7 +362,7 @@ export function SideConversationPanel({
           </div>
 
           {switchMenuOpen ? (
-            <div className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-[12px] border border-ds-border bg-ds-card/98 p-1 shadow-[0_18px_46px_rgba(20,47,95,0.18)] backdrop-blur-xl">
+            <div className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-[12px] border border-ds-border bg-[var(--ds-card-strong)] p-1 shadow-[var(--c360-shadow-overlay)] backdrop-blur-[var(--blur-overlay)]">
               {currentSides.map((side) => {
                 const selected = side.threadId === activeSide?.threadId
                 return (
@@ -424,7 +424,7 @@ export function SideConversationPanel({
               <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={1.9} />
             </button>
             {moreMenuOpen && activeSide ? (
-              <div className="absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded-[12px] border border-ds-border bg-ds-card/98 p-1 text-[12.5px] shadow-[0_18px_46px_rgba(20,47,95,0.18)] backdrop-blur-xl">
+              <div className="absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded-[12px] border border-ds-border bg-[var(--ds-card-strong)] p-1 text-[12.5px] shadow-[var(--c360-shadow-overlay)] backdrop-blur-[var(--blur-overlay)]">
                 <button
                   type="button"
                   onClick={promoteActiveSide}

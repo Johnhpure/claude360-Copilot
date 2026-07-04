@@ -55,7 +55,7 @@ export function ChatStarterGrid({
           key={starter.titleKey}
           type="button"
           onClick={() => onSelectSuggestion?.(t(starter.promptKey))}
-          className={`ds-empty-hero-card group flex min-h-[112px] items-center gap-4 rounded-[16px] border border-ds-border bg-ds-card px-5 py-4 text-left shadow-[var(--c360-shadow-sm)] transition duration-200 hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--ds-accent)_18%,transparent)] hover:bg-ds-elevated ${compact ? 'min-h-[92px]' : ''}`}
+          className={`ds-empty-hero-card group flex min-h-[112px] items-center gap-4 rounded-[16px] border border-ds-border bg-ds-card px-5 py-4 text-left shadow-[var(--c360-shadow-sm)] transition duration-[var(--motion-base)] hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--ds-accent)_18%,transparent)] hover:bg-ds-elevated ${compact ? 'min-h-[92px]' : ''}`}
         >
           <span
             className={`ds-empty-hero-card-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] ${SUGGESTION_TONE[starter.tone]}`}

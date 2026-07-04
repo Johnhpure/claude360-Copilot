@@ -1211,7 +1211,7 @@ export function SddDraftHistoryRows({
         <span className="min-w-0 flex-1 truncate text-[11.5px] font-medium text-ds-faint">
           {t('sddDraftHistoryTitle')}
         </span>
-        <span className="shrink-0 rounded-md bg-ds-card/70 px-1.5 py-0.5 text-[10.5px] text-ds-faint tabular-nums">
+        <span className="shrink-0 rounded-md bg-ds-card px-1.5 py-0.5 text-[10.5px] text-ds-faint tabular-nums">
           {items.length}
         </span>
       </SidebarTreeRow>
@@ -1267,7 +1267,7 @@ export function SddDraftHistoryRows({
                 <span className="block truncate text-[13px] leading-4 text-ds-ink">{item.title}</span>
                 <span className="block truncate text-[11.5px] leading-4 text-ds-faint">{item.relativePath}</span>
               </span>
-              <span className="shrink-0 rounded-md bg-ds-card/70 px-1.5 py-0.5 text-[10.5px] text-ds-faint transition group-hover:opacity-0 group-focus-within:opacity-0">
+              <span className="shrink-0 rounded-md bg-ds-card px-1.5 py-0.5 text-[10.5px] text-ds-faint transition group-hover:opacity-0 group-focus-within:opacity-0">
                 {item.source === 'remembered' ? t('sddDraftHistoryRemembered') : t('sddDraftHistoryDisk')}
               </span>
             </SidebarTreeRow>
@@ -1393,7 +1393,7 @@ export function ThreadRow({
         ) : null}
         {worktreeRecord ? (
           <span
-            className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-full border border-ds-border-muted bg-ds-card/80 text-ds-muted"
+            className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-full border border-ds-border-muted bg-ds-card text-ds-muted"
             title={worktreeLabel}
             aria-label={worktreeLabel}
           >
@@ -1461,7 +1461,7 @@ export function ThreadRenameDialog({
       <form
         onSubmit={onSubmit}
         onMouseDown={(event) => event.stopPropagation()}
-        className="w-full max-w-sm rounded-[24px] border border-ds-border bg-ds-card p-5 shadow-[0_24px_72px_rgba(20,47,95,0.22)]"
+        className="w-full max-w-sm rounded-[24px] border border-ds-border bg-ds-card p-5 shadow-[var(--c360-shadow-overlay)]"
       >
         <h2
           id="thread-rename-dialog-title"
@@ -1479,7 +1479,7 @@ export function ThreadRenameDialog({
           value={state.value}
           onChange={(event) => onValueChange(event.target.value)}
           onFocus={(event) => event.currentTarget.select()}
-          className="mt-4 w-full rounded-xl border border-ds-border bg-ds-main/65 px-3 py-2 text-[14px] text-ds-ink outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/25 disabled:cursor-wait disabled:opacity-70"
+          className="mt-4 w-full rounded-xl border border-ds-border bg-ds-main px-3 py-2 text-[14px] text-ds-ink outline-none transition focus:border-[color-mix(in_srgb,var(--ds-accent)_40%,transparent)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] disabled:cursor-wait disabled:opacity-70"
         />
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -1537,7 +1537,7 @@ function ThreadContextMenu({
     <div
       role="menu"
       aria-label={state.thread.title}
-      className="ds-thread-context-menu ds-no-drag fixed z-50 min-w-[210px] rounded-[16px] border border-ds-border bg-ds-card/95 p-1.5 text-[13px] text-ds-ink shadow-[0_18px_52px_rgba(20,47,95,0.18)] backdrop-blur-xl dark:bg-ds-card"
+      className="ds-thread-context-menu ds-no-drag fixed z-50 min-w-[210px] rounded-[16px] border border-ds-border bg-[var(--ds-card-strong)] p-1.5 text-[13px] text-ds-ink shadow-[var(--c360-shadow-overlay)] backdrop-blur-[var(--blur-overlay)]"
       style={{ left: state.x, top: state.y }}
       onPointerDown={(event) => event.stopPropagation()}
     >
@@ -1606,7 +1606,7 @@ function WorkspaceContextMenu({
     <div
       role="menu"
       aria-label={state.workspacePath}
-      className="ds-workspace-context-menu ds-no-drag fixed z-50 min-w-[230px] rounded-[16px] border border-ds-border bg-ds-card/95 p-1.5 text-[13px] text-ds-ink shadow-[0_18px_52px_rgba(20,47,95,0.18)] backdrop-blur-xl dark:bg-ds-card"
+      className="ds-workspace-context-menu ds-no-drag fixed z-50 min-w-[230px] rounded-[16px] border border-ds-border bg-[var(--ds-card-strong)] p-1.5 text-[13px] text-ds-ink shadow-[var(--c360-shadow-overlay)] backdrop-blur-[var(--blur-overlay)]"
       style={{ left: state.x, top: state.y }}
       onPointerDown={(event) => event.stopPropagation()}
     >
@@ -1664,7 +1664,7 @@ function SidebarActionDialog({
     >
       <div
         onMouseDown={(event) => event.stopPropagation()}
-        className="w-full max-w-[520px] rounded-[26px] border border-ds-border bg-ds-elevated p-6 shadow-[0_26px_82px_rgba(20,47,95,0.24)] backdrop-blur-xl"
+        className="w-full max-w-[520px] rounded-[26px] border border-ds-border bg-ds-elevated p-6 shadow-[var(--c360-shadow-overlay)]"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">

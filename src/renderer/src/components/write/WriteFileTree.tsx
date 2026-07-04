@@ -236,7 +236,7 @@ export function WriteFileTree({
             {[0, 1, 2, 3, 4].map((item) => (
               <div
                 key={item}
-                className="h-8 animate-pulse rounded-lg bg-ds-hover"
+                className="ds-ui-skeleton h-8 rounded-lg bg-ds-hover"
                 style={{ width: `${92 - item * 8}%` }}
               />
             ))}

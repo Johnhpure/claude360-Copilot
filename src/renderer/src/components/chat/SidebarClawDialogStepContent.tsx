@@ -73,7 +73,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
 
   return activeStep === 'defaults' ? (
                   <div className="mt-5 space-y-4">
-                    <div className="rounded-[24px] border border-ds-border-muted bg-ds-main/45 p-5">
+                    <div className="rounded-[24px] border border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-bg-main)_45%,transparent)] p-5">
                       <div className="text-[13px] font-semibold text-ds-ink">
                         {t('clawAddImProfileBasics')}
                       </div>
@@ -91,7 +91,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                             placeholder={t('clawAddImAgentNamePlaceholder', {
                               provider: clawInstallTargetLabel(t, officialInstallTarget)
                             })}
-                            className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-accent/60"
+                            className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-[color-mix(in_srgb,var(--ds-accent)_60%,transparent)]"
                           />
                         </label>
                         <label className="block min-w-0">
@@ -102,7 +102,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                             value={agentProfile.description}
                             onChange={(event) => updateAgentProfile({ description: event.target.value })}
                             placeholder={t('clawAddImAgentDescriptionPlaceholder')}
-                            className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-accent/60"
+                            className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-[color-mix(in_srgb,var(--ds-accent)_60%,transparent)]"
                           />
                         </label>
                       </div>
@@ -114,7 +114,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                           <select
                             value={channelModel}
                             onChange={(event) => setChannelModel(event.target.value)}
-                            className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-accent/60"
+                            className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-[color-mix(in_srgb,var(--ds-accent)_60%,transparent)]"
                           >
                             {channelModelOptions.map((model: string) => (
                               <option key={model} value={model}>{model}</option>
@@ -131,7 +131,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                               type="button"
                               onClick={() => setChannelEnabled((value: boolean) => !value)}
                               className={`relative h-6 w-11 rounded-full transition ${
-                                channelEnabled ? 'bg-accent/80' : 'bg-ds-border'
+                                channelEnabled ? 'bg-accent' : 'bg-ds-border'
                               }`}
                             >
                               <span
@@ -151,13 +151,13 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                           value={channelWorkspaceRoot}
                           onChange={(event) => setChannelWorkspaceRoot(event.target.value)}
                           placeholder={t('clawWorkspaceOverrideHint')}
-                          className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-accent/60"
+                          className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-[color-mix(in_srgb,var(--ds-accent)_60%,transparent)]"
                         />
                         <span className="mt-1.5 block text-[12px] leading-5 text-ds-faint">
                           {t('clawWorkspaceOverrideDesc')}
                         </span>
                         <span
-                          className="mt-1 block break-all rounded-xl border border-ds-border-muted bg-ds-main/55 px-3 py-2 font-mono text-[11.5px] leading-5 text-ds-muted"
+                          className="mt-1 block break-all rounded-xl border border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-bg-main)_55%,transparent)] px-3 py-2 font-mono text-[11.5px] leading-5 text-ds-muted"
                           title={defaultWorkspacePreview}
                         >
                           {defaultWorkspacePreview}
@@ -167,7 +167,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                   </div>
                 ) : activeStep === 'prompt' ? (
                   <div className="mt-5 space-y-4">
-                    <div className="rounded-[24px] border border-ds-border-muted bg-ds-main/45 p-5">
+                    <div className="rounded-[24px] border border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-bg-main)_45%,transparent)] p-5">
                       <div className="text-[13px] font-semibold text-ds-ink">
                         {t('clawAddImPersonaTitle')}
                       </div>
@@ -176,7 +176,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                       </p>
                       <div className="mt-4 grid gap-4 xl:grid-cols-2">
                         {CLAW_AGENT_TABS.map((tab) => (
-                          <label key={tab.id} className="block rounded-2xl border border-ds-border-muted bg-ds-card/80 p-4">
+                          <label key={tab.id} className="block rounded-2xl border border-ds-border-muted bg-ds-card p-4">
                             <span className="block text-[13px] font-semibold text-ds-ink">
                               {t(tab.labelKey)}
                             </span>
@@ -187,7 +187,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                               value={agentProfile[tab.id]}
                               onChange={(event) => updateAgentProfile({ [tab.id]: event.target.value })}
                               placeholder={t(tab.placeholderKey)}
-                              className="mt-3 min-h-[170px] w-full resize-y rounded-2xl border border-ds-border bg-ds-main/50 px-4 py-3 text-[13px] leading-6 text-ds-ink outline-none transition focus:border-accent/60"
+                              className="mt-3 min-h-[170px] w-full resize-y rounded-2xl border border-ds-border bg-[color-mix(in_srgb,var(--ds-bg-main)_50%,transparent)] px-4 py-3 text-[13px] leading-6 text-ds-ink outline-none transition focus:border-[color-mix(in_srgb,var(--ds-accent)_60%,transparent)]"
                             />
                           </label>
                         ))}
@@ -197,7 +197,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                 ) : (
                   <div className="mt-5 space-y-4">
                     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-                      <div className="rounded-[24px] border border-ds-border-muted bg-ds-main/45 p-5">
+                      <div className="rounded-[24px] border border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-bg-main)_45%,transparent)] p-5">
                         <div className="text-[13px] font-semibold text-ds-ink">
                           {t('clawAddImConnectionMethod')}
                         </div>
@@ -235,7 +235,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                                     onClick={() => setOfficialInstallTarget(target)}
                                     className={`rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition ${
                                       active
-                                        ? 'bg-accent/12 text-accent'
+                                        ? 'bg-accent-soft text-accent'
                                         : 'text-ds-faint hover:bg-ds-hover hover:text-ds-ink'
                                     }`}
                                   >
@@ -262,7 +262,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-center justify-center rounded-[24px] border border-dashed border-ds-border-muted bg-ds-main/45 p-5">
+                      <div className="flex flex-col items-center justify-center rounded-[24px] border border-dashed border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-bg-main)_45%,transparent)] p-5">
                         {!requiresOfficialInstall ? (
                           <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 text-center">
                             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-ds-subtle text-accent">
@@ -344,11 +344,11 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                       </div>
                     </div>
 
-                    <div className="rounded-[24px] border border-ds-border-muted bg-ds-main/45 p-5">
+                    <div className="rounded-[24px] border border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-bg-main)_45%,transparent)] p-5">
                       <button
                         type="button"
                         onClick={() => setAdvancedSettingsOpen((value: boolean) => !value)}
-                        className="flex w-full items-center justify-between gap-3 rounded-2xl bg-ds-card/75 px-4 py-3 text-left transition hover:bg-ds-card"
+                        className="flex w-full items-center justify-between gap-3 rounded-2xl bg-[color-mix(in_srgb,var(--ds-surface-card)_75%,transparent)] px-4 py-3 text-left transition hover:bg-ds-card"
                       >
                         <span className="min-w-0">
                           <span className="block text-[13px] font-semibold text-ds-ink">
@@ -367,7 +367,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
 
                       {advancedSettingsOpen ? (
                         <div className="mt-4 space-y-5">
-                          <div className="rounded-[20px] border border-ds-border-muted bg-ds-card/70 p-4">
+                          <div className="rounded-[20px] border border-ds-border-muted bg-ds-card p-4">
                             <div className="text-[13px] font-semibold text-ds-ink">
                               {t('clawImWebhook')}
                             </div>
@@ -385,7 +385,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                                     type="button"
                                     onClick={() => setImEnabled((value: boolean) => !value)}
                                     className={`relative h-6 w-11 rounded-full transition ${
-                                      imEnabled ? 'bg-accent/80' : 'bg-ds-border'
+                                      imEnabled ? 'bg-accent' : 'bg-ds-border'
                                     }`}
                                   >
                                     <span
@@ -403,7 +403,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                                 <select
                                   value={runMode}
                                   onChange={(event) => setRunMode(event.target.value as ClawRunMode)}
-                                  className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-accent/60"
+                                  className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-[color-mix(in_srgb,var(--ds-accent)_60%,transparent)]"
                                 >
                                   <option value="agent">agent</option>
                                   <option value="plan">plan</option>
@@ -428,7 +428,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                                       setEndpoint(`http://127.0.0.1:${value}${normalizedPath}`)
                                     }
                                   }}
-                                  className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-accent/60"
+                                  className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-[color-mix(in_srgb,var(--ds-accent)_60%,transparent)]"
                                 />
                               </label>
                               <label className="block min-w-0">
@@ -443,7 +443,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                                     const normalizedPath = nextPath.startsWith('/') ? nextPath : `/${nextPath}`
                                     setEndpoint(`http://127.0.0.1:${imPort}${normalizedPath}`)
                                   }}
-                                  className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-accent/60"
+                                  className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-[color-mix(in_srgb,var(--ds-accent)_60%,transparent)]"
                                 />
                               </label>
                             </div>
@@ -461,7 +461,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                                     const value = Number(event.target.value)
                                     if (Number.isFinite(value)) setResponseTimeoutSec(value)
                                   }}
-                                  className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-accent/60"
+                                  className="mt-1.5 w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] text-ds-ink outline-none transition focus:border-[color-mix(in_srgb,var(--ds-accent)_60%,transparent)]"
                                 />
                               </label>
                               <label className="block min-w-0">
@@ -489,7 +489,7 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                             </div>
                           </div>
 
-                          <div className="rounded-[20px] border border-ds-border-muted bg-ds-card/70 p-4">
+                          <div className="rounded-[20px] border border-ds-border-muted bg-ds-card p-4">
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="text-[13px] font-semibold text-ds-ink">

@@ -78,7 +78,7 @@ export function ImagePreviewLightbox({
       disabled={!canDownload}
       aria-label={resolvedDownloadLabel}
       title={resolvedDownloadLabel}
-      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-zinc-700 shadow-[0_14px_34px_rgba(0,0,0,0.22)] transition hover:bg-zinc-50 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-800"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-zinc-700 shadow-[var(--c360-shadow-overlay)] transition hover:bg-zinc-50 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-800"
     >
       <Download className="h-5 w-5" strokeWidth={1.9} />
     </button>
@@ -88,7 +88,7 @@ export function ImagePreviewLightbox({
       download={downloadName || resolvedTitle}
       aria-label={resolvedDownloadLabel}
       title={resolvedDownloadLabel}
-      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-zinc-700 shadow-[0_14px_34px_rgba(0,0,0,0.22)] transition hover:bg-zinc-50 hover:text-zinc-950 dark:bg-zinc-100 dark:text-zinc-800"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-zinc-700 shadow-[var(--c360-shadow-overlay)] transition hover:bg-zinc-50 hover:text-zinc-950 dark:bg-zinc-100 dark:text-zinc-800"
     >
       <Download className="h-5 w-5" strokeWidth={1.9} />
     </a>
@@ -114,13 +114,13 @@ export function ImagePreviewLightbox({
           onClick={onClose}
           aria-label={closeLabel}
           title={closeLabel}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-zinc-700 shadow-[0_14px_34px_rgba(0,0,0,0.22)] transition hover:bg-zinc-50 hover:text-zinc-950 dark:bg-zinc-100 dark:text-zinc-800"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-zinc-700 shadow-[var(--c360-shadow-overlay)] transition hover:bg-zinc-50 hover:text-zinc-950 dark:bg-zinc-100 dark:text-zinc-800"
         >
           <X className="h-5 w-5" strokeWidth={2} />
         </button>
       </div>
       <div className="flex h-full w-full items-center justify-center px-4 py-20 sm:px-8">
-        <div className="flex max-h-[calc(100dvh-128px)] w-full max-w-[min(1120px,calc(100vw-32px))] items-center justify-center overflow-auto rounded-[18px] border border-white/16 bg-[rgba(255,250,242,0.96)] p-2 shadow-[0_30px_90px_rgba(0,0,0,0.42)] dark:bg-zinc-950/88 sm:max-h-[calc(100dvh-144px)]">
+        <div className="flex max-h-[calc(100dvh-128px)] w-full max-w-[min(1120px,calc(100vw-32px))] items-center justify-center overflow-auto rounded-[18px] border border-white/16 bg-ds-card p-2 shadow-[var(--c360-shadow-overlay)] sm:max-h-[calc(100dvh-144px)]">
           <img
             src={src}
             alt={alt}
@@ -130,7 +130,7 @@ export function ImagePreviewLightbox({
           />
         </div>
       </div>
-      <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center overflow-hidden rounded-full bg-white text-zinc-700 shadow-[0_14px_34px_rgba(0,0,0,0.24)] dark:bg-zinc-100 dark:text-zinc-800">
+      <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center overflow-hidden rounded-full bg-white text-zinc-700 shadow-[var(--c360-shadow-overlay)] dark:bg-zinc-100 dark:text-zinc-800">
         <button
           type="button"
           onClick={() => setZoom((value) => clampZoom(value - ZOOM_STEP))}

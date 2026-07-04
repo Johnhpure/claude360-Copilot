@@ -71,7 +71,7 @@ export function InjectedMemoryMetaChip({
       {tooltip
         ? createPortal(
             <div
-              className="pointer-events-none fixed z-[9999] max-w-[min(20rem,calc(100vw-1.5rem))] whitespace-pre-wrap break-words rounded-lg border border-ds-border bg-ds-elevated px-2.5 py-1.5 text-[12px] font-normal leading-5 text-ds-ink shadow-[0_14px_36px_rgba(15,23,42,0.22)]"
+              className="pointer-events-none fixed z-[9999] max-w-[min(20rem,calc(100vw-1.5rem))] whitespace-pre-wrap break-words rounded-lg border border-ds-border bg-ds-elevated px-2.5 py-1.5 text-[12px] font-normal leading-5 text-ds-ink shadow-[var(--c360-shadow-overlay)]"
               style={{ left: tooltip.x, top: tooltip.y, transform: 'translateY(-100%)' }}
             >
               {tooltip.text}

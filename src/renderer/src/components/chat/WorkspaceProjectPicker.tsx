@@ -206,7 +206,7 @@ export function WorkspaceProjectPicker({ currentWorkspaceRoot }: Props): ReactEl
       </button>
 
       {open ? (
-        <div className="absolute bottom-[calc(100%+8px)] left-0 z-50 w-[min(360px,calc(100vw-48px))] overflow-hidden rounded-xl border border-ds-border bg-ds-elevated shadow-[0_24px_70px_rgba(44,55,78,0.18)] backdrop-blur-xl dark:shadow-[0_30px_80px_rgba(0,0,0,0.42)]">
+        <div className="absolute bottom-[calc(100%+8px)] left-0 z-50 w-[min(360px,calc(100vw-48px))] overflow-hidden rounded-xl border border-ds-border bg-ds-elevated shadow-[var(--c360-shadow-overlay)]">
           {showSearch ? (
             <div className="flex items-center gap-2 border-b border-ds-border-muted px-4 py-3">
               <Search className="h-4 w-4 shrink-0 text-ds-faint" strokeWidth={1.8} />

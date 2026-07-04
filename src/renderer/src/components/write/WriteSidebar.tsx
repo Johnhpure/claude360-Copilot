@@ -530,7 +530,7 @@ function WriteEntryDialog({
       <form
         onSubmit={onSubmit}
         onMouseDown={(event) => event.stopPropagation()}
-        className="w-full max-w-sm rounded-[24px] border border-ds-border bg-ds-card p-5 shadow-[0_24px_72px_rgba(20,47,95,0.22)]"
+        className="w-full max-w-sm rounded-[24px] border border-ds-border bg-ds-card p-5 shadow-[var(--c360-shadow-overlay)]"
       >
         <h2 className="text-[18px] font-semibold tracking-[-0.035em] text-ds-ink">
           {entryDialogTitle(dialog, t)}

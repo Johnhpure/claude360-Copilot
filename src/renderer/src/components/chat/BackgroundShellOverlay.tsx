@@ -92,7 +92,7 @@ export function BackgroundShellOverlay({
   return (
     <div className="pointer-events-none flex w-full max-w-[min(100vw-2rem,28rem)] flex-col items-center gap-2">
       {open ? (
-        <div className="pointer-events-auto w-full overflow-hidden rounded-2xl border border-ds-border-muted bg-ds-card/95 shadow-xl backdrop-blur-md">
+        <div className="pointer-events-auto w-full overflow-hidden rounded-2xl border border-ds-border-muted bg-ds-card shadow-[var(--c360-shadow-overlay)]">
           <div className="flex items-center justify-between border-b border-ds-border-muted px-3 py-2">
             <div className="min-w-0">
               <p className="truncate text-[13px] font-medium text-ds-text">
@@ -126,8 +126,8 @@ export function BackgroundShellOverlay({
                   <button
                     key={session.id}
                     type="button"
-                    className={`flex w-full items-start gap-2 border-b border-ds-border-muted/60 px-3 py-2 text-left last:border-b-0 ${
-                      active ? 'bg-ds-hover/70' : 'hover:bg-ds-hover/40'
+                    className={`flex w-full items-start gap-2 border-b border-ds-border-muted px-3 py-2 text-left last:border-b-0 ${
+                      active ? 'bg-ds-hover' : 'hover:bg-ds-hover'
                     }`}
                     onClick={() => setSelectedId(session.id)}
                   >
@@ -164,7 +164,7 @@ export function BackgroundShellOverlay({
                   </button>
                 ) : null}
               </div>
-              <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-ds-main/80 p-2 font-mono text-[11px] leading-5 text-ds-text">
+              <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-ds-main p-2 font-mono text-[11px] leading-5 text-ds-text">
                 {selected.output.trim() || t('backgroundShells.noOutput', { defaultValue: '(no output yet)' })}
               </pre>
               {selected.outputFilePath ? (
@@ -181,7 +181,7 @@ export function BackgroundShellOverlay({
       ) : null}
       <button
         type="button"
-        className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-ds-border-muted bg-ds-card/95 px-3 py-1.5 text-[12px] font-medium text-ds-text shadow-lg backdrop-blur-md hover:bg-ds-hover"
+        className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-ds-border-muted bg-ds-card px-3 py-1.5 text-[12px] font-medium text-ds-text shadow-[var(--c360-shadow-sm)] hover:bg-ds-hover"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
       >

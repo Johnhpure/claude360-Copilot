@@ -318,10 +318,10 @@ function buildEditorTheme(appearance: 'source' | 'live'): Extension {
       display: 'none'
     },
     '.cm-activeLine': {
-      backgroundColor: 'rgba(0, 0, 0, 0.025)'
+      backgroundColor: 'color-mix(in srgb, var(--ds-text) 3%, transparent)'
     },
     '[data-theme="dark"] & .cm-activeLine': {
-      backgroundColor: 'rgba(255, 255, 255, 0.04)'
+      backgroundColor: 'color-mix(in srgb, var(--ds-text) 4%, transparent)'
     }
   })
 }

@@ -637,7 +637,7 @@ export function ClawAddImDialog({
   return (
     <div className="ds-no-drag fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
       <div className="flex max-h-[min(860px,calc(100vh-32px))] w-full max-w-[1080px] flex-col overflow-hidden rounded-[28px] border border-ds-border bg-ds-elevated shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-ds-border-muted/60 px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-[color-mix(in_srgb,var(--ds-border-muted)_60%,transparent)] px-5 py-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <QrCode className="h-4 w-4 text-accent" strokeWidth={1.9} />
@@ -663,7 +663,7 @@ export function ClawAddImDialog({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 md:px-6">
           <div className="mx-auto w-full max-w-[900px]">
             {showEmptyState ? (
-              <div className="rounded-[24px] border border-dashed border-ds-border-muted bg-ds-main/35 p-8 text-center">
+              <div className="rounded-[24px] border border-dashed border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-bg-main)_35%,transparent)] p-8 text-center">
                 <div className="text-[15px] font-semibold text-ds-ink">
                   {mode === 'edit' ? t('clawManageImEmptyTitle') : t('clawAddImEmptyTitle')}
                 </div>

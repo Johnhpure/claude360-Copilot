@@ -52,7 +52,7 @@ type Props = {
 
 const TOPBAR_ICON_CLASS = 'h-[17px] w-[17px]'
 const TOPBAR_BUTTON_BASE =
-  'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border p-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+  'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border p-0 shadow-[var(--ds-shadow-chip)] transition'
 const TOPBAR_BUTTON_ACTIVE = 'border-ds-border-strong bg-white/70 text-ds-ink dark:bg-white/10'
 const TOPBAR_BUTTON_IDLE =
   'border-transparent bg-white/38 text-ds-faint opacity-90 hover:border-ds-border-muted hover:bg-white/55 hover:text-ds-ink hover:opacity-100 dark:bg-white/4 dark:hover:bg-white/8'
@@ -298,7 +298,7 @@ export function WorkbenchTopBar({
         <button
           type="button"
           onClick={() => setEditorMenuOpen((value) => !value)}
-          className="inline-flex h-7 items-center gap-1 rounded-full border border-transparent bg-white/38 px-2.5 text-ds-faint opacity-90 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition hover:border-ds-border-muted hover:bg-white/55 hover:text-ds-ink hover:opacity-100 dark:bg-white/4 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] dark:hover:bg-white/8"
+          className="inline-flex h-7 items-center gap-1 rounded-full border border-transparent bg-white/38 px-2.5 text-ds-faint opacity-90 shadow-[var(--ds-shadow-chip)] transition hover:border-ds-border-muted hover:bg-white/55 hover:text-ds-ink hover:opacity-100 dark:bg-white/4 dark:hover:bg-white/8"
           aria-label={t('editorPickerTitle')}
           aria-expanded={editorMenuOpen}
           title={
@@ -312,7 +312,7 @@ export function WorkbenchTopBar({
         </button>
 
         {editorMenuOpen ? (
-          <div className="ds-card-strong absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-[18px] border border-ds-border py-1.5 shadow-[0_18px_52px_rgba(20,47,95,0.18)] backdrop-blur-xl dark:shadow-[0_22px_58px_rgba(0,0,0,0.38)]">
+          <div className="ds-card-strong absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-[18px] border border-ds-border py-1.5 shadow-[var(--c360-shadow-overlay)] backdrop-blur-[var(--blur-overlay)]">
             <div className="border-b border-ds-border-muted px-3 pb-2 pt-1.5 text-[11px] font-semibold text-ds-faint">
               {t('editorPickerMenuTitle')}
             </div>
@@ -326,13 +326,13 @@ export function WorkbenchTopBar({
                   className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-[14px] transition ${
                     active
                       ? 'bg-ds-hover text-ds-ink'
-                      : 'text-ds-muted hover:bg-ds-hover/70 hover:text-ds-ink'
+                      : 'text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
                   }`}
                 >
                   {renderEditorIcon(editor, 'h-4 w-4')}
                   <span className="min-w-0 flex-1 truncate">{editor.label}</span>
                   {editor.supportsLine ? (
-                    <span className="shrink-0 rounded-md bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent">
+                    <span className="shrink-0 rounded-md bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold text-accent">
                       {t('editorLineBadge')}
                     </span>
                   ) : null}
