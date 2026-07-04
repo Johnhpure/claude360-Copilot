@@ -60,17 +60,12 @@ vi.mock('../../write/write-workspace-store', async (importOriginal) => {
 })
 
 // 隔离重型子组件，聚焦入口区可见性断言（与 chat/Sidebar.test.ts 同款策略）。
+// FeatureSwitcher 为轻量纯展示组件，直接真渲染（阶段2 统一四工作台切换入口）。
 vi.mock('../chat/ConnectPhoneView', () => ({
   ConnectPhoneSidebarPanel: () => createElement('div', { 'data-testid': 'connect-phone-panel' })
 }))
 vi.mock('./WriteFileTree', () => ({
   WriteFileTree: () => createElement('div', { 'data-testid': 'write-file-tree' })
-}))
-vi.mock('../chat/WorkspaceModeTabs', () => ({
-  WorkspaceModeTabs: () => createElement('div', { 'data-testid': 'mode-tabs' }),
-  sidebarSegTabsContainerClass: 'seg-container',
-  sidebarSegTabClass: () => 'seg-tab',
-  sidebarSegTabIconClass: () => 'seg-icon'
 }))
 
 import { WriteSidebar } from './WriteSidebar'
@@ -93,18 +88,17 @@ function renderWriteSidebar(): string {
 describe('WriteSidebar 功能入口', () => {
   it('写作页仍渲染生图(canvas)/音乐(music)入口，与 Code/写作并列', () => {
     const html = renderWriteSidebar()
-    expect(html).toContain('data-testid="mode-tabs"')
-    // 两个 role="tab" 按钮（防 aria-label 里的同名词误绿）
-    expect(html.match(/role="tab"/g)?.length).toBe(2)
+    expect(html).toContain('data-testid="feature-switcher"')
+    // 四个 role="tab" 按钮：Code/写作 + 生图/音乐（防 aria-label 里的同名词误绿）
+    expect(html.match(/role="tab"/g)?.length).toBe(4)
     expect(html).toContain('>canvas</span>')
     expect(html).toContain('>music</span>')
   })
 
-  it('生图/音乐入口使用与 chat 侧栏同款分段按钮样式（非选中态）', () => {
+  it('写作路由下仅写作 tab 选中，生图/音乐恒非选中', () => {
     const html = renderWriteSidebar()
-    expect(html).toContain('seg-container')
-    expect(html).toContain('seg-tab')
-    // 写作路由下生图/音乐恒非选中。
-    expect(html).not.toContain('aria-selected="true"')
+    // activeView='write' → 只有写作 tab aria-selected="true"。
+    expect(html.match(/aria-selected="true"/g)?.length).toBe(1)
+    expect(html.match(/aria-selected="false"/g)?.length).toBe(3)
   })
 })

@@ -40,6 +40,7 @@ import {
   extractLatestTurnDevPreviewUrls
 } from '../lib/dev-preview-detection'
 import { Sidebar } from './chat/Sidebar'
+import { WorkbenchShell } from './shell/WorkbenchShell'
 import { WorkbenchTopBar, type RightPanelMode } from './chat/WorkbenchTopBar'
 import { SubagentReturnBar } from './chat/message-timeline-empty'
 import {
@@ -2586,28 +2587,30 @@ export function Workbench(): ReactElement {
     )
   }
 
+  // 壳层（侧栏列/拖宽分隔条/主区框架）由 WorkbenchShell 承载（阶段2 拆壳，
+  // DOM 结构与类名在 WorkbenchShell 内逐字保留）；业务状态仍由本组件持有。
   return (
-    <div
-      ref={shellRef}
-      className="ds-workbench-shell ds-drag flex h-full min-h-0 w-full min-w-0 bg-ds-main"
-    >
-      {!leftSidebarCollapsed ? (
-        <>
-          <div className="min-h-0 shrink-0" style={{ width: leftSidebarWidth }}>
-            {route === 'write' ? (
-              <Suspense fallback={<WorkbenchPaneFallback />}>
-                <WriteSidebar
-                  activeView="write"
-                  connectPhoneSidebarOpen={connectPhoneSidebarOpen}
-                  onCodeOpen={openCodeMode}
-                  onWriteOpen={openWriteMode}
-                  onOpenCanvas={() => setRoute('canvas')}
-                  onOpenMusic={() => setRoute('music')}
-                  onOpenSettings={(section) => openSettings(section)}
-                  onToggleConnectPhone={toggleConnectPhone}
-                />
-              </Suspense>
-            ) : (
+    <WorkbenchShell
+      shellRef={shellRef}
+      sidebarWidth={leftSidebarWidth}
+      onSidebarResizeStart={beginLeftResize}
+      mainClassName={route === 'plugins' ? 'px-0' : ''}
+      sidebar={
+        !leftSidebarCollapsed ? (
+          route === 'write' ? (
+            <Suspense fallback={<WorkbenchPaneFallback />}>
+              <WriteSidebar
+                activeView="write"
+                connectPhoneSidebarOpen={connectPhoneSidebarOpen}
+                onCodeOpen={openCodeMode}
+                onWriteOpen={openWriteMode}
+                onOpenCanvas={() => setRoute('canvas')}
+                onOpenMusic={() => setRoute('music')}
+                onOpenSettings={(section) => openSettings(section)}
+                onToggleConnectPhone={toggleConnectPhone}
+              />
+            </Suspense>
+          ) : (
             <Sidebar
               threads={codeThreads}
               activeThreadId={activeThreadId}
@@ -2646,22 +2649,17 @@ export function Workbench(): ReactElement {
               onWorkflowOpen={openWorkflowView}
               onNewConversation={startNewConversation}
             />
-            )}
-          </div>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            className="ds-workbench-divider ds-no-drag relative z-20 shrink-0 cursor-col-resize"
-            onPointerDown={beginLeftResize}
-          />
-        </>
-      ) : null}
-
-      <main
-        className={`ds-drag ds-stage-surface relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
-          route === 'plugins' ? 'px-0' : ''
-        }`}
-      >
+          )
+        ) : null
+      }
+      afterMain={
+        route === 'chat' ? (
+          <Suspense fallback={null}>
+            <WorkflowRunPanel enabled />
+          </Suspense>
+        ) : null
+      }
+    >
         {route === 'plugins' ? (
           <Suspense fallback={<div className="h-full bg-ds-main" />}>
             <PluginMarketplaceView
@@ -2963,12 +2961,6 @@ export function Workbench(): ReactElement {
           </>
         )}
         {renderPlanPanelOverlay()}
-      </main>
-      {route === 'chat' ? (
-        <Suspense fallback={null}>
-          <WorkflowRunPanel enabled />
-        </Suspense>
-      ) : null}
-    </div>
+    </WorkbenchShell>
   )
 }

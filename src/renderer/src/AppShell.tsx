@@ -3,6 +3,8 @@ import { useChatStore } from './store/chat-store'
 import { supportsDesktopTitleBar, WindowsTitleBar } from './components/WindowsTitleBar'
 import { RuntimeStatusBanner } from './components/RuntimeStatusBanner'
 import { GroupKeyPromptModal } from './components/GroupKeyPromptModal'
+import { Toaster } from './components/ui'
+import { applyBlurPreference, readBlurPreference } from './lib/blur-preference'
 import i18n from './i18n'
 
 const Workbench = lazy(() =>
@@ -40,6 +42,8 @@ export default function AppShell(): React.ReactElement {
   const hasDesktopTitleBar = supportsDesktopTitleBar(platform)
 
   useEffect(() => {
+    // 浮层 blur 偏好（阶段2 降级开关）：启动时应用一次，设置 UI 入口在阶段5。
+    applyBlurPreference(readBlurPreference())
     let frame = 0
     const timer = window.setTimeout(() => {
       frame = window.requestAnimationFrame(() => {
@@ -67,6 +71,8 @@ export default function AppShell(): React.ReactElement {
         </Suspense>
       ) : null}
       <GroupKeyPromptModal />
+      {/* 全局 Toast 出口（阶段2）：唯一挂载点。 */}
+      <Toaster />
     </div>
   )
 }

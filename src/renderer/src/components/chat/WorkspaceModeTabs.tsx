@@ -2,6 +2,11 @@ import type { ReactElement } from 'react'
 import { Code2, PencilLine } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+/**
+ * @deprecated 阶段2（07-04-ui-p2-shell）起由 `shell/FeatureSwitcher` 取代：
+ * 四工作台切换统一为单一 token 化组件。本文件保留一版供回滚参照，
+ * 生产代码已无引用，阶段6 清理时删除。
+ */
 // 侧栏分段按钮样式（Code/写作 与 生图/音乐 复用同款尺寸/圆角/图标/选中态/hover）。
 export const sidebarSegTabsContainerClass =
   'mb-1.5 flex flex-row gap-1 rounded-[8px] bg-[color-mix(in_srgb,var(--ds-sidebar-field-bg)_72%,transparent)] p-0.5 shadow-[inset_0_0_0_1px_var(--ds-sidebar-row-ring)] dark:bg-white/[0.045] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]'
@@ -26,6 +31,10 @@ type Props = {
   onWriteOpen: () => void
 }
 
+/**
+ * @deprecated 阶段2（07-04-ui-p2-shell）起由 `shell/FeatureSwitcher` 取代，
+ * 生产代码已无引用，阶段6 清理时删除。
+ */
 export function WorkspaceModeTabs({
   activeView,
   onCodeOpen,

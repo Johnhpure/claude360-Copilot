@@ -5,10 +5,8 @@ import {
   Clock3,
   FileQuestion,
   Focus,
-  Image,
   LayoutGrid,
   Moon,
-  Music,
   Plus,
   Settings,
   Smartphone,
@@ -31,12 +29,7 @@ import { ClawAddImDialog } from './SidebarClawDialog'
 import { ConnectPhoneSidebarPanel } from './ConnectPhoneView'
 import { SidebarProjectsSection } from './SidebarProjectsSection'
 import { SidebarConversationsSection } from './SidebarConversationsSection'
-import {
-  WorkspaceModeTabs,
-  sidebarSegTabsContainerClass,
-  sidebarSegTabClass,
-  sidebarSegTabIconClass
-} from './WorkspaceModeTabs'
+import { FeatureSwitcher } from '../shell/FeatureSwitcher'
 import {
   SidebarCommandRow,
   SidebarFrame,
@@ -212,47 +205,29 @@ export function Sidebar({
       }
     >
       <div className="ds-no-drag flex flex-col px-1">
-        <WorkspaceModeTabs
-          activeView={activeView}
-          onCodeOpen={onCodeOpen}
-          onWriteOpen={onWriteOpen}
+        {/* 四工作台切换唯一入口（阶段2 统一为 FeatureSwitcher，token 化）。
+            active 单值互斥：canvas/music 激活时 Code 不再同时高亮（修正旧缺陷）。 */}
+        <FeatureSwitcher
+          active={
+            canvasActive
+              ? 'canvas'
+              : musicActive
+                ? 'music'
+                : activeView === 'chat' || activeView === 'write'
+                  ? activeView
+                  : null
+          }
+          visible={{
+            canvas: isPrimaryRouteVisible('canvas'),
+            music: isPrimaryRouteVisible('music')
+          }}
+          onOpen={(feature) => {
+            if (feature === 'chat') onCodeOpen()
+            else if (feature === 'write') onWriteOpen()
+            else if (feature === 'canvas') onOpenCanvas()
+            else onOpenMusic()
+          }}
         />
-
-        {/* 生图 / 音乐：与 Code/写作 同款分段按钮，紧邻其下方。 */}
-        {isPrimaryRouteVisible('canvas') || isPrimaryRouteVisible('music') ? (
-          <div
-            role="tablist"
-            aria-label={`${t('canvas')} / ${t('music')}`}
-            className={sidebarSegTabsContainerClass}
-          >
-            {isPrimaryRouteVisible('canvas') ? (
-              <button
-                type="button"
-                data-cursor-spotlight-target
-                role="tab"
-                aria-selected={canvasActive}
-                onClick={onOpenCanvas}
-                className={sidebarSegTabClass(canvasActive)}
-              >
-                <Image className={sidebarSegTabIconClass(canvasActive)} strokeWidth={1.9} />
-                <span className="truncate">{t('canvas')}</span>
-              </button>
-            ) : null}
-            {isPrimaryRouteVisible('music') ? (
-              <button
-                type="button"
-                data-cursor-spotlight-target
-                role="tab"
-                aria-selected={musicActive}
-                onClick={onOpenMusic}
-                className={sidebarSegTabClass(musicActive)}
-              >
-                <Music className={sidebarSegTabIconClass(musicActive)} strokeWidth={1.9} />
-                <span className="truncate">{t('music')}</span>
-              </button>
-            ) : null}
-          </div>
-        ) : null}
 
         {activeView !== 'claw' && activeView !== 'schedule' && activeView !== 'workflow' ? (
           <>

@@ -8,8 +8,6 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
-  Image,
-  Music,
   Plus,
   RefreshCw,
   Settings,
@@ -29,12 +27,7 @@ import {
   writeRelativeToWorkspace
 } from '../../write/write-workspace-store'
 import { ConnectPhoneSidebarPanel } from '../chat/ConnectPhoneView'
-import {
-  WorkspaceModeTabs,
-  sidebarSegTabClass,
-  sidebarSegTabIconClass,
-  sidebarSegTabsContainerClass
-} from '../chat/WorkspaceModeTabs'
+import { FeatureSwitcher } from '../shell/FeatureSwitcher'
 import { isPrimaryRouteVisible } from '../../lib/feature-visibility'
 import {
   SidebarCommandRow,
@@ -290,48 +283,21 @@ export function WriteSidebar({
       }
     >
       <div className="ds-no-drag flex flex-col px-0.5">
-        <WorkspaceModeTabs
-          activeView={activeView}
-          onCodeOpen={onCodeOpen}
-          onWriteOpen={onWriteOpen}
+        {/* 四工作台切换唯一入口（阶段2 统一为 FeatureSwitcher，与 chat 侧栏同源）。
+            四个功能入口在所有页面固定显示，写作页也不例外。 */}
+        <FeatureSwitcher
+          active={activeView === 'write' ? 'write' : activeView === 'chat' ? 'chat' : null}
+          visible={{
+            canvas: isPrimaryRouteVisible('canvas'),
+            music: isPrimaryRouteVisible('music')
+          }}
+          onOpen={(feature) => {
+            if (feature === 'chat') onCodeOpen()
+            else if (feature === 'write') onWriteOpen()
+            else if (feature === 'canvas') onOpenCanvas()
+            else onOpenMusic()
+          }}
         />
-
-        {/* 生图 / 音乐：与 chat 侧栏同款分段按钮。四个功能入口在所有页面固定显示，
-            写作页也不例外（此前缺失导致切到写作后生图/音乐入口消失）。 */}
-        {isPrimaryRouteVisible('canvas') || isPrimaryRouteVisible('music') ? (
-          <div
-            role="tablist"
-            aria-label={`${t('canvas')} / ${t('music')}`}
-            className={sidebarSegTabsContainerClass}
-          >
-            {isPrimaryRouteVisible('canvas') ? (
-              <button
-                type="button"
-                data-cursor-spotlight-target
-                role="tab"
-                aria-selected={false}
-                onClick={onOpenCanvas}
-                className={sidebarSegTabClass(false)}
-              >
-                <Image className={sidebarSegTabIconClass(false)} strokeWidth={1.9} />
-                <span className="truncate">{t('canvas')}</span>
-              </button>
-            ) : null}
-            {isPrimaryRouteVisible('music') ? (
-              <button
-                type="button"
-                data-cursor-spotlight-target
-                role="tab"
-                aria-selected={false}
-                onClick={onOpenMusic}
-                className={sidebarSegTabClass(false)}
-              >
-                <Music className={sidebarSegTabIconClass(false)} strokeWidth={1.9} />
-                <span className="truncate">{t('music')}</span>
-              </button>
-            ) : null}
-          </div>
-        ) : null}
         <SidebarCommandRow
           icon={<FilePlus2 className="h-4 w-4" strokeWidth={1.9} />}
           label={t('writeCreateFile')}
