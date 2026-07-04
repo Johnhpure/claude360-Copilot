@@ -3,8 +3,8 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { Claude360TokenListItem, Claude360TokenPurpose } from '@shared/claude360'
 import {
+  GroupCard,
   GroupKeysTable,
-  GroupListItem,
   flattenGroups,
   type GroupSummary
 } from './settings-section-groups-keys'
@@ -91,11 +91,11 @@ describe('flattenGroups', () => {
   })
 })
 
-// ── GroupListItem：倍率 ×N 与推荐徽章 ──
-describe('GroupListItem', () => {
-  function renderItem(props: Partial<Parameters<typeof GroupListItem>[0]> = {}): string {
+// ── GroupCard：倍率 ×N 与推荐徽章 ──
+describe('GroupCard', () => {
+  function renderItem(props: Partial<Parameters<typeof GroupCard>[0]> = {}): string {
     return renderToStaticMarkup(
-      createElement(GroupListItem, {
+      createElement(GroupCard, {
         group: group(),
         keyCount: 2,
         selected: false,

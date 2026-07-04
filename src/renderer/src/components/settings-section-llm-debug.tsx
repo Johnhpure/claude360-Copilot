@@ -143,7 +143,7 @@ export function LlmDebugSettingsSection({ ctx }: { ctx: Record<string, any> }): 
             type="button"
             disabled={loading}
             onClick={() => void load()}
-            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-accent/12 px-4 py-2 text-[12.5px] font-medium text-accent transition hover:bg-accent/18 disabled:opacity-60"
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-accent-soft px-4 py-2 text-[12.5px] font-medium text-accent transition-colors duration-[var(--motion-fast)] hover:bg-[color-mix(in_srgb,var(--ds-accent)_22%,transparent)] disabled:opacity-60"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.8} />
             {t('refresh')}

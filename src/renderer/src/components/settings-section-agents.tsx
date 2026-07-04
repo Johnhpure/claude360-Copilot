@@ -56,6 +56,9 @@ import { formatCompactNumber } from '../hooks/use-thread-usage'
 import { parseUsageResponse } from '../hooks/usage-response'
 
 
+// 工具权限五级风险标识色（领域标注色，css-design.md「内容色集中管理块」豁免）：
+// 五档风险需要五个可区分色相，功能 token 只有四个语义位，故保留调色板色并集中在本表；
+// 新增档位时必须落在本表内，禁止散落到 JSX。
 const TOOL_PERMISSION_OPTIONS: Array<{
   value: KunToolPermissionMode
   labelKey: string
@@ -101,9 +104,9 @@ const TOOL_PERMISSION_OPTIONS: Array<{
 ]
 
 function statusPill(status: string | undefined): string {
-  if (status === 'available') return 'border-emerald-400/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+  if (status === 'available') return 'border-[color-mix(in_srgb,var(--ds-success)_35%,transparent)] bg-ds-success-soft text-ds-success'
   if (status === 'disabled') return 'border-ds-border-muted bg-ds-card text-ds-faint'
-  return 'border-red-300/50 bg-red-500/10 text-red-700 dark:text-red-200'
+  return 'border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft text-ds-danger'
 }
 
 function skillRootShortLabel(path: string): string {
@@ -597,7 +600,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                         value={form?.codePromptPrefix ?? ''}
                         onChange={(e) => update({ codePromptPrefix: e.target.value })}
                         placeholder={t('codePromptPrefixPlaceholder')}
-                        className="min-h-[110px] w-full resize-y rounded-xl border border-ds-border bg-ds-main/60 px-3 py-3 text-[14px] leading-6 text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/25"
+                        className="min-h-[110px] w-full resize-y rounded-xl border border-ds-border bg-ds-subtle px-3 py-3 text-[14px] leading-6 text-ds-ink outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                       />
                     }
                   />
@@ -618,14 +621,14 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                           max={65535}
                           className={`w-28 rounded-xl border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:outline-none focus:ring-1 ${
                             portError
-                              ? 'border-red-400 focus:ring-red-300'
-                              : 'border-ds-border focus:border-accent/40 focus:ring-accent/30'
+                              ? 'border-ds-danger focus:ring-ds-danger'
+                              : 'border-ds-border focus:border-accent focus:ring-accent'
                           }`}
                           value={kun.port}
                           onChange={(e) => updateKun({ port: Number(e.target.value) })}
                         />
                         {portError ? (
-                          <p className="mt-1 text-[12px] text-red-700 dark:text-red-300">{portError}</p>
+                          <p className="mt-1 text-[12px] text-ds-danger">{portError}</p>
                         ) : null}
                       </div>
                     }
@@ -635,7 +638,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     description={t('kunBinaryDesc')}
                     control={
                       <input
-                        className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30 md:max-w-md"
+                        className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)] md:max-w-md"
                         placeholder={t('kunBinaryPlaceholder')}
                         value={compactHomePath(kun.binaryPath)}
                         onChange={(e) => updateKun({ binaryPath: expandHomePath(e.target.value) })}
@@ -647,7 +650,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     description={t('kunDataDirDesc')}
                     control={
                       <input
-                        className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30 md:max-w-md"
+                        className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)] md:max-w-md"
                         placeholder={DEFAULT_KUN_DATA_DIR}
                         value={compactHomePath(kun.dataDir)}
                         onChange={(e) => updateKun({ dataDir: expandHomePath(e.target.value) })}
@@ -697,7 +700,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                           onChange={(enabled) => updateTokenEconomy({ enabled })}
                         />
                         {tokenEconomy.enabled ? (
-                          <div className="max-w-full rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1.5 text-[12px] font-medium leading-5 text-emerald-700 dark:text-emerald-200">
+                          <div className="max-w-full rounded-lg border border-[color-mix(in_srgb,var(--ds-success)_35%,transparent)] bg-ds-success-soft px-2.5 py-1.5 text-[12px] font-medium leading-5 text-ds-success">
                             {tokenEconomySavings ? (
                               <span>
                                 {t('kunTokenEconomySavings', {
@@ -744,8 +747,8 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                               onClick={() => updateKun(kunToolPermissionModeSettings(option.value))}
                               className={`min-h-[72px] rounded-lg border px-3 py-2.5 text-left transition ${
                                 selected
-                                  ? 'border-accent/55 bg-accent/10 text-ds-ink'
-                                  : 'border-ds-border-muted bg-ds-card/70 text-ds-ink hover:bg-ds-hover/70'
+                                  ? 'border-accent bg-accent-soft text-ds-ink'
+                                  : 'border-ds-border-muted bg-ds-card text-ds-ink hover:bg-ds-hover'
                               }`}
                             >
                               <span className="flex items-start gap-2">
@@ -776,7 +779,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                 <SettingsCard title={t('computerUseTitle')}>
                   <div className="space-y-4 px-3 py-4">
                     <InlineNoticeView notice={{ tone: 'info', message: t('computerUseHint') }} />
-                    <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-[12px] leading-5 text-amber-700 dark:text-amber-200">
+                    <div className="rounded-lg border border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft px-3 py-2 text-[12px] leading-5 text-ds-warning">
                       <div className="font-semibold">{t('computerUseModelQualityTitle')}</div>
                       <div className="mt-1">{t('computerUseModelQualityBody')}</div>
                     </div>
@@ -858,11 +861,11 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     control={
                       <div className="flex w-full flex-col gap-2">
                         {skillRootsLoading && skillRoots.length === 0 ? (
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-3 text-[13px] text-ds-faint">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-3 text-[13px] text-ds-faint">
                             {t('loading')}
                           </div>
                         ) : skillRoots.length === 0 ? (
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-3 text-[13px] text-ds-faint">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-3 text-[13px] text-ds-faint">
                             {t('skillsDetectedDirsEmpty')}
                           </div>
                         ) : (
@@ -870,7 +873,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             <div
                               key={`${root.id}:${root.path}`}
                               className={`flex items-start justify-between gap-3 rounded-xl border px-3 py-2.5 shadow-sm ${
-                                root.enabled ? 'border-ds-border bg-ds-card' : 'border-ds-border-muted bg-ds-main/40'
+                                root.enabled ? 'border-ds-border bg-ds-card' : 'border-ds-border-muted bg-ds-subtle'
                               }`}
                             >
                               <div className="min-w-0 flex-1">
@@ -878,15 +881,15 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                                   <span className="text-[13px] font-medium text-ds-ink">
                                     {root.labelKey ? tCommon(root.labelKey) : skillRootShortLabel(root.path)}
                                   </span>
-                                  <span className="rounded-md border border-ds-border-muted bg-ds-main/50 px-1.5 py-0.5 text-[11px] font-medium text-ds-muted">
+                                  <span className="rounded-md border border-ds-border-muted bg-ds-subtle px-1.5 py-0.5 text-[11px] font-medium text-ds-muted">
                                     {root.scope === 'project' ? t('skillsScopeProject') : t('skillsScopeGlobal')}
                                   </span>
                                   {root.exists ? (
-                                    <span className="rounded-md border border-emerald-400/25 bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-200">
+                                    <span className="rounded-md border border-[color-mix(in_srgb,var(--ds-success)_35%,transparent)] bg-ds-success-soft px-1.5 py-0.5 text-[11px] font-medium text-ds-success">
                                       {t('skillsDirSkillCount', { count: root.skillCount })}
                                     </span>
                                   ) : (
-                                    <span className="rounded-md border border-ds-border-muted bg-ds-main/50 px-1.5 py-0.5 text-[11px] font-medium text-ds-faint">
+                                    <span className="rounded-md border border-ds-border-muted bg-ds-subtle px-1.5 py-0.5 text-[11px] font-medium text-ds-faint">
                                       {t('skillsDirNotFound')}
                                     </span>
                                   )}
@@ -920,23 +923,23 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     control={
                       <div className="flex w-full flex-col gap-2">
                         <div className="grid gap-2 text-[12.5px] text-ds-muted sm:grid-cols-5">
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('skillsPermissionEnabledRoots')}: <span className="font-mono text-ds-ink">{skillPermissionSummary.enabledRoots}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('skillsPermissionDisabledRoots')}: <span className="font-mono text-ds-ink">{skillPermissionSummary.disabledRoots}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('skillsPermissionWorkspaceRoots')}: <span className="font-mono text-ds-ink">{skillPermissionSummary.workspaceRoots}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('skillsPermissionGlobalRoots')}: <span className="font-mono text-ds-ink">{skillPermissionSummary.globalRoots}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('skillsPermissionDisabledIds')}: <span className="font-mono text-ds-ink">{skillPermissionSummary.disabledSkillIds}</span>
                           </div>
                         </div>
-                        <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-[12px] leading-5 text-amber-700 dark:text-amber-200">
+                        <div className="rounded-xl border border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft px-3 py-2 text-[12px] leading-5 text-ds-warning">
                           {t('skillsPermissionRuntimeNote')}
                         </div>
                       </div>
@@ -960,7 +963,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                         }
                         spellCheck={false}
                         placeholder={'~/.agents/skills'}
-                        className="min-h-24 w-full rounded-2xl border border-ds-border bg-ds-card px-4 py-3 font-mono text-[13px] leading-6 text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                        className="min-h-24 w-full rounded-2xl border border-ds-border bg-ds-card px-4 py-3 font-mono text-[13px] leading-6 text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                       />
                     }
                   />
@@ -1032,7 +1035,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                           <input
                             type="number"
                             min={1}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={mcpSearch.autoThresholdToolCount}
                             disabled={!mcpSearch.enabled}
                             onChange={(e) => updateMcpSearch({ autoThresholdToolCount: Number(e.target.value) })}
@@ -1043,7 +1046,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                           <input
                             type="number"
                             min={1}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={mcpSearch.topKDefault}
                             disabled={!mcpSearch.enabled}
                             onChange={(e) => updateMcpSearch({ topKDefault: Number(e.target.value) })}
@@ -1054,7 +1057,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                           <input
                             type="number"
                             min={1}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={mcpSearch.topKMax}
                             disabled={!mcpSearch.enabled}
                             onChange={(e) => updateMcpSearch({ topKMax: Number(e.target.value) })}
@@ -1067,7 +1070,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             min={0}
                             max={1}
                             step={0.01}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={mcpSearch.minScore}
                             disabled={!mcpSearch.enabled}
                             onChange={(e) => updateMcpSearch({ minScore: Number(e.target.value) })}
@@ -1082,13 +1085,13 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     wideControl
                     control={
                       <div className="grid gap-2 text-[12.5px] text-ds-muted sm:grid-cols-3">
-                        <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                        <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                           {t('mcpSearchStatus')}: <span className="font-mono text-ds-ink">{toolDiagnostics?.mcpSearch?.active ? t('mcpSearchActive') : t('mcpSearchInactive')}</span>
                         </div>
-                        <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                        <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                           {t('mcpSearchIndexed')}: <span className="font-mono text-ds-ink">{toolDiagnostics?.mcpSearch?.indexedToolCount ?? runtimeInfo?.capabilities?.mcp?.search?.indexedToolCount ?? 0}</span>
                         </div>
-                        <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                        <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                           {t('mcpSearchAdvertised')}: <span className="font-mono text-ds-ink">{toolDiagnostics?.mcpSearch?.advertisedToolCount ?? runtimeInfo?.capabilities?.mcp?.search?.advertisedToolCount ?? 0}</span>
                         </div>
                       </div>
@@ -1101,40 +1104,40 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     control={
                       <div className="flex w-full flex-col gap-2">
                         <div className="grid gap-2 text-[12.5px] text-ds-muted sm:grid-cols-4">
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('mcpPermissionEnabledServers')}: <span className="font-mono text-ds-ink">{mcpPermissionSummary.enabledServers}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('mcpPermissionDisabledServers')}: <span className="font-mono text-ds-ink">{mcpPermissionSummary.disabledServers}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('mcpPermissionUserServers')}: <span className="font-mono text-ds-ink">{mcpPermissionSummary.userScopeServers}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('mcpPermissionWorkspaceServers')}: <span className="font-mono text-ds-ink">{mcpPermissionSummary.workspaceScopeServers}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('mcpPermissionVisibleServers')}: <span className="font-mono text-ds-ink">{mcpPermissionSummary.workspaceVisibleServers}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('mcpPermissionLocalServers')}: <span className="font-mono text-ds-ink">{mcpPermissionSummary.localServers}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('mcpPermissionRemoteServers')}: <span className="font-mono text-ds-ink">{mcpPermissionSummary.remoteServers}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('mcpPermissionEnvServers')}: <span className="font-mono text-ds-ink">{mcpPermissionSummary.envServers}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('mcpPermissionHeaderServers')}: <span className="font-mono text-ds-ink">{mcpPermissionSummary.headerServers}</span>
                           </div>
                         </div>
                         {mcpPermissionSummary.parseError ? (
-                          <div className="rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-[12px] leading-5 text-red-700 dark:text-red-200">
+                          <div className="rounded-xl border border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft px-3 py-2 text-[12px] leading-5 text-ds-danger">
                             {t('mcpPermissionParseError')}
                           </div>
                         ) : (
-                          <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-[12px] leading-5 text-amber-700 dark:text-amber-200">
+                          <div className="rounded-xl border border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft px-3 py-2 text-[12px] leading-5 text-ds-warning">
                             {t('mcpPermissionRuntimeNote')}
                           </div>
                         )}
@@ -1146,7 +1149,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     description={t('mcpPathDesc')}
                     control={
                       <div className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-muted shadow-sm">
-                        <code className="block break-all rounded-lg bg-ds-main/70 px-2 py-1 font-mono text-[12px] text-ds-ink">
+                        <code className="block break-all rounded-lg bg-ds-subtle px-2 py-1 font-mono text-[12px] text-ds-ink">
                           {compactHomePath(mcpConfigPath)}
                         </code>
                       </div>
@@ -1158,7 +1161,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     wideControl
                     control={
                       <div className="flex w-full flex-col gap-3">
-                        <div className="rounded-xl border border-ds-border bg-ds-main/50 px-3 py-2 text-[12px] leading-5 text-ds-muted">
+                        <div className="rounded-xl border border-ds-border bg-ds-subtle px-3 py-2 text-[12px] leading-5 text-ds-muted">
                           {mcpConfigExists ? t('mcpFileStatusReady') : t('mcpFileStatusMissing')}
                         </div>
                         <McpServersEditor
@@ -1275,7 +1278,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             type="number"
                             min={1}
                             max={100000}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={tokenEconomy.historyHygiene.maxToolResultLines}
                             onChange={(e) => updateHistoryHygiene({ maxToolResultLines: Number(e.target.value) })}
                           />
@@ -1287,7 +1290,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             min={512}
                             max={8388608}
                             step={1024}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={tokenEconomy.historyHygiene.maxToolResultBytes}
                             onChange={(e) => updateHistoryHygiene({ maxToolResultBytes: Number(e.target.value) })}
                           />
@@ -1299,7 +1302,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             min={128}
                             max={256000}
                             step={128}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={tokenEconomy.historyHygiene.maxToolResultTokens}
                             onChange={(e) => updateHistoryHygiene({ maxToolResultTokens: Number(e.target.value) })}
                           />
@@ -1311,7 +1314,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             min={512}
                             max={8388608}
                             step={1024}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={tokenEconomy.historyHygiene.maxToolArgumentStringBytes}
                             onChange={(e) =>
                               updateHistoryHygiene({ maxToolArgumentStringBytes: Number(e.target.value) })}
@@ -1324,7 +1327,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             min={128}
                             max={64000}
                             step={128}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={tokenEconomy.historyHygiene.maxToolArgumentStringTokens}
                             onChange={(e) =>
                               updateHistoryHygiene({ maxToolArgumentStringTokens: Number(e.target.value) })}
@@ -1336,7 +1339,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             type="number"
                             min={1}
                             max={10000}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={tokenEconomy.historyHygiene.maxArrayItems}
                             onChange={(e) => updateHistoryHygiene({ maxArrayItems: Number(e.target.value) })}
                           />
@@ -1407,7 +1410,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     description={t('kunStorageSqlitePathDesc')}
                     control={
                       <input
-                        className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30 md:max-w-md"
+                        className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)] md:max-w-md"
                         value={compactHomePath(storage.sqlitePath)}
                         disabled={storage.backend !== 'hybrid'}
                         placeholder={t('kunStorageSqlitePathPlaceholder')}
@@ -1427,7 +1430,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             type="number"
                             min={1024}
                             step={1024}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={contextCompaction.defaultSoftThreshold}
                             onChange={(e) => updateContextCompaction({ defaultSoftThreshold: Number(e.target.value) })}
                           />
@@ -1438,7 +1441,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             type="number"
                             min={1024}
                             step={1024}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={contextCompaction.defaultHardThreshold}
                             onChange={(e) => updateContextCompaction({ defaultHardThreshold: Number(e.target.value) })}
                           />
@@ -1459,7 +1462,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             min={1000}
                             max={120000}
                             step={1000}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={contextCompaction.summaryTimeoutMs}
                             onChange={(e) => updateContextCompaction({ summaryTimeoutMs: Number(e.target.value) })}
                           />
@@ -1471,7 +1474,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             min={64}
                             max={16000}
                             step={64}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={contextCompaction.summaryMaxTokens}
                             onChange={(e) => updateContextCompaction({ summaryMaxTokens: Number(e.target.value) })}
                           />
@@ -1483,7 +1486,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             min={1024}
                             max={8388608}
                             step={1024}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={contextCompaction.summaryInputMaxBytes}
                             onChange={(e) => updateContextCompaction({ summaryInputMaxBytes: Number(e.target.value) })}
                           />
@@ -1500,7 +1503,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                         min={0}
                         max={3600000}
                         step={1000}
-                        className="w-40 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                        className="w-40 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                         value={runtimeTuning.streamIdleTimeoutMs}
                         onChange={(e) =>
                           updateRuntimeTuning({ streamIdleTimeoutMs: Number(e.target.value) })
@@ -1530,7 +1533,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             type="number"
                             min={1}
                             max={128}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={runtimeTuning.toolStorm.windowSize}
                             disabled={!runtimeTuning.toolStorm.enabled}
                             onChange={(e) => updateToolStorm({ windowSize: Number(e.target.value) })}
@@ -1542,7 +1545,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                             type="number"
                             min={2}
                             max={128}
-                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                            className="rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                             value={runtimeTuning.toolStorm.threshold}
                             disabled={!runtimeTuning.toolStorm.enabled}
                             onChange={(e) => updateToolStorm({ threshold: Number(e.target.value) })}
@@ -1560,7 +1563,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                         min={1024}
                         max={16777216}
                         step={1024}
-                        className="w-40 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                        className="w-40 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                         value={runtimeTuning.toolArgumentRepair.maxStringBytes}
                         onChange={(e) => updateToolArgumentRepair({ maxStringBytes: Number(e.target.value) })}
                       />
@@ -1605,20 +1608,20 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                           ))}
                         </div>
                         <div className="grid gap-2 text-[12.5px] text-ds-muted sm:grid-cols-2">
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('kunRuntimeModel')}: <span className="font-mono text-ds-ink">{runtimeInfo?.capabilities?.model?.id ?? 'unknown'}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             {t('kunRuntimePid')}: <span className="font-mono text-ds-ink">{runtimeInfo?.pid ?? 'unknown'}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             MCP: <span className="font-mono text-ds-ink">{runtimeInfo?.capabilities?.mcp?.connectedServers ?? 0}/{runtimeInfo?.capabilities?.mcp?.configuredServers ?? 0}</span>
                           </div>
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                             Web: <span className="font-mono text-ds-ink">{runtimeInfo?.capabilities?.web?.provider ?? 'none'}</span>
                           </div>
                           {runtimeInfo?.capabilities?.subagents?.enabled ? (
-                            <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                            <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                               Subagents: <span className="font-mono text-ds-ink">
                                 {runtimeInfo?.capabilities?.subagents?.maxParallel ?? 0}∥ · {runtimeInfo?.capabilities?.subagents?.maxChildRuns ?? 0} max
                                 {runtimeInfo?.capabilities?.subagents?.defaultToolPolicy ? ` · ${runtimeInfo.capabilities.subagents.defaultToolPolicy}` : ''}
@@ -1648,16 +1651,16 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     wideControl
                     control={
                       <div className="grid gap-2 text-[12.5px] text-ds-muted sm:grid-cols-2">
-                        <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                        <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                           {t('kunDiagnosticsProviders')}: <span className="font-mono text-ds-ink">{toolDiagnostics?.providers?.length ?? 0}</span>
                         </div>
-                        <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                        <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                           {t('kunDiagnosticsMcpServers')}: <span className="font-mono text-ds-ink">{toolDiagnostics?.mcpServers?.length ?? 0}</span>
                         </div>
-                        <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                        <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                           {t('kunDiagnosticsSkills')}: <span className="font-mono text-ds-ink">{toolDiagnostics?.skills?.skills?.length ?? 0}</span>
                         </div>
-                        <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                        <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                           {t('kunDiagnosticsAttachments')}: <span className="font-mono text-ds-ink">{toolDiagnostics?.attachments?.count ?? 0}</span>
                         </div>
                       </div>
@@ -1670,12 +1673,12 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     control={
                       <div className="flex flex-col gap-2">
                         {memoryRecords.length === 0 ? (
-                          <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-3 text-[13px] text-ds-faint">
+                          <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-3 text-[13px] text-ds-faint">
                             {t('kunMemoryEmpty')}
                           </div>
                         ) : (
                           memoryRecords.slice(0, 8).map((memory: any) => (
-                            <div key={memory.id} className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+                            <div key={memory.id} className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
                               <div className="flex min-w-0 items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="truncate text-[13px] font-semibold text-ds-ink">{memory.content}</div>
@@ -1700,7 +1703,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                                   <button
                                     type="button"
                                     onClick={() => void deleteMemoryRecord(memory.id)}
-                                    className="rounded-lg p-1.5 text-ds-muted transition hover:bg-red-500/10 hover:text-red-600"
+                                    className="rounded-lg p-1.5 text-ds-muted transition hover:bg-ds-danger-soft hover:text-ds-danger"
                                     aria-label={t('kunMemoryDelete')}
                                     title={t('kunMemoryDelete')}
                                   >
@@ -1725,10 +1728,10 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
 
 function permissionBadgeClass(state: ComputerUsePermissionState): string {
   if (state === 'granted') {
-    return 'border-emerald-400/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+    return 'border-[color-mix(in_srgb,var(--ds-success)_35%,transparent)] bg-ds-success-soft text-ds-success'
   }
   if (state === 'denied') {
-    return 'border-rose-400/25 bg-rose-500/10 text-rose-700 dark:text-rose-200'
+    return 'border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft text-ds-danger'
   }
   return 'border-ds-border-muted bg-ds-card text-ds-faint'
 }
@@ -1767,7 +1770,7 @@ function ComputerUsePermissionRow({ t }: { t: (key: string) => string }): ReactE
         <div className="flex min-w-0 flex-col items-start gap-2 sm:items-end">
           <div className="flex flex-wrap gap-2">
             {permissions?.accessibilityNeedsRestart ? (
-              <span className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[12px] font-medium text-amber-700 dark:text-amber-200">
+              <span className="rounded-lg border border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft px-2 py-0.5 text-[12px] font-medium text-ds-warning">
                 {t('computerUseAccessibility')}: {t('computerUsePermissionNeedsRestart')}
               </span>
             ) : (
@@ -1776,7 +1779,7 @@ function ComputerUsePermissionRow({ t }: { t: (key: string) => string }): ReactE
             {badge(t('computerUseScreenRecording'), permissions?.screenRecording ?? 'unknown')}
           </div>
           {permissions?.accessibilityNeedsRestart ? (
-            <p className="max-w-full text-[12px] leading-5 text-amber-700 dark:text-amber-200">
+            <p className="max-w-full text-[12px] leading-5 text-ds-warning">
               {t('computerUseRestartHint')}
             </p>
           ) : null}

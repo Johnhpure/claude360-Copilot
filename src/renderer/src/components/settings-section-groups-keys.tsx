@@ -21,10 +21,15 @@ import {
   Trash2
 } from 'lucide-react'
 import type { Claude360TokenListItem, Claude360TokenPurpose } from '@shared/claude360'
+import { Button } from './ui'
 
 // 「设置 → 分组及 Key」页(Master-Detail)。
-// 把旧的「供应商」只读壳改造成:左列 = 从 claude360 拉取的模型分组,
-// 右侧 = 该分组的可用模型 + 该分组下的 API Key 管理。
+// 规范出处:父任务 07-03-oneui-redesign design §4.6(分组及 Key)+ §5/§6 token 表。
+// 视觉契约:
+//   - 左列分组 = GroupCard(分组名 / Key 数量 / 健康状态点;选中 = accent-soft 底 + 蓝字);
+//   - Key 列表 = 行式布局(44px 行高节奏),状态用功能色小圆点 + 胶囊 chip;
+//   - 危险操作红色仅出现在删除确认(系统确认框)上,行内删除按钮平时中性、hover 才显 danger;
+//   - 颜色/圆角/动效一律走 token,禁止字面量。
 //
 // 安全约束(与 MyPage 对齐):
 //   - 明文 Key 默认不显示,列表只展示脱敏 maskedKey;
@@ -91,9 +96,62 @@ export function flattenGroups(
   return merged
 }
 
+// ── Key 状态 / 分组健康(纯展示派生,不改数据层) ──────────────────
+
+/** 单个 Key 的展示状态:可用 / 额度用尽 / 已禁用(newapi status 1 = 启用)。 */
+export type KeyDisplayStatus = 'active' | 'exhausted' | 'disabled'
+
+export function keyStatusOf(token: Claude360TokenListItem): KeyDisplayStatus {
+  if (token.status !== 1) return 'disabled'
+  if (!token.unlimitedQuota && token.remainQuota <= 0) return 'exhausted'
+  return 'active'
+}
+
+/** 分组健康:全部可用=ok、部分可用=attention、全部不可用=down、无 Key=none。 */
+export type GroupHealth = 'ok' | 'attention' | 'down' | 'none'
+
+export function groupHealthOf(keys: Claude360TokenListItem[]): GroupHealth {
+  if (keys.length === 0) return 'none'
+  const active = keys.filter((token) => keyStatusOf(token) === 'active').length
+  if (active === keys.length) return 'ok'
+  if (active > 0) return 'attention'
+  return 'down'
+}
+
+const HEALTH_DOT_CLASS: Record<GroupHealth, string> = {
+  ok: 'bg-ds-success',
+  attention: 'bg-ds-warning',
+  down: 'bg-ds-danger',
+  none: 'bg-ds-faint'
+}
+
+const KEY_STATUS_CHIP_CLASS: Record<KeyDisplayStatus, string> = {
+  active: 'bg-ds-success-soft text-ds-success',
+  exhausted: 'bg-ds-warning-soft text-ds-warning',
+  disabled: 'bg-ds-danger-soft text-ds-danger'
+}
+
+const KEY_STATUS_LABEL_KEYS: Record<KeyDisplayStatus, string> = {
+  active: 'groupsKeysStatusActive',
+  exhausted: 'groupsKeysStatusExhausted',
+  disabled: 'groupsKeysStatusDisabled'
+}
+
+// 功能色胶囊 chip:小圆点 + 文案,小面积原则。
+function KeyStatusChip({ status, t }: { status: KeyDisplayStatus; t: Translate }): ReactElement {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-medium leading-4 ${KEY_STATUS_CHIP_CLASS[status]}`}
+    >
+      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
+      {t(KEY_STATUS_LABEL_KEYS[status])}
+    </span>
+  )
+}
+
 function RecommendedBadge({ label }: { label: string }): ReactElement {
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-300/70 bg-emerald-50 px-2 py-0.5 text-[10.5px] font-semibold leading-4 text-emerald-700 dark:border-emerald-800/70 dark:bg-emerald-950/30 dark:text-emerald-300">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-pill)] bg-ds-success-soft px-2 py-0.5 text-[10.5px] font-semibold leading-4 text-ds-success">
       <Check className="h-2.5 w-2.5" strokeWidth={2.6} />
       {label}
     </span>
@@ -109,7 +167,7 @@ function RatioPill({
 }): ReactElement {
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full bg-accent/15 px-2 py-0.5 text-[11.5px] font-semibold tabular-nums text-accent ${className}`}
+      className={`inline-flex shrink-0 items-center rounded-[var(--radius-pill)] bg-accent-soft px-2 py-0.5 text-[11.5px] font-semibold tabular-nums text-accent ${className}`}
     >
       ×{formatRatio(ratio)}
     </span>
@@ -128,12 +186,12 @@ function DetailPanelSection({
   children: ReactNode
 }): ReactElement {
   return (
-    <section className="overflow-hidden rounded-2xl border border-ds-border bg-ds-card">
+    <section className="overflow-hidden rounded-xl border border-ds-border bg-ds-card">
       <div className="flex items-center justify-between gap-2 border-b border-ds-border-muted px-4 py-3">
         <h3 className="flex items-center gap-2 text-[13px] font-semibold text-ds-ink">
           {title}
           {typeof count === 'number' ? (
-            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-ds-main px-1.5 text-[11px] font-semibold text-ds-faint">
+            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-[var(--radius-pill)] bg-ds-main px-1.5 text-[11px] font-semibold text-ds-faint">
               {count}
             </span>
           ) : null}
@@ -188,15 +246,11 @@ function GroupModelsSection({
             {t('groupsKeysModelsLoading')}
           </div>
         ) : error ? (
-          <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-red-600 dark:text-red-300">
+          <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-ds-danger">
             <span>{error}</span>
-            <button
-              type="button"
-              onClick={onRetry}
-              className="rounded-md border border-ds-border bg-ds-card px-2 py-0.5 text-[12px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
-            >
+            <Button variant="secondary" size="sm" onClick={onRetry}>
               {t('groupsKeysRetry')}
-            </button>
+            </Button>
           </div>
         ) : total === 0 ? (
           <p className="text-[12.5px] text-ds-faint">{t('groupsKeysModelsEmpty')}</p>
@@ -205,7 +259,7 @@ function GroupModelsSection({
             {shown.map((model) => (
               <span
                 key={model}
-                className="inline-flex max-w-full items-center rounded-lg border border-ds-border-muted bg-ds-main px-2.5 py-1 font-mono text-[11.5px] text-ds-muted"
+                className="inline-flex max-w-full items-center rounded-[var(--radius-sm)] border border-ds-border-muted bg-ds-main px-2.5 py-1 font-mono text-[11.5px] text-ds-muted"
               >
                 <span className="truncate">{model}</span>
               </span>
@@ -214,7 +268,7 @@ function GroupModelsSection({
               <button
                 type="button"
                 onClick={() => setExpanded(true)}
-                className="inline-flex items-center rounded-lg bg-accent/15 px-2.5 py-1 font-mono text-[11.5px] font-semibold text-accent transition hover:bg-accent/25"
+                className="inline-flex items-center rounded-[var(--radius-sm)] bg-accent-soft px-2.5 py-1 font-mono text-[11.5px] font-semibold text-accent transition-opacity duration-[var(--motion-fast)] ease-linear hover:opacity-80"
               >
                 {t('groupsKeysModelsExpand', { count: overflow })}
               </button>
@@ -226,7 +280,13 @@ function GroupModelsSection({
   )
 }
 
-// ── 分组下的 API Key 表(纯展示,便于测试) ────────────────────────
+// 行内图标操作按钮(reveal/copy 中性;delete 平时中性、hover 才显 danger)。
+const ICON_ACTION_CLASS =
+  'rounded-[var(--radius-sm)] border border-ds-border p-1.5 text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink'
+const ICON_ACTION_DANGER_CLASS =
+  'rounded-[var(--radius-sm)] border border-ds-border p-1.5 text-ds-muted transition-colors duration-[var(--motion-fast)] hover:border-transparent hover:bg-ds-danger-soft hover:text-ds-danger'
+
+// ── 分组下的 API Key 列表(行式布局,纯展示,便于测试) ─────────────
 export function GroupKeysTable({
   keys,
   revealed,
@@ -248,19 +308,10 @@ export function GroupKeysTable({
   t: Translate
 }): ReactElement {
   const createButton = (
-    <button
-      type="button"
-      onClick={onCreate}
-      disabled={creating}
-      className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      {creating ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
-      ) : (
-        <Plus className="h-3.5 w-3.5" strokeWidth={2} />
-      )}
+    <Button size="sm" loading={creating} onClick={onCreate}>
+      {creating ? null : <Plus className="h-3.5 w-3.5" strokeWidth={2} />}
       {creating ? t('groupsKeysCreating') : t('groupsKeysCreate')}
-    </button>
+    </Button>
   )
 
   return (
@@ -281,95 +332,92 @@ export function GroupKeysTable({
           <p className="text-[12px] text-ds-faint">{t('groupsKeysKeysEmptyHint')}</p>
         </div>
       ) : (
-        <div className="overflow-hidden">
-          <table className="w-full border-collapse text-left text-[13px]">
-            <thead className="bg-ds-main text-[11px] uppercase tracking-wide text-ds-faint">
-              <tr>
-                <th className="px-5 py-3 font-semibold">{t('groupsKeysColName')}</th>
-                <th className="px-5 py-3 font-semibold">{t('groupsKeysColKey')}</th>
-                <th className="px-5 py-3 font-semibold">{t('groupsKeysColQuota')}</th>
-                <th className="px-5 py-3 text-right font-semibold">{t('groupsKeysColActions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {keys.map((token) => {
-                const plain = revealed[token.id]
-                const isRevealed = typeof plain === 'string' && plain.length > 0
-                return (
-                  <tr key={token.id} className="border-t border-ds-border-muted transition hover:bg-ds-hover">
-                    <td className="px-5 py-3 font-medium text-ds-ink">{token.name}</td>
-                    <td className="px-5 py-3 font-mono text-[12px] tabular-nums text-ds-muted">
-                      {isRevealed ? plain : token.maskedKey}
-                    </td>
-                    <td
-                      className={`px-5 py-3 tabular-nums ${
-                        token.unlimitedQuota
-                          ? 'font-semibold text-emerald-600 dark:text-emerald-300'
-                          : 'text-ds-muted'
-                      }`}
+        <ul className="divide-y divide-ds-border-muted">
+          {keys.map((token) => {
+            const plain = revealed[token.id]
+            const isRevealed = typeof plain === 'string' && plain.length > 0
+            return (
+              <li
+                key={token.id}
+                className="flex min-h-[44px] flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover"
+              >
+                <div className="flex min-w-0 flex-1 basis-48 items-center gap-2.5">
+                  <span className="min-w-0 truncate text-[13px] font-medium text-ds-ink">
+                    {token.name}
+                  </span>
+                  <KeyStatusChip status={keyStatusOf(token)} t={t} />
+                </div>
+                <code className="min-w-0 max-w-full truncate font-mono text-[12px] tabular-nums text-ds-muted">
+                  {isRevealed ? plain : token.maskedKey}
+                </code>
+                <span className="flex shrink-0 items-baseline gap-1 text-[12px] tabular-nums">
+                  <span className="text-ds-faint">{t('groupsKeysColQuota')}</span>
+                  <span
+                    className={
+                      token.unlimitedQuota ? 'font-semibold text-ds-success' : 'text-ds-muted'
+                    }
+                  >
+                    {token.unlimitedQuota
+                      ? t('groupsKeysQuotaUnlimited')
+                      : token.remainQuota.toLocaleString()}
+                  </span>
+                </span>
+                <div className="flex shrink-0 items-center justify-end gap-1.5">
+                  <button
+                    type="button"
+                    aria-label={isRevealed ? t('groupsKeysHide') : t('groupsKeysReveal')}
+                    title={isRevealed ? t('groupsKeysHide') : t('groupsKeysReveal')}
+                    onClick={() => onReveal(token.id)}
+                    className={ICON_ACTION_CLASS}
+                  >
+                    {isRevealed ? (
+                      <EyeOff className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    ) : (
+                      <Eye className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    )}
+                  </button>
+                  {isRevealed ? (
+                    <button
+                      type="button"
+                      aria-label={t('groupsKeysCopy')}
+                      title={t('groupsKeysCopy')}
+                      onClick={() => onCopy(token.id, plain)}
+                      className={ICON_ACTION_CLASS}
                     >
-                      {token.unlimitedQuota
-                        ? t('groupsKeysQuotaUnlimited')
-                        : token.remainQuota.toLocaleString()}
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          aria-label={isRevealed ? t('groupsKeysHide') : t('groupsKeysReveal')}
-                          title={isRevealed ? t('groupsKeysHide') : t('groupsKeysReveal')}
-                          onClick={() => onReveal(token.id)}
-                          className="rounded-md border border-ds-border px-2 py-1 text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
-                        >
-                          {isRevealed ? (
-                            <EyeOff className="h-3.5 w-3.5" strokeWidth={1.75} />
-                          ) : (
-                            <Eye className="h-3.5 w-3.5" strokeWidth={1.75} />
-                          )}
-                        </button>
-                        {isRevealed ? (
-                          <button
-                            type="button"
-                            aria-label={t('groupsKeysCopy')}
-                            title={t('groupsKeysCopy')}
-                            onClick={() => onCopy(token.id, plain)}
-                            className="rounded-md border border-ds-border px-2 py-1 text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
-                          >
-                            <Copy className="h-3.5 w-3.5" strokeWidth={1.75} />
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          aria-label={t('groupsKeysDelete')}
-                          title={t('groupsKeysDelete')}
-                          onClick={() => onDelete(token.id)}
-                          className="rounded-md border border-red-200/70 px-2 py-1 text-red-600 transition hover:bg-red-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/30"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                      <Copy className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    aria-label={t('groupsKeysDelete')}
+                    title={t('groupsKeysDelete')}
+                    onClick={() => onDelete(token.id)}
+                    className={ICON_ACTION_DANGER_CLASS}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  </button>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
       )}
     </DetailPanelSection>
   )
 }
 
-// ── 左列分组列表项 ─────────────────────────────────────────────
-export function GroupListItem({
+// ── 左列 GroupCard(分组名 / Key 数量 / 健康状态点;D2:文件内部子组件) ──
+export function GroupCard({
   group,
   keyCount,
+  health = 'none',
   selected,
   onSelect,
   t
 }: {
   group: GroupSummary
   keyCount: number
+  health?: GroupHealth
   selected: boolean
   onSelect: () => void
   t: Translate
@@ -379,23 +427,25 @@ export function GroupListItem({
       type="button"
       aria-current={selected}
       onClick={onSelect}
-      className={`relative block w-full rounded-xl border px-3.5 py-2.5 pl-4 text-left transition ${
-        selected
-          ? 'border-ds-border bg-ds-card shadow-sm'
-          : 'border-transparent hover:bg-ds-hover'
+      className={`block w-full rounded-[var(--radius-md)] px-3.5 py-2.5 text-left transition-colors duration-[var(--motion-fast)] ${
+        selected ? 'bg-accent-soft' : 'hover:bg-ds-hover'
       }`}
     >
-      {selected ? (
+      <div className="flex items-center gap-2">
         <span
           aria-hidden="true"
-          className="absolute bottom-2.5 left-0 top-2.5 w-[3px] rounded-full bg-accent"
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${HEALTH_DOT_CLASS[health]}`}
         />
-      ) : null}
-      <div className="flex items-center gap-2">
-        <span className="min-w-0 truncate text-[13.5px] font-semibold text-ds-ink">{group.name}</span>
+        <span
+          className={`min-w-0 truncate text-[13.5px] font-semibold ${
+            selected ? 'text-accent' : 'text-ds-ink'
+          }`}
+        >
+          {group.name}
+        </span>
         {group.recommended ? <RecommendedBadge label={t('groupsKeysRecommended')} /> : null}
       </div>
-      <div className="mt-1 flex items-center gap-2.5 text-[11.5px] text-ds-faint">
+      <div className="mt-1 flex items-center gap-2.5 pl-3.5 text-[11.5px] text-ds-faint">
         <RatioPill ratio={group.ratio} />
         <span>{t('groupsKeysKeyCount', { count: keyCount })}</span>
       </div>
@@ -635,19 +685,14 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
     [tokens]
   )
 
-  const keyCountForGroup = useCallback(
-    (groupName: string) => tokens.reduce((total, token) => (token.group === groupName ? total + 1 : total), 0),
-    [tokens]
-  )
-
   const activeGroupKeys = activeGroup ? keysForGroup(activeGroup.name) : []
 
   return (
-    <section className="w-full rounded-2xl border border-ds-border bg-ds-card/95 shadow-sm shadow-black/5 dark:shadow-black/25">
+    <section className="w-full rounded-xl border border-ds-border bg-ds-card">
       {/* 头部:标题 + 刷新 */}
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-ds-border-muted px-5 py-3.5">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/15 text-accent">
+          <span className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-accent-soft text-accent">
             <Layers className="h-4.5 w-4.5" strokeWidth={1.9} />
           </span>
           <div>
@@ -655,18 +700,18 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
             <p className="mt-0.5 text-[12px] text-ds-faint">{t('groupsKeysDesc')}</p>
           </div>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => void handleRefresh()}
           disabled={refreshing}
-          className="inline-flex items-center gap-1.5 rounded-full border border-ds-border bg-ds-card px-3 py-1.5 text-[12.5px] font-medium text-ds-muted shadow-sm transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCw
             className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
             strokeWidth={1.9}
           />
           {t('groupsKeysRefresh')}
-        </button>
+        </Button>
       </div>
 
       {/* 筛选 segmented */}
@@ -674,7 +719,7 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
         <div
           role="tablist"
           aria-label={t('groupsKeysFilterAria')}
-          className="inline-flex gap-0.5 rounded-full border border-ds-border-muted bg-ds-main p-0.5"
+          className="inline-flex gap-0.5 rounded-[var(--radius-pill)] border border-ds-border-muted bg-ds-main p-0.5"
         >
           {PURPOSE_FILTERS.map((value) => {
             const active = purpose === value
@@ -685,9 +730,9 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setPurpose(value)}
-                className={`rounded-full px-3.5 py-1.5 text-[12.5px] font-medium transition ${
+                className={`rounded-[var(--radius-pill)] px-3.5 py-1.5 text-[12.5px] font-medium transition-colors duration-[var(--motion-fast)] ${
                   active
-                    ? 'bg-ds-card text-ds-ink shadow-sm'
+                    ? 'bg-ds-card text-ds-ink shadow-[var(--c360-shadow-sm)]'
                     : 'text-ds-muted hover:text-ds-ink'
                 }`}
               >
@@ -704,15 +749,11 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
       </div>
 
       {error ? (
-        <div className="flex flex-wrap items-center gap-2 border-b border-ds-border-muted bg-red-50 px-5 py-2.5 text-[12.5px] text-red-700 dark:bg-red-950/25 dark:text-red-200">
+        <div className="flex flex-wrap items-center gap-2 border-b border-ds-border-muted bg-ds-danger-soft px-5 py-2.5 text-[12.5px] text-ds-danger">
           <span className="min-w-0 break-words">{error}</span>
-          <button
-            type="button"
-            onClick={() => void loadAll()}
-            className="rounded-md border border-red-200/70 bg-red-50 px-2 py-0.5 text-[12px] font-medium text-red-700 transition hover:bg-red-100 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-200"
-          >
+          <Button variant="secondary" size="sm" onClick={() => void loadAll()}>
             {t('groupsKeysRetry')}
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -732,7 +773,7 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
         // 主区高度：至少撑到接近整屏（顶部标题/卡片头部/筛选约占 360px），
         // 左右两栏随 grid 拉伸等高；内容超出时由设置页外层统一滚动。
         <div className="grid gap-0 md:min-h-[calc(100vh-360px)] md:grid-cols-[240px_minmax(0,1fr)]">
-          {/* 左列:分组 */}
+          {/* 左列:分组 GroupCard */}
           <nav
             aria-label={t('groupsKeysListAria')}
             className="flex flex-col gap-1 border-b border-ds-border-muted p-2.5 md:border-b-0 md:border-r"
@@ -740,16 +781,20 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
             <div className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-ds-faint">
               {t('groupsKeysListLabel')}
             </div>
-            {visibleGroups.map((group) => (
-              <GroupListItem
-                key={group.name}
-                group={group}
-                keyCount={keyCountForGroup(group.name)}
-                selected={activeGroup?.name === group.name}
-                onSelect={() => setSelectedGroup(group.name)}
-                t={t}
-              />
-            ))}
+            {visibleGroups.map((group) => {
+              const groupKeys = keysForGroup(group.name)
+              return (
+                <GroupCard
+                  key={group.name}
+                  group={group}
+                  keyCount={groupKeys.length}
+                  health={groupHealthOf(groupKeys)}
+                  selected={activeGroup?.name === group.name}
+                  onSelect={() => setSelectedGroup(group.name)}
+                  t={t}
+                />
+              )
+            })}
           </nav>
 
           {/* 右侧:详情 */}
@@ -762,7 +807,7 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
                     {activeGroup.recommended ? (
                       <RecommendedBadge label={t('groupsKeysRecommended')} />
                     ) : null}
-                    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-accent/15 px-2.5 py-0.5 text-[12.5px] font-semibold tabular-nums text-accent">
+                    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-[var(--radius-pill)] bg-accent-soft px-2.5 py-0.5 text-[12.5px] font-semibold tabular-nums text-accent">
                       {t('groupsKeysRatioLabel')} ×{formatRatio(activeGroup.ratio)}
                     </span>
                   </div>

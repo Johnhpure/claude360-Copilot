@@ -118,7 +118,7 @@ export function ArchivedThreadsSettingsSection({ ctx }: { ctx: Record<string, an
         control={
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-ds-border bg-ds-main/70 px-3 py-2 shadow-sm">
+              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-ds-border bg-ds-subtle px-3 py-2 shadow-sm">
                 <Search className="h-4 w-4 shrink-0 text-ds-faint" strokeWidth={1.75} />
                 <input
                   type="search"
@@ -128,22 +128,22 @@ export function ArchivedThreadsSettingsSection({ ctx }: { ctx: Record<string, an
                   className="min-w-0 flex-1 bg-transparent text-[13px] text-ds-ink outline-none placeholder:text-ds-faint"
                 />
               </label>
-              <div className="flex shrink-0 items-center gap-2 rounded-xl border border-ds-border-muted bg-ds-main/50 px-3 py-2 text-[12px] font-medium text-ds-muted">
+              <div className="flex shrink-0 items-center gap-2 rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2 text-[12px] font-medium text-ds-muted">
                 <Archive className="h-3.5 w-3.5" strokeWidth={1.75} />
                 {t('archivesCount', { count: totalArchived })}
               </div>
             </div>
 
             {groups.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-ds-border-muted bg-ds-main/40 px-4 py-10 text-center">
+              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-ds-border-muted bg-ds-subtle px-4 py-10 text-center">
                 <Archive className="h-7 w-7 text-ds-faint" strokeWidth={1.5} />
                 <div className="text-[13px] text-ds-faint">{emptyMessage}</div>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-ds-border-muted bg-ds-main/35">
+              <div className="overflow-hidden rounded-xl border border-ds-border-muted bg-ds-subtle">
                 {groups.map(([workspace, items]) => (
                   <div key={workspace} className="border-b border-ds-border-muted last:border-b-0">
-                    <div className="flex items-center justify-between gap-2 bg-ds-hover/30 px-3 py-2 text-[12px] text-ds-faint">
+                    <div className="flex items-center justify-between gap-2 bg-ds-subtle px-3 py-2 text-[12px] text-ds-faint">
                       <div className="flex min-w-0 items-center gap-2">
                         <Folder className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                         <span className="truncate font-medium text-ds-muted">
@@ -194,7 +194,7 @@ export function ArchivedThreadsSettingsSection({ ctx }: { ctx: Record<string, an
                               onClick={() => void removeThread(thread)}
                               aria-label={t('archivesDelete')}
                               title={t('archivesDelete')}
-                              className="rounded-lg p-1.5 text-ds-muted transition hover:bg-red-500/10 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-lg p-1.5 text-ds-muted transition hover:bg-ds-danger-soft hover:text-ds-danger disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} />
                             </button>

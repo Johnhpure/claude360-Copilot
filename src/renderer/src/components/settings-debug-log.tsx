@@ -19,7 +19,7 @@ function WriteInlineEditDebugText({
       <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ds-faint">
         {label}
       </div>
-      <pre className="max-h-72 min-h-[88px] overflow-auto whitespace-pre-wrap rounded-xl border border-ds-border-muted bg-ds-main/72 p-3 font-mono text-[11.5px] leading-5 text-ds-ink">
+      <pre className="max-h-72 min-h-[88px] overflow-auto whitespace-pre-wrap rounded-xl border border-ds-border-muted bg-ds-subtle p-3 font-mono text-[11.5px] leading-5 text-ds-ink">
         {value || '—'}
       </pre>
     </div>
@@ -51,8 +51,8 @@ export function WriteDebugLogModal({
     completionEntries.find((entry) => entry.id === completionSelectedId) ?? completionEntries[0] ?? null
 
   return (
-    <div className="ds-no-drag fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
-      <div className="flex h-[min(86vh,820px)] w-[min(1180px,96vw)] min-w-0 flex-col overflow-hidden rounded-2xl border border-ds-border bg-ds-card shadow-[0_26px_80px_rgba(20,47,95,0.28)]">
+    <div className="ds-no-drag fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[var(--blur-overlay)]">
+      <div className="flex h-[min(86vh,820px)] w-[min(1180px,96vw)] min-w-0 flex-col overflow-hidden rounded-3xl border border-ds-border bg-ds-elevated shadow-[var(--c360-shadow-overlay)]">
         <div className="flex min-h-[64px] shrink-0 items-center justify-between gap-3 border-b border-ds-border-muted px-4 py-3">
           <div className="min-w-0">
             <h2 className="text-[16px] font-semibold text-ds-ink">{t('writeDebugLogTitle')}</h2>
@@ -74,7 +74,7 @@ export function WriteDebugLogModal({
         </div>
 
         {error ? (
-          <div className="shrink-0 border-b border-red-200 bg-red-50 px-4 py-2 text-[12.5px] text-red-700 dark:border-red-900/60 dark:bg-red-950/25 dark:text-red-200">
+          <div className="shrink-0 border-b border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft px-4 py-2 text-[12.5px] text-ds-danger">
             {error}
           </div>
         ) : null}
@@ -130,10 +130,10 @@ function WriteDebugLogListButton({
     <button
       type="button"
       onClick={onClick}
-      className={`block w-full px-3 py-2.5 text-left transition ${active ? 'bg-ds-hover text-ds-ink' : 'hover:bg-ds-hover/70'}`}
+      className={`block w-full px-3 py-2.5 text-left transition ${active ? 'bg-ds-hover text-ds-ink' : 'hover:bg-ds-hover'}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${ok ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300' : 'bg-red-500/12 text-red-700 dark:text-red-300'}`}>
+        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${ok ? 'bg-ds-success-soft text-ds-success' : 'bg-ds-danger-soft text-ds-danger'}`}>
           {ok ? t('writeInlineEditDebugOk') : t('writeInlineEditDebugFailed')}
         </span>
         <span className="text-[10.5px] text-ds-faint">{durationMs}ms</span>
@@ -186,20 +186,20 @@ function WriteDebugMeta({
 }): ReactElement {
   return (
     <div className="grid gap-2 text-[11.5px] text-ds-muted sm:grid-cols-2">
-      <div className="rounded-xl border border-ds-border-muted bg-ds-main/45 px-3 py-2">
+      <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
         <span className="font-semibold text-ds-ink">{t('writeInlineEditDebugModel')}</span>
         <span className="ml-2 font-mono">{model}</span>
       </div>
-      <div className="rounded-xl border border-ds-border-muted bg-ds-main/45 px-3 py-2">
+      <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
         <span className="font-semibold text-ds-ink">{t('writeInlineEditDebugContext')}</span>
         <span className="ml-2">{context}</span>
       </div>
-      <div className="rounded-xl border border-ds-border-muted bg-ds-main/45 px-3 py-2 sm:col-span-2">
+      <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2 sm:col-span-2">
         <span className="font-semibold text-ds-ink">{t('writeInlineEditDebugFile')}</span>
         <span className="ml-2 break-all font-mono">{filePath || '—'}</span>
       </div>
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-red-700 dark:border-red-900/60 dark:bg-red-950/25 dark:text-red-200 sm:col-span-2">
+        <div className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft px-3 py-2 text-ds-danger sm:col-span-2">
           {error}
         </div>
       ) : null}

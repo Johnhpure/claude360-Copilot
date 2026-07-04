@@ -106,7 +106,7 @@ export function WorktreeSettingsSection({ ctx }: { ctx: Record<string, any> }): 
         control={
           <div className="flex flex-col gap-3">
             <div className="grid grid-cols-[1fr_auto] items-start gap-3">
-              <div className="min-w-0 rounded-lg border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+              <div className="min-w-0 rounded-lg border border-ds-border-muted bg-ds-subtle px-3 py-2">
                 <div className="text-[12px] text-ds-faint">{t('worktreePoolDir')}</div>
                 <div
                   className="mt-0.5 truncate font-mono text-[12px] text-ds-muted"
@@ -127,12 +127,12 @@ export function WorktreeSettingsSection({ ctx }: { ctx: Record<string, any> }): 
             </div>
 
             {error ? (
-              <div className="rounded-lg border border-red-200/80 bg-red-50/80 px-3 py-2 text-[12px] text-red-700 dark:border-red-800/40 dark:bg-red-500/10 dark:text-red-300">
+              <div className="rounded-lg border border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft px-3 py-2 text-[12px] text-ds-danger">
                 {error}
               </div>
             ) : null}
 
-            <div className="overflow-hidden rounded-lg border border-ds-border-muted bg-ds-main/35">
+            <div className="overflow-hidden rounded-lg border border-ds-border-muted bg-ds-subtle">
               {rows.length === 0 ? (
                 <div className="px-3 py-4 text-[13px] text-ds-faint">{t('worktreeEmptyList')}</div>
               ) : rows.map((row) => {
@@ -163,7 +163,7 @@ export function WorktreeSettingsSection({ ctx }: { ctx: Record<string, any> }): 
                         type="button"
                         onClick={() => void removeWorktree(row.path)}
                         disabled={busyPath === row.path}
-                        className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-red-600 transition hover:bg-red-500/10 disabled:opacity-45"
+                        className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-ds-danger transition hover:bg-ds-danger-soft disabled:opacity-45"
                       >
                         {busyPath === row.path ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.8} />

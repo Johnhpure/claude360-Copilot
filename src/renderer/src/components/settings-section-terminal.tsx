@@ -55,7 +55,7 @@ function ColorInput({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-24 min-w-0 rounded-lg border border-ds-border bg-ds-card px-2 py-1 font-mono text-[12px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+        className="w-24 min-w-0 rounded-lg border border-ds-border bg-ds-card px-2 py-1 font-mono text-[12px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
         spellCheck={false}
         aria-label={label}
       />

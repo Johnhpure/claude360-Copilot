@@ -110,7 +110,7 @@ function SpotlightColorControl({
     onChange(scale[nextIndex] ?? normalized)
   }
   return (
-    <div className="grid w-full min-w-0 gap-2 rounded-xl border border-ds-border-muted bg-ds-main/35 p-3">
+    <div className="grid w-full min-w-0 gap-2 rounded-xl border border-ds-border-muted bg-ds-subtle p-3">
       <div className="flex items-center gap-2">
         <input
           type="color"
@@ -121,7 +121,7 @@ function SpotlightColorControl({
           onChange={(event) => selectColor(event.target.value)}
         />
         <input
-          className="min-w-0 flex-1 rounded-xl border border-ds-border bg-ds-card px-3 py-2 font-mono text-[13px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30 disabled:opacity-60"
+          className="min-w-0 flex-1 rounded-xl border border-ds-border bg-ds-card px-3 py-2 font-mono text-[13px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)] disabled:opacity-60"
           value={draftColor}
           disabled={disabled}
           spellCheck={false}
@@ -164,7 +164,7 @@ function SpotlightColorControl({
             aria-label={t('cursorSpotlightColorShade', { index: index + 1 })}
             title={shade}
             className={`h-6 min-w-0 flex-1 rounded-lg border transition disabled:cursor-not-allowed disabled:opacity-50 ${
-              shade === normalized ? 'border-ds-ink ring-1 ring-ds-ink/25' : 'border-ds-border hover:scale-[1.02]'
+              shade === normalized ? 'border-ds-ink ring-1 ring-ds-ink' : 'border-ds-border hover:scale-[1.02]'
             }`}
             style={{ backgroundColor: shade }}
             onClick={() => selectTone(index)}
@@ -405,7 +405,7 @@ export function GeneralSettingsSection({ ctx }: { ctx: Record<string, any> }): R
                     <div className="grid w-full min-w-0 gap-2 md:max-w-xl">
                       <div className="min-w-0">
                         <input
-                          className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                          className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                           value={compactHomePath(form.workspaceRoot)}
                           onChange={(e) => update({ workspaceRoot: expandHomePath(e.target.value) })}
                           placeholder={t('workspaceRootPlaceholder')}
@@ -428,7 +428,7 @@ export function GeneralSettingsSection({ ctx }: { ctx: Record<string, any> }): R
                         </button>
                       </div>
                       {workspacePickerError ? (
-                        <p className="mt-2 text-[13px] leading-5 text-amber-700 dark:text-amber-300">
+                        <p className="mt-2 text-[13px] leading-5 text-ds-warning">
                           {workspacePickerError}
                         </p>
                       ) : null}
@@ -442,7 +442,7 @@ export function GeneralSettingsSection({ ctx }: { ctx: Record<string, any> }): R
                     <div className="grid w-full min-w-0 gap-2 md:max-w-xl">
                       <div className="min-w-0">
                         <input
-                          className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                          className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                           value={compactHomePath(form.conversationWorkspaceRoot)}
                           onChange={(e) => update({ conversationWorkspaceRoot: expandHomePath(e.target.value) })}
                           placeholder={t('conversationWorkspaceRootPlaceholder')}
@@ -465,7 +465,7 @@ export function GeneralSettingsSection({ ctx }: { ctx: Record<string, any> }): R
                         </button>
                       </div>
                       {conversationWorkspacePickerError ? (
-                        <p className="mt-2 text-[13px] leading-5 text-amber-700 dark:text-amber-300">
+                        <p className="mt-2 text-[13px] leading-5 text-ds-warning">
                           {conversationWorkspacePickerError}
                         </p>
                       ) : null}
@@ -653,7 +653,7 @@ export function GeneralSettingsSection({ ctx }: { ctx: Record<string, any> }): R
                   control={
                     <div className="flex w-full min-w-0 flex-col items-start gap-2">
                       {logPath ? (
-                        <code className="block w-full max-w-full break-all rounded-xl bg-ds-main/70 px-3 py-2 font-mono text-[12px] text-ds-muted shadow-sm">
+                        <code className="block w-full max-w-full break-all rounded-xl bg-ds-subtle px-3 py-2 font-mono text-[12px] text-ds-muted shadow-sm">
                           {compactHomePath(logPath)}
                         </code>
                       ) : (
@@ -678,7 +678,7 @@ export function GeneralSettingsSection({ ctx }: { ctx: Record<string, any> }): R
                         {t('logDirOpen')}
                       </button>
                       {logDirOpenError ? (
-                        <p className="text-[12px] text-red-700 dark:text-red-300">
+                        <p className="text-[12px] text-ds-danger">
                           {logDirOpenError}
                         </p>
                       ) : null}

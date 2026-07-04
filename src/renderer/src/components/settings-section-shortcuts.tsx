@@ -127,7 +127,7 @@ export function KeyboardShortcutsSettingsSection({ ctx }: { ctx: Record<string, 
                   }}
                   className={`flex min-h-9 w-full items-center gap-1.5 rounded-xl border px-3 py-1.5 text-left transition ${
                     capturing
-                      ? 'border-accent/50 bg-accent/10 text-accent'
+                      ? 'border-accent bg-accent-soft text-accent'
                       : 'border-ds-border bg-ds-card text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
                   }`}
                 >

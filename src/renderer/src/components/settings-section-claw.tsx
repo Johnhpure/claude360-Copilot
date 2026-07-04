@@ -54,7 +54,7 @@ const profileFields: Array<{
 ]
 
 function textInputClass(extra = ''): string {
-  return `w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30 ${extra}`
+  return `w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)] ${extra}`
 }
 
 function surfaceButtonClass(extra = ''): string {
@@ -258,7 +258,7 @@ function TelegramConnectCard({
           {connecting ? tCommon('connectPhoneTelegramConnecting') : tCommon('connectPhoneTelegramConnect')}
         </button>
         {error ? (
-          <p className="rounded-xl bg-red-500/10 px-3 py-2 text-[13px] leading-5 text-red-600 dark:text-red-300">
+          <p className="rounded-xl bg-ds-danger-soft px-3 py-2 text-[13px] leading-5 text-ds-danger">
             {error}
           </p>
         ) : null}
@@ -332,7 +332,7 @@ export function ClawSettingsSection({ ctx }: { ctx: ClawSettingsContext }): Reac
                 </button>
               </div>
               {clawWorkspacePickerError ? (
-                <p className="mt-2 text-[13px] leading-5 text-amber-700 dark:text-amber-300">
+                <p className="mt-2 text-[13px] leading-5 text-ds-warning">
                   {clawWorkspacePickerError}
                 </p>
               ) : null}
@@ -370,7 +370,7 @@ export function ClawSettingsSection({ ctx }: { ctx: ClawSettingsContext }): Reac
                   })}
                 >
                   <div className="grid gap-4 px-4 py-4">
-                    <div className="flex flex-col gap-3 rounded-xl border border-ds-border-muted bg-ds-card/55 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-3 rounded-xl border border-ds-border-muted bg-ds-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
                         <div className="text-[13px] font-semibold text-ds-ink">{providerLabel}</div>
                         <div className="mt-1 text-[12px] leading-5 text-ds-faint">
@@ -409,7 +409,7 @@ export function ClawSettingsSection({ ctx }: { ctx: ClawSettingsContext }): Reac
                     ) : null}
 
                     {tgCredential ? (
-                      <div className="rounded-xl border border-ds-border-muted bg-ds-card/70 p-4">
+                      <div className="rounded-xl border border-ds-border-muted bg-ds-card p-4">
                         <div className="text-[12px] font-semibold text-ds-muted">
                           {t('clawTelegramCredentialTitle')}
                         </div>

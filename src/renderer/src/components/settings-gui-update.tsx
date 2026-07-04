@@ -90,16 +90,16 @@ export function GuiUpdateControl({
 
   const panelClass =
     tone === 'error'
-      ? 'border-red-300 bg-red-50 text-red-950 dark:border-red-800/70 dark:bg-red-950/25 dark:text-red-100'
+      ? 'border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft text-ds-danger'
       : tone === 'warn'
-        ? 'border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100'
+        ? 'border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft text-ds-warning'
         : tone === 'good'
-          ? 'border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-700/70 dark:bg-emerald-950/30 dark:text-emerald-100'
+          ? 'border-[color-mix(in_srgb,var(--ds-success)_35%,transparent)] bg-ds-success-soft text-ds-success'
           : 'border-ds-border bg-ds-card text-ds-ink'
 
   return (
     <div className="w-full min-w-0 md:max-w-md">
-      <div className={`rounded-xl border px-3 py-2.5 shadow-sm ${panelClass}`}>
+      <div className={`rounded-[var(--radius-md)] border px-3 py-2.5 ${panelClass}`}>
         <div className="flex items-start gap-2">
           {busy ? (
             <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" strokeWidth={2} />

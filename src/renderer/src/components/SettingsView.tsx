@@ -42,6 +42,7 @@ import {
   expandSettingsHomePathsForUse
 } from '../lib/settings-home-paths'
 import { useChatStore, type SettingsRouteSection } from '../store/chat-store'
+import { Button } from './ui'
 import { SettingsSidebar } from './SettingsSidebar'
 import { useSettingsGuiUpdate } from './use-settings-gui-update'
 import {
@@ -814,7 +815,7 @@ export function SettingsView(): ReactElement {
       loadError === 'PRELOAD_BRIDGE' ? t('preloadBridgeError') : t('loadFailed', { message: loadError })
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 bg-ds-main p-6 text-center">
-        <p className="max-w-md text-sm text-red-700 dark:text-red-300">{msg}</p>
+        <p className="max-w-md text-sm text-ds-danger">{msg}</p>
         <button
           type="button"
           className="rounded-xl bg-ds-userbubble px-4 py-2 text-sm font-medium text-ds-userbubbleFg"
@@ -985,8 +986,9 @@ export function SettingsView(): ReactElement {
     }
   }
 
+  // 设置分段共用的下拉触发器样式（Calm Blue：--radius-md、focus = accent 描边 + soft 外发光）。
   const selectControlClass =
-    'w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30'
+    'w-full min-w-0 rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]'
 
   const settingsSectionContext = {
     t,
@@ -1102,13 +1104,13 @@ export function SettingsView(): ReactElement {
             </div>
             <span
               title={saveStatus === 'error' && saveError ? saveError : undefined}
-              className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-medium ${
+              className={`shrink-0 rounded-[var(--radius-pill)] px-3 py-1 text-[12px] font-medium ${
                 portError
-                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-200'
+                  ? 'bg-ds-warning-soft text-ds-warning'
                   : saveStatus === 'saved'
-                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-200'
+                    ? 'bg-ds-success-soft text-ds-success'
                     : saveStatus === 'error'
-                      ? 'bg-red-500/15 text-red-700 dark:text-red-200'
+                      ? 'bg-ds-danger-soft text-ds-danger'
                       : 'bg-ds-subtle text-ds-muted'
               }`}
             >
@@ -1127,7 +1129,7 @@ export function SettingsView(): ReactElement {
           {saveStatus === 'error' && saveError ? (
             <div
               role="alert"
-              className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] leading-5 text-red-800 shadow-sm dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200"
+              className="mb-5 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft px-4 py-3 text-[13px] leading-5 text-ds-danger"
             >
               {saveError}
             </div>
@@ -1156,22 +1158,23 @@ export function SettingsView(): ReactElement {
       {saveStatus === 'error' && saveError ? (
         <div
           role="alert"
-          className="ds-no-drag fixed bottom-6 right-8 z-30 flex max-w-[min(560px,calc(100vw-3rem))] items-center gap-3 rounded-2xl border border-red-300/70 bg-red-50/95 px-4 py-3 text-red-900 shadow-2xl shadow-red-950/10 backdrop-blur dark:border-red-500/30 dark:bg-red-950/90 dark:text-red-100"
+          className="ds-no-drag fixed bottom-6 right-8 z-30 flex max-w-[min(560px,calc(100vw-3rem))] items-center gap-3 rounded-2xl border border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-elevated px-4 py-3 shadow-[var(--c360-shadow-overlay)]"
         >
           <div className="min-w-0">
-            <div className="text-[13px] font-semibold">{t('applyFailed')}</div>
-            <div className="mt-0.5 truncate text-[12px] text-red-800/85 dark:text-red-100/80">
+            <div className="text-[13px] font-semibold text-ds-danger">{t('applyFailed')}</div>
+            <div className="mt-0.5 truncate text-[12px] text-ds-muted">
               {saveError}
             </div>
           </div>
-          <button
-            type="button"
-            className="shrink-0 rounded-xl bg-red-600 px-3 py-2 text-[12px] font-semibold text-white shadow-sm transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+          <Button
+            variant="danger"
+            size="sm"
+            className="shrink-0"
             disabled={Boolean(portError)}
             onClick={() => void flushPendingSave()}
           >
             {t('retrySave')}
-          </button>
+          </Button>
         </div>
       ) : null}
       {writeDebugModalOpen ? (

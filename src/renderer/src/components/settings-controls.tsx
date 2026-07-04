@@ -1,3 +1,9 @@
+/**
+ * 设置页组合控件（SettingsCard / SettingRow / Toggle 等）。
+ * 规范出处：父任务 07-03-oneui-redesign design §4.5（One UI 设置页模板）+ §5/§6 token 表。
+ * 约束：颜色/圆角/动效一律走 token；卡片 = focus block（--radius-lg、不透明 surface、无投影）；
+ * Toggle = 蓝色胶囊（选中 bg-accent）。所有导出符号与 props 契约保持不变（20+ 分段依赖）。
+ */
 import { isValidElement, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { ChevronDown, Eye, EyeOff } from 'lucide-react'
 
@@ -31,10 +37,10 @@ export function SecretInput({
 }): ReactElement {
   return (
     <div
-      className={`flex w-full min-w-0 items-stretch overflow-hidden rounded-xl bg-ds-card shadow-sm ${className} ${
+      className={`flex w-full min-w-0 items-stretch overflow-hidden rounded-[var(--radius-md)] bg-ds-card transition-[border-color,box-shadow] duration-[var(--motion-fast)] ${className} ${
         invalid
-          ? 'border border-amber-300 focus-within:border-amber-400 focus-within:ring-1 focus-within:ring-amber-200'
-          : 'border border-ds-border focus-within:border-accent/40 focus-within:ring-1 focus-within:ring-accent/30'
+          ? 'border border-ds-warning focus-within:border-ds-warning focus-within:shadow-[0_0_0_3px_var(--ds-warning-soft)]'
+          : 'border border-ds-border focus-within:border-accent focus-within:shadow-[0_0_0_3px_var(--ds-accent-soft)]'
       }`}
     >
       <input
@@ -50,7 +56,7 @@ export function SecretInput({
         aria-label={visible ? hideLabel : showLabel}
         title={visible ? hideLabel : showLabel}
         onClick={onToggleVisibility}
-        className="shrink-0 border-l border-ds-border-muted px-3 text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
+        className="shrink-0 border-l border-ds-border-muted px-3 text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
       >
         {visible ? <EyeOff className="h-4 w-4" strokeWidth={1.75} /> : <Eye className="h-4 w-4" strokeWidth={1.75} />}
       </button>
@@ -69,7 +75,7 @@ export function SectionJumpButton({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full border border-ds-border bg-ds-card px-3 py-1.5 text-[12px] font-medium text-ds-muted shadow-sm transition hover:bg-ds-hover hover:text-ds-ink"
+      className="rounded-[var(--radius-pill)] border border-ds-border bg-ds-card px-3 py-1.5 text-[12px] font-medium text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
     >
       {label}
     </button>
@@ -83,10 +89,10 @@ export function InlineNoticeView({
 }): ReactElement {
   const className =
     notice.tone === 'error'
-      ? 'border-red-300/80 bg-red-50 text-red-800 dark:border-red-800/70 dark:bg-red-950/25 dark:text-red-200'
+      ? 'border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft text-ds-danger'
       : notice.tone === 'success'
-        ? 'border-emerald-300/80 bg-emerald-50 text-emerald-800 dark:border-emerald-800/70 dark:bg-emerald-950/25 dark:text-emerald-200'
-        : 'border-ds-border bg-ds-main/50 text-ds-muted'
+        ? 'border-[color-mix(in_srgb,var(--ds-success)_35%,transparent)] bg-ds-success-soft text-ds-success'
+        : 'border-ds-border bg-ds-subtle text-ds-muted'
 
   return (
     // `min-w-0 break-words` keeps long messages (a failed-probe error can carry
@@ -94,7 +100,7 @@ export function InlineNoticeView({
     // instead of forcing horizontal overflow that stretches the settings panel
     // — the success notice is short so the bug only ever showed on failure (#617).
     <div
-      className={`min-w-0 break-words rounded-xl border px-3 py-2 text-[12.5px] leading-5 ${className}`}
+      className={`min-w-0 break-words rounded-[var(--radius-md)] border px-3 py-2 text-[12.5px] leading-5 ${className}`}
     >
       {notice.message}
     </div>
@@ -112,9 +118,9 @@ export function SettingsCard({
 }): ReactElement {
   return (
     <section
-      className={`rounded-2xl border border-ds-border bg-ds-card/95 shadow-sm shadow-black/5 dark:shadow-black/25 ${className}`}
+      className={`rounded-xl border border-ds-border bg-ds-card ${className}`}
     >
-      <div className="border-b border-ds-border-muted px-5 py-3">
+      <div className="border-b border-ds-border-muted px-5 py-4">
         <h2 className="text-[16px] font-semibold text-ds-ink">{title}</h2>
       </div>
       <div className="divide-y divide-ds-border-muted px-2 py-1">{children}</div>
@@ -140,7 +146,7 @@ export function SettingRow({
 
   return (
     <div
-      className={`flex gap-3 px-3 py-4 ${
+      className={`flex min-h-[44px] gap-3 px-3 py-4 ${
         wideControl
           ? 'flex-col sm:gap-3.5'
           : 'flex-col sm:flex-row sm:items-start sm:justify-between sm:gap-8'
@@ -245,7 +251,7 @@ export function ModelSelect({
       </select>
       {customActive ? (
         <input
-          className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 font-mono text-[13px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+          className="w-full min-w-0 rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 py-2 font-mono text-[13px] text-ds-ink transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
           value={customDraft}
           placeholder={customPlaceholder}
           spellCheck={false}
@@ -282,17 +288,17 @@ export function AdvancedSettingsDisclosure({
   children: ReactNode
 }): ReactElement {
   return (
-    <details className="group overflow-hidden rounded-xl border border-ds-border-muted bg-ds-main/35">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-ds-hover/70 [&::-webkit-details-marker]:hidden">
+    <details className="group overflow-hidden rounded-[var(--radius-md)] border border-ds-border-muted bg-ds-subtle">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover [&::-webkit-details-marker]:hidden">
         <span className="min-w-0">
           <span className="block text-[13px] font-semibold text-ds-ink">{title}</span>
           {description ? (
             <span className="mt-1 block text-[12.5px] leading-5 text-ds-faint">{description}</span>
           ) : null}
         </span>
-        <ChevronDown className="h-4 w-4 shrink-0 text-ds-faint transition group-open:rotate-180" strokeWidth={1.9} />
+        <ChevronDown className="h-4 w-4 shrink-0 text-ds-faint transition-transform duration-[var(--motion-fast)] group-open:rotate-180" strokeWidth={1.9} />
       </summary>
-      <div className="border-t border-ds-border-muted bg-ds-card/45">{children}</div>
+      <div className="border-t border-ds-border-muted bg-ds-card">{children}</div>
     </details>
   )
 }
@@ -316,12 +322,12 @@ export function Toggle({
       onClick={() => {
         if (!disabled) onChange(!checked)
       }}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ease-out ${
-        checked ? 'bg-emerald-500' : 'bg-ds-faint'
+      className={`relative h-7 w-12 shrink-0 rounded-[var(--radius-pill)] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-oneui)] ${
+        checked ? 'bg-accent' : 'bg-ds-faint'
       } ${disabled ? 'cursor-not-allowed opacity-60' : 'active:scale-[0.98]'}`}
     >
       <span
-        className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ease-out ${
+        className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-[var(--radius-pill)] bg-white shadow-[var(--c360-shadow-sm)] transition-transform duration-[var(--motion-fast)] ease-[var(--ease-oneui)] ${
           checked ? 'translate-x-5' : 'translate-x-0'
         }`}
       />

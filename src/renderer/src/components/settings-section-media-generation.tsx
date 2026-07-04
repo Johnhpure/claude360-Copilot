@@ -62,9 +62,9 @@ type ProviderProfile = {
 }
 
 const inputClass =
-  'w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30'
+  'w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]'
 const compactInputClass =
-  'w-40 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30'
+  'w-40 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]'
 
 export function MediaGenerationSettingsSection({ ctx }: { ctx: Record<string, any> }): ReactElement {
   const {
@@ -334,7 +334,7 @@ function renderAudioFormatRow(
       description={t(`${titleKey}Desc`)}
       control={
         <select
-          className="w-40 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+          className="w-40 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
           value={value}
           onChange={(e) => update({ format: e.target.value })}
         >

@@ -209,19 +209,19 @@ export function MemorySettingsSection({ ctx }: { ctx: Record<string, any> }): Re
         wideControl
         control={
           <div className="grid grid-cols-3 gap-2 text-[12px]">
-            <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+            <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
               <div className="text-ds-faint">{t('memoryActiveCount')}</div>
               <div className="mt-0.5 font-mono text-[15px] font-semibold text-ds-ink">
                 {memoryDiagnostics?.activeCount ?? memoryRecords?.length ?? 0}
               </div>
             </div>
-            <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+            <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
               <div className="text-ds-faint">{t('memoryTombstoneCount')}</div>
               <div className="mt-0.5 font-mono text-[15px] font-semibold text-ds-ink">
                 {memoryDiagnostics?.tombstoneCount ?? 0}
               </div>
             </div>
-            <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
+            <div className="rounded-xl border border-ds-border-muted bg-ds-subtle px-3 py-2">
               <div className="text-ds-faint">{t('memoryEnabled')}</div>
               <div className="mt-0.5 font-mono text-[15px] font-semibold text-ds-ink">
                 {memoryDiagnostics?.enabled === false ? t('memoryOff') : t('memoryOn')}
@@ -238,7 +238,7 @@ export function MemorySettingsSection({ ctx }: { ctx: Record<string, any> }): Re
         control={
           <div className="flex flex-col gap-3">
             {memoryDiagnostics?.enabled === false ? (
-              <div className="rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-700 dark:border-amber-800/40 dark:bg-amber-500/10 dark:text-amber-300">
+              <div className="rounded-xl border border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft px-3 py-2 text-[12px] text-ds-warning">
                 {t('memoryDisabledHint')}
               </div>
             ) : null}
@@ -272,7 +272,7 @@ export function MemorySettingsSection({ ctx }: { ctx: Record<string, any> }): Re
 
             {/* List */}
             {filteredRecords.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-ds-border-muted bg-ds-main/40 px-3 py-8 text-center">
+              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-ds-border-muted bg-ds-subtle px-3 py-8 text-center">
                 <BrainCircuit className="h-6 w-6 text-ds-faint" strokeWidth={1.5} />
                 <div className="text-[13px] text-ds-faint">{t('memoryEmpty')}</div>
               </div>
@@ -284,8 +284,8 @@ export function MemorySettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                     key={memory.id}
                     className={`rounded-xl border px-3 py-2 transition ${
                       memory.disabledAt
-                        ? 'border-ds-border-muted bg-ds-main/20 opacity-60'
-                        : 'border-ds-border-muted bg-ds-main/40'
+                        ? 'border-ds-border-muted bg-ds-subtle opacity-60'
+                        : 'border-ds-border-muted bg-ds-subtle'
                     }`}
                   >
                     <div className="flex min-w-0 items-start justify-between gap-3">
@@ -294,7 +294,7 @@ export function MemorySettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                           {memoryPreview(memory.content)}
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-ds-faint">
-                          <span className="rounded bg-ds-hover/60 px-1.5 py-0.5 font-medium">{memory.scope}</span>
+                          <span className="rounded bg-ds-hover px-1.5 py-0.5 font-medium">{memory.scope}</span>
                           {memory.confidence !== undefined && memory.confidence !== 1 && (
                             <span className="font-mono">★ {memory.confidence.toFixed(2)}</span>
                           )}
@@ -309,7 +309,7 @@ export function MemorySettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                               </span>
                             </span>
                           ) : null}
-                          {memory.disabledAt ? <span className="text-amber-600">{t('memoryDisabled')}</span> : null}
+                          {memory.disabledAt ? <span className="text-ds-warning">{t('memoryDisabled')}</span> : null}
                           <span className="font-mono opacity-60">{memory.id.slice(0, 8)}</span>
                         </div>
                       </div>
@@ -336,7 +336,7 @@ export function MemorySettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                         <button
                           type="button"
                           onClick={() => void deleteMemoryRecord(memory.id)}
-                          className="rounded-lg p-1.5 text-ds-muted transition hover:bg-red-500/10 hover:text-red-600"
+                          className="rounded-lg p-1.5 text-ds-muted transition hover:bg-ds-danger-soft hover:text-ds-danger"
                           aria-label={t('memoryDelete')}
                           title={t('memoryDelete')}
                         >
@@ -374,7 +374,7 @@ export function MemorySettingsSection({ ctx }: { ctx: Record<string, any> }): Re
               {memoryDiagnostics.lastInjectedIds.map((id: string) => (
                 <span
                   key={id}
-                  className="rounded-lg bg-ds-hover/50 px-2 py-0.5 font-mono text-[11px] text-ds-faint"
+                  className="rounded-lg bg-ds-hover px-2 py-0.5 font-mono text-[11px] text-ds-faint"
                 >
                   {id.slice(0, 12)}
                 </span>
@@ -415,7 +415,7 @@ function MemoryRecordDialog({
 
   return (
     <div
-      className="ds-no-drag fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm dark:bg-black/55"
+      className="ds-no-drag fixed inset-0 z-[90] flex items-center justify-center bg-black/45 px-4 py-6 backdrop-blur-[var(--blur-overlay)]"
       role="dialog"
       aria-modal="true"
     >
@@ -426,7 +426,7 @@ function MemoryRecordDialog({
             {memory ? (
               <div className="mt-1 flex min-w-0 flex-col gap-1 text-[11px] text-ds-faint">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="rounded bg-ds-hover/60 px-1.5 py-0.5 font-medium">{memory.scope}</span>
+                  <span className="rounded bg-ds-hover px-1.5 py-0.5 font-medium">{memory.scope}</span>
                   {memory.tags?.length ? <span>{memory.tags.join(' · ')}</span> : null}
                   <span className="font-mono opacity-60">{memory.id}</span>
                 </div>
@@ -458,14 +458,14 @@ function MemoryRecordDialog({
                 onChange={(e) => onDraftChange((prev) => ({ ...prev, content: e.target.value }))}
                 rows={10}
                 placeholder={t('memoryContentPlaceholder')}
-                className="min-h-[220px] w-full resize-y rounded-lg border border-ds-border-muted bg-ds-surface-subtle px-3 py-2 text-[13px] text-ds-ink outline-none focus:border-ds-ink/40"
+                className="min-h-[220px] w-full resize-y rounded-lg border border-ds-border-muted bg-ds-card px-3 py-2 text-[13px] text-ds-ink outline-none focus:border-accent"
               />
               <div className="flex flex-wrap items-center gap-2">
                 {dialog.mode === 'create' ? (
                   <select
                     value={draft.scope}
                     onChange={(e) => onDraftChange((prev) => ({ ...prev, scope: e.target.value as MemoryScope }))}
-                    className="rounded-lg border border-ds-border-muted bg-ds-surface-subtle px-2 py-1 text-[12px] text-ds-ink outline-none"
+                    className="rounded-lg border border-ds-border-muted bg-ds-card px-2 py-1 text-[12px] text-ds-ink outline-none"
                   >
                     <option value="user">{t('memoryScope_user')}</option>
                     <option value="workspace">{t('memoryScope_workspace')}</option>
@@ -478,7 +478,7 @@ function MemoryRecordDialog({
                     value={draft.targetPath}
                     onChange={(e) => onDraftChange((prev) => ({ ...prev, targetPath: e.target.value }))}
                     placeholder={t('memoryTargetPathPlaceholder')}
-                    className="min-w-[200px] flex-1 rounded-lg border border-ds-border-muted bg-ds-surface-subtle px-2 py-1 text-[12px] text-ds-ink outline-none"
+                    className="min-w-[200px] flex-1 rounded-lg border border-ds-border-muted bg-ds-card px-2 py-1 text-[12px] text-ds-ink outline-none"
                   />
                 ) : null}
                 <input
@@ -486,7 +486,7 @@ function MemoryRecordDialog({
                   value={draft.tags}
                   onChange={(e) => onDraftChange((prev) => ({ ...prev, tags: e.target.value }))}
                   placeholder={t('memoryTagsPlaceholder')}
-                  className="min-w-[160px] flex-1 rounded-lg border border-ds-border-muted bg-ds-surface-subtle px-2 py-1 text-[12px] text-ds-ink outline-none"
+                  className="min-w-[160px] flex-1 rounded-lg border border-ds-border-muted bg-ds-card px-2 py-1 text-[12px] text-ds-ink outline-none"
                 />
                 <div className="flex items-center gap-1 text-[12px] text-ds-faint">
                   <span>{t('memoryConfidence')}</span>
@@ -500,13 +500,13 @@ function MemoryRecordDialog({
                       ...prev,
                       confidence: Number(e.target.value) || 0
                     }))}
-                    className="w-14 rounded-lg border border-ds-border-muted bg-ds-surface-subtle px-1.5 py-1 text-[12px] text-ds-ink outline-none"
+                    className="w-14 rounded-lg border border-ds-border-muted bg-ds-card px-1.5 py-1 text-[12px] text-ds-ink outline-none"
                   />
                 </div>
               </div>
             </div>
           ) : memory ? (
-            <div className="whitespace-pre-wrap break-words rounded-lg border border-ds-border-muted bg-ds-surface-subtle px-3 py-3 text-[13px] leading-6 text-ds-ink">
+            <div className="whitespace-pre-wrap break-words rounded-lg border border-ds-border-muted bg-ds-card px-3 py-3 text-[13px] leading-6 text-ds-ink">
               {memory.content}
             </div>
           ) : null}

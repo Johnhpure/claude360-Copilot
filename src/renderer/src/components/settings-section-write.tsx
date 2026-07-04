@@ -36,7 +36,7 @@ import {
 } from './settings-controls'
 
 const textInputClass =
-  'w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30'
+  'w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]'
 const ghostButtonClass =
   'inline-flex items-center gap-1.5 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] font-medium text-ds-ink shadow-sm transition hover:bg-ds-hover'
 
@@ -120,7 +120,7 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                     <div className="w-full min-w-[200px] md:max-w-xl">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <input
-                          className="w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                          className="w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                           value={compactHomePath(form.write.defaultWorkspaceRoot)}
                           onChange={(e) => {
                             const workspaceRoot = expandHomePath(e.target.value)
@@ -150,7 +150,7 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                         </button>
                       </div>
                       {writeWorkspacePickerError ? (
-                        <p className="mt-2 text-[13px] leading-5 text-amber-700 dark:text-amber-300">
+                        <p className="mt-2 text-[13px] leading-5 text-ds-warning">
                           {writeWorkspacePickerError}
                         </p>
                       ) : null}
@@ -353,7 +353,7 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                       min={16}
                       max={512}
                       step={8}
-                      className="w-32 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                      className="w-32 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                       value={form.write.inlineCompletion.maxTokens}
                       placeholder={String(DEFAULT_WRITE_INLINE_COMPLETION_MAX_TOKENS)}
                       onChange={(e) => update({
@@ -383,7 +383,7 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                       min={64}
                       max={1024}
                       step={16}
-                      className="w-32 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                      className="w-32 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                       value={form.write.inlineCompletion.longMaxTokens}
                       placeholder={String(DEFAULT_WRITE_INLINE_LONG_COMPLETION_MAX_TOKENS)}
                       onChange={(e) => update({
@@ -472,7 +472,7 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                               return (
                                 <div
                                   key={action.id}
-                                  className="rounded-xl border border-ds-border-muted bg-ds-card/70 p-3"
+                                  className="rounded-xl border border-ds-border-muted bg-ds-card p-3"
                                 >
                                   <div className="flex items-center gap-2">
                                     <input
@@ -505,7 +505,7 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                                     </select>
                                     <button
                                       type="button"
-                                      className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ds-faint transition hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300"
+                                      className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ds-faint transition hover:bg-ds-danger-soft hover:text-ds-danger"
                                       title={t('writeQuickActionRemove')}
                                       aria-label={t('writeQuickActionRemove')}
                                       onClick={() =>
@@ -578,7 +578,7 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                         return (
                           <div
                             key={preset.id}
-                            className="rounded-xl border border-ds-border-muted bg-ds-card/70 p-3"
+                            className="rounded-xl border border-ds-border-muted bg-ds-card p-3"
                           >
                             <div className="flex items-center gap-2">
                               <input
@@ -605,7 +605,7 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                               />
                               <button
                                 type="button"
-                                className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ds-faint transition hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300"
+                                className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ds-faint transition hover:bg-ds-danger-soft hover:text-ds-danger"
                                 title={t('writeAgentPresetRemove')}
                                 aria-label={t('writeAgentPresetRemove')}
                                 onClick={() =>

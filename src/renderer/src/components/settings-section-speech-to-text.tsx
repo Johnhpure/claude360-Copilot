@@ -415,7 +415,7 @@ export function SpeechToTextSettingsSection({ ctx }: { ctx: Record<string, any> 
                   <option value={CUSTOM_SPEECH_TO_TEXT_PROVIDER_ID}>{t('speechToTextProviderCustom')}</option>
                 </select>
                 {!usingLocalWhisper && !usingCustomProvider && !selectedSpeechProvider?.apiKey?.trim() ? (
-                  <p className="mt-2 text-[12px] text-amber-700 dark:text-amber-300">
+                  <p className="mt-2 text-[12px] text-ds-warning">
                     {t('speechToTextProviderMissingKey', { provider: selectedSpeechProvider?.name ?? selectedProviderId })}
                   </p>
                 ) : null}
@@ -446,7 +446,7 @@ export function SpeechToTextSettingsSection({ ctx }: { ctx: Record<string, any> 
                 description={t('speechToTextBaseUrlDesc')}
                 control={
                   <input
-                    className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30 md:max-w-md"
+                    className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)] md:max-w-md"
                     value={speechToText.baseUrl}
                     placeholder={t('speechToTextBaseUrlPlaceholder')}
                     onChange={(e) => updateSpeechToText({ baseUrl: e.target.value })}
@@ -503,14 +503,14 @@ export function SpeechToTextSettingsSection({ ctx }: { ctx: Record<string, any> 
                           key={status.sourceId}
                           className={[
                             'inline-flex min-w-0 items-center gap-1.5 rounded-lg border px-2 py-1',
-                            selected ? 'border-accent/35 bg-accent/10' : 'border-ds-border bg-ds-card',
-                            available ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'
+                            selected ? 'border-accent bg-accent-soft' : 'border-ds-border bg-ds-card',
+                            available ? 'text-ds-success' : 'text-ds-warning'
                           ].join(' ')}
                         >
                           <span
                             className={[
                               'h-2 w-2 shrink-0 rounded-full',
-                              available ? 'bg-emerald-500' : 'bg-amber-500'
+                              available ? 'bg-ds-success' : 'bg-ds-warning'
                             ].join(' ')}
                           />
                           <span className="min-w-0 truncate">{localWhisperSourceStatusText(t, status)}</span>
@@ -551,7 +551,7 @@ export function SpeechToTextSettingsSection({ ctx }: { ctx: Record<string, any> 
                           className={[
                             'flex min-w-0 flex-col rounded-xl border px-3 py-2.5 text-left transition',
                             selected
-                              ? 'border-accent/60 bg-accent/10 text-ds-ink shadow-sm'
+                              ? 'border-accent bg-accent-soft text-ds-ink'
                               : 'border-ds-border bg-ds-card text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
                           ].join(' ')}
                         >
@@ -561,16 +561,16 @@ export function SpeechToTextSettingsSection({ ctx }: { ctx: Record<string, any> 
                               className={[
                                 'rounded-full px-2 py-0.5 text-[11px] font-medium',
                                 modelState === 'ready'
-                                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                  ? 'bg-ds-success-soft text-ds-success'
                                   : modelState === 'downloading'
-                                    ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
-                                    : 'bg-slate-500/15 text-slate-600 dark:text-slate-300'
+                                    ? 'bg-accent-soft text-accent'
+                                    : 'bg-ds-subtle text-ds-muted'
                               ].join(' ')}
                             >
                               {localWhisperModelStateLabel(t, modelState)}
                             </span>
                             {model.recommended ? (
-                              <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-[11px] font-medium text-orange-700 dark:text-orange-300">
+                              <span className="rounded-full bg-ds-warning-soft px-2 py-0.5 text-[11px] font-medium text-ds-warning">
                                 {t('speechToTextLocalRecommended')}
                               </span>
                             ) : null}
@@ -662,7 +662,7 @@ export function SpeechToTextSettingsSection({ ctx }: { ctx: Record<string, any> 
                 <div className="w-full min-w-0 md:max-w-md">
                   {usingCustomProvider ? (
                     <input
-                      className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                      className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                       value={speechToText.model}
                       placeholder={t('speechToTextModelPlaceholder')}
                       onChange={(e) => updateSpeechToText({ model: e.target.value })}
@@ -717,7 +717,7 @@ export function SpeechToTextSettingsSection({ ctx }: { ctx: Record<string, any> 
                       min={5000}
                       max={600000}
                       step={5000}
-                      className="w-32 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                      className="w-32 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]"
                       value={speechToText.timeoutMs}
                       onChange={(e) => updateSpeechToText({ timeoutMs: Number(e.target.value) })}
                     />
