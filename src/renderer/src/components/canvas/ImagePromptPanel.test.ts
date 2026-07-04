@@ -57,10 +57,11 @@ describe('ImagePromptPanel · 工具型面板', () => {
     expect(html.toLowerCase()).not.toContain('apikey')
   })
 
-  it('模型下拉展示传入的 image 模型（不硬编码 gpt-image-2）', () => {
+  it('模型触发器展示当前选中的 image 模型（不硬编码 gpt-image-2）', () => {
+    // 阶段4：原生 select 换 ui/Select（Popover 浮层），关闭态只渲染触发器与选中项。
     const html = renderToStaticMarkup(createElement(ImagePromptPanel, base))
+    expect(html).toContain('image-model-select')
     expect(html).toContain('flux-pro')
-    expect(html).toContain('dall-e-3')
     expect(html).not.toContain('gpt-image-2')
   })
 

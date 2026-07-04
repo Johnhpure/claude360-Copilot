@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from 'zustand'
-import { Copy, Download, Image as ImageIcon, X } from 'lucide-react'
+import { Image as ImageIcon } from 'lucide-react'
 import {
   CLAUDE360_ASPECT_PRESETS,
   CLAUDE360_IMAGE_OUTPUT_FORMATS,
@@ -31,8 +31,11 @@ import {
 } from '../../canvas/canvas-workbench-actions'
 import { imageDataUrl } from '../../canvas/image-result-utils'
 import { confirmDialog } from '../../lib/confirm-dialog'
+import { PageHeader } from '../shell'
+import { toast } from '../ui'
 import { CanvasToolbar } from './CanvasToolbar'
 import { ImagePromptPanel } from './ImagePromptPanel'
+import { ImageLightbox } from './ImageLightbox'
 import { ArtworkGrid } from './ArtworkGrid'
 import { ensureGroupKeyForSelection } from '../../lib/group-key-ensure'
 import { useGroupKeyPromptStore } from '../../store/group-key-prompt-store'
@@ -109,11 +112,9 @@ export function CanvasWorkbench({
 
   const [lowBalance, setLowBalance] = useState(false)
   const [imageModels, setImageModels] = useState<string[]>([])
-  // 复制结果的一次性反馈（成功「已复制」/ 失败提示），短暂展示后自动消失。
-  const [copyNotice, setCopyNotice] = useState<string | null>(null)
   // 当前 image 分组（执行时用于确保该分组已有 Key）。
   const [imageGroup, setImageGroup] = useState('')
-  // 大图查看（lightbox）。
+  // 大图查看（lightbox，基于 ui/Modal，Esc/遮罩关闭由基类接管）。
   const [viewing, setViewing] = useState<CanvasArtwork | null>(null)
 
   const visibleArtworks = useMemo(
@@ -163,15 +164,7 @@ export function CanvasWorkbench({
     }
   }, [applyModelsFromCache])
 
-  // Escape 关闭大图查看。
-  useEffect(() => {
-    if (!viewing) return
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setViewing(null)
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [viewing])
+  // Escape 关闭大图查看由 ui/Modal 基类接管（ImageLightbox）。
 
   const refreshModels = useCallback((): void => {
     const w = window.kunGui
@@ -263,11 +256,6 @@ export function CanvasWorkbench({
     ).then((dataUrl) => setReferenceImage(dataUrl || null)).catch(() => undefined)
   }, [setReferenceImage])
 
-  const showCopyNotice = useCallback((message: string): void => {
-    setCopyNotice(message)
-    setTimeout(() => setCopyNotice(null), 2000)
-  }, [])
-
   const handleCopyImage = useCallback((artwork: CanvasArtwork): void => {
     if (!artwork.image) return
     void copyImage(artwork.image, {
@@ -278,16 +266,18 @@ export function CanvasWorkbench({
       },
       fetch: (...a: Parameters<typeof fetch>) => fetch(...a)
     }).then((outcome) => {
-      showCopyNotice(outcome === 'failed' ? t('canvasCopyFailed') : t('canvasCopied'))
+      // 一次性反馈走全局 toast（Toaster 已挂 AppShell，勿重复挂载）。
+      if (outcome === 'failed') toast.error(t('canvasCopyFailed'))
+      else toast.success(t('canvasCopied'))
     })
-  }, [showCopyNotice, t])
+  }, [t])
 
   const handleCopyPrompt = useCallback((artwork: CanvasArtwork): void => {
     void navigator.clipboard
       .writeText(artwork.prompt)
-      .then(() => showCopyNotice(t('canvasPromptCopied')))
-      .catch(() => showCopyNotice(t('canvasCopyFailed')))
-  }, [showCopyNotice, t])
+      .then(() => toast.success(t('canvasPromptCopied')))
+      .catch(() => toast.error(t('canvasCopyFailed')))
+  }, [t])
 
   const handleDownload = useCallback((artwork: CanvasArtwork): void => {
     if (!artwork.image) return
@@ -322,27 +312,24 @@ export function CanvasWorkbench({
 
   return (
     <div className="ds-drag flex h-full min-h-0 flex-col bg-ds-main" data-testid="canvas-workbench">
-      <div className="ds-stage-inset shrink-0">
-        <header className="ds-topbar-surface relative z-10 mt-3 flex min-h-[46px] w-full items-stretch overflow-visible rounded-[24px]">
-          <div className="grid w-full min-w-0 items-center gap-2.5 px-3 py-2 sm:px-4 md:pl-5 md:pr-2">
-            <div className={`flex min-w-0 items-center gap-2.5 ${headerInset}`}>
-              <SidebarTitlebarToggleButton
-                onClick={onToggleLeftSidebar}
-                title={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')}
-                ariaLabel={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')}
-              />
-              <ImageIcon className="h-4 w-4 text-ds-muted" strokeWidth={1.75} />
-              <h1 className="min-w-0 flex-1 truncate text-[15px] font-medium text-ds-muted">
-                {t('canvasWorkbenchTitle')}
-              </h1>
-            </div>
+      {/* 统一页头（shell/PageHeader）：大标题 + 侧栏折叠开关；窗口控制留白沿用 inset 类 */}
+      <PageHeader
+        title={t('canvasWorkbenchTitle')}
+        leading={
+          <div className={`flex items-center gap-2.5 ${headerInset}`}>
+            <SidebarTitlebarToggleButton
+              onClick={onToggleLeftSidebar}
+              title={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')}
+              ariaLabel={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')}
+            />
+            <ImageIcon className="h-4 w-4 text-ds-muted" strokeWidth={1.75} aria-hidden />
           </div>
-        </header>
-      </div>
+        }
+      />
 
       {/* 左右分栏：左=创作配置区（固定宽、独立滚动），右=作品宫格区（占满剩余、独立滚动）。
-          小屏（<lg）回退为上下排布并整体滚动。 */}
-      <main className="ds-no-drag flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 pb-5 pt-4 lg:flex-row lg:overflow-hidden">
+          小屏（<lg）回退为上下排布并整体滚动。页边距 24px / 卡间距 16px（Calm Blue 语义常量）。 */}
+      <main className="ds-no-drag flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6 pt-1 lg:flex-row lg:overflow-hidden">
         <aside
           data-testid="canvas-config-pane"
           className="flex w-full shrink-0 flex-col gap-4 lg:w-[350px] lg:overflow-y-auto lg:pr-1"
@@ -377,9 +364,9 @@ export function CanvasWorkbench({
 
         <section
           data-testid="canvas-artworks-pane"
-          className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:border-l lg:border-ds-border lg:pl-4"
+          className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 lg:border-l lg:border-ds-border lg:pl-4"
         >
-          {/* 作品管理栏：标题/数量 + 状态筛选 + 清空 / 批量选择 */}
+          {/* 作品管理栏：标题/数量 + 状态筛选（胶囊 chip）+ 清空 / 批量选择 */}
           <div
             data-testid="canvas-artworks-toolbar"
             className="flex flex-wrap items-center gap-2 rounded-xl border border-ds-border bg-ds-card px-3 py-2"
@@ -396,10 +383,10 @@ export function CanvasWorkbench({
                   role="tab"
                   aria-selected={statusFilter === filter}
                   onClick={() => setStatusFilter(filter)}
-                  className={`rounded-md px-2 py-1 text-[12px] transition ${
+                  className={`rounded-full px-2.5 py-1 text-[12px] transition-colors duration-[var(--motion-fast)] ${
                     statusFilter === filter
-                      ? 'bg-ds-hover font-medium text-ds-ink'
-                      : 'text-ds-muted hover:text-ds-ink'
+                      ? 'bg-ds-accent-soft font-medium text-ds-accent'
+                      : 'text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
                   }`}
                 >
                   {filterLabel(filter)}
@@ -410,7 +397,7 @@ export function CanvasWorkbench({
                 type="button"
                 data-testid="canvas-clear-button"
                 onClick={handleClearArtworks}
-                className="rounded-md px-2 py-1 text-[12px] text-ds-muted transition hover:text-ds-ink"
+                className="rounded-full px-2.5 py-1 text-[12px] text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
               >
                 {t('canvasClearAll')}
               </button>
@@ -421,7 +408,7 @@ export function CanvasWorkbench({
                     data-testid="canvas-batch-delete-button"
                     disabled={selectedCount === 0}
                     onClick={removeSelected}
-                    className="rounded-md px-2 py-1 text-[12px] text-red-400 transition hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-full px-2.5 py-1 text-[12px] text-ds-danger transition-colors duration-[var(--motion-fast)] hover:bg-ds-danger-soft disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {t('canvasBatchDelete', { count: selectedCount })}
                   </button>
@@ -429,7 +416,7 @@ export function CanvasWorkbench({
                     type="button"
                     data-testid="canvas-batch-cancel-button"
                     onClick={toggleSelectMode}
-                    className="rounded-md px-2 py-1 text-[12px] text-ds-muted transition hover:text-ds-ink"
+                    className="rounded-full px-2.5 py-1 text-[12px] text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
                   >
                     {t('canvasBatchCancel')}
                   </button>
@@ -439,7 +426,7 @@ export function CanvasWorkbench({
                   type="button"
                   data-testid="canvas-batch-select-button"
                   onClick={toggleSelectMode}
-                  className="rounded-md px-2 py-1 text-[12px] text-ds-muted transition hover:text-ds-ink"
+                  className="rounded-full px-2.5 py-1 text-[12px] text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
                 >
                   {t('canvasBatchSelect')}
                 </button>
@@ -450,18 +437,9 @@ export function CanvasWorkbench({
           {error ? (
             <div
               data-testid="canvas-error"
-              className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-[12px] text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"
+              className="rounded-[var(--radius-md)] border border-ds-danger bg-ds-danger-soft px-3 py-2 text-[12px] text-ds-danger"
             >
               {error}
-            </div>
-          ) : null}
-          {copyNotice ? (
-            <div
-              className="rounded-xl border border-ds-border bg-ds-card px-3 py-1.5 text-[13px] text-ds-muted"
-              role="status"
-              data-testid="canvas-copy-notice"
-            >
-              {copyNotice}
             </div>
           ) : null}
 
@@ -486,55 +464,22 @@ export function CanvasWorkbench({
         </section>
       </main>
 
-      {/* 大图查看（lightbox）：点击遮罩或 Escape 关闭；提供 复制图片 / 下载。 */}
-      {viewing && viewingSrc ? (
-        <div
-          data-testid="canvas-lightbox"
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/80 p-6"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setViewing(null)}
-        >
-          <img
-            src={viewingSrc}
-            alt={t('canvasImageAlt', { prompt: viewing.prompt })}
-            className="max-h-[78vh] max-w-full rounded-xl object-contain shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          />
-          <p
-            className="max-w-[720px] text-center text-[12.5px] leading-5 text-white/80"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {viewing.prompt}
-          </p>
-          <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => handleCopyImage(viewing)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white/90 px-3 py-1.5 text-[12.5px] font-medium text-ds-ink transition hover:bg-white"
-            >
-              <Copy className="h-3.5 w-3.5" strokeWidth={1.75} />
-              {t('canvasCopyImage')}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDownload(viewing)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white/90 px-3 py-1.5 text-[12.5px] font-medium text-ds-ink transition hover:bg-white"
-            >
-              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-              {t('canvasDownload')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewing(null)}
-              aria-label={t('close')}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white/20 px-3 py-1.5 text-[12.5px] font-medium text-white transition hover:bg-white/30"
-            >
-              <X className="h-3.5 w-3.5" strokeWidth={1.75} />
-              {t('close')}
-            </button>
-          </div>
-        </div>
+      {/* 大图查看：基于 ui/Modal 的轻玻璃 Lightbox（遮罩 blur + 降级开关由基类提供）。 */}
+      {viewing ? (
+        <ImageLightbox
+          open
+          src={viewingSrc}
+          prompt={viewing.prompt}
+          onClose={() => setViewing(null)}
+          onCopyImage={() => handleCopyImage(viewing)}
+          onCopyPrompt={() => handleCopyPrompt(viewing)}
+          onDownload={() => handleDownload(viewing)}
+          onDelete={() => {
+            removeArtwork(viewing.id)
+            setViewing(null)
+          }}
+          t={t}
+        />
       ) : null}
     </div>
   )

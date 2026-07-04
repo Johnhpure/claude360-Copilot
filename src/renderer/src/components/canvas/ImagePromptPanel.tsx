@@ -1,5 +1,5 @@
 import type { ChangeEvent, ReactElement } from 'react'
-import { Loader2, Sparkles, RefreshCw, ImagePlus, X } from 'lucide-react'
+import { Sparkles, RefreshCw, ImagePlus, X } from 'lucide-react'
 import {
   CLAUDE360_ASPECT_PRESETS,
   CLAUDE360_IMAGE_OUTPUT_FORMATS,
@@ -9,6 +9,7 @@ import {
   type Claude360ImageQuality,
   type Claude360ImageResolution
 } from '@shared/claude360-canvas'
+import { Button, Card, Select, Textarea } from '../ui'
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string
 
@@ -50,9 +51,51 @@ function ratioShapeStyle(ratio: string): { width: string; height: string } {
   return { width: `${rw}px`, height: `${rh}px` }
 }
 
-// 文本生图面板（表单）：模型 + prompt + 可选参考图 + 宽高比图标网格 + 分辨率 + 张数 +
-// 质量 + 输出格式 + 生成按钮。模型下拉只来自 image 模型；无 image 模型时给出刷新入口。
-// 全程无独立登录 / API Key 配置。
+/** 胶囊 chip 组（Calm Blue：小控件走 pill；选中 = accent-soft 底 + accent 字）。 */
+function ChipGroup<V extends string>({
+  options,
+  value,
+  label,
+  testIdPrefix,
+  labelOf,
+  onChange
+}: {
+  options: readonly V[]
+  value: V
+  label: string
+  testIdPrefix: string
+  labelOf?: (v: V) => string
+  onChange: (v: V) => void
+}): ReactElement {
+  return (
+    <div className="flex flex-wrap gap-1.5" role="group" aria-label={label}>
+      {options.map((option) => {
+        const active = option === value
+        return (
+          <button
+            key={option}
+            type="button"
+            data-testid={`${testIdPrefix}-${option}`}
+            aria-pressed={active}
+            onClick={() => onChange(option)}
+            className={`rounded-full border px-3 py-1 text-[12px] transition-colors duration-[var(--motion-fast)] ${
+              active
+                ? 'border-ds-accent bg-ds-accent-soft font-semibold text-ds-accent'
+                : 'border-ds-border bg-ds-card font-medium text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
+            }`}
+          >
+            {labelOf ? labelOf(option) : option}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// 文本生图面板：按 Calm Blue focus block 分组（提示词 / 参数 / 操作，阶段4 design §3.1）——
+// 提示词卡 = 模型 + prompt + 参考图；参数卡 = 宽高比 + 分辨率 + 张数 + 质量 + 输出格式；
+// 操作 = 主生成按钮。控件全部走 components/ui/ 原语与胶囊 chip，无字面量色/圆角/动效。
+// 模型下拉只来自 image 模型；无 image 模型时给出刷新入口。全程无独立登录 / API Key 配置。
 export function ImagePromptPanel({
   prompt,
   model,
@@ -95,245 +138,208 @@ export function ImagePromptPanel({
   const activePreset = CLAUDE360_ASPECT_PRESETS.find((p) => p.id === aspectPreset) ?? CLAUDE360_ASPECT_PRESETS[0]
 
   return (
-    <section
-      data-testid="image-prompt-panel"
-      className="flex min-h-0 flex-col gap-4 rounded-2xl border border-ds-border bg-ds-card p-4"
-    >
-      <div className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-ds-muted" strokeWidth={1.75} />
-        <h2 className="text-[14px] font-semibold text-ds-ink">{t('canvasCreateTitle')}</h2>
-      </div>
-
-      {/* 模型选择 —— 只来自 image 模型 */}
-      {hasModels ? (
-        <label className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
-          {t('canvasModelLabel')}
-          <select
-            data-testid="image-model-select"
-            value={model}
-            onChange={(e) => onChangeModel(e.target.value)}
-            className="h-9 rounded-lg border border-ds-border bg-ds-main px-2.5 text-[12.5px] text-ds-ink"
-          >
-            {imageModels.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : (
-        <div
-          data-testid="image-no-models"
-          className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-ds-border bg-ds-main px-3 py-2 text-[12.5px] text-ds-muted"
-        >
-          <span>{t('canvasNoImageModels')}</span>
-          <button
-            type="button"
-            onClick={onRefreshModels}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-ds-border bg-ds-card px-2 py-1 text-[11.5px] text-ds-ink transition hover:bg-ds-hover"
-          >
-            <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />
-            {t('canvasRefreshModels')}
-          </button>
+    <section data-testid="image-prompt-panel" className="flex min-h-0 flex-col gap-4">
+      {/* ── 提示词组（focus block）：标题 + 模型 + prompt + 参考图 ── */}
+      <Card className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-ds-muted" strokeWidth={1.75} aria-hidden />
+          <h2 className="text-[14px] font-semibold text-ds-ink">{t('canvasCreateTitle')}</h2>
         </div>
-      )}
 
-      {/* prompt 输入 */}
-      <label className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
-        <span>
-          {t('canvasPromptLabel')}
-          <span className="text-ds-danger" aria-hidden="true">
-            {' '}
-            *
-          </span>
-        </span>
-        <textarea
-          data-testid="image-prompt-input"
-          value={prompt}
-          onChange={handlePrompt}
-          rows={4}
-          placeholder={t('canvasPromptPlaceholder')}
-          aria-required="true"
-          aria-invalid={promptMissing ? 'true' : undefined}
-          className={`resize-none rounded-lg border bg-ds-main px-2.5 py-2 text-[12.5px] text-ds-ink ${promptMissing ? 'border-ds-danger' : 'border-ds-border'}`}
-        />
-        {promptMissing ? (
-          <span role="alert" className="text-[11.5px] text-ds-danger">
-            {t('canvasPromptRequired')}
-          </span>
-        ) : null}
-      </label>
-
-      {/* 参考图上传（可选，走 editImage 无 mask） */}
-      <div className="flex flex-col gap-1.5 text-[12.5px] text-ds-muted">
-        <span>{t('canvasReferenceLabel')}</span>
-        {referenceImage ? (
-          <div
-            data-testid="image-reference-preview"
-            className="flex items-center gap-3 rounded-xl border border-ds-border bg-ds-main p-2"
-          >
-            <img
-              src={referenceImage}
-              alt={t('canvasReferenceLabel')}
-              className="h-12 w-12 shrink-0 rounded-lg border border-ds-border object-cover"
+        {/* 模型选择 —— 只来自 image 模型 */}
+        {hasModels ? (
+          <div data-testid="image-model-select" className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
+            <span>{t('canvasModelLabel')}</span>
+            <Select
+              value={model || null}
+              options={imageModels.map((m) => ({ value: m, label: m }))}
+              onChange={onChangeModel}
+              aria-label={t('canvasModelLabel')}
             />
-            <span className="flex-1 text-[11.5px] text-ds-faint">{t('canvasReferenceHint')}</span>
-            <button
-              type="button"
-              onClick={onClearReference}
-              aria-label={t('canvasReferenceRemove')}
-              title={t('canvasReferenceRemove')}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-ds-border bg-ds-card text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
-            >
-              <X className="h-4 w-4" strokeWidth={1.75} />
-            </button>
           </div>
         ) : (
-          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-ds-border bg-ds-main p-3 transition hover:border-ds-accent">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ds-card text-ds-muted">
-              <ImagePlus className="h-4.5 w-4.5" strokeWidth={1.75} />
-            </span>
-            <span className="flex flex-col">
-              <span className="text-[12.5px] font-medium text-ds-ink">{t('canvasReferenceUpload')}</span>
-              <span className="text-[11px] text-ds-faint">{t('canvasReferenceHint')}</span>
-            </span>
-            <input
-              type="file"
-              accept="image/*"
-              data-testid="image-reference-input"
-              onChange={handleReferenceInput}
-              className="hidden"
-            />
-          </label>
+          <div
+            data-testid="image-no-models"
+            className="flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-dashed border-ds-border bg-ds-main px-3 py-2 text-[12.5px] text-ds-muted"
+          >
+            <span>{t('canvasNoImageModels')}</span>
+            <Button variant="secondary" size="sm" className="shrink-0" onClick={onRefreshModels}>
+              <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+              {t('canvasRefreshModels')}
+            </Button>
+          </div>
         )}
-      </div>
 
-      {/* 宽高比图标网格 */}
-      <div className="flex flex-col gap-1.5 text-[12.5px] text-ds-muted">
-        <span>{t('canvasAspectLabel')}</span>
-        <div className="grid grid-cols-5 gap-1.5" role="group" aria-label={t('canvasAspectLabel')}>
-          {CLAUDE360_ASPECT_PRESETS.map((p) => {
-            const active = p.id === aspectPreset
-            return (
+        {/* prompt 输入 */}
+        <label className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
+          <span>
+            {t('canvasPromptLabel')}
+            <span className="text-ds-danger" aria-hidden="true">
+              {' '}
+              *
+            </span>
+          </span>
+          <Textarea
+            data-testid="image-prompt-input"
+            value={prompt}
+            onChange={handlePrompt}
+            rows={4}
+            placeholder={t('canvasPromptPlaceholder')}
+            aria-required="true"
+            invalid={promptMissing}
+            className="resize-none text-[12.5px]"
+          />
+          {promptMissing ? (
+            <span role="alert" className="text-[11.5px] text-ds-danger">
+              {t('canvasPromptRequired')}
+            </span>
+          ) : null}
+        </label>
+
+        {/* 参考图上传（可选，走 editImage 无 mask） */}
+        <div className="flex flex-col gap-1.5 text-[12.5px] text-ds-muted">
+          <span>{t('canvasReferenceLabel')}</span>
+          {referenceImage ? (
+            <div
+              data-testid="image-reference-preview"
+              className="flex items-center gap-3 rounded-[var(--radius-md)] border border-ds-border bg-ds-main p-2"
+            >
+              <img
+                src={referenceImage}
+                alt={t('canvasReferenceLabel')}
+                className="h-12 w-12 shrink-0 rounded-[var(--radius-sm)] border border-ds-border object-cover"
+              />
+              <span className="flex-1 text-[11.5px] text-ds-faint">{t('canvasReferenceHint')}</span>
               <button
-                key={p.id}
                 type="button"
-                data-testid={`image-aspect-${p.id}`}
-                aria-pressed={active}
-                title={`${p.ratio} ${p.name}`}
-                onClick={() => onChangeAspect(p.id)}
-                className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-2 transition ${
-                  active
-                    ? 'border-ds-accent bg-ds-accent-soft text-ds-accent'
-                    : 'border-ds-border bg-ds-main text-ds-muted hover:border-ds-accent hover:text-ds-ink'
-                }`}
+                onClick={onClearReference}
+                aria-label={t('canvasReferenceRemove')}
+                title={t('canvasReferenceRemove')}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-sm)] border border-ds-border bg-ds-card text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
               >
-                <span className="grid h-[26px] place-items-center">
-                  <span
-                    className="rounded-[3px] border-[1.6px] border-current"
-                    style={ratioShapeStyle(p.ratio)}
-                  />
-                </span>
-                <span className="text-[11px] font-semibold tabular-nums">{p.ratio}</span>
+                <X className="h-4 w-4" strokeWidth={1.75} />
               </button>
-            )
-          })}
+            </div>
+          ) : (
+            <label className="flex cursor-pointer items-center gap-3 rounded-[var(--radius-md)] border border-dashed border-ds-border bg-ds-main p-3 transition-colors duration-[var(--motion-fast)] hover:border-ds-accent">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-sm)] bg-ds-card text-ds-muted">
+                <ImagePlus className="h-4.5 w-4.5" strokeWidth={1.75} />
+              </span>
+              <span className="flex flex-col">
+                <span className="text-[12.5px] font-medium text-ds-ink">{t('canvasReferenceUpload')}</span>
+                <span className="text-[11px] text-ds-faint">{t('canvasReferenceHint')}</span>
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                data-testid="image-reference-input"
+                onChange={handleReferenceInput}
+                className="hidden"
+              />
+            </label>
+          )}
         </div>
-        <span className="text-[11px] text-ds-faint">
-          {activePreset.ratio} {activePreset.name} · {resolution} · {size.replace('x', '×')}
-        </span>
-      </div>
+      </Card>
 
-      {/* 分辨率 + 张数 */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
-          {t('canvasResolutionLabel')}
-          <div className="inline-flex rounded-lg border border-ds-border bg-ds-main p-0.5" role="group" aria-label={t('canvasResolutionLabel')}>
-            {CLAUDE360_IMAGE_RESOLUTIONS.map((r) => (
-              <button
-                key={r}
-                type="button"
-                data-testid={`image-resolution-${r}`}
-                aria-selected={r === resolution}
-                onClick={() => onChangeResolution(r)}
-                className={`flex-1 rounded-md px-2 py-1.5 text-[12px] transition ${
-                  r === resolution ? 'bg-ds-card font-semibold text-ds-ink shadow-sm' : 'font-medium text-ds-muted'
-                }`}
-              >
-                {r}
-              </button>
-            ))}
+      {/* ── 参数组（focus block）：宽高比 + 分辨率 + 张数 + 质量 + 输出格式 ── */}
+      <Card className="flex flex-col gap-4">
+        {/* 宽高比图标网格 */}
+        <div className="flex flex-col gap-1.5 text-[12.5px] text-ds-muted">
+          <span>{t('canvasAspectLabel')}</span>
+          <div className="grid grid-cols-5 gap-1.5" role="group" aria-label={t('canvasAspectLabel')}>
+            {CLAUDE360_ASPECT_PRESETS.map((p) => {
+              const active = p.id === aspectPreset
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  data-testid={`image-aspect-${p.id}`}
+                  aria-pressed={active}
+                  title={`${p.ratio} ${p.name}`}
+                  onClick={() => onChangeAspect(p.id)}
+                  className={`flex flex-col items-center gap-1 rounded-[var(--radius-sm)] border px-1 py-2 transition-colors duration-[var(--motion-fast)] ${
+                    active
+                      ? 'border-ds-accent bg-ds-accent-soft text-ds-accent'
+                      : 'border-ds-border bg-ds-main text-ds-muted hover:border-ds-accent hover:text-ds-ink'
+                  }`}
+                >
+                  <span className="grid h-[26px] place-items-center">
+                    <span
+                      className="rounded-[3px] border-[1.6px] border-current"
+                      style={ratioShapeStyle(p.ratio)}
+                    />
+                  </span>
+                  <span className="text-[11px] font-semibold tabular-nums">{p.ratio}</span>
+                </button>
+              )
+            })}
+          </div>
+          <span className="text-[11px] text-ds-faint">
+            {activePreset.ratio} {activePreset.name} · {resolution} · {size.replace('x', '×')}
+          </span>
+        </div>
+
+        {/* 分辨率（胶囊 chip）+ 张数 */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
+            <span>{t('canvasResolutionLabel')}</span>
+            <ChipGroup
+              options={CLAUDE360_IMAGE_RESOLUTIONS}
+              value={resolution}
+              label={t('canvasResolutionLabel')}
+              testIdPrefix="image-resolution"
+              onChange={onChangeResolution}
+            />
+          </div>
+          <div data-testid="image-count-select" className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
+            <span>{t('canvasCountLabel')}</span>
+            <Select
+              value={String(n)}
+              options={['1', '2', '3', '4'].map((c) => ({ value: c, label: c }))}
+              onChange={(v) => onChangeCount(Number(v))}
+              aria-label={t('canvasCountLabel')}
+            />
           </div>
         </div>
-        <label className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
-          {t('canvasCountLabel')}
-          <select
-            data-testid="image-count-select"
-            value={n}
-            onChange={(e) => onChangeCount(Number(e.target.value))}
-            className="h-9 rounded-lg border border-ds-border bg-ds-main px-2.5 text-[12.5px] text-ds-ink"
-          >
-            {[1, 2, 3, 4].map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
 
-      {/* 质量档位 */}
-      <div className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
-        {t('canvasQualityLabel')}
-        <div className="inline-flex rounded-lg border border-ds-border bg-ds-main p-0.5" role="group" aria-label={t('canvasQualityLabel')}>
-          {CLAUDE360_IMAGE_QUALITIES.map((q) => (
-            <button
-              key={q}
-              type="button"
-              data-testid={`image-quality-${q}`}
-              aria-selected={q === quality}
-              onClick={() => onChangeQuality(q)}
-              className={`flex-1 rounded-md px-2 py-1.5 text-[12px] transition ${
-                q === quality ? 'bg-ds-card font-semibold text-ds-ink shadow-sm' : 'font-medium text-ds-muted'
-              }`}
-            >
-              {qualityLabels[q]}
-            </button>
-          ))}
+        {/* 质量档位（胶囊 chip） */}
+        <div className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
+          <span>{t('canvasQualityLabel')}</span>
+          <ChipGroup
+            options={CLAUDE360_IMAGE_QUALITIES}
+            value={quality}
+            label={t('canvasQualityLabel')}
+            testIdPrefix="image-quality"
+            labelOf={(q) => qualityLabels[q]}
+            onChange={onChangeQuality}
+          />
         </div>
-      </div>
 
-      {/* 输出格式 */}
-      <label className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
-        {t('canvasOutputFormatLabel')}
-        <select
-          data-testid="image-output-format-select"
-          value={outputFormat}
-          onChange={(e) => onChangeOutputFormat(e.target.value as Claude360ImageOutputFormat)}
-          className="h-9 rounded-lg border border-ds-border bg-ds-main px-2.5 text-[12.5px] text-ds-ink"
-        >
-          {CLAUDE360_IMAGE_OUTPUT_FORMATS.map((f) => (
-            <option key={f} value={f}>
-              {f}
-            </option>
-          ))}
-        </select>
-      </label>
+        {/* 输出格式 */}
+        <div data-testid="image-output-format-select" className="flex flex-col gap-1 text-[12.5px] text-ds-muted">
+          <span>{t('canvasOutputFormatLabel')}</span>
+          <Select
+            value={outputFormat}
+            options={CLAUDE360_IMAGE_OUTPUT_FORMATS.map((f) => ({ value: f, label: f }))}
+            onChange={onChangeOutputFormat}
+            aria-label={t('canvasOutputFormatLabel')}
+          />
+        </div>
+      </Card>
 
-      <button
-        type="button"
+      {/* ── 操作组：主生成按钮（胶囊 primary，独立于卡片避免空壳） ── */}
+      <Button
+        variant="primary"
+        size="lg"
         data-testid="image-generate-button"
         onClick={onSubmit}
-        disabled={generating || !hasModels}
-        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-ds-ink px-4 text-[13px] font-semibold text-ds-main shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={!hasModels}
+        loading={generating}
+        className="w-full"
       >
-        {generating ? (
-          <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
-        ) : (
-          <Sparkles className="h-4 w-4" strokeWidth={1.75} />
-        )}
+        {generating ? null : <Sparkles className="h-4 w-4" strokeWidth={1.75} aria-hidden />}
         {generating ? t('canvasGenerating') : t('canvasGenerate')}
-      </button>
+      </Button>
     </section>
   )
 }
