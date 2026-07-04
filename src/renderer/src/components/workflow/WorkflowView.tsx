@@ -22,6 +22,7 @@ import { parseWorkflowDsl, serializeWorkflowDsl } from '@shared/workflow-dsl'
 import { WorkflowEditorView } from './WorkflowEditorView'
 import { WorkflowHookTriggers } from './WorkflowHookTriggers'
 import { createWorkflow } from './workflow-types'
+import { Button, Card, EmptyState, LoadingState, Modal } from '../ui'
 
 type Props = {
   leftSidebarCollapsed: boolean
@@ -34,9 +35,9 @@ const EMPTY_PRESETS: WorkflowNodePresetV1[] = []
 const EMPTY_MODULES: WorkflowCustomModuleV1[] = []
 
 function statusTone(status: WorkflowV1['lastStatus']): string {
-  if (status === 'running') return 'bg-amber-500/15 text-amber-900 dark:text-amber-100'
-  if (status === 'success') return 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-100'
-  if (status === 'error') return 'bg-red-500/15 text-red-700 dark:text-red-100'
+  if (status === 'running') return 'bg-ds-warning-soft text-ds-warning'
+  if (status === 'success') return 'bg-ds-success-soft text-ds-success'
+  if (status === 'error') return 'bg-ds-danger-soft text-ds-danger'
   return 'bg-ds-subtle text-ds-muted'
 }
 
@@ -407,62 +408,49 @@ export function WorkflowView({ leftSidebarCollapsed, onToggleLeftSidebar }: Prop
                   if (file) void handleImportFile(file)
                 }}
               />
-              <button
-                type="button"
-                onClick={() => setShowHooks(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-ds-border bg-ds-card px-3.5 py-2 text-[13px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
-              >
+              <Button variant="secondary" onClick={() => setShowHooks(true)}>
                 <Zap className="h-4 w-4" strokeWidth={1.8} />
                 {t('workflowHooks')}
-              </button>
-              <button
-                type="button"
-                onClick={() => importInputRef.current?.click()}
-                className="inline-flex items-center gap-2 rounded-xl border border-ds-border bg-ds-card px-3.5 py-2 text-[13px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
-              >
+              </Button>
+              <Button variant="secondary" onClick={() => importInputRef.current?.click()}>
                 <Upload className="h-4 w-4" strokeWidth={1.8} />
                 {t('workflowImport')}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleCreate()}
-                className="inline-flex items-center gap-2 rounded-xl bg-ds-userbubble px-4 py-2 text-[13px] font-semibold text-ds-userbubbleFg shadow-sm transition hover:opacity-90"
-              >
+              </Button>
+              <Button onClick={() => void handleCreate()}>
                 <Plus className="h-4 w-4" strokeWidth={2} />
                 {t('workflowNew')}
-              </button>
+              </Button>
             </div>
           </div>
 
           {error ? (
-            <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-[13px] text-red-700 dark:text-red-200">
+            <div className="rounded-xl border border-[color-mix(in_srgb,var(--ds-danger)_30%,transparent)] bg-ds-danger-soft px-4 py-3 text-[13px] text-ds-danger">
               {error}
             </div>
           ) : null}
 
           {loading ? (
-            <p className="text-[13px] text-ds-faint">{t('loading')}</p>
+            <LoadingState label={t('loading')} />
           ) : workflows.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-ds-border px-6 py-16 text-center">
-              <WorkflowIcon className="h-8 w-8 text-ds-faint" strokeWidth={1.5} />
-              <p className="text-[14px] font-medium text-ds-ink">{t('workflowEmpty')}</p>
-              <p className="max-w-[360px] text-[13px] text-ds-faint">{t('workflowEmptyHint')}</p>
-            </div>
+            <Card unpadded className="border-dashed py-10">
+              <EmptyState
+                icon={WorkflowIcon}
+                title={t('workflowEmpty')}
+                description={t('workflowEmptyHint')}
+              />
+            </Card>
           ) : (
             <div className="flex flex-col gap-3">
               {workflows.map((workflow) => {
                 const running = runningIds.has(workflow.id)
                 const lastStatus: WorkflowV1['lastStatus'] = running ? 'running' : workflow.lastStatus
                 return (
-                  <div
-                    key={workflow.id}
-                    className="flex flex-col gap-3 rounded-2xl border border-ds-border bg-ds-card px-4 py-3.5 shadow-sm"
-                  >
+                  <Card key={workflow.id} unpadded className="flex flex-col gap-3 px-4 py-3.5">
                     {/* Title + status + the row's real actions (run / export / edit / delete). */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
                             <WorkflowIcon className="h-4 w-4" strokeWidth={1.9} />
                           </span>
                           <h3 className="truncate text-[15px] font-semibold text-ds-ink">
@@ -478,18 +466,14 @@ export function WorkflowView({ leftSidebarCollapsed, onToggleLeftSidebar }: Prop
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          type="button"
+                        <Button
+                          size="sm"
+                          variant={running ? 'danger' : 'primary'}
                           onClick={() => (running ? void handleStop(workflow.id) : requestRun(workflow))}
-                          className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-semibold transition ${
-                            running
-                              ? 'bg-red-500/90 text-white hover:bg-red-500'
-                              : 'bg-ds-userbubble text-ds-userbubbleFg shadow-sm hover:opacity-90'
-                          }`}
                         >
                           {running ? <Square className="h-3.5 w-3.5" strokeWidth={2.2} /> : <Play className="h-3.5 w-3.5" strokeWidth={2} />}
                           {running ? t('workflowStop') : t('workflowRunNow')}
-                        </button>
+                        </Button>
                         <span className="mx-0.5 h-5 w-px bg-ds-border" />
                         <button
                           type="button"
@@ -512,7 +496,7 @@ export function WorkflowView({ leftSidebarCollapsed, onToggleLeftSidebar }: Prop
                         <button
                           type="button"
                           onClick={() => void handleDelete(workflow.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-muted transition hover:bg-red-500/10 hover:text-red-600"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-muted transition duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger"
                           title={t('workflowDelete')}
                           aria-label={t('workflowDelete')}
                         >
@@ -548,7 +532,7 @@ export function WorkflowView({ leftSidebarCollapsed, onToggleLeftSidebar }: Prop
                         icon={<Bot className="h-3.5 w-3.5" strokeWidth={1.9} />}
                       />
                     </div>
-                  </div>
+                  </Card>
                 )
               })}
             </div>
@@ -616,7 +600,7 @@ function WorkflowToggle({
         }`}
       >
         <span
-          className={`h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-transform ${
+          className={`h-[14px] w-[14px] rounded-full bg-white shadow-[var(--c360-shadow-sm)] transition-transform duration-[var(--motion-fast)] ${
             on ? 'translate-x-[14px]' : 'translate-x-0'
           }`}
         />
@@ -630,7 +614,7 @@ function WorkflowToggle({
 }
 
 const RUN_INPUT_FIELD =
-  'w-full rounded-lg border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/25'
+  'w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]'
 
 /** Generated form that collects a manual trigger's typed inputs before a one-off run. */
 function RunInputDialog({
@@ -658,27 +642,30 @@ function RunInputDialog({
   })
 
   return (
-    <div className="ds-no-drag fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-6" onClick={onClose}>
-      <div
-        className="flex max-h-[80vh] w-[460px] flex-col overflow-hidden rounded-2xl border border-ds-border bg-ds-card shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="flex items-center justify-between border-b border-ds-border px-5 py-3.5">
-          <span className="text-[14px] font-semibold text-ds-ink">{t('workflowRunWithInputs')}</span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
-          >
-            <X className="h-4 w-4" strokeWidth={1.8} />
-          </button>
-        </header>
-        <div className="flex flex-col gap-3 overflow-y-auto px-5 py-4">
+    <Modal
+      open
+      onClose={onClose}
+      ariaLabel={t('workflowRunWithInputs')}
+      size="md"
+      className="flex max-h-[80vh] flex-col"
+    >
+      <header className="flex items-center justify-between border-b border-ds-border pb-3.5">
+        <span className="text-[14px] font-semibold text-ds-ink">{t('workflowRunWithInputs')}</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('cancel')}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-faint transition duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
+        >
+          <X className="h-4 w-4" strokeWidth={1.8} />
+        </button>
+      </header>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-4">
           {schema.map((field) => (
             <label key={field.key} className="flex flex-col gap-1.5">
               <span className="text-[12px] font-medium text-ds-muted">
                 {field.label.trim() || field.key}
-                {field.required ? <span className="ml-1 text-red-500">*</span> : null}
+                {field.required ? <span className="ml-1 text-ds-danger">*</span> : null}
               </span>
               {field.description ? <span className="text-[11px] text-ds-faint">{field.description}</span> : null}
               {field.type === 'boolean' ? (
@@ -717,26 +704,16 @@ function RunInputDialog({
               )}
             </label>
           ))}
-        </div>
-        <footer className="flex justify-end gap-2 border-t border-ds-border px-5 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex items-center rounded-xl border border-ds-border bg-ds-card px-4 py-2 text-[13px] font-medium text-ds-muted transition hover:bg-ds-hover"
-          >
-            {t('cancel')}
-          </button>
-          <button
-            type="button"
-            disabled={missing}
-            onClick={() => onRun(values)}
-            className="inline-flex items-center gap-2 rounded-xl bg-ds-userbubble px-4 py-2 text-[13px] font-semibold text-ds-userbubbleFg shadow-sm transition hover:opacity-90 disabled:opacity-50"
-          >
-            <Play className="h-4 w-4" strokeWidth={2} />
-            {t('workflowRunNow')}
-          </button>
-        </footer>
       </div>
-    </div>
+      <footer className="flex justify-end gap-2 border-t border-ds-border pt-3">
+        <Button variant="secondary" onClick={onClose}>
+          {t('cancel')}
+        </Button>
+        <Button disabled={missing} onClick={() => onRun(values)}>
+          <Play className="h-4 w-4" strokeWidth={2} />
+          {t('workflowRunNow')}
+        </Button>
+      </footer>
+    </Modal>
   )
 }

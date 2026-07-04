@@ -69,6 +69,7 @@ import {
   type WorkflowFlowEdge,
   type WorkflowFlowNode
 } from './workflow-types'
+import { Button, Modal } from '../ui'
 
 type ConnectMenuState = {
   x: number
@@ -87,7 +88,7 @@ export const WORKFLOW_EDITOR_HEADER_CLASS =
 export const WORKFLOW_EDITOR_HEADER_SIDEBAR_COLLAPSED_CLASS =
   'workflow-editor-header-sidebar-collapsed'
 export const WORKFLOW_EDITOR_SIDEBAR_CLASS =
-  'workflow-editor-sidebar ds-drag flex w-[184px] shrink-0 flex-col border-r border-ds-border bg-ds-card/40'
+  'workflow-editor-sidebar ds-drag flex w-[184px] shrink-0 flex-col border-r border-ds-border bg-ds-sidebar'
 export const WORKFLOW_EDITOR_BACK_BUTTON_CLASS =
   'ds-no-drag flex h-9 items-center gap-2 rounded-xl px-2 text-[13px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink'
 
@@ -476,9 +477,9 @@ function WorkflowEditorInner({
                             draggable
                             onDragStart={(event) => onPaletteDragStart(event, kind)}
                             onClick={() => addNode(kind)}
-                            className="flex cursor-grab items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-left text-[12.5px] text-ds-ink transition hover:border-ds-border hover:bg-ds-hover active:cursor-grabbing"
+                            className="flex cursor-grab items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-left text-[12.5px] text-ds-ink transition duration-[var(--motion-fast)] hover:border-ds-border hover:bg-ds-hover active:cursor-grabbing"
                           >
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent">
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
                               <Icon className="h-3.5 w-3.5" strokeWidth={1.9} />
                             </span>
                             <span className="min-w-0 flex-1 truncate">{t(`workflowNode_${kind}`)}</span>
@@ -526,9 +527,9 @@ function WorkflowEditorInner({
                         onDragStart={(event) => onModuleDragStart(event, module.id)}
                         onClick={() => addModuleNode(module)}
                         title={module.description || module.name}
-                        className="flex cursor-grab items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-left text-[12.5px] text-ds-ink transition hover:border-ds-border hover:bg-ds-hover active:cursor-grabbing"
+                        className="flex cursor-grab items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-left text-[12.5px] text-ds-ink transition duration-[var(--motion-fast)] hover:border-ds-border hover:bg-ds-hover active:cursor-grabbing"
                       >
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
                           <Icon className="h-3.5 w-3.5" strokeWidth={1.9} />
                         </span>
                         <span className="min-w-0 flex-1 truncate">{module.name}</span>
@@ -545,9 +546,9 @@ function WorkflowEditorInner({
                           draggable
                           onDragStart={(event) => onPresetDragStart(event, preset.id)}
                           onClick={() => addPresetNode(preset)}
-                          className="flex min-w-0 flex-1 cursor-grab items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 pr-7 text-left text-[12.5px] text-ds-ink transition hover:border-ds-border hover:bg-ds-hover active:cursor-grabbing"
+                          className="flex min-w-0 flex-1 cursor-grab items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 pr-7 text-left text-[12.5px] text-ds-ink transition duration-[var(--motion-fast)] hover:border-ds-border hover:bg-ds-hover active:cursor-grabbing"
                         >
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
                             <Icon className="h-3.5 w-3.5" strokeWidth={1.9} />
                           </span>
                           <span className="min-w-0 flex-1 truncate">{preset.label}</span>
@@ -557,7 +558,7 @@ function WorkflowEditorInner({
                           title={t('workflowPresetDelete')}
                           aria-label={t('workflowPresetDelete')}
                           onClick={() => void onDeletePreset(preset.id)}
-                          className="absolute right-1 flex h-5 w-5 items-center justify-center rounded text-ds-faint opacity-0 transition hover:bg-red-500/10 hover:text-red-600 group-hover/preset:opacity-100"
+                          className="absolute right-1 flex h-5 w-5 items-center justify-center rounded text-ds-faint opacity-0 transition duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger group-hover/preset:opacity-100"
                         >
                           <X className="h-3 w-3" strokeWidth={2} />
                         </button>
@@ -623,38 +624,25 @@ function WorkflowEditorInner({
             <Variable className="h-4 w-4" strokeWidth={1.8} />
             {t('workflowEnvVars')}
             {env.length > 0 ? (
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent/15 px-1 text-[10px] font-semibold text-accent">
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-soft px-1 text-[10px] font-semibold text-accent">
                 {env.length}
               </span>
             ) : null}
           </button>
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-ds-border bg-ds-card px-3 text-[13px] font-medium text-ds-ink transition hover:bg-ds-hover disabled:opacity-60"
-          >
+          <Button variant="secondary" onClick={() => void handleSave()} disabled={saving}>
             <Save className="h-4 w-4" strokeWidth={1.8} />
             {dirty ? t('workflowSave') : t('workflowSaved')}
-          </button>
+          </Button>
           {running ? (
-            <button
-              type="button"
-              onClick={() => void onStop()}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-red-500/90 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-red-500"
-            >
+            <Button variant="danger" onClick={() => void onStop()}>
               <Square className="h-3.5 w-3.5" strokeWidth={2} />
               {t('workflowStop')}
-            </button>
+            </Button>
           ) : (
-            <button
-              type="button"
-              onClick={() => void handleRun()}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-ds-userbubble px-4 text-[13px] font-semibold text-ds-userbubbleFg shadow-sm transition hover:opacity-90"
-            >
+            <Button onClick={() => void handleRun()}>
               <Play className="h-4 w-4" strokeWidth={2} />
               {t('workflowRunNow')}
-            </button>
+            </Button>
           )}
         </header>
 
@@ -689,7 +677,7 @@ function WorkflowEditorInner({
                     nodeColor="var(--ds-accent)"
                     nodeStrokeColor="transparent"
                     nodeBorderRadius={3}
-                    maskColor="rgb(15 23 42 / 0.08)"
+                    maskColor="color-mix(in srgb, var(--ds-text) 8%, transparent)"
                   />
                 </ReactFlow>
               </WorkflowNodeActionsContext.Provider>
@@ -704,7 +692,7 @@ function WorkflowEditorInner({
               <>
                 <div className="fixed inset-0 z-[70]" onClick={() => setConnectMenu(null)} />
                 <div
-                  className="fixed z-[71] max-h-[60vh] w-44 overflow-y-auto rounded-lg border border-ds-border bg-ds-card p-1 shadow-lg"
+                  className="fixed z-[71] max-h-[60vh] w-44 overflow-y-auto rounded-lg border border-ds-border bg-ds-elevated p-1 shadow-[var(--c360-shadow-overlay)]"
                   style={{ left: connectMenu.x, top: connectMenu.y }}
                 >
                   {WORKFLOW_PALETTE_GROUPS.map((group) => {
@@ -741,7 +729,7 @@ function WorkflowEditorInner({
               onClick={() => setLeftPanelCollapsed((value) => !value)}
               title={leftPanelCollapsed ? t('workflowExpandPanel') : t('workflowCollapsePanel')}
               aria-label={leftPanelCollapsed ? t('workflowExpandPanel') : t('workflowCollapsePanel')}
-              className="absolute left-0 top-1/2 z-10 flex h-12 w-5 -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-ds-border bg-ds-card text-ds-faint shadow-sm transition hover:text-ds-ink"
+              className="absolute left-0 top-1/2 z-10 flex h-12 w-5 -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-ds-border bg-ds-card text-ds-faint shadow-[var(--c360-shadow-sm)] transition duration-[var(--motion-fast)] hover:text-ds-ink"
             >
               {leftPanelCollapsed ? (
                 <ChevronRight className="h-4 w-4" strokeWidth={2} />
@@ -754,7 +742,7 @@ function WorkflowEditorInner({
               onClick={() => setRightPanelCollapsed((value) => !value)}
               title={rightPanelCollapsed ? t('workflowExpandPanel') : t('workflowCollapsePanel')}
               aria-label={rightPanelCollapsed ? t('workflowExpandPanel') : t('workflowCollapsePanel')}
-              className="absolute right-0 top-1/2 z-10 flex h-12 w-5 -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-ds-border bg-ds-card text-ds-faint shadow-sm transition hover:text-ds-ink"
+              className="absolute right-0 top-1/2 z-10 flex h-12 w-5 -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-ds-border bg-ds-card text-ds-faint shadow-[var(--c360-shadow-sm)] transition duration-[var(--motion-fast)] hover:text-ds-ink"
             >
               {rightPanelCollapsed ? (
                 <ChevronLeft className="h-4 w-4" strokeWidth={2} />
@@ -765,7 +753,7 @@ function WorkflowEditorInner({
           </div>
 
           {!rightPanelCollapsed ? (
-            <aside className="flex w-[320px] shrink-0 flex-col overflow-hidden border-l border-ds-border bg-ds-card/40">
+            <aside className="flex w-[320px] shrink-0 flex-col overflow-hidden border-l border-ds-border bg-ds-sidebar">
               <div className="flex shrink-0 items-center gap-1 border-b border-ds-border px-2 pt-2">
                 {(['config', 'log'] as const).map((tab) => (
                   <button
@@ -778,7 +766,7 @@ function WorkflowEditorInner({
                   >
                     {tab === 'config' ? t('workflowTabConfig') : t('workflowTabRunLog')}
                     {tab === 'log' && running ? (
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-ds-warning animate-pulse" />
                     ) : null}
                     {rightTab === tab ? (
                       <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-accent" />
@@ -851,27 +839,30 @@ function EnvVarsModal({
 }): ReactElement {
   const { t } = useTranslation('common')
   const inputClass =
-    'w-full rounded-lg border border-ds-border bg-ds-card px-2.5 py-1.5 text-[13px] text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/25'
+    'w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-2.5 py-1.5 text-[13px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]'
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6" onClick={onClose}>
-      <div
-        className="flex max-h-[80vh] w-[560px] flex-col overflow-hidden rounded-2xl border border-ds-border bg-ds-card shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="flex items-center justify-between border-b border-ds-border px-5 py-3.5">
-          <div className="flex flex-col">
-            <span className="text-[14px] font-semibold text-ds-ink">{t('workflowEnvVars')}</span>
-            <span className="text-[11.5px] text-ds-faint">{t('workflowEnvVarsHint')}</span>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
-          >
-            <X className="h-4 w-4" strokeWidth={1.8} />
-          </button>
-        </header>
-        <div className="flex flex-col gap-2 overflow-y-auto px-5 py-4">
+    <Modal
+      open
+      onClose={onClose}
+      ariaLabel={t('workflowEnvVars')}
+      size="lg"
+      className="flex max-h-[80vh] flex-col"
+    >
+      <header className="flex items-center justify-between border-b border-ds-border pb-3.5">
+        <div className="flex flex-col">
+          <span className="text-[14px] font-semibold text-ds-ink">{t('workflowEnvVars')}</span>
+          <span className="text-[11.5px] text-ds-faint">{t('workflowEnvVarsHint')}</span>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('cancel')}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-faint transition duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
+        >
+          <X className="h-4 w-4" strokeWidth={1.8} />
+        </button>
+      </header>
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pt-4">
           {env.length === 0 ? (
             <p className="py-6 text-center text-[12.5px] text-ds-faint">{t('workflowEnvEmpty')}</p>
           ) : (
@@ -907,7 +898,7 @@ function EnvVarsModal({
                   <button
                     type="button"
                     onClick={() => onChange(env.filter((_, i) => i !== index))}
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-faint transition hover:bg-red-500/10 hover:text-red-600"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-faint transition duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger"
                     aria-label={t('workflowEnvRemove')}
                   >
                     <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -919,14 +910,13 @@ function EnvVarsModal({
           <button
             type="button"
             onClick={() => onChange([...env, { key: `KEY_${env.length + 1}`, value: '', type: 'string' }])}
-            className="mt-1 inline-flex items-center gap-1.5 self-start rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-accent transition hover:bg-accent/10"
+            className="mt-1 inline-flex items-center gap-1.5 self-start rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-accent transition duration-[var(--motion-fast)] hover:bg-accent-soft"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={2} />
             {t('workflowEnvAdd')}
           </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 

@@ -10,9 +10,10 @@ import {
   type WorkflowModuleFieldV1
 } from '@shared/app-settings'
 import { createCustomModule } from './workflow-types'
+import { Button } from '../ui'
 
 const INPUT_CLASS =
-  'w-full rounded-lg border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/25'
+  'w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]'
 
 const CODE_PLACEHOLDERS: Record<WorkflowCodeLanguage, string> = {
   javascript: 'return { greeting: `hi ${$fields.name}` }',
@@ -97,28 +98,27 @@ export function ModuleManager({ modules, onChange, onClose }: Props): ReactEleme
   }
 
   return (
-    <div className="ds-no-drag fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-6">
-      <div className="flex h-[80vh] w-full max-w-[900px] flex-col overflow-hidden rounded-2xl border border-ds-border bg-ds-card shadow-xl">
+    <div className="ds-no-drag fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-6">
+      <div className="flex h-[80vh] w-full max-w-[900px] flex-col overflow-hidden rounded-2xl border border-ds-border bg-ds-card shadow-[var(--c360-shadow-overlay)]">
         <div className="flex items-center justify-between border-b border-ds-border px-4 py-3">
           <h2 className="flex items-center gap-2 text-[14px] font-semibold text-ds-ink">
             <Blocks className="h-4 w-4 text-accent" strokeWidth={1.9} />
             {t('workflowModulesTitle')}
           </h2>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              size="sm"
               onClick={() => {
                 onChange(draft)
                 onClose()
               }}
-              className="inline-flex h-8 items-center rounded-lg bg-accent px-3 text-[12.5px] font-medium text-white transition hover:opacity-90"
             >
               {t('workflowModulesDone')}
-            </button>
+            </Button>
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-ds-border text-ds-muted transition hover:bg-ds-hover"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-ds-border text-ds-muted transition duration-[var(--motion-fast)] hover:bg-ds-hover"
               aria-label={t('cancel')}
             >
               <X className="h-4 w-4" strokeWidth={1.8} />
@@ -127,11 +127,11 @@ export function ModuleManager({ modules, onChange, onClose }: Props): ReactEleme
         </div>
 
         <div className="flex min-h-0 flex-1">
-          <aside className="flex w-[220px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-ds-border bg-ds-card/40 p-2">
+          <aside className="flex w-[220px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-ds-border bg-ds-sidebar p-2">
             <button
               type="button"
               onClick={addModule}
-              className="mb-1 flex items-center gap-2 rounded-lg border border-dashed border-ds-border px-2 py-2 text-[12.5px] font-medium text-ds-muted transition hover:border-accent/50 hover:text-accent"
+              className="mb-1 flex items-center gap-2 rounded-lg border border-dashed border-ds-border px-2 py-2 text-[12.5px] font-medium text-ds-muted transition duration-[var(--motion-fast)] hover:border-accent hover:text-accent"
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={1.9} />
               {t('workflowModuleNew')}
@@ -144,9 +144,9 @@ export function ModuleManager({ modules, onChange, onClose }: Props): ReactEleme
                   key={module.id}
                   type="button"
                   onClick={() => setSelectedId(module.id)}
-                  className={`flex items-center gap-2 rounded-lg px-2 py-2 text-left text-[12.5px] transition ${
+                  className={`flex items-center gap-2 rounded-lg px-2 py-2 text-left text-[12.5px] transition duration-[var(--motion-fast)] ${
                     module.id === selectedId
-                      ? 'bg-accent/10 text-accent'
+                      ? 'bg-accent-soft text-accent'
                       : 'text-ds-ink hover:bg-ds-hover'
                   }`}
                 >
@@ -174,7 +174,7 @@ export function ModuleManager({ modules, onChange, onClose }: Props): ReactEleme
                 <button
                   type="button"
                   onClick={() => deleteModule(selected.id)}
-                  className="mt-6 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-ds-border text-ds-muted transition hover:bg-red-500/10 hover:text-red-600"
+                  className="mt-6 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-ds-border text-ds-muted transition duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger"
                   aria-label={t('workflowModuleDelete')}
                   title={t('workflowModuleDelete')}
                 >
@@ -216,7 +216,7 @@ export function ModuleManager({ modules, onChange, onClose }: Props): ReactEleme
                   <button
                     type="button"
                     onClick={addField}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-accent transition hover:bg-accent/10"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-accent transition duration-[var(--motion-fast)] hover:bg-accent-soft"
                   >
                     <Plus className="h-3 w-3" strokeWidth={2} />
                     {t('workflowModuleAddField')}
@@ -250,7 +250,7 @@ export function ModuleManager({ modules, onChange, onClose }: Props): ReactEleme
                         <button
                           type="button"
                           onClick={() => removeField(index)}
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-faint transition hover:bg-red-500/10 hover:text-red-600"
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-faint transition duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger"
                           aria-label={t('workflowModuleRemoveField')}
                         >
                           <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -301,14 +301,14 @@ export function ModuleManager({ modules, onChange, onClose }: Props): ReactEleme
               </label>
               <p className="text-[11.5px] leading-5 text-ds-faint">{t('workflowModuleCodeHint')}</p>
               {codeCheck?.status === 'error' ? (
-                <div className="rounded-lg border border-red-500/40 bg-red-500/5 px-3 py-2">
-                  <div className="text-[11.5px] font-semibold text-red-600">{t('workflowCodeSyntaxError')}</div>
-                  <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-red-600/90">
+                <div className="rounded-lg border border-[color-mix(in_srgb,var(--ds-danger)_40%,transparent)] bg-ds-danger-soft px-3 py-2">
+                  <div className="text-[11.5px] font-semibold text-ds-danger">{t('workflowCodeSyntaxError')}</div>
+                  <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-ds-danger">
                     {codeCheck.message}
                   </pre>
                 </div>
               ) : codeCheck?.status === 'ok' ? (
-                <div className="text-[11.5px] font-medium text-emerald-600">✓ {t('workflowCodeSyntaxOk')}</div>
+                <div className="text-[11.5px] font-medium text-ds-success">✓ {t('workflowCodeSyntaxOk')}</div>
               ) : codeCheck?.status === 'unavailable' ? (
                 <div className="text-[11.5px] text-ds-faint">{codeCheck.message}</div>
               ) : null}

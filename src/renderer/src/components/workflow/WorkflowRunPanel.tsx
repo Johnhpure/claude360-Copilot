@@ -19,15 +19,15 @@ const POLL_MS = 1500
 function statusDotClass(status: WorkflowNodeRunStatus | undefined): string {
   switch (status) {
     case 'running':
-      return 'bg-amber-500 animate-pulse'
+      return 'bg-ds-warning animate-pulse'
     case 'success':
-      return 'bg-emerald-500'
+      return 'bg-ds-success'
     case 'error':
-      return 'bg-red-500'
+      return 'bg-ds-danger'
     case 'skipped':
       return 'bg-ds-border'
     default:
-      return 'bg-ds-border/50'
+      return 'bg-[color-mix(in_srgb,var(--ds-border)_50%,transparent)]'
   }
 }
 
@@ -132,7 +132,7 @@ export function WorkflowRunPanel({ enabled }: Props): ReactElement | null {
       : Object.fromEntries((lastRun?.nodeResults ?? []).map((result) => [result.nodeId, result]))
 
   return (
-    <div className="ds-no-drag fixed right-0 top-0 z-[55] flex h-full w-[400px] flex-col border-l border-ds-border bg-ds-card shadow-xl">
+    <div className="ds-no-drag fixed right-0 top-0 z-[55] flex h-full w-[400px] flex-col border-l border-ds-border bg-ds-card shadow-[var(--c360-shadow-overlay)]">
       <div className="flex items-center gap-2 border-b border-ds-border px-3 py-2.5">
         {isRunning ? (
           <Loader2 className="h-4 w-4 shrink-0 animate-spin text-accent" strokeWidth={2} />
@@ -151,8 +151,8 @@ export function WorkflowRunPanel({ enabled }: Props): ReactElement | null {
             onClick={() => setMode('canvas')}
             title={t('workflowViewCanvas')}
             aria-label={t('workflowViewCanvas')}
-            className={`flex h-6 w-6 items-center justify-center rounded-md transition ${
-              mode === 'canvas' ? 'bg-accent/10 text-accent' : 'text-ds-faint hover:text-ds-ink'
+            className={`flex h-6 w-6 items-center justify-center rounded-md transition duration-[var(--motion-fast)] ${
+              mode === 'canvas' ? 'bg-accent-soft text-accent' : 'text-ds-faint hover:text-ds-ink'
             }`}
           >
             <LayoutGrid className="h-3.5 w-3.5" strokeWidth={1.9} />
@@ -162,8 +162,8 @@ export function WorkflowRunPanel({ enabled }: Props): ReactElement | null {
             onClick={() => setMode('list')}
             title={t('workflowViewList')}
             aria-label={t('workflowViewList')}
-            className={`flex h-6 w-6 items-center justify-center rounded-md transition ${
-              mode === 'list' ? 'bg-accent/10 text-accent' : 'text-ds-faint hover:text-ds-ink'
+            className={`flex h-6 w-6 items-center justify-center rounded-md transition duration-[var(--motion-fast)] ${
+              mode === 'list' ? 'bg-accent-soft text-accent' : 'text-ds-faint hover:text-ds-ink'
             }`}
           >
             <ListIcon className="h-3.5 w-3.5" strokeWidth={1.9} />
@@ -181,14 +181,14 @@ export function WorkflowRunPanel({ enabled }: Props): ReactElement | null {
       </div>
 
       {pendingApprovals.length > 0 ? (
-        <div className="flex flex-col gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-3">
+        <div className="flex flex-col gap-2 border-b border-[color-mix(in_srgb,var(--ds-warning)_30%,transparent)] bg-ds-warning-soft px-3 py-3">
           {pendingApprovals.map((approval) => (
             <div
               key={approval.token}
-              className="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-ds-card px-3 py-2.5"
+              className="flex flex-col gap-2 rounded-lg border border-[color-mix(in_srgb,var(--ds-warning)_40%,transparent)] bg-ds-card px-3 py-2.5"
             >
               <div className="flex items-center gap-2">
-                <UserCheck className="h-4 w-4 shrink-0 text-amber-600" strokeWidth={1.9} />
+                <UserCheck className="h-4 w-4 shrink-0 text-ds-warning" strokeWidth={1.9} />
                 <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-ds-ink">{approval.title}</span>
               </div>
               {approval.instruction ? (
@@ -198,7 +198,7 @@ export function WorkflowRunPanel({ enabled }: Props): ReactElement | null {
                 <button
                   type="button"
                   onClick={() => void window.kunGui.resolveWorkflowApproval(approval.token, 'approved')}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-500/90 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-emerald-500"
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-ds-success px-3 py-1.5 text-[12.5px] font-semibold text-white transition duration-[var(--motion-fast)] hover:opacity-90"
                 >
                   <Check className="h-3.5 w-3.5" strokeWidth={2.2} />
                   {t('workflowApprovalApprove')}
@@ -206,7 +206,7 @@ export function WorkflowRunPanel({ enabled }: Props): ReactElement | null {
                 <button
                   type="button"
                   onClick={() => void window.kunGui.resolveWorkflowApproval(approval.token, 'rejected')}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-ds-border bg-ds-card px-3 py-1.5 text-[12.5px] font-semibold text-red-600 transition hover:bg-red-500/10"
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-ds-border bg-ds-card px-3 py-1.5 text-[12.5px] font-semibold text-ds-danger transition duration-[var(--motion-fast)] hover:bg-ds-danger-soft"
                 >
                   <X className="h-3.5 w-3.5" strokeWidth={2.2} />
                   {t('workflowApprovalReject')}

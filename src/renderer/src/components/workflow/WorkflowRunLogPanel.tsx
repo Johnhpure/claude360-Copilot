@@ -6,15 +6,15 @@ import type { WorkflowNodeRunResultV1, WorkflowNodeRunStatus, WorkflowNodeV1 } f
 function statusDotClass(status: WorkflowNodeRunStatus | undefined): string {
   switch (status) {
     case 'running':
-      return 'bg-amber-500'
+      return 'bg-ds-warning'
     case 'success':
-      return 'bg-emerald-500'
+      return 'bg-ds-success'
     case 'error':
-      return 'bg-red-500'
+      return 'bg-ds-danger'
     case 'skipped':
       return 'bg-ds-border'
     default:
-      return 'bg-ds-border/50'
+      return 'bg-[color-mix(in_srgb,var(--ds-border)_50%,transparent)]'
   }
 }
 
@@ -92,7 +92,9 @@ function RunLogRow({ result, name }: { result: WorkflowNodeRunResultV1; name: st
   const [open, setOpen] = useState(isRunning || isError)
   const duration = fmtDuration(result.startedAt, result.finishedAt)
   return (
-    <div className={`rounded-xl border ${isError ? 'border-red-500/40' : 'border-ds-border'}`}>
+    <div
+      className={`rounded-xl border ${isError ? 'border-[color-mix(in_srgb,var(--ds-danger)_40%,transparent)]' : 'border-ds-border'}`}
+    >
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -100,13 +102,13 @@ function RunLogRow({ result, name }: { result: WorkflowNodeRunResultV1; name: st
       >
         <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-ds-faint transition-transform ${open ? 'rotate-90' : ''}`} strokeWidth={2} />
         {isRunning ? (
-          <Loader2 className="h-3 w-3 shrink-0 animate-spin text-amber-500" strokeWidth={2.4} />
+          <Loader2 className="h-3 w-3 shrink-0 animate-spin text-ds-warning" strokeWidth={2.4} />
         ) : (
           <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClass(result.status)}`} />
         )}
         <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ds-ink">{name}</span>
         {typeof result.retries === 'number' && result.retries > 0 ? (
-          <span className="shrink-0 rounded-full bg-amber-500/15 px-1.5 text-[10px] font-medium text-amber-600">
+          <span className="shrink-0 rounded-full bg-ds-warning-soft px-1.5 text-[10px] font-medium text-ds-warning">
             {t('workflowRetriesBadge', { n: result.retries })}
           </span>
         ) : null}
@@ -145,7 +147,7 @@ function LogBlock({
       <span className="text-[10px] font-medium uppercase tracking-wide text-ds-faint">{label}</span>
       <pre
         className={`max-h-44 overflow-auto whitespace-pre-wrap break-words rounded-lg px-2 py-1.5 text-[11px] leading-[1.45] ${
-          tone === 'error' ? 'bg-red-500/10 text-red-600' : 'bg-ds-subtle text-ds-muted'
+          tone === 'error' ? 'bg-ds-danger-soft text-ds-danger' : 'bg-ds-subtle text-ds-muted'
         } ${mono ? 'font-mono' : ''}`}
       >
         {value}

@@ -11,15 +11,15 @@ import type {
 function statusClass(status: WorkflowNodeRunStatus | WorkflowRunV1['status'] | undefined): string {
   switch (status) {
     case 'running':
-      return 'bg-amber-500'
+      return 'bg-ds-warning'
     case 'success':
-      return 'bg-emerald-500'
+      return 'bg-ds-success'
     case 'error':
-      return 'bg-red-500'
+      return 'bg-ds-danger'
     case 'skipped':
       return 'bg-ds-border'
     default:
-      return 'bg-ds-border/50'
+      return 'bg-[color-mix(in_srgb,var(--ds-border)_50%,transparent)]'
   }
 }
 
@@ -60,9 +60,9 @@ export function WorkflowRunHistory({
   const selected = ordered.find((run) => run.id === selectedId) ?? ordered[0] ?? null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6" onClick={onClose}>
       <div
-        className="flex h-[80vh] w-[860px] flex-col overflow-hidden rounded-2xl border border-ds-border bg-ds-card shadow-xl"
+        className="flex h-[80vh] w-[860px] flex-col overflow-hidden rounded-2xl border border-ds-border bg-ds-card shadow-[var(--c360-shadow-overlay)]"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex items-center justify-between border-b border-ds-border px-5 py-3.5">
@@ -91,7 +91,7 @@ export function WorkflowRunHistory({
                   key={run.id}
                   type="button"
                   onClick={() => setSelectedId(run.id)}
-                  className={`flex w-full flex-col gap-0.5 border-b border-ds-border/60 px-4 py-2.5 text-left transition hover:bg-ds-hover ${
+                  className={`flex w-full flex-col gap-0.5 border-b border-[color-mix(in_srgb,var(--ds-border)_60%,transparent)] px-4 py-2.5 text-left transition duration-[var(--motion-fast)] hover:bg-ds-hover ${
                     run.id === selected?.id ? 'bg-ds-hover' : ''
                   }`}
                 >
@@ -151,7 +151,7 @@ function NodeResultRow({ result, name }: { result: WorkflowNodeRunResultV1; name
         <span className={`h-2 w-2 shrink-0 rounded-full ${statusClass(result.status)}`} />
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ds-ink">{name}</span>
         {typeof result.retries === 'number' && result.retries > 0 ? (
-          <span className="rounded-full bg-amber-500/15 px-1.5 text-[10.5px] font-medium text-amber-600">
+          <span className="rounded-full bg-ds-warning-soft px-1.5 text-[10.5px] font-medium text-ds-warning">
             {t('workflowRetriesBadge', { n: result.retries })}
           </span>
         ) : null}
@@ -188,7 +188,7 @@ function Block({
       <span className="text-[11px] font-medium uppercase tracking-wide text-ds-faint">{label}</span>
       <pre
         className={`max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg px-2.5 py-1.5 text-[11.5px] leading-5 ${
-          tone === 'error' ? 'bg-red-500/10 text-red-600' : 'bg-ds-subtle text-ds-muted'
+          tone === 'error' ? 'bg-ds-danger-soft text-ds-danger' : 'bg-ds-subtle text-ds-muted'
         } ${mono ? 'font-mono' : ''}`}
       >
         {value}

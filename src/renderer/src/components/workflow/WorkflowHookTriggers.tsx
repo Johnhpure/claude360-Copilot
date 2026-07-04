@@ -9,9 +9,10 @@ import {
   type WorkflowHookTriggerV1,
   type WorkflowV1
 } from '@shared/app-settings'
+import { Modal } from '../ui'
 
 const FIELD =
-  'w-full rounded-lg border border-ds-border bg-ds-card px-2.5 py-1.5 text-[13px] text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/25'
+  'w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-2.5 py-1.5 text-[13px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]'
 
 function isToolPhase(phase: WorkflowHookPhase): boolean {
   return phase === 'PreToolUse' || phase === 'PostToolUse'
@@ -43,29 +44,32 @@ export function WorkflowHookTriggers({
     onChange(triggers.map((trigger, i) => (i === index ? { ...trigger, ...patch } : trigger)))
 
   return (
-    <div className="ds-no-drag fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6" onClick={onClose}>
-      <div
-        className="flex max-h-[82vh] w-[620px] flex-col overflow-hidden rounded-2xl border border-ds-border bg-ds-card shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="flex items-center justify-between border-b border-ds-border px-5 py-3.5">
-          <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-ds-muted" strokeWidth={1.8} />
-            <div className="flex flex-col">
-              <span className="text-[14px] font-semibold text-ds-ink">{t('workflowHooks')}</span>
-              <span className="text-[11.5px] text-ds-faint">{t('workflowHooksHint')}</span>
-            </div>
+    <Modal
+      open
+      onClose={onClose}
+      ariaLabel={t('workflowHooks')}
+      size="lg"
+      className="flex max-h-[82vh] flex-col"
+    >
+      <header className="flex items-center justify-between border-b border-ds-border pb-3.5">
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 text-ds-muted" strokeWidth={1.8} />
+          <div className="flex flex-col">
+            <span className="text-[14px] font-semibold text-ds-ink">{t('workflowHooks')}</span>
+            <span className="text-[11.5px] text-ds-faint">{t('workflowHooksHint')}</span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
-          >
-            <X className="h-4 w-4" strokeWidth={1.8} />
-          </button>
-        </header>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('cancel')}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ds-faint transition duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
+        >
+          <X className="h-4 w-4" strokeWidth={1.8} />
+        </button>
+      </header>
 
-        <div className="flex flex-col gap-3 overflow-y-auto px-5 py-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pt-4">
           {triggers.length === 0 ? (
             <p className="py-6 text-center text-[12.5px] leading-5 text-ds-faint">{t('workflowHooksEmpty')}</p>
           ) : (
@@ -83,7 +87,7 @@ export function WorkflowHookTriggers({
                   <button
                     type="button"
                     onClick={() => onChange(triggers.filter((_, i) => i !== index))}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-ds-faint transition hover:bg-red-500/10 hover:text-red-600"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-ds-faint transition duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger"
                     aria-label={t('workflowHookRemove')}
                   >
                     <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -177,7 +181,7 @@ export function WorkflowHookTriggers({
                 }
               ])
             }
-            className="inline-flex items-center gap-1.5 self-start rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-accent transition hover:bg-accent/10"
+            className="inline-flex items-center gap-1.5 self-start rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-accent transition duration-[var(--motion-fast)] hover:bg-accent-soft"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={2} />
             {t('workflowHookAdd')}
@@ -187,7 +191,6 @@ export function WorkflowHookTriggers({
             {t('workflowHookRecursionNote')}
           </p>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

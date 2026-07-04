@@ -29,7 +29,7 @@ import {
 const WEBHOOK_METHODS: WorkflowWebhookMethod[] = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 
 const INPUT_CLASS =
-  'w-full rounded-lg border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/25'
+  'w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]'
 
 /** A reachable upstream node, carrying the full node so the picker can derive its typed outputs. */
 type UpstreamNode = { id: string; name: string; type: WorkflowNodeV1['type']; node: WorkflowNodeV1 }
@@ -132,7 +132,7 @@ function CustomNodeForm({
   const { t } = useTranslation('common')
   const module = settings.workflow.modules.find((item) => item.id === node.config.moduleId)
   if (!module) {
-    return <p className="text-[12px] leading-5 text-red-600">{t('workflowModuleMissing')}</p>
+    return <p className="text-[12px] leading-5 text-ds-danger">{t('workflowModuleMissing')}</p>
   }
   const setValue = (key: string, value: string): void =>
     onChange({ ...node, config: { ...node.config, values: { ...node.config.values, [key]: value } } })
@@ -353,7 +353,7 @@ function InputBindingsEditor({
         <button
           type="button"
           onClick={addInput}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-accent transition hover:bg-accent/10"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-accent transition duration-[var(--motion-fast)] hover:bg-accent-soft"
         >
           <Plus className="h-3 w-3" strokeWidth={2} />
           {t('workflowNodeInputAdd')}
@@ -405,7 +405,7 @@ function InputBindingsEditor({
                   <button
                     type="button"
                     onClick={() => setInputs(inputs.filter((_, i) => i !== index))}
-                    className="mt-[22px] inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-faint transition hover:bg-red-500/10 hover:text-red-600"
+                    className="mt-[22px] inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-faint transition duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger"
                     aria-label={t('workflowNodeInputRemove')}
                   >
                     <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -478,7 +478,7 @@ function InputFieldsEditor({
         <button
           type="button"
           onClick={addField}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-accent transition hover:bg-accent/10"
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-accent transition duration-[var(--motion-fast)] hover:bg-accent-soft"
         >
           <Plus className="h-3 w-3" strokeWidth={2} />
           {t('workflowInputAddField')}
@@ -513,7 +513,7 @@ function InputFieldsEditor({
                 <button
                   type="button"
                   onClick={() => onChange(fields.filter((_, i) => i !== index))}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-faint transition hover:bg-red-500/10 hover:text-red-600"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-faint transition duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger"
                   aria-label={t('workflowInputRemoveField')}
                 >
                   <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -653,7 +653,7 @@ function VariablePicker({
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute right-0 top-9 z-50 flex max-h-[60vh] w-[280px] flex-col overflow-y-auto rounded-xl border border-ds-border bg-ds-elevated p-1.5 shadow-[0_24px_70px_rgba(44,55,78,0.22)] backdrop-blur-xl dark:shadow-[0_30px_80px_rgba(0,0,0,0.5)]">
+      <div className="absolute right-0 top-9 z-50 flex max-h-[60vh] w-[280px] flex-col overflow-y-auto rounded-xl border border-ds-border bg-ds-elevated p-1.5 shadow-[var(--c360-shadow-overlay)] backdrop-blur-[var(--blur-overlay)]">
         <input
           autoFocus
           className={`${INPUT_CLASS} mb-1 py-1.5 text-[12px]`}
@@ -829,9 +829,9 @@ export function NodeConfigPanel({
               <button
                 type="button"
                 onClick={() => setPickerOpen((open) => !open)}
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition ${
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition duration-[var(--motion-fast)] ${
                   pickerOpen
-                    ? 'border-accent/40 bg-accent/10 text-accent'
+                    ? 'border-accent bg-accent-soft text-accent'
                     : 'border-ds-border text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
                 }`}
                 title={t('workflowVarPicker')}
@@ -847,7 +847,7 @@ export function NodeConfigPanel({
           <button
             type="button"
             onClick={() => onDelete(node.id)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-ds-border text-ds-muted transition hover:bg-red-500/10 hover:text-red-600"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-ds-border text-ds-muted transition duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger"
             title={t('workflowDeleteNode')}
             aria-label={t('workflowDeleteNode')}
           >
@@ -875,14 +875,14 @@ export function NodeConfigPanel({
         </Field>
 
         {danglingRefs.length > 0 ? (
-          <div className="flex flex-col gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
-            <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-amber-600">
+          <div className="flex flex-col gap-1.5 rounded-lg border border-[color-mix(in_srgb,var(--ds-warning)_40%,transparent)] bg-ds-warning-soft px-3 py-2">
+            <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-ds-warning">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
               {t('workflowDanglingTitle')}
             </div>
             {danglingRefs.map((ref, index) => (
               <div key={index} className="flex items-center justify-between gap-2 text-[11px]">
-                <code className="min-w-0 truncate font-mono text-amber-700/90 dark:text-amber-300/90">{ref.token}</code>
+                <code className="min-w-0 truncate font-mono text-ds-warning">{ref.token}</code>
                 <span className="shrink-0 text-ds-faint">
                   {t(ref.reason === 'node' ? 'workflowDanglingNode' : 'workflowDanglingField')}
                 </span>
@@ -1241,7 +1241,7 @@ export function NodeConfigPanel({
                   />
                   <button
                     type="button"
-                    className="shrink-0 text-ds-faint hover:text-red-500"
+                    className="shrink-0 text-ds-faint hover:text-ds-danger"
                     onClick={() => {
                       const fields = node.config.fields.filter((_, idx) => idx !== index)
                       onChange({ ...node, config: { ...node.config, fields } })
@@ -1335,7 +1335,7 @@ export function NodeConfigPanel({
                   />
                   <button
                     type="button"
-                    className="shrink-0 text-ds-faint hover:text-red-500"
+                    className="shrink-0 text-ds-faint hover:text-ds-danger"
                     onClick={() => {
                       const headers = node.config.headers.filter((_, idx) => idx !== index)
                       onChange({ ...node, config: { ...node.config, headers } })
@@ -1401,7 +1401,7 @@ export function NodeConfigPanel({
                     </span>
                     <button
                       type="button"
-                      className="text-ds-faint hover:text-red-500"
+                      className="text-ds-faint hover:text-ds-danger"
                       aria-label={t('workflowDeleteNode')}
                       onClick={() =>
                         onChange({
@@ -1516,14 +1516,14 @@ export function NodeConfigPanel({
               {t(node.config.language === 'javascript' ? 'workflowCodeHintJs' : 'workflowCodeHintCmd')}
             </p>
             {codeCheck?.status === 'error' ? (
-              <div className="rounded-lg border border-red-500/40 bg-red-500/5 px-3 py-2">
-                <div className="text-[11.5px] font-semibold text-red-600">{t('workflowCodeSyntaxError')}</div>
-                <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-red-600/90">
+              <div className="rounded-lg border border-[color-mix(in_srgb,var(--ds-danger)_40%,transparent)] bg-ds-danger-soft px-3 py-2">
+                <div className="text-[11.5px] font-semibold text-ds-danger">{t('workflowCodeSyntaxError')}</div>
+                <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-ds-danger">
                   {codeCheck.message}
                 </pre>
               </div>
             ) : codeCheck?.status === 'ok' ? (
-              <div className="text-[11.5px] font-medium text-emerald-600">✓ {t('workflowCodeSyntaxOk')}</div>
+              <div className="text-[11.5px] font-medium text-ds-success">✓ {t('workflowCodeSyntaxOk')}</div>
             ) : codeCheck?.status === 'unavailable' ? (
               <div className="text-[11.5px] text-ds-faint">{codeCheck.message}</div>
             ) : null}
@@ -2047,7 +2047,7 @@ export function NodeConfigPanel({
                       }
                     })
                   }
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-accent transition hover:bg-accent/10"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-accent transition duration-[var(--motion-fast)] hover:bg-accent-soft"
                 >
                   <Plus className="h-3 w-3" strokeWidth={2} />
                   {t('workflowClassifyAddCategory')}
@@ -2084,7 +2084,7 @@ export function NodeConfigPanel({
                         }
                       })
                     }
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-faint transition hover:bg-red-500/10 hover:text-red-600 disabled:opacity-40"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-faint transition duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger disabled:opacity-40"
                     aria-label={t('workflowClassifyRemoveCategory')}
                   >
                     <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -2244,7 +2244,7 @@ export function NodeConfigPanel({
               </button>
             </div>
             {presetSaved ? (
-              <span className="text-[11.5px] text-emerald-600">{t('workflowPresetSaved')}</span>
+              <span className="text-[11.5px] text-ds-success">{t('workflowPresetSaved')}</span>
             ) : (
               <span className="text-[11px] leading-4 text-ds-faint">{t('workflowSaveAsPresetHint')}</span>
             )}
@@ -2311,9 +2311,9 @@ function TestNodeDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6" onClick={onClose}>
       <div
-        className="flex max-h-[80vh] w-[520px] flex-col overflow-hidden rounded-2xl border border-ds-border bg-ds-card shadow-xl"
+        className="flex max-h-[80vh] w-[520px] flex-col overflow-hidden rounded-2xl border border-ds-border bg-ds-card shadow-[var(--c360-shadow-overlay)]"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex items-center justify-between border-b border-ds-border px-5 py-3.5">
@@ -2344,13 +2344,13 @@ function TestNodeDialog({
             type="button"
             onClick={() => void run()}
             disabled={running}
-            className="inline-flex items-center justify-center gap-2 self-start rounded-xl bg-ds-userbubble px-4 py-2 text-[13px] font-semibold text-ds-userbubbleFg shadow-sm transition hover:opacity-90 disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 self-start rounded-full bg-accent px-4 py-2 text-[13px] font-semibold text-white shadow-[var(--c360-shadow-sm)] transition duration-[var(--motion-fast)] hover:bg-[var(--c360-accent-hover)] disabled:opacity-60"
           >
             {running ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <FlaskConical className="h-4 w-4" strokeWidth={1.9} />}
             {t('workflowTestRun')}
           </button>
           {error ? (
-            <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-red-500/10 px-3 py-2 text-[11.5px] leading-5 text-red-600">
+            <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-ds-danger-soft px-3 py-2 text-[11.5px] leading-5 text-ds-danger">
               {error}
             </pre>
           ) : null}
@@ -2358,7 +2358,7 @@ function TestNodeDialog({
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2 text-[12px]">
                 <span
-                  className={`h-2 w-2 rounded-full ${result.status === 'error' ? 'bg-red-500' : 'bg-emerald-500'}`}
+                  className={`h-2 w-2 rounded-full ${result.status === 'error' ? 'bg-ds-danger' : 'bg-ds-success'}`}
                 />
                 <span className="font-medium text-ds-ink">
                   {result.status === 'error' ? t('workflowRunStatus_error') : t('workflowRunStatus_success')}

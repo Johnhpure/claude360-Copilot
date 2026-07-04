@@ -5,7 +5,7 @@ import { Check, ChevronDown, Search } from 'lucide-react'
 import type { ModelProviderProfileV1 } from '@shared/app-settings'
 
 const FIELD_CLASS =
-  'w-full rounded-lg border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/25'
+  'w-full rounded-[var(--radius-md)] border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] focus:border-accent focus:shadow-[0_0_0_3px_var(--ds-accent-soft)]'
 
 type Props = {
   providers: ModelProviderProfileV1[]
@@ -112,7 +112,7 @@ export function ModelPicker({
             <>
               <div className="fixed inset-0 z-[80]" onClick={() => setOpen(false)} />
               <div
-                className="fixed z-[81] flex max-h-[320px] flex-col overflow-hidden rounded-xl border border-ds-border bg-ds-card shadow-lg"
+                className="fixed z-[81] flex max-h-[320px] flex-col overflow-hidden rounded-[var(--radius-md)] border border-ds-border bg-ds-elevated shadow-[var(--c360-shadow-overlay)]"
                 style={{ left: rect.left, top: rect.bottom + 4, width: rect.width }}
               >
                 <div className="flex items-center gap-2 border-b border-ds-border px-3 py-2">

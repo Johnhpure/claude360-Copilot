@@ -83,11 +83,11 @@ export const NODE_ICONS: Record<WorkflowNodeKind, LucideIcon> = {
 function statusDotClass(status: WorkflowNodeRunStatus | undefined): string {
   switch (status) {
     case 'running':
-      return 'bg-amber-500 animate-pulse'
+      return 'bg-ds-warning animate-pulse'
     case 'success':
-      return 'bg-emerald-500'
+      return 'bg-ds-success'
     case 'error':
-      return 'bg-red-500'
+      return 'bg-ds-danger'
     case 'skipped':
       return 'bg-ds-border'
     default:
@@ -157,7 +157,7 @@ function nodeSummary(node: WorkflowNodeV1): string {
 }
 
 const TOOLBAR_BTN =
-  'nodrag nopan flex h-7 w-7 items-center justify-center rounded-md text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink'
+  'nodrag nopan flex h-7 w-7 items-center justify-center rounded-md text-ds-muted transition duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink'
 
 function WorkflowCanvasNode({ id, data, selected }: NodeProps): ReactElement {
   const { t } = useTranslation('common')
@@ -171,15 +171,17 @@ function WorkflowCanvasNode({ id, data, selected }: NodeProps): ReactElement {
   const isCondition = node.type === 'condition'
   const summary = nodeSummary(node)
 
-  const ring = selected ? 'border-accent ring-2 ring-accent/30' : 'border-ds-border'
+  const ring = selected
+    ? 'border-accent ring-2 ring-[color-mix(in_srgb,var(--ds-accent)_30%,transparent)]'
+    : 'border-ds-border'
   const disabled = node.disabled ? 'opacity-50' : ''
 
   return (
     <div
-      className={`relative w-[210px] rounded-xl border bg-ds-card px-3 py-2.5 shadow-sm ${ring} ${disabled}`}
+      className={`relative w-[210px] rounded-xl border bg-ds-card px-3 py-2.5 shadow-[var(--c360-shadow-sm)] ${ring} ${disabled}`}
     >
       <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
-        <div className="flex items-center gap-0.5 rounded-lg border border-ds-border bg-ds-card p-1 shadow-md">
+        <div className="flex items-center gap-0.5 rounded-lg border border-ds-border bg-ds-card p-1 shadow-[var(--c360-shadow-sm)]">
           {!isTrigger ? (
             <button
               type="button"
@@ -202,7 +204,7 @@ function WorkflowCanvasNode({ id, data, selected }: NodeProps): ReactElement {
           </button>
           <button
             type="button"
-            className={`${TOOLBAR_BTN} hover:bg-red-500/10 hover:text-red-600`}
+            className={`${TOOLBAR_BTN} hover:bg-ds-danger-soft hover:text-ds-danger`}
             title={t('workflowDeleteNode')}
             aria-label={t('workflowDeleteNode')}
             onClick={() => actions.deleteNode(id)}
@@ -217,7 +219,7 @@ function WorkflowCanvasNode({ id, data, selected }: NodeProps): ReactElement {
       ) : null}
 
       <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
           <Icon className="h-4 w-4" strokeWidth={1.9} />
         </span>
         <div className="min-w-0 flex-1">
@@ -235,10 +237,10 @@ function WorkflowCanvasNode({ id, data, selected }: NodeProps): ReactElement {
         <>
           <Handle type="source" position={Position.Right} id="true" style={{ top: '38%' }} />
           <Handle type="source" position={Position.Right} id="false" style={{ top: '70%' }} />
-          <div className="pointer-events-none absolute right-1 top-[30%] text-[9px] font-medium text-emerald-600">
+          <div className="pointer-events-none absolute right-1 top-[30%] text-[9px] font-medium text-ds-success">
             {t('workflowConditionTrue')}
           </div>
-          <div className="pointer-events-none absolute right-1 top-[62%] text-[9px] font-medium text-red-500">
+          <div className="pointer-events-none absolute right-1 top-[62%] text-[9px] font-medium text-ds-danger">
             {t('workflowConditionFalse')}
           </div>
         </>
@@ -267,10 +269,10 @@ function WorkflowCanvasNode({ id, data, selected }: NodeProps): ReactElement {
         <>
           <Handle type="source" position={Position.Right} id="approved" style={{ top: '38%' }} />
           <Handle type="source" position={Position.Right} id="rejected" style={{ top: '70%' }} />
-          <div className="pointer-events-none absolute right-1 top-[30%] text-[9px] font-medium text-emerald-600">
+          <div className="pointer-events-none absolute right-1 top-[30%] text-[9px] font-medium text-ds-success">
             {t('workflowApprovalApproved')}
           </div>
-          <div className="pointer-events-none absolute right-1 top-[62%] text-[9px] font-medium text-red-500">
+          <div className="pointer-events-none absolute right-1 top-[62%] text-[9px] font-medium text-ds-danger">
             {t('workflowApprovalRejected')}
           </div>
         </>
