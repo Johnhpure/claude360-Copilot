@@ -58,11 +58,11 @@ export function RuntimeBanner({
   }
 
   return (
-    <div className="ds-no-drag shrink-0 border-b border-amber-200/70 bg-[rgba(255,248,235,0.82)] backdrop-blur-lg dark:border-amber-800/50 dark:bg-amber-950/35">
+    <div className="ds-no-drag shrink-0 border-b border-ds-warning-soft bg-ds-warning-soft">
       <div className={`${stageInsetClass} w-full min-w-0`}>
         <div className="flex w-full min-w-0 flex-col gap-2 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex w-full min-w-0 items-start justify-between gap-3">
-            <p className="min-w-0 flex-1 text-[14px] leading-6 text-amber-950 dark:text-amber-100">
+            <p className="min-w-0 flex-1 text-[14px] leading-6 text-ds-warning">
               {message}
             </p>
             <div className="flex shrink-0 items-center gap-2">

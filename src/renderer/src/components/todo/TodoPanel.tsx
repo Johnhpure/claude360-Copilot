@@ -126,7 +126,7 @@ function TodoRow({
 }): ReactElement {
   const { t } = useTranslation('common')
   return (
-    <div className="rounded-lg border border-ds-border-muted bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(20,47,95,0.04)] dark:bg-ds-card">
+    <div className="rounded-lg border border-ds-border-muted bg-ds-card px-3 py-2.5 shadow-[var(--c360-shadow-sm)]">
       <div className="flex items-start gap-2.5">
         <button
           type="button"
@@ -147,7 +147,7 @@ function TodoRow({
           <div
             className={`break-words text-[13px] leading-5 ${
               item.status === 'completed'
-                ? 'text-ds-faint line-through decoration-ds-faint/60'
+                ? 'text-ds-faint line-through decoration-[color-mix(in_srgb,var(--ds-text-faint)_60%,transparent)]'
                 : 'text-ds-ink'
             }`}
           >
@@ -174,7 +174,7 @@ function TodoRow({
             onClick={() => onStatus(status)}
             className={`rounded-full px-2 py-1 text-[11px] font-medium transition ${
               item.status === status
-                ? 'bg-accent/12 text-accent'
+                ? 'bg-[color-mix(in_srgb,var(--ds-accent)_12%,transparent)] text-accent'
                 : 'text-ds-faint hover:bg-ds-hover hover:text-ds-ink'
             }`}
           >

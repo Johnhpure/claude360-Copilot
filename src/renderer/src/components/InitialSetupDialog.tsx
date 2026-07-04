@@ -203,17 +203,17 @@ export function InitialSetupDialog(): ReactElement {
     'w-full rounded-lg border border-ds-border bg-ds-card px-3 py-2 text-sm text-ds-strong outline-none focus:border-sky-400'
   const tabClass = (active: boolean): string =>
     `flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
-      active ? 'bg-sky-500/15 text-sky-700 dark:text-sky-200' : 'text-ds-muted hover:bg-ds-hover'
+      active ? 'bg-accent-soft text-accent' : 'text-ds-muted hover:bg-ds-hover'
     }`
 
   return (
-    <div className="ds-no-drag fixed inset-0 z-50 overflow-y-auto bg-[#eef2fb]/45 p-3 backdrop-blur-[18px] dark:bg-black/62 dark:backdrop-blur-[22px] sm:p-6">
+    <div className="ds-no-drag fixed inset-0 z-50 overflow-y-auto bg-[color-mix(in_srgb,var(--ds-bg-main)_45%,transparent)] p-3 backdrop-blur-[var(--blur-overlay)] sm:p-6">
       <div className="grid min-h-full place-items-center">
         <div
           role="dialog"
           aria-modal="true"
           aria-label={t('claude360LoginTitle')}
-          className="flex w-full max-w-[460px] flex-col gap-4 rounded-2xl border border-white/75 bg-[rgba(255,255,255,0.96)] p-6 text-slate-900 shadow-[0_28px_86px_rgba(88,105,136,0.22)] backdrop-blur-2xl dark:border-white/10 dark:bg-[rgba(18,21,28,0.97)] dark:text-white"
+          className="flex w-full max-w-[460px] flex-col gap-4 rounded-2xl border border-ds-border bg-ds-elevated p-6 text-ds-ink shadow-[var(--c360-shadow-overlay)]"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -232,7 +232,7 @@ export function InitialSetupDialog(): ReactElement {
             ) : null}
           </div>
 
-          <div className="flex gap-1 rounded-xl bg-ds-hover/40 p-1">
+          <div className="flex gap-1 rounded-xl bg-[color-mix(in_srgb,var(--ds-hover)_40%,transparent)] p-1">
             <button type="button" className={tabClass(tab === 'password')} onClick={() => setTab('password')}>
               {t('claude360LoginTabPassword')}
             </button>

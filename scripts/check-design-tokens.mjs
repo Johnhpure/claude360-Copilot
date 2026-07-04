@@ -4,9 +4,9 @@
  *
  * 零依赖审计：对「已完成迁移域」强制执行 spec（frontend/css-design.md）的强约束，
  * 防止字面量色值 / 死类 / 游离缓动回潮。规则：
- *   A alpha-on-var    tsx 中对 var() 自定义色使用 /alpha 修饰符（Tailwind 静默不生成，已实证陷阱）
- *   B literal-color   tsx 中的 #hex / rgb() / hsl() 字面量（UI 色必须走 token）
- *   C literal-duration tsx 中的 duration-{N}（必须 duration-[var(--motion-*)]）
+ *   A alpha-on-var    ts/tsx 中对 var() 自定义色使用 /alpha 修饰符（Tailwind 静默不生成，已实证陷阱）
+ *   B literal-color   ts/tsx 中的 #hex / rgb() / hsl() 字面量（UI 色必须走 token）
+ *   C literal-duration ts/tsx 中的 duration-{N}（必须 duration-[var(--motion-*)]）
  *   D raw-easing      css 中游离 cubic-bezier(（必须 --ease-* token 或 ease-exempt 演出区间）
  *
  * 用法：
@@ -14,7 +14,7 @@
  *   node scripts/check-design-tokens.mjs --report   # 软模式：只列出，恒 exit 0
  *
  * 豁免机制（三层，均显式）：
- *   1. INCLUDED_SCOPES 白名单——只审计已完成迁移的域；p5/p7 完成一个域就加一行（收网清单）。
+ *   1. INCLUDED_SCOPES 白名单——审计 renderer UI 域；新增 UI 目录必须显式登记。
  *   2. 行级：包含 `token-exempt` 注释标记的行跳过（极少数确需保留处，须写明原因）。
  *   3. 区间级（css）：`ease-exempt:<reason>` 注释行 … `/ease-exempt` 注释行之间跳过——
  *      装饰演出动画（logo 编排/打印机/声呐）的逐帧缓动属演出设计，不强制 token 化。
@@ -27,23 +27,13 @@ const ROOT = join(import.meta.dirname, '..')
 const SRC = join(ROOT, 'src', 'renderer', 'src')
 
 /**
- * 已完成迁移、纳入审计的域（相对 src/renderer/src，目录以 / 结尾）。
- * 未列出的路径 = 尚未迁移（p5 进行中：settings-* / my / plan / schedule / sdd / terminal /
- * workflow / PluginMarketplace 系 / components/sidebar；未认领待 p7 裁决：mcp、subagents、todo、根级散件）。
- * p5 归档后由 p7 将其域加入本数组并最终并入 `npm run lint` 主链。
+ * 纳入审计的 renderer UI 域（相对 src/renderer/src，目录以 / 结尾）。
+ * P7 起覆盖全部 components 与 styles，非 UI 代码（store/hooks/lib/locales 等）不在本脚本职责内。
  */
 const INCLUDED_SCOPES = [
-  'AppShell.tsx', //                p2 壳层
-  'components/chat/', //            p3
-  'components/write/', //           p3
-  'components/canvas/', //          p4
-  'components/music/', //           p4
-  'components/ui/', //              p2 Primitives
-  'components/shell/', //           p2 Patterns
-  'components/task/', //            p4 TaskCard
-  'components/Workbench.tsx', //    p2 拆壳
-  'components/GroupKeyPromptModal.tsx', // p2 Modal 迁移示范
-  'styles/' //                      p1–p3 归一四文件 + ui-primitives（规则 D）
+  'AppShell.tsx',
+  'components/',
+  'styles/'
 ]
 
 /** 测试文件不审计（断言里合法出现旧类名/色值）。 */
@@ -95,9 +85,9 @@ for (const file of walk(SRC)) {
   const rel = relOf(file)
   if (!inScope(rel) || isExemptFile(rel)) continue
 
-  const isTsx = /\.tsx$/.test(rel)
+  const isTsLike = /\.[tj]sx?$/.test(rel)
   const isCss = /\.css$/.test(rel) && rel.startsWith('styles/')
-  if (!isTsx && !isCss) continue
+  if (!isTsLike && !isCss) continue
 
   const lines = readFileSync(file, 'utf8').split('\n')
   let inEaseExempt = false
@@ -120,7 +110,7 @@ for (const file of walk(SRC)) {
       return
     }
 
-    // tsx 规则
+    // ts/tsx 规则
     if (isCommentLine(line)) return
     if (RE_ALPHA_ON_VAR.test(line)) push(rel, i, 'alpha-on-var', line)
     if (RE_HEX.test(line) || RE_FUNC_COLOR.test(line)) push(rel, i, 'literal-color', line)

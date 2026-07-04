@@ -121,7 +121,7 @@ function SddDesignContextBar({
   // token-exempt: this hex is the swatch's content default (user brand color
   // input value), not a UI framework color — native <input type="color">
   // requires a concrete hex and cannot read CSS variables.
-  const colorInputValue = isHexBrandColor ? brandColor : '#3b82d8'
+  const colorInputValue = isHexBrandColor ? brandColor : '#3b82d8' // token-exempt: color input fallback value
   const swatchEditable = brandColor === '' || isHexBrandColor
   const toggleTone = (value: string): void => {
     const next = tone.includes(value) ? tone.filter((item) => item !== value) : [...tone, value]

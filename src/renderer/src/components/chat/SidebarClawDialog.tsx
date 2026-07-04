@@ -635,7 +635,7 @@ export function ClawAddImDialog({
   }
 
   return (
-    <div className="ds-no-drag fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+    <div className="ds-no-drag fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[var(--blur-overlay)]">
       <div className="flex max-h-[min(860px,calc(100vh-32px))] w-full max-w-[1080px] flex-col overflow-hidden rounded-[28px] border border-ds-border bg-ds-elevated shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-[color-mix(in_srgb,var(--ds-border-muted)_60%,transparent)] px-5 py-4">
           <div className="min-w-0">

@@ -459,7 +459,7 @@ export function WorkspaceFilePreviewPanel({
           {breadcrumbSegments.length ? breadcrumbSegments.map((segment, index) => (
             <span key={`${segment}-${index}`} className="contents">
               {index > 0 ? (
-                <ChevronRight className="h-3 w-3 shrink-0 text-ds-faint/70" strokeWidth={1.8} />
+                <ChevronRight className="h-3 w-3 shrink-0 text-ds-faint opacity-70" strokeWidth={1.8} />
               ) : null}
               <span
                 className={[
@@ -501,7 +501,7 @@ export function WorkspaceFilePreviewPanel({
         ) : result?.ok ? (
           <div className="relative flex min-h-0 flex-1 flex-col">
             {result.truncated ? (
-              <div className="shrink-0 border-b border-ds-border-muted/70 px-4 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
+              <div className="shrink-0 border-b border-[color-mix(in_srgb,var(--ds-border-muted)_70%,transparent)] px-4 py-1.5 text-[11px] text-ds-warning">
                 {t('filePreviewTruncated')}
               </div>
             ) : null}

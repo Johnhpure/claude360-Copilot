@@ -134,7 +134,7 @@ export function modeButtonClass(active: boolean): string {
 export function toolbarIconButtonClass(active = false): string {
   return `inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ds-faint transition ${
     active
-      ? 'bg-accent/10 text-accent'
+      ? 'bg-[color-mix(in_srgb,var(--ds-accent)_10%,transparent)] text-accent'
       : 'hover:bg-white/70 hover:text-ds-ink dark:hover:bg-white/8'
   }`
 }
@@ -142,7 +142,7 @@ export function toolbarIconButtonClass(active = false): string {
 export function toolbarMenuButtonClass(active = false): string {
   return `inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2.5 text-[12.5px] font-medium text-ds-faint transition ${
     active
-      ? 'bg-accent/10 text-accent'
+      ? 'bg-[color-mix(in_srgb,var(--ds-accent)_10%,transparent)] text-accent'
       : 'hover:bg-white/70 hover:text-ds-ink dark:hover:bg-white/8'
   }`
 }

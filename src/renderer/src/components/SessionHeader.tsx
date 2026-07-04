@@ -135,7 +135,7 @@ export function SessionHeader({ compact = false, className = '' }: Props): React
             <div className="flex min-w-0 items-center gap-2.5">
               {editing ? (
                 <input
-                  className="min-w-0 flex-1 rounded-2xl border border-ds-border bg-ds-elevated px-3.5 py-2 text-[21px] font-semibold tracking-[-0.02em] text-ds-ink focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
+                  className="min-w-0 flex-1 rounded-2xl border border-ds-border bg-ds-elevated px-3.5 py-2 text-[21px] font-semibold tracking-[-0.02em] text-ds-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent-soft"
                   value={draftTitle}
                   onChange={(e) => setDraftTitle(e.target.value)}
                   onBlur={() => commitTitle()}
@@ -168,13 +168,13 @@ export function SessionHeader({ compact = false, className = '' }: Props): React
                 {active.mode}
               </span>
               {active.workspace ? (
-                <span className="truncate rounded-full border border-ds-border bg-ds-card/70 px-2.5 py-1">
+                <span className="truncate rounded-full border border-ds-border bg-[color-mix(in_srgb,var(--ds-card)_70%,transparent)] px-2.5 py-1">
                   {active.workspace.split(/[/\\]/).pop()}
                 </span>
               ) : null}
               {active.forkedFromThreadId ? (
                 <span
-                  className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-accent/18 bg-accent/8 px-2.5 py-1 font-medium text-accent"
+                  className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--ds-accent)_18%,transparent)] bg-[color-mix(in_srgb,var(--ds-accent)_8%,transparent)] px-2.5 py-1 font-medium text-accent"
                   title={forkLabel}
                 >
                   <GitFork className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
@@ -191,13 +191,13 @@ export function SessionHeader({ compact = false, className = '' }: Props): React
                       tokens: formatCompactNumber(threadUsage.totalTokens)
                     })}
                   </span>
-                  <span className="inline-flex items-center rounded-full border border-ds-border bg-ds-card/70 px-2.5 py-1 font-medium text-ds-muted">
+                  <span className="inline-flex items-center rounded-full border border-ds-border bg-[color-mix(in_srgb,var(--ds-card)_70%,transparent)] px-2.5 py-1 font-medium text-ds-muted">
                     {t('sessionUsageCost', {
                       cost: formatCost(threadUsage.costUsd, i18n.language, threadUsage.costCny)
                     })}
                   </span>
                   <span
-                    className="inline-flex items-center rounded-full border border-ds-border bg-ds-card/70 px-2.5 py-1 font-medium text-ds-muted"
+                    className="inline-flex items-center rounded-full border border-ds-border bg-[color-mix(in_srgb,var(--ds-card)_70%,transparent)] px-2.5 py-1 font-medium text-ds-muted"
                     title={t(
                       threadUsage.lastTurnCacheHitRate != null
                         ? 'sessionUsageCacheTitleWithLatest'

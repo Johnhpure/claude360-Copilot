@@ -15,7 +15,7 @@ import { AgentKun } from './AgentKun'
 type Props = { className?: string; onCollapse: () => void }
 
 const EMPTY_SUBAGENTS: KunSubagentsSettingsV1 = { enabled: true, profiles: [] }
-const PRESET_COLORS = ['#3b82d8', '#1d9e75', '#e8943a', '#7f77dd', '#d4537e', '#d85a30']
+const PRESET_COLORS = ['#3b82d8', '#1d9e75', '#e8943a', '#7f77dd', '#d4537e', '#d85a30'] // token-exempt: persisted subagent preset color values
 
 /** kun's built-in tool names (mirror kun/src/adapters/tool/builtin-tool-types.ts). Small,
  *  stable set — a static catalog gives nicer labels than parsing the loose diagnostics shape. */
@@ -58,10 +58,10 @@ async function loadCapabilityCatalog(): Promise<CapabilityCatalog> {
 /** kun's REAL built-in delegatable subagents (mirror kun/src/delegation/builtin-profiles.ts). */
 const BUILTIN_IDS = new Set(['general', 'explore', 'design-reviewer', 'over-engineering-reviewer'])
 const BUILTIN_AGENTS: KunSubagentProfileV1[] = [
-  { id: 'general', enabled: true, name: '', mode: 'subagent', toolPolicy: 'inherit', color: '#3b82d8' },
-  { id: 'explore', enabled: true, name: '', mode: 'subagent', toolPolicy: 'readOnly', color: '#1d9e75' },
-  { id: 'design-reviewer', enabled: true, name: '', mode: 'subagent', toolPolicy: 'readOnly', color: '#7f77dd' },
-  { id: 'over-engineering-reviewer', enabled: true, name: '', mode: 'subagent', toolPolicy: 'readOnly', color: '#e8943a' }
+  { id: 'general', enabled: true, name: '', mode: 'subagent', toolPolicy: 'inherit', color: '#3b82d8' }, // token-exempt: built-in subagent identity color
+  { id: 'explore', enabled: true, name: '', mode: 'subagent', toolPolicy: 'readOnly', color: '#1d9e75' }, // token-exempt: built-in subagent identity color
+  { id: 'design-reviewer', enabled: true, name: '', mode: 'subagent', toolPolicy: 'readOnly', color: '#7f77dd' }, // token-exempt: built-in subagent identity color
+  { id: 'over-engineering-reviewer', enabled: true, name: '', mode: 'subagent', toolPolicy: 'readOnly', color: '#e8943a' } // token-exempt: built-in subagent identity color
 ]
 
 function newProfile(): KunSubagentProfileV1 {
@@ -396,7 +396,7 @@ export function SubagentDetailPanel({ className, onCollapse }: Props): ReactElem
         <button
           type="button"
           onClick={() => setDialog({ profile: newProfile(), isNew: true })}
-          className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-accent px-3 py-2.5 text-[12.5px] font-semibold text-white transition hover:bg-accent/90"
+          className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-accent px-3 py-2.5 text-[12.5px] font-semibold text-white transition hover:bg-accent-hover"
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2.4} />
           {t('subagentsPanel.newSubagent', 'New subagent')}
@@ -461,10 +461,10 @@ function Row({
 }): ReactElement {
   const { t } = useTranslation('common')
   return (
-    <div className={`mx-2 flex items-center gap-3 rounded-xl px-2.5 py-2.5 transition hover:bg-ds-hover/60 ${disabled ? 'opacity-60' : ''}`}>
+    <div className={`mx-2 flex items-center gap-3 rounded-xl px-2.5 py-2.5 transition hover:bg-ds-hover ${disabled ? 'opacity-60' : ''}`}>
       <span
         className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full"
-        style={{ background: 'radial-gradient(circle at 50% 36%, #fff 0%, rgba(238,244,251,0.9) 78%)', boxShadow: 'inset 0 0 0 1px rgba(188,214,245,0.7)' }}
+        style={{ background: 'radial-gradient(circle at 50% 36%, var(--ds-surface-elevated) 0%, var(--ds-surface-card) 78%)', boxShadow: 'inset 0 0 0 1px var(--ds-border-muted)' }}
       >
         <AgentKun id={roleId} disabled={disabled} className="h-9 w-9" />
       </span>
@@ -473,8 +473,7 @@ function Row({
           <span className="truncate text-[13.5px] font-semibold text-ds-heading">{name}</span>
           {builtin ? (
             <span
-              className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-semibold"
-              style={{ backgroundColor: 'rgba(59,130,216,0.14)', color: '#3b82d8' }}
+              className="shrink-0 rounded-full bg-accent-soft px-1.5 py-px text-[9.5px] font-semibold text-accent"
             >
               {t('subagentsPanel.builtin', '内置')}
             </span>
@@ -614,7 +613,7 @@ function ModelSelect({
       {open ? (
         <div
           style={{ backgroundColor: 'var(--ds-surface-elevated)' }}
-          className={`absolute z-50 mt-1 max-h-[300px] overflow-auto rounded-xl border border-ds-border p-1 shadow-[0_12px_32px_rgba(31,45,64,0.16)] ${
+          className={`absolute z-50 mt-1 max-h-[300px] overflow-auto rounded-xl border border-ds-border p-1 shadow-[var(--c360-shadow-overlay)] ${
             stretch ? 'left-0 w-full' : 'right-0 w-[230px]'
           }`}
         >
@@ -739,7 +738,7 @@ function ProfileDialog({
     || Boolean(d.blockedTools?.length || d.blockedMcpServers?.length || d.blockedSkills?.length)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-[var(--blur-overlay)]">
       <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl border border-ds-border bg-ds-main shadow-2xl">
         <div className="flex items-center gap-2 border-b border-ds-border px-4 py-3">
           <Bot className="h-4 w-4 text-ds-muted" />
@@ -793,7 +792,7 @@ function ProfileDialog({
                       backgroundColor: c,
                       boxShadow: selected
                         ? `0 0 0 2px var(--ds-surface-card), 0 0 0 4px ${c}, 0 2px 6px ${c}66`
-                        : `inset 0 0 0 1px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.15)`
+                        : 'inset 0 0 0 1px var(--ds-border-muted), var(--c360-shadow-sm)'
                     }}
                   >
                     {selected && (
@@ -849,7 +848,7 @@ function ProfileDialog({
           <button
             type="button"
             onClick={() => onSave({ ...d, name: d.name.trim() || d.id })}
-            className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90"
+            className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent-hover"
           >
             {isNew ? t('agentsView.create', 'Create') : t('agentsView.save', 'Save')}
           </button>
@@ -876,8 +875,7 @@ function TabButton({ active, onClick, badge, children }: {
       {children}
       {badge ? (
         <span
-          className="rounded-full px-1.5 py-px text-[9.5px] font-semibold"
-          style={{ backgroundColor: 'rgba(59,130,216,0.14)', color: '#3b82d8' }}
+          className="rounded-full bg-accent-soft px-1.5 py-px text-[9.5px] font-semibold text-accent"
         >
           {badge}
         </span>
@@ -1095,7 +1093,7 @@ function CapRow({ on, onToggle, label, meta }: {
     <button
       type="button"
       onClick={onToggle}
-      className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left hover:bg-ds-hover/60"
+      className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left hover:bg-ds-hover"
     >
       <span className={`flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition ${on ? 'justify-end bg-accent' : 'justify-start bg-ds-border'}`}>
         <span className="h-3 w-3 rounded-full bg-white" />

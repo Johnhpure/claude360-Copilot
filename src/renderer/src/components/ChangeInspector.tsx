@@ -63,7 +63,7 @@ export function ChangeInspector({
 
   return (
     <aside
-      className={`ds-no-drag ds-panel-ghost flex flex-col border-l border-ds-border-muted backdrop-blur-xl ${className ?? ''}`}
+      className={`ds-no-drag ds-panel-ghost flex flex-col border-l border-ds-border-muted ${className ?? ''}`}
     >
       <div className="flex min-h-[58px] shrink-0 items-center gap-3 border-b border-ds-border-muted px-3 py-3">
         <button
@@ -101,7 +101,7 @@ export function ChangeInspector({
         ) : (
           <>
             <div className="max-h-[42%] min-h-0 overflow-y-auto py-2">
-              <ul className="divide-y divide-ds-border-muted/60">
+              <ul className="divide-y divide-[color-mix(in_srgb,var(--ds-border-muted)_60%,transparent)]">
                 {fileChanges.map((b) => {
                   const stats = countDiffStats(b.detail)
                   const displayPath = formatFilePathForDisplay(b.filePath, workspaceRoot)
@@ -113,7 +113,7 @@ export function ChangeInspector({
                         className={`flex w-full items-start gap-2 px-4 py-2.5 text-left transition ${
                           active?.id === b.id
                             ? 'bg-ds-hover text-ds-ink'
-                            : 'text-ds-ink hover:bg-ds-hover/70'
+                            : 'text-ds-ink hover:bg-[color-mix(in_srgb,var(--ds-hover)_70%,transparent)]'
                         }`}
                       >
                         <FileEdit

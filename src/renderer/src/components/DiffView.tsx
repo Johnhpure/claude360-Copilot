@@ -137,7 +137,7 @@ export function DiffView({
     let cls: string
     let displayedNo: number | null = null
     if (line.startsWith('@@')) {
-      cls = 'bg-accent-soft/60 text-ds-muted'
+      cls = 'bg-accent-soft text-ds-muted'
       const m = line.match(/\+(\d+)/)
       newLineNo = m ? parseInt(m[1], 10) : null
     } else if (line.startsWith('+')) {

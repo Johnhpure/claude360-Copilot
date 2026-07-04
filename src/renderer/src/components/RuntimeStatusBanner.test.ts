@@ -32,7 +32,7 @@ describe('RuntimeStatusBanner', () => {
 
     expect(html).toContain('data-variant="info"')
     expect(html).toContain('role="status"')
-    expect(html).toContain('border-sky-200')
+    expect(html).toContain('border-accent-soft')
     expect(html).not.toContain('role="alert"')
   })
 
@@ -48,6 +48,6 @@ describe('RuntimeStatusBanner', () => {
 
     expect(html).toContain('data-variant="warning"')
     expect(html).toContain('role="alert"')
-    expect(html).toContain('border-amber-200')
+    expect(html).toContain('border-ds-warning-soft')
   })
 })

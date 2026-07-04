@@ -31,8 +31,8 @@ export function RuntimeStatusBanner(): ReactElement | null {
       : t('runtimeStatusCrashed')
   const tone = recoveredWithRollback ? 'warning' : 'info'
   const bannerClass = recoveredWithRollback
-    ? 'border-amber-200/70 bg-[rgba(255,248,235,0.82)] dark:border-amber-800/50 dark:bg-amber-950/35'
-    : 'border-sky-200/70 bg-[rgba(239,248,255,0.82)] dark:border-sky-900/60 dark:bg-sky-950/30'
+    ? 'border-ds-warning-soft bg-ds-warning-soft'
+    : 'border-accent-soft bg-accent-soft'
   const iconClass = recoveredWithRollback
     ? 'text-amber-700 dark:text-amber-300'
     : 'text-sky-700 dark:text-sky-300'
@@ -41,7 +41,7 @@ export function RuntimeStatusBanner(): ReactElement | null {
     : 'text-sky-950 dark:text-sky-100'
   return (
     <div
-      className={`ds-no-drag shrink-0 border-b backdrop-blur-lg ${bannerClass}`}
+      className={`ds-no-drag shrink-0 border-b ${bannerClass}`}
       data-variant={tone}
       role={recoveredWithRollback ? 'alert' : 'status'}
     >

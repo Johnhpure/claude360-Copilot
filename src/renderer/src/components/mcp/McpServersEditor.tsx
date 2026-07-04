@@ -25,11 +25,11 @@ type Props = {
 }
 
 const inputClass =
-  'w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30'
+  'w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent-soft'
 const inputErrorClass =
-  'w-full min-w-0 rounded-xl border border-red-400 bg-ds-card px-3 py-2 text-[13px] text-ds-ink shadow-sm focus:outline-none focus:ring-1 focus:ring-red-300'
+  'w-full min-w-0 rounded-xl border border-ds-danger bg-ds-card px-3 py-2 text-[13px] text-ds-ink shadow-sm focus:outline-none focus:ring-1 focus:ring-ds-danger-soft'
 const selectClass =
-  'rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30'
+  'rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] text-ds-ink shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent-soft'
 const labelClass = 'flex min-w-0 flex-col gap-1 text-[12px] font-medium text-ds-muted'
 const ghostButtonClass =
   'inline-flex items-center gap-1.5 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] font-medium text-ds-ink shadow-sm transition hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-55'
@@ -123,7 +123,7 @@ export function McpServersEditor({
     return (
       <div className="flex w-full flex-col gap-3">
         {forceRaw ? (
-          <div className="rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-[12px] leading-5 text-red-700 dark:text-red-200">
+          <div className="rounded-xl border border-ds-danger-soft bg-ds-danger-soft px-3 py-2 text-[12px] leading-5 text-ds-danger">
             {t('mcpFormInvalidJson', { error: parseError ?? '' })}
           </div>
         ) : null}
@@ -133,7 +133,7 @@ export function McpServersEditor({
           spellCheck={false}
           disabled={disabled}
           placeholder={loadingPlaceholder}
-          className="min-h-[320px] w-full rounded-2xl border border-ds-border bg-ds-card px-4 py-3 font-mono text-[13px] leading-6 text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+          className="min-h-[320px] w-full rounded-2xl border border-ds-border bg-ds-card px-4 py-3 font-mono text-[13px] leading-6 text-ds-ink shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent-soft"
         />
         {!forceRaw ? (
           <div>
@@ -149,7 +149,7 @@ export function McpServersEditor({
   return (
     <div className="flex w-full flex-col gap-3">
       {model.servers.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-ds-border bg-ds-main/40 px-4 py-6 text-center text-[13px] text-ds-faint">
+        <div className="rounded-xl border border-dashed border-ds-border bg-[color-mix(in_srgb,var(--ds-bg-main)_40%,transparent)] px-4 py-6 text-center text-[13px] text-ds-faint">
           {t('mcpFormEmpty')}
         </div>
       ) : (
@@ -202,7 +202,7 @@ function McpServerCard({
   return (
     <div
       className={`rounded-2xl border px-4 py-3 shadow-sm ${
-        server.enabled ? 'border-ds-border bg-ds-card' : 'border-ds-border-muted bg-ds-main/40'
+        server.enabled ? 'border-ds-border bg-ds-card' : 'border-ds-border-muted bg-[color-mix(in_srgb,var(--ds-bg-main)_40%,transparent)]'
       }`}
     >
       <div className="flex flex-wrap items-end gap-3">
@@ -248,7 +248,7 @@ function McpServerCard({
           disabled={disabled}
           aria-label={t('mcpFormRemoveServer')}
           title={t('mcpFormRemoveServer')}
-          className="mb-1 rounded-lg p-1.5 text-ds-muted transition hover:bg-red-500/10 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-55 dark:hover:text-red-300"
+          className="mb-1 rounded-lg p-1.5 text-ds-muted transition hover:bg-ds-danger-soft hover:text-ds-danger disabled:cursor-not-allowed disabled:opacity-55"
         >
           <Trash2 className="h-4 w-4" strokeWidth={1.8} />
         </button>
@@ -287,7 +287,7 @@ function McpServerCard({
                 disabled={disabled}
                 placeholder={t('mcpFormArgsPlaceholder')}
                 onChange={(e) => onChange({ args: e.target.value.split('\n') })}
-                className="min-h-[72px] w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 font-mono text-[12.5px] leading-5 text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                className="min-h-[72px] w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 font-mono text-[12.5px] leading-5 text-ds-ink shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent-soft"
               />
             </label>
             <KeyValueEditor
@@ -364,7 +364,7 @@ function McpServerCard({
             disabled={disabled}
             placeholder={t('mcpFormVisibleRootsPlaceholder')}
             onChange={(e) => onChange({ workspaceRoots: e.target.value.split('\n') })}
-            className="min-h-[60px] w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 font-mono text-[12.5px] leading-5 text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
+            className="min-h-[60px] w-full rounded-xl border border-ds-border bg-ds-card px-3 py-2 font-mono text-[12.5px] leading-5 text-ds-ink shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent-soft"
           />
           <span className="text-[11px] font-normal text-ds-faint">{t('mcpFormVisibleRootsHint')}</span>
         </label>
@@ -437,7 +437,7 @@ function KeyValueEditor({
             type="button"
             onClick={() => removeEntry(index)}
             disabled={disabled}
-            className="shrink-0 rounded-lg p-1.5 text-ds-muted transition hover:bg-red-500/10 hover:text-red-600 disabled:opacity-55 dark:hover:text-red-300"
+            className="shrink-0 rounded-lg p-1.5 text-ds-muted transition hover:bg-ds-danger-soft hover:text-ds-danger disabled:opacity-55"
           >
             <Trash2 className="h-4 w-4" strokeWidth={1.8} />
           </button>
@@ -454,5 +454,5 @@ function KeyValueEditor({
 }
 
 function FieldError({ message }: { message: string }): ReactElement {
-  return <p className="mt-1 text-[12px] text-red-700 dark:text-red-300">{message}</p>
+  return <p className="mt-1 text-[12px] text-ds-danger">{message}</p>
 }

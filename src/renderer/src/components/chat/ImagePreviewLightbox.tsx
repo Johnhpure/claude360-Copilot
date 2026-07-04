@@ -96,7 +96,7 @@ export function ImagePreviewLightbox({
 
   return createPortal(
     <div
-      className="ds-no-drag fixed inset-0 z-[1100] bg-zinc-950/82 text-white backdrop-blur-[2px]"
+      className="ds-no-drag fixed inset-0 z-[1100] bg-zinc-950/82 text-white backdrop-blur-[var(--blur-overlay)]"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}

@@ -33,7 +33,7 @@ const STYLE = `
 @keyframes dsKunBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 @keyframes dsKunBob{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-2.5px) rotate(3deg)}}
 .ds-agent-kun{display:inline-flex;align-items:center;justify-content:center}
-.ds-agent-kun img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 3px rgba(31,45,64,.14))}
+.ds-agent-kun img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 3px var(--ds-border-muted))}
 .ds-agent-kun.is-disabled img{filter:grayscale(1) opacity(.7)}
 .ds-agent-kun-float img{animation:dsKunFloat 2.4s ease-in-out infinite}
 .ds-agent-kun-sway img{animation:dsKunSway 2.1s ease-in-out infinite;transform-origin:50% 90%}

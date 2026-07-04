@@ -84,7 +84,7 @@ function resolveThemeMode(): 'dark' | 'light' {
 }
 
 function isTransparentColor(color: string): boolean {
-  return !color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)'
+  return !color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)' // token-exempt: terminal color parser accepts xterm transparent rgb string
 }
 
 function parseCssColor(color: string): RgbaColor | null {
@@ -118,7 +118,7 @@ function compositeColor(foreground: RgbaColor, background: RgbaColor): RgbaColor
 }
 
 function toOpaqueRgb(color: RgbaColor): string {
-  return `rgb(${Math.round(color.r)}, ${Math.round(color.g)}, ${Math.round(color.b)})`
+  return `rgb(${Math.round(color.r)}, ${Math.round(color.g)}, ${Math.round(color.b)})` // token-exempt: terminal theme adapter emits xterm rgb string
 }
 
 function resolveTerminalSurfaceColor(container: HTMLElement | null): string {
@@ -703,7 +703,7 @@ export function TerminalPanel({ className = '', workspaceRoot, onCollapse, heigh
             <button
               type="button"
               onClick={() => void handleRestart()}
-              className="pointer-events-auto rounded-full bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white shadow-lg backdrop-blur transition hover:bg-white/20"
+              className="pointer-events-auto rounded-full bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white shadow-lg backdrop-blur-[var(--blur-toast)] transition hover:bg-white/20"
             >
               {t('terminalExitMessage')}
             </button>
