@@ -397,7 +397,7 @@ export function FloatingComposerModelPicker({
             role="menu"
             aria-label={activeProviderGroup.label}
             style={submenuStyle}
-            className="fixed z-[1001] overflow-y-auto rounded-xl border border-ds-border bg-white p-1.5 text-[13px] text-ds-muted shadow-[0_18px_48px_rgba(20,47,95,0.16)] dark:bg-ds-card"
+            className="fixed z-[1001] overflow-y-auto rounded-xl border border-ds-border bg-ds-elevated p-1.5 text-[13px] text-ds-muted shadow-[var(--c360-shadow-overlay)]"
           >
             <div className="px-2.5 pb-1 pt-1 text-[11px] font-bold uppercase tracking-[0.08em] text-ds-faint">
               {t('composerModel')}
@@ -491,7 +491,7 @@ export function FloatingComposerModelPicker({
           aria-label={t('composerModelControls')}
           className={`flex h-9 min-w-0 flex-1 items-center justify-end gap-1 overflow-hidden rounded-full py-2 pl-3 pr-1 text-[13px] font-medium outline-none transition ${
             canOpenModelControls
-              ? 'text-current focus-visible:ring-2 focus-visible:ring-accent/25'
+              ? 'text-current focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)]'
               : 'cursor-not-allowed text-ds-faint'
           }`}
         >
@@ -507,7 +507,7 @@ export function FloatingComposerModelPicker({
             <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.8} />
           </span>
         </button>
-        {renderMenu('fixed z-[1000] overflow-x-hidden overflow-y-auto rounded-xl border border-ds-border bg-white p-1.5 text-[12.5px] shadow-[0_18px_50px_rgba(20,47,95,0.16)] dark:bg-ds-card')}
+        {renderMenu('fixed z-[1000] overflow-x-hidden overflow-y-auto rounded-xl border border-ds-border bg-ds-elevated p-1.5 text-[12.5px] shadow-[var(--c360-shadow-overlay)]')}
       </div>
     )
   }
@@ -545,7 +545,7 @@ export function FloatingComposerModelPicker({
       </button>
 
       {menuOpen && canOpenModelControls ? (
-        renderMenu('fixed z-[1000] overflow-x-hidden overflow-y-auto rounded-xl border border-ds-border bg-white p-1.5 text-[13px] text-ds-muted shadow-[0_22px_64px_rgba(20,47,95,0.18)] dark:bg-ds-card')
+        renderMenu('fixed z-[1000] overflow-x-hidden overflow-y-auto rounded-xl border border-ds-border bg-ds-elevated p-1.5 text-[13px] text-ds-muted shadow-[var(--c360-shadow-overlay)]')
       ) : null}
     </div>
   )
@@ -950,7 +950,7 @@ function ModelCapabilityBadge({
   label: string
 }): ReactElement {
   const tone = kind === 'vision'
-    ? 'border-emerald-300/70 bg-emerald-50 text-emerald-700 dark:border-emerald-800/70 dark:bg-emerald-950/30 dark:text-emerald-300'
+    ? 'border-[color-mix(in_srgb,var(--ds-success)_30%,transparent)] bg-ds-success-soft text-ds-success'
     : 'border-ds-border bg-ds-hover text-ds-muted'
   const Icon = kind === 'vision' ? ImageIcon : TypeIcon
   return (

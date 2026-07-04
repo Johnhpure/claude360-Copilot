@@ -44,9 +44,9 @@ function ClawEmptyHero({
 
   return (
     <div className="ds-no-drag flex justify-center px-4 pb-6 pt-12 md:px-8 md:pt-16">
-      <div className="w-full ds-chat-content-max-width rounded-[32px] border border-ds-border-muted bg-ds-card/78 px-8 py-10 text-center shadow-[0_16px_40px_rgba(20,47,95,0.06)] backdrop-blur md:px-12 md:py-14">
+      <div className="w-full ds-chat-content-max-width rounded-[32px] border border-ds-border-muted bg-ds-card px-8 py-10 text-center shadow-[var(--c360-shadow-sm)] md:px-12 md:py-14">
         <div className="mx-auto max-w-[720px]">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[24px] border border-ds-border-muted bg-ds-main/55 text-accent">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[24px] border border-ds-border-muted bg-ds-main text-accent">
             <KunStateFigure kind="greet" className="h-14 w-14" />
           </div>
 
@@ -184,9 +184,9 @@ export function MessageTimelineEmptyHero({
 export function ThreadForkBanner({ parentTitle }: { parentTitle: string }): ReactElement {
   const { t } = useTranslation('common')
   return (
-    <div className="rounded-[18px] border border-accent/16 bg-accent/7 px-4 py-3 text-ds-muted shadow-[0_14px_36px_rgba(59,130,216,0.05)]">
+    <div className="rounded-[18px] border border-[color-mix(in_srgb,var(--ds-accent)_16%,transparent)] bg-accent-soft px-4 py-3 text-ds-muted shadow-[0_14px_36px_color-mix(in_srgb,var(--ds-accent)_5%,transparent)]">
       <div className="flex min-w-0 items-start gap-3">
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-accent/12 text-accent">
+        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-accent-soft text-accent">
           <GitFork className="h-4 w-4" strokeWidth={1.85} />
         </span>
         <span className="min-w-0">
@@ -222,9 +222,9 @@ export function SubagentReturnBar({
     <button
       type="button"
       onClick={onBack}
-      className="group ds-chat-content-max-width flex w-full items-center gap-3 rounded-[16px] border border-accent/16 bg-accent/7 px-4 py-3 text-left text-ds-muted shadow-[0_14px_36px_rgba(59,130,216,0.05)] transition hover:bg-accent/12"
+      className="group ds-chat-content-max-width flex w-full items-center gap-3 rounded-[16px] border border-[color-mix(in_srgb,var(--ds-accent)_16%,transparent)] bg-accent-soft px-4 py-3 text-left text-ds-muted shadow-[0_14px_36px_color-mix(in_srgb,var(--ds-accent)_5%,transparent)] transition hover:bg-[color-mix(in_srgb,var(--ds-accent)_14%,transparent)]"
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-accent/12 text-accent">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-accent-soft text-accent">
         <Bot className="h-4 w-4" strokeWidth={1.85} />
       </span>
       <span className="min-w-0 flex-1">
@@ -237,7 +237,7 @@ export function SubagentReturnBar({
             : t('subagentSessionBannerSubUnknown')}
         </span>
       </span>
-      <span className="flex shrink-0 items-center gap-1.5 rounded-[10px] bg-accent/10 px-2.5 py-1.5 text-[12px] font-semibold text-accent transition group-hover:bg-accent/15">
+      <span className="flex shrink-0 items-center gap-1.5 rounded-[10px] bg-accent-soft px-2.5 py-1.5 text-[12px] font-semibold text-accent transition group-hover:bg-[color-mix(in_srgb,var(--ds-accent)_15%,transparent)]">
         <CornerUpLeft className="h-3.5 w-3.5" strokeWidth={2} />
         {t('subagentSessionBannerBack')}
       </span>
@@ -251,7 +251,7 @@ export function ThreadForkPoint({ parentTitle }: { parentTitle: string }): React
     <div className="flex items-center gap-3 py-1 text-[12px] font-medium text-ds-faint">
       <span className="h-px min-w-6 flex-1 bg-ds-border-muted" />
       <span
-        className="inline-flex max-w-[min(100%,420px)] items-center gap-1.5 rounded-full border border-accent/16 bg-ds-card/78 px-3 py-1.5 text-accent shadow-sm"
+        className="inline-flex max-w-[min(100%,420px)] items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--ds-accent)_16%,transparent)] bg-ds-card px-3 py-1.5 text-accent shadow-sm"
         title={parentTitle ? t('threadForkPointFrom', { title: parentTitle }) : t('threadForkPoint')}
       >
         <GitFork className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />

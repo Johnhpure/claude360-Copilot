@@ -185,7 +185,7 @@ export function WriteAssistantPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-ds-main/45 dark:bg-transparent">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         {hasTimeline ? (
           <MessageTimeline
             blocks={blocks}
@@ -200,8 +200,8 @@ export function WriteAssistantPanel({
           />
         ) : (
           <div className="flex min-h-full flex-col justify-end px-5 py-5">
-            <div className="mb-auto rounded-[24px] border border-ds-border bg-ds-card/95 p-4 shadow-sm">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+            <div className="mb-auto rounded-[24px] border border-ds-border bg-ds-card p-4 shadow-sm">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent-soft text-accent">
                 <Sparkles className="h-5 w-5" strokeWidth={1.9} />
               </div>
               <h3 className="mt-4 text-[18px] font-semibold tracking-[-0.035em] text-ds-ink">
@@ -216,9 +216,9 @@ export function WriteAssistantPanel({
               <button
                 type="button"
                 onClick={() => setAssistantPrompt(t('writeAssistantSummarizePrompt', { file: activeFileLabel }))}
-                className="flex items-center gap-3 rounded-2xl border border-ds-border bg-ds-card px-3 py-3 text-left transition hover:border-accent/25 hover:bg-ds-hover"
+                className="flex items-center gap-3 rounded-2xl border border-ds-border bg-ds-card px-3 py-3 text-left transition hover:border-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] hover:bg-ds-hover"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-300">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
                   <FileText className="h-4 w-4" strokeWidth={1.9} />
                 </span>
                 <span className="min-w-0">
@@ -229,9 +229,9 @@ export function WriteAssistantPanel({
               <button
                 type="button"
                 onClick={() => setAssistantPrompt(t('writeAssistantOutlinePrompt', { file: activeFileLabel }))}
-                className="flex items-center gap-3 rounded-2xl border border-ds-border bg-ds-card px-3 py-3 text-left transition hover:border-accent/25 hover:bg-ds-hover"
+                className="flex items-center gap-3 rounded-2xl border border-ds-border bg-ds-card px-3 py-3 text-left transition hover:border-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] hover:bg-ds-hover"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-ds-success-soft text-ds-success">
                   <ListTodo className="h-4 w-4" strokeWidth={1.9} />
                 </span>
                 <span className="min-w-0">
@@ -248,9 +248,9 @@ export function WriteAssistantPanel({
                     setAssistantPrompt(t('writeAssistantPolishSelectionPrompt'))
                   }
                 }}
-                className="flex items-center gap-3 rounded-2xl border border-ds-border bg-ds-card px-3 py-3 text-left transition hover:border-accent/25 hover:bg-ds-hover"
+                className="flex items-center gap-3 rounded-2xl border border-ds-border bg-ds-card px-3 py-3 text-left transition hover:border-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] hover:bg-ds-hover"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-300">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-ds-warning-soft text-ds-warning">
                   <MessageSquareQuote className="h-4 w-4" strokeWidth={1.9} />
                 </span>
                 <span className="min-w-0">
@@ -273,7 +273,7 @@ export function WriteAssistantPanel({
             {quotedSelections.map((quote) => (
               <div
                 key={quote.id}
-                className="flex min-w-0 items-center gap-2 rounded-xl border border-accent/20 bg-accent/10 px-3 py-2 text-[12px] text-ds-muted"
+                className="flex min-w-0 items-center gap-2 rounded-xl border border-[color-mix(in_srgb,var(--ds-accent)_20%,transparent)] bg-accent-soft px-3 py-2 text-[12px] text-ds-muted"
               >
                 <MessageSquareQuote className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.9} />
                 <span className="min-w-0 flex-1 truncate">

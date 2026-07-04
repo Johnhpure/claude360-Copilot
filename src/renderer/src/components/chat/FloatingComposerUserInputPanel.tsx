@@ -32,7 +32,7 @@ export function FloatingComposerUserInputPanel({
     <div
       role="group"
       aria-label={t('userInputPanelTitle')}
-      className="ds-no-drag absolute inset-x-2 bottom-full z-30 mb-3 overflow-hidden rounded-[26px] border border-accent/30 bg-ds-card/95 p-3.5 shadow-[0_18px_52px_rgba(20,47,95,0.14)] backdrop-blur-xl dark:bg-ds-card/90"
+      className="ds-no-drag absolute inset-x-2 bottom-full z-30 mb-3 overflow-hidden rounded-[26px] border border-[color-mix(in_srgb,var(--ds-accent)_30%,transparent)] bg-ds-elevated p-3.5 shadow-[var(--c360-shadow-overlay)]"
     >
       {multi ? (
         <div className="mb-2.5">
@@ -106,7 +106,7 @@ export function FloatingComposerUserInputPanel({
           </div>
         )
       ) : (
-        <div className="mt-2.5 flex items-center gap-2 rounded-2xl border border-ds-border-muted bg-ds-card/70 px-3 py-2 text-[12.5px] text-ds-muted">
+        <div className="mt-2.5 flex items-center gap-2 rounded-2xl border border-ds-border-muted bg-ds-card px-3 py-2 text-[12.5px] text-ds-muted">
           <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.9} />
           <span className="min-w-0">{t('userInputPanelFreeformHint')}</span>
         </div>
@@ -138,8 +138,8 @@ function OptionChip({
       title={option.description || undefined}
       className={`inline-flex min-w-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${
         selected
-          ? 'border-accent/45 bg-accent/12 text-ds-ink'
-          : 'border-ds-border-muted bg-ds-card/80 text-ds-muted hover:border-ds-border hover:bg-ds-card hover:text-ds-ink'
+          ? 'border-[color-mix(in_srgb,var(--ds-accent)_45%,transparent)] bg-accent-soft text-ds-ink'
+          : 'border-ds-border-muted bg-ds-card text-ds-muted hover:border-ds-border hover:bg-ds-card hover:text-ds-ink'
       }`}
     >
       {selected ? <Check className="h-3 w-3 shrink-0 text-accent" strokeWidth={2.4} /> : null}
@@ -163,13 +163,13 @@ function OptionRow({
       onClick={onSelect}
       className={`group flex min-w-0 items-start gap-2.5 rounded-[14px] border px-3 py-2 text-left transition ${
         selected
-          ? 'border-accent/40 bg-accent/10 text-ds-ink ring-1 ring-accent/10'
-          : 'border-ds-border-muted bg-ds-card/80 text-ds-muted hover:border-ds-border hover:bg-ds-card hover:text-ds-ink'
+          ? 'border-[color-mix(in_srgb,var(--ds-accent)_40%,transparent)] bg-accent-soft text-ds-ink ring-1 ring-[color-mix(in_srgb,var(--ds-accent)_10%,transparent)]'
+          : 'border-ds-border-muted bg-ds-card text-ds-muted hover:border-ds-border hover:bg-ds-card hover:text-ds-ink'
       }`}
     >
       <span
         className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition ${
-          selected ? 'border-accent bg-accent/10' : 'border-ds-border group-hover:border-ds-muted'
+          selected ? 'border-accent bg-accent-soft' : 'border-ds-border group-hover:border-ds-muted'
         }`}
       >
         {selected ? <span className="h-2 w-2 rounded-full bg-accent" /> : null}

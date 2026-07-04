@@ -43,7 +43,7 @@ export function WriteFontSizeControl(): ReactElement {
   const [size, setSize] = useState<number>(() => readEditorFontSize())
 
   const buttonClass =
-    'flex h-7 w-7 items-center justify-center rounded-lg text-ds-ink transition hover:bg-ds-hover/80 disabled:cursor-not-allowed disabled:opacity-40'
+    'flex h-7 w-7 items-center justify-center rounded-lg text-ds-ink transition hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-40'
 
   return (
     <div

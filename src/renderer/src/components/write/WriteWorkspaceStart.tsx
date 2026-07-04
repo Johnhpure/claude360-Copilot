@@ -19,10 +19,10 @@ export function WriteWorkspaceStart({
 }): ReactElement {
   const { t } = useTranslation('common')
   return (
-    <div className="write-start-shell relative h-full min-h-[420px] overflow-auto rounded-[28px] bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(247,250,255,0.62))] px-5 py-5 dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] sm:px-8 sm:py-8">
+    <div className="write-start-shell relative h-full min-h-[420px] overflow-auto rounded-[28px] bg-[linear-gradient(180deg,color-mix(in_srgb,white_82%,transparent),color-mix(in_srgb,var(--ds-bg-canvas)_62%,transparent))] px-5 py-5 dark:bg-[linear-gradient(180deg,color-mix(in_srgb,white_7%,transparent),color-mix(in_srgb,white_2.5%,transparent))] sm:px-8 sm:py-8">
       <div className="write-start-grid mx-auto grid min-h-full w-full max-w-6xl gap-6">
         <section className="write-start-hero min-w-0 py-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-accent/15 bg-accent/10 px-3 py-1.5 text-[12px] font-semibold text-accent">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--ds-accent)_15%,transparent)] bg-accent-soft px-3 py-1.5 text-[12px] font-semibold text-accent">
             <Sparkles className="h-3.5 w-3.5" strokeWidth={1.9} />
             <span>{t('writeStudio')}</span>
           </div>
@@ -37,7 +37,7 @@ export function WriteWorkspaceStart({
             <button
               type="button"
               onClick={onCreateDraft}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 text-[14px] font-semibold text-white shadow-[0_14px_30px_rgba(59,130,216,0.22)] transition hover:brightness-110"
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 text-[14px] font-semibold text-white shadow-[0_14px_30px_color-mix(in_srgb,var(--ds-accent)_22%,transparent)] transition hover:brightness-110"
             >
               <FilePlus2 className="h-4 w-4" strokeWidth={1.9} />
               {t('writeStartNewDraft')}
@@ -47,7 +47,7 @@ export function WriteWorkspaceStart({
               onClick={onAskAssistant}
               className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-ds-border bg-white/70 px-5 text-[14px] font-semibold text-ds-ink shadow-sm transition hover:bg-white dark:bg-white/[0.055] dark:hover:bg-white/[0.08]"
             >
-              <ListTodo className="h-4 w-4 text-emerald-600 dark:text-emerald-300" strokeWidth={1.9} />
+              <ListTodo className="h-4 w-4 text-ds-success" strokeWidth={1.9} />
               {t('writeStartAskAi')}
             </button>
           </div>
@@ -56,9 +56,9 @@ export function WriteWorkspaceStart({
             <button
               type="button"
               onClick={onRefreshWorkspace}
-              className="group flex min-h-[82px] items-center gap-3 rounded-2xl border border-ds-border-muted bg-white/52 px-4 py-3 text-left transition hover:border-accent/25 hover:bg-white/78 dark:bg-white/[0.035] dark:hover:bg-white/[0.07]"
+              className="group flex min-h-[82px] items-center gap-3 rounded-2xl border border-ds-border-muted bg-ds-card px-4 py-3 text-left transition hover:border-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)]"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-300">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
                 <RefreshCw className="h-5 w-5" strokeWidth={1.9} />
               </span>
               <span className="min-w-0">
@@ -73,9 +73,9 @@ export function WriteWorkspaceStart({
             <button
               type="button"
               onClick={onPickWorkspace}
-              className="group flex min-h-[82px] items-center gap-3 rounded-2xl border border-ds-border-muted bg-white/52 px-4 py-3 text-left transition hover:border-accent/25 hover:bg-white/78 dark:bg-white/[0.035] dark:hover:bg-white/[0.07]"
+              className="group flex min-h-[82px] items-center gap-3 rounded-2xl border border-ds-border-muted bg-ds-card px-4 py-3 text-left transition hover:border-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)]"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-300">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ds-skill-soft text-ds-skill">
                 <FolderOpen className="h-5 w-5" strokeWidth={1.9} />
               </span>
               <span className="min-w-0">
@@ -90,7 +90,7 @@ export function WriteWorkspaceStart({
           </div>
         </section>
 
-        <aside className="write-start-card min-w-0 rounded-[24px] border border-ds-border-muted bg-white/58 p-5 shadow-[0_18px_48px_rgba(20,47,95,0.07)] dark:bg-white/[0.04]">
+        <aside className="write-start-card min-w-0 rounded-[24px] border border-ds-border-muted bg-ds-card p-5 shadow-[var(--c360-shadow-sm)]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[12px] font-semibold text-ds-faint">
@@ -100,14 +100,14 @@ export function WriteWorkspaceStart({
                 {workspaceName}
               </div>
             </div>
-            <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11.5px] font-semibold text-emerald-700 dark:text-emerald-300">
+            <span className="shrink-0 rounded-full bg-ds-success-soft px-2.5 py-1 text-[11.5px] font-semibold text-ds-success">
               {t('writeStartReadyLabel')}
             </span>
           </div>
 
-          <div className="mt-5 rounded-[20px] border border-ds-border-muted bg-white/76 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.64)] dark:bg-white/[0.035] dark:shadow-none">
+          <div className="mt-5 rounded-[20px] border border-ds-border-muted bg-ds-subtle p-5">
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
                 <FilePenLine className="h-5 w-5" strokeWidth={1.9} />
               </span>
               <div className="min-w-0">
@@ -120,17 +120,17 @@ export function WriteWorkspaceStart({
               </div>
             </div>
             <div className="mt-6 space-y-3" aria-hidden="true">
-              <div className="h-3 w-2/3 rounded-full bg-slate-900/10 dark:bg-white/10" />
-              <div className="h-2.5 w-full rounded-full bg-slate-900/5 dark:bg-white/10" />
-              <div className="h-2.5 w-11/12 rounded-full bg-slate-900/5 dark:bg-white/10" />
-              <div className="h-2.5 w-4/5 rounded-full bg-slate-900/5 dark:bg-white/10" />
+              <div className="h-3 w-2/3 rounded-full bg-[color-mix(in_srgb,var(--ds-text)_10%,transparent)]" />
+              <div className="h-2.5 w-full rounded-full bg-[color-mix(in_srgb,var(--ds-text)_6%,transparent)]" />
+              <div className="h-2.5 w-11/12 rounded-full bg-[color-mix(in_srgb,var(--ds-text)_6%,transparent)]" />
+              <div className="h-2.5 w-4/5 rounded-full bg-[color-mix(in_srgb,var(--ds-text)_6%,transparent)]" />
               <div className="pt-2">
-                <div className="h-2.5 w-1/2 rounded-full bg-accent/15" />
+                <div className="h-2.5 w-1/2 rounded-full bg-accent-soft" />
               </div>
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-ds-border-muted bg-ds-subtle/45 px-4 py-3">
+          <div className="mt-4 rounded-2xl border border-ds-border-muted bg-ds-subtle px-4 py-3">
             <div className="text-[12px] font-semibold text-ds-faint">
               {t('writeStartWorkspacePath')}
             </div>

@@ -19,7 +19,7 @@
   font-size: 15px;
   font-weight: 500;
   line-height: 1.58;
-  box-shadow: 0 8px 22px rgba(20, 47, 95, 0.06);
+  box-shadow: var(--c360-shadow-sm);
 }
 
 @media (max-width: 640px) {
@@ -95,7 +95,7 @@ summary,
 .cm-inline-edit-original {
   color: color-mix(in srgb, var(--ds-text-muted) 78%, transparent);
   text-decoration-line: line-through;
-  text-decoration-color: color-mix(in srgb, #dc2626 62%, var(--ds-text-faint));
+  text-decoration-color: color-mix(in srgb, var(--ds-diff-removed) 62%, var(--ds-text-faint));
   text-decoration-thickness: 1.5px;
 }
 
@@ -150,12 +150,12 @@ summary,
 }
 
 .cm-write-diff-accept-all {
-  background: #16a34a;
-  color: #fff;
+  background: var(--ds-success);
+  color: white;
 }
 
 .cm-write-diff-accept-all:hover {
-  background: #15803d;
+  background: color-mix(in srgb, var(--ds-success) 88%, black);
 }
 
 .cm-write-diff-reject-all {
@@ -174,18 +174,18 @@ summary,
 .write-codemirror-host .cm-deletedChunk,
 .write-codemirror-host .cm-deletedLine,
 .write-codemirror-host .cm-deletedText {
-  background-color: color-mix(in srgb, #dc2626 15%, transparent);
+  background-color: color-mix(in srgb, var(--ds-diff-removed) 15%, transparent);
 }
 
 .write-codemirror-host .cm-deletedText {
   text-decoration: line-through;
-  text-decoration-color: color-mix(in srgb, #dc2626 58%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--ds-diff-removed) 58%, transparent);
 }
 
 .write-codemirror-host .cm-changedLine,
 .write-codemirror-host .cm-changedText,
 .write-codemirror-host .cm-insertedLine {
-  background-color: color-mix(in srgb, #16a34a 15%, transparent);
+  background-color: color-mix(in srgb, var(--ds-diff-added) 15%, transparent);
 }
 
 .write-codemirror-host .cm-chunkButtons {
@@ -205,25 +205,15 @@ summary,
 }
 
 .write-codemirror-host .cm-chunkButtons button[name='accept'] {
-  border-color: color-mix(in srgb, #16a34a 45%, transparent);
-  color: #15803d;
+  border-color: color-mix(in srgb, var(--ds-success) 45%, transparent);
+  color: var(--ds-success);
 }
 
 .write-codemirror-host .cm-chunkButtons button:hover {
   background: var(--ds-hover);
 }
 
-[data-theme='dark'] .write-codemirror-host .cm-deletedChunk,
-[data-theme='dark'] .write-codemirror-host .cm-deletedLine,
-[data-theme='dark'] .write-codemirror-host .cm-deletedText {
-  background-color: color-mix(in srgb, #f87171 22%, transparent);
-}
-
-[data-theme='dark'] .write-codemirror-host .cm-changedLine,
-[data-theme='dark'] .write-codemirror-host .cm-changedText,
-[data-theme='dark'] .write-codemirror-host .cm-insertedLine {
-  background-color: color-mix(in srgb, #4ade80 20%, transparent);
-}
+/* 暗色 diff 覆写已删：--ds-diff-* 引 c360 功能色，双主题自适应（阶段3） */
 
 .write-codemirror-host > .cm-editor {
   --write-selection-bg: var(--ds-selection);
@@ -247,10 +237,7 @@ summary,
   color: var(--write-selection-text);
 }
 
-[data-theme='dark'] .write-codemirror-host > .cm-editor {
-  --write-selection-bg: rgba(161, 161, 170, 0.45);
-  --write-selection-text: #f8fbff;
-}
+/* 暗色选区银灰覆写已删：--ds-selection 双主题自适应（阶段3，p1 移交项） */
 
 .write-markdown-preview {
   width: min(100%, 864px);
@@ -352,12 +339,9 @@ summary,
 }
 
 .write-markdown-preview :not(pre) > code {
-  color: #d44a4a;
+  color: var(--write-hl-code);
 }
 
-[data-theme='dark'] .write-markdown-preview :not(pre) > code {
-  color: #f47067;
-}
 
 .write-markdown-preview pre {
   margin: 1.1rem 0 1.25rem;
@@ -365,7 +349,7 @@ summary,
   border-radius: 8px;
   background: color-mix(in srgb, var(--ds-pre-bg) 86%, var(--ds-bg-canvas));
   padding: 0.9rem 1rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 50%, transparent);
 }
 
 .write-markdown-preview pre code {
@@ -402,7 +386,7 @@ summary,
 }
 
 [data-theme='dark'] .write-markdown-preview pre {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 4%, transparent);
 }
 
 @media (max-width: 720px) {
@@ -512,11 +496,11 @@ summary,
   display: inline-flex;
   max-width: 100%;
   align-items: center;
-  border: 1px solid color-mix(in srgb, #dc2626 38%, var(--ds-border-muted));
+  border: 1px solid color-mix(in srgb, var(--ds-danger) 38%, var(--ds-border-muted));
   border-radius: 8px;
-  background: color-mix(in srgb, #dc2626 8%, var(--ds-card));
+  background: color-mix(in srgb, var(--ds-danger) 8%, var(--ds-card));
   padding: 0.28rem 0.55rem;
-  color: #b91c1c;
+  color: color-mix(in srgb, var(--ds-danger) 82%, black);
   font-size: 0.82em;
   line-height: 1.4;
 }
@@ -534,7 +518,7 @@ summary,
 }
 
 [data-theme='dark'] .cm-write-md-image-error {
-  color: #fecaca;
+  color: color-mix(in srgb, var(--ds-danger) 45%, white);
 }
 
 .cm-write-live-preview .cm-write-md-codeblock-line {
@@ -594,7 +578,7 @@ summary,
 }
 
 .cm-write-live-preview .cm-write-md-codeblock-copy[data-copy-failed='true'] {
-  color: #dc2626;
+  color: var(--ds-danger);
 }
 
 .cm-write-md-code-block {
@@ -605,7 +589,7 @@ summary,
   border: 1px solid var(--ds-border);
   border-radius: 14px;
   background: var(--ds-pre-bg);
-  box-shadow: 0 12px 30px rgba(20, 47, 95, 0.045);
+  box-shadow: var(--c360-shadow-sm);
   cursor: text;
 }
 
@@ -682,7 +666,7 @@ html[data-theme='dark'] .cm-write-md-code-block-html > pre span {
   font-family: inherit;
   font-size: 0.92em;
   line-height: 1.55;
-  box-shadow: 0 14px 34px rgba(20, 47, 95, 0.055);
+  box-shadow: var(--c360-shadow-sm);
   cursor: text;
 }
 
@@ -721,11 +705,9 @@ html[data-theme='dark'] .cm-write-md-code-block-html > pre span {
   border-radius: 16px;
   background: color-mix(in srgb, var(--ds-card-strong) 96%, transparent);
   padding: 0.4rem;
-  box-shadow:
-    0 20px 52px rgba(20, 47, 95, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  box-shadow: var(--c360-shadow-overlay);
+  backdrop-filter: blur(var(--blur-overlay)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--blur-overlay)) saturate(160%);
 }
 
 .write-inline-agent-block {
@@ -772,9 +754,9 @@ html[data-theme='dark'] .cm-write-md-code-block-html > pre span {
   border-radius: 12px;
   background: color-mix(in srgb, var(--ds-card-strong) 98%, transparent);
   padding: 0.3rem;
-  box-shadow: 0 18px 44px rgba(20, 47, 95, 0.18);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  box-shadow: var(--c360-shadow-overlay);
+  backdrop-filter: blur(var(--blur-overlay)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--blur-overlay)) saturate(160%);
 }
 
 .write-inline-agent-block-item {
@@ -1030,13 +1012,13 @@ html[data-theme='dark'] .cm-write-md-code-block-html > pre span {
   overflow: hidden;
   border: 1px solid var(--ds-border-muted);
   border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 10px 28px rgba(20, 47, 95, 0.08);
+  background: white;
+  box-shadow: var(--c360-shadow-sm);
   animation: wip-canvas-breathe 7.5s ease-in-out infinite;
 }
 
 [data-theme='dark'] .write-infographic-pending-canvas {
-  background: #f4f6f9;
+  background: color-mix(in srgb, white 96%, var(--c360-text-primary));
   border-color: color-mix(in srgb, var(--ds-text) 18%, transparent);
 }
 
@@ -1062,12 +1044,18 @@ html[data-theme='dark'] .cm-write-md-code-block-html > pre span {
   animation-iteration-count: infinite;
 }
 
+.write-infographic-pending {
+  /* 插画内容色（绑定白色画布，不随主题；集中管理，p6 lint 豁免） */
+  --wip-ink: #2c3a55;
+  --wip-steel: #9aa7bd;
+}
+
 .write-infographic-pending .wip-stroke-accent {
   stroke: var(--ds-accent);
 }
 
 .write-infographic-pending .wip-stroke-muted {
-  stroke: color-mix(in srgb, #2c3a55 30%, transparent);
+  stroke: color-mix(in srgb, var(--wip-ink) 30%, transparent);
 }
 
 .write-infographic-pending .wip-stroke-wash {
@@ -1099,11 +1087,11 @@ html[data-theme='dark'] .cm-write-md-code-block-html > pre span {
 }
 
 .write-infographic-pending .wip-brush-ferrule {
-  fill: #9aa7bd;
+  fill: var(--wip-steel);
 }
 
 .write-infographic-pending .wip-brush-handle {
-  fill: #2c3a55;
+  fill: var(--wip-ink);
 }
 
 .write-infographic-pending-label {
@@ -1176,8 +1164,8 @@ html[data-theme='dark'] .cm-write-md-code-block-html > pre span {
 }
 
 @keyframes wip-canvas-breathe {
-  0%, 100% { box-shadow: 0 10px 28px rgba(20, 47, 95, 0.08); }
-  50% { box-shadow: 0 14px 36px rgba(20, 47, 95, 0.14); }
+  0%, 100% { box-shadow: 0 10px 28px color-mix(in srgb, black 8%, transparent); }
+  50% { box-shadow: 0 14px 36px color-mix(in srgb, black 14%, transparent); }
 }
 
 @keyframes wip-draw-1 {
@@ -1338,7 +1326,7 @@ html[data-theme='dark'] .cm-write-md-code-block-html > pre span {
   height: 52px;
   border-radius: 9999px;
   font-size: 18px;
-  color: #fff;
+  color: white;
   background: var(--ds-accent);
   box-shadow: 0 10px 26px color-mix(in srgb, var(--ds-accent) 35%, transparent);
   transition: transform 140ms ease;
@@ -1359,7 +1347,7 @@ html[data-theme='dark'] .cm-write-md-code-block-html > pre span {
   width: 100%;
   height: 100%;
   border: 0;
-  background: #fff;
+  background: white;
 }
 
 .write-html-embed-status {

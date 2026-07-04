@@ -215,14 +215,14 @@ function StatusDot({ status }: { status: CardStatus }): ReactElement {
   const ring = 'absolute -bottom-px -right-px flex h-[13px] w-[13px] items-center justify-center rounded-full border-[2.5px] border-ds-card'
   if (status === 'done') {
     return (
-      <span className={`${ring} bg-emerald-500 dark:bg-emerald-400`}>
+      <span className={`${ring} bg-ds-success`}>
         <Check className="h-2 w-2 text-white" strokeWidth={3.5} />
       </span>
     )
   }
   if (status === 'failed') {
     return (
-      <span className={`${ring} bg-red-500 dark:bg-red-400`}>
+      <span className={`${ring} bg-ds-danger`}>
         <TriangleAlert className="h-2 w-2 text-white" strokeWidth={3} />
       </span>
     )
@@ -231,7 +231,7 @@ function StatusDot({ status }: { status: CardStatus }): ReactElement {
     return <span className={`${ring} bg-ds-faint/60`} />
   }
   if (status === 'awaiting-permission') {
-    return <span className={`${ring} bg-amber-500`} />
+    return <span className={`${ring} bg-ds-warning`} />
   }
   // running: pulsing accent dot
   return <span className={`${ring} ds-subagent-dot-pulse bg-accent`} />
@@ -254,7 +254,7 @@ function StatusPill({ status, t }: { status: CardStatus; t: (k: string) => strin
       )
     case 'awaiting-permission':
       return (
-        <span className={`${base} bg-amber-500/10 text-amber-600 dark:text-amber-300`}>
+        <span className={`${base} bg-ds-warning-soft text-ds-warning`}>
           {t('subagentStatusAwaiting')}
         </span>
       )
@@ -281,14 +281,14 @@ function LaneHairline({ status, animate }: { status: CardStatus; animate: boolea
   if (status === 'done') {
     return (
       <div className={base}>
-        <span className="absolute inset-0 bg-emerald-500" />
+        <span className="absolute inset-0 bg-ds-success" />
       </div>
     )
   }
   if (status === 'failed') {
     return (
       <div className={base}>
-        <span className="absolute inset-y-0 left-0 w-[62%] bg-red-500" />
+        <span className="absolute inset-y-0 left-0 w-[62%] bg-ds-danger" />
       </div>
     )
   }
@@ -504,7 +504,7 @@ export function SubagentCallCard({
       {expanded ? (
         <div className="border-t border-ds-border-muted/70 px-4 py-3.5">
           {detail.error?.trim() ? (
-            <pre className="whitespace-pre-wrap break-words rounded-[10px] border border-red-200/80 bg-red-50/80 px-3 py-2.5 font-mono text-[12px] leading-5 text-ds-danger dark:border-red-800/40 dark:bg-red-500/10">
+            <pre className="whitespace-pre-wrap break-words rounded-[10px] border border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-danger-soft px-3 py-2.5 font-mono text-[12px] leading-5 text-ds-danger">
               {detail.error}
             </pre>
           ) : detail.summary?.trim() ? (

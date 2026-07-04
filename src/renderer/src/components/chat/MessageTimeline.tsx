@@ -129,15 +129,15 @@ function CompactionDivider({ block }: { block: CompactionTimelineBlock }): React
       aria-live={block.status === 'running' ? 'polite' : undefined}
       className="flex w-full items-center gap-4 py-2"
     >
-      <span className={`h-px min-w-8 flex-1 ${error ? 'bg-red-200/80 dark:bg-red-900/50' : 'bg-ds-border-muted/80'}`} />
+      <span className={`h-px min-w-8 flex-1 ${error ? 'bg-[color-mix(in_srgb,var(--ds-danger)_30%,transparent)]' : 'bg-ds-border-muted'}`} />
       <span
         className={`shrink-0 text-[15px] font-semibold leading-6 ${
-          error ? 'text-red-600 dark:text-red-300' : 'text-ds-faint'
+          error ? 'text-ds-danger' : 'text-ds-faint'
         }`}
       >
         {compactionDividerLabel(block, t)}
       </span>
-      <span className={`h-px min-w-8 flex-1 ${error ? 'bg-red-200/80 dark:bg-red-900/50' : 'bg-ds-border-muted/80'}`} />
+      <span className={`h-px min-w-8 flex-1 ${error ? 'bg-[color-mix(in_srgb,var(--ds-danger)_30%,transparent)]' : 'bg-ds-border-muted'}`} />
     </div>
   )
 }

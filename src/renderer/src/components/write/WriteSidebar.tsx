@@ -340,7 +340,7 @@ export function WriteSidebar({
         />
 
         {settingsError ? (
-          <div className="mx-2 mt-1 rounded-lg border border-red-200/70 bg-red-50/80 px-2.5 py-2 text-[12px] leading-5 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+          <div className="mx-2 mt-1 rounded-lg border border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-danger-soft px-2.5 py-2 text-[12px] leading-5 text-ds-danger">
             {settingsError}
           </div>
         ) : null}
@@ -524,7 +524,7 @@ function WriteEntryDialog({
   const deleting = dialog.kind === 'delete'
   return (
     <div
-      className="ds-no-drag fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/18 px-4 backdrop-blur-[2px] dark:bg-black/35"
+      className="ds-no-drag fixed inset-0 z-[80] flex items-center justify-center bg-black/45 px-4 backdrop-blur-[var(--blur-overlay)]"
       onMouseDown={onClose}
     >
       <form
@@ -543,7 +543,7 @@ function WriteEntryDialog({
             autoFocus
             value={dialog.value}
             onChange={(event) => onValueChange(event.target.value)}
-            className="mt-4 w-full rounded-xl border border-ds-border bg-ds-main/65 px-3 py-2 text-[14px] text-ds-ink outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/25"
+            className="mt-4 w-full rounded-xl border border-ds-border bg-ds-main px-3 py-2 text-[14px] text-ds-ink outline-none transition focus:border-[color-mix(in_srgb,var(--ds-accent)_40%,transparent)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)]"
           />
         ) : null}
         <div className="mt-5 flex justify-end gap-2">
@@ -557,7 +557,7 @@ function WriteEntryDialog({
           <button
             type="submit"
             className={`rounded-xl px-3 py-2 text-[13px] font-semibold text-white transition hover:brightness-110 ${
-              deleting ? 'bg-red-500' : 'bg-accent'
+              deleting ? 'bg-ds-danger' : 'bg-accent'
             }`}
           >
             {entryDialogSubmitLabel(dialog, t)}

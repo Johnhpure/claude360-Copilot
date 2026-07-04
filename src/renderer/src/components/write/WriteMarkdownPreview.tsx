@@ -406,7 +406,7 @@ function ResolvedMarkdownImage({
   if (loadError) {
     return (
       <span
-        className="inline-flex max-w-full items-center rounded-lg border border-red-200/70 bg-red-50/80 px-2 py-1 text-[12px] text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
+        className="inline-flex max-w-full items-center rounded-lg border border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-danger-soft px-2 py-1 text-[12px] text-ds-danger"
         title={loadError}
       >
         {alt || imageSrc || 'Image could not be loaded'}
@@ -465,7 +465,7 @@ class PreviewErrorBoundary extends Component<PreviewBoundaryProps, PreviewBounda
     if (!this.state.error) return this.props.children
     return (
       <div className="min-h-full px-6 py-6">
-        <div className="mb-4 rounded-2xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-[13px] leading-5 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/35 dark:text-amber-100">
+        <div className="mb-4 rounded-2xl border border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft px-4 py-3 text-[13px] leading-5 text-ds-warning">
           {this.props.previewErrorMessage}
         </div>
         {plainTextFallback(this.props.content)}

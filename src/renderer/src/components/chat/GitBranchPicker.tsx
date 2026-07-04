@@ -327,7 +327,7 @@ export function GitBranchPicker({ workspaceRoot }: Props): ReactElement | null {
       </button>
 
       {open ? (
-        <div className="absolute bottom-[calc(100%+8px)] left-0 z-50 w-[min(420px,calc(100vw-48px))] overflow-hidden rounded-xl border border-ds-border bg-ds-elevated shadow-[0_24px_70px_rgba(44,55,78,0.18)] backdrop-blur-xl dark:shadow-[0_30px_80px_rgba(0,0,0,0.42)]">
+        <div className="absolute bottom-[calc(100%+8px)] left-0 z-50 w-[min(420px,calc(100vw-48px))] overflow-hidden rounded-xl border border-ds-border bg-ds-elevated shadow-[var(--c360-shadow-overlay)] backdrop-blur-[var(--blur-overlay)]">
           <div className="flex items-center gap-2 border-b border-ds-border-muted px-4 py-3">
             <Search className="h-4 w-4 shrink-0 text-ds-faint" strokeWidth={1.8} />
             <input
@@ -367,7 +367,7 @@ export function GitBranchPicker({ workspaceRoot }: Props): ReactElement | null {
             ) : null}
 
             {error ? (
-              <div className="mb-2 flex gap-2 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-[12px] leading-5 text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/35 dark:text-amber-100">
+              <div className="mb-2 flex gap-2 rounded-lg border border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft px-3 py-2 text-[12px] leading-5 text-ds-warning">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} />
                 <span className="min-w-0 break-words">{error}</span>
               </div>
@@ -511,7 +511,7 @@ export function GitBranchPicker({ workspaceRoot }: Props): ReactElement | null {
       ) : null}
       {tooltip ? createPortal(
         <div
-          className="pointer-events-none fixed z-[9999] max-w-[min(34rem,calc(100vw-2rem))] break-all rounded-lg border border-ds-border bg-ds-elevated px-2.5 py-1.5 text-[12px] font-medium leading-5 text-ds-ink shadow-[0_14px_36px_rgba(15,23,42,0.22)]"
+          className="pointer-events-none fixed z-[9999] max-w-[min(34rem,calc(100vw-2rem))] break-all rounded-lg border border-ds-border bg-ds-elevated px-2.5 py-1.5 text-[12px] font-medium leading-5 text-ds-ink shadow-[var(--c360-shadow-overlay)]"
           style={{ left: tooltip.x, top: tooltip.y }}
         >
           {tooltip.text}

@@ -621,7 +621,7 @@ export function WritePdfViewer({
       className="write-pdf-viewer flex h-full min-h-0 min-w-0 flex-col"
       data-live-selection={liveSelection ? '' : undefined}
     >
-      <div className="write-pdf-toolbar shrink-0 border-b border-ds-border-muted bg-white/88 px-3 py-2 dark:bg-ds-card/95">
+      <div className="write-pdf-toolbar shrink-0 border-b border-ds-border-muted bg-ds-card px-3 py-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <div className="min-w-0 flex-1 truncate text-[12px] text-ds-muted">
             {formatSize(size)} · {workspaceRoot ? filePath.replace(`${workspaceRoot}/`, '') : filePath}
@@ -722,7 +722,7 @@ export function WritePdfViewer({
       </div>
       <div
         ref={scrollerRef}
-        className="write-pdf-scroller min-h-0 flex-1 overflow-auto bg-ds-main/55 px-4 py-5 dark:bg-black/20"
+        className="write-pdf-scroller min-h-0 flex-1 overflow-auto bg-ds-main px-4 py-5"
         onPointerDown={beginPdfSelection}
         onPointerUp={syncSelectionSoon}
         onMouseUp={syncSelectionSoon}
@@ -735,13 +735,13 @@ export function WritePdfViewer({
             {t('writePdfLoading')}
           </div>
         ) : error ? (
-          <div className="flex h-full min-h-[320px] items-center justify-center text-[13px] text-red-600 dark:text-red-300">
+          <div className="flex h-full min-h-[320px] items-center justify-center text-[13px] text-ds-danger">
             {t('writePdfLoadFailed', { message: error })}
           </div>
         ) : pdfDocument ? (
           <div className="mx-auto flex w-max max-w-full flex-col items-center gap-5">
             {allPageTextLoaded && !pdfHasText ? (
-              <div className="max-w-[560px] rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] leading-5 text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/36 dark:text-amber-100">
+              <div className="max-w-[560px] rounded-xl border border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft px-4 py-3 text-[13px] leading-5 text-ds-warning">
                 {t('writePdfNoTextLayer')}
               </div>
             ) : null}

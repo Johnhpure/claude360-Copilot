@@ -372,8 +372,8 @@ export function WriteInlineAgent({
                       onClick={() => onSelectAgent?.('')}
                       className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[12px] font-medium transition ${
                         activeAgentId === ''
-                          ? 'border-accent/40 bg-accent/12 text-accent'
-                          : 'border-ds-border bg-ds-card text-ds-faint hover:border-accent/40 hover:bg-accent/5'
+                          ? 'border-[color-mix(in_srgb,var(--ds-accent)_40%,transparent)] bg-accent-soft text-accent'
+                          : 'border-ds-border bg-ds-card text-ds-faint hover:border-[color-mix(in_srgb,var(--ds-accent)_40%,transparent)] hover:bg-accent-soft'
                       }`}
                     >
                       {t('writeAgentSwitcherNone')}
@@ -387,8 +387,8 @@ export function WriteInlineAgent({
                         onClick={() => onSelectAgent?.(activeAgentId === preset.id ? '' : preset.id)}
                         className={`inline-flex max-w-[150px] items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] font-medium transition ${
                           activeAgentId === preset.id
-                            ? 'border-accent/40 bg-accent/12 text-accent'
-                            : 'border-ds-border bg-ds-card text-ds-ink hover:border-accent/40 hover:bg-accent/5'
+                            ? 'border-[color-mix(in_srgb,var(--ds-accent)_40%,transparent)] bg-accent-soft text-accent'
+                            : 'border-ds-border bg-ds-card text-ds-ink hover:border-[color-mix(in_srgb,var(--ds-accent)_40%,transparent)] hover:bg-accent-soft'
                         }`}
                       >
                         <span aria-hidden="true" className="text-[13px] leading-none">{preset.emoji}</span>
@@ -401,7 +401,7 @@ export function WriteInlineAgent({
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => onOpenAgentSettings?.()}
-                    className="mt-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-ds-border px-2.5 py-1.5 text-[12px] text-ds-ink transition hover:border-accent/40 hover:bg-accent/5"
+                    className="mt-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-ds-border px-2.5 py-1.5 text-[12px] text-ds-ink transition hover:border-[color-mix(in_srgb,var(--ds-accent)_40%,transparent)] hover:bg-accent-soft"
                   >
                     <Sparkles className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.85} />
                     <span className="min-w-0 flex-1 truncate text-left">{t('writeAgentSwitcherEmptyHint')}</span>

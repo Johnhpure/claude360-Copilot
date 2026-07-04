@@ -1216,7 +1216,7 @@ export function SddDraftHistoryRows({
         </span>
       </SidebarTreeRow>
       {error ? (
-        <div className="px-2 py-1 text-[11.5px] leading-4 text-red-600 dark:text-red-300">
+        <div className="px-2 py-1 text-[11.5px] leading-4 text-ds-danger">
           {error}
         </div>
       ) : null}
@@ -1256,8 +1256,8 @@ export function SddDraftHistoryRows({
               <span
                 className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg border transition ${
                   activeDraftId === item.id
-                    ? 'border-accent/25 bg-accent/10 text-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]'
-                    : 'border-ds-border-muted bg-ds-card/70 text-ds-faint group-hover:border-accent/20 group-hover:bg-accent/10 group-hover:text-accent'
+                    ? 'border-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] bg-accent-soft text-accent shadow-[inset_0_1px_0_color-mix(in_srgb,white_55%,transparent)]'
+                    : 'border-ds-border-muted bg-ds-card text-ds-faint group-hover:border-[color-mix(in_srgb,var(--ds-accent)_20%,transparent)] group-hover:bg-accent-soft group-hover:text-accent'
                 }`}
                 aria-hidden="true"
               >
@@ -1455,7 +1455,7 @@ export function ThreadRenameDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="thread-rename-dialog-title"
-      className="ds-no-drag fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/18 px-4 backdrop-blur-[2px] dark:bg-black/35"
+      className="ds-no-drag fixed inset-0 z-[80] flex items-center justify-center bg-black/45 px-4 backdrop-blur-[var(--blur-overlay)]"
       onMouseDown={onClose}
     >
       <form
@@ -1659,7 +1659,7 @@ function SidebarActionDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="sidebar-action-dialog-title"
-      className="ds-no-drag fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/12 px-4 pb-10 backdrop-blur-[2px] dark:bg-black/30 sm:items-center sm:pb-0"
+      className="ds-no-drag fixed inset-0 z-[90] flex items-end justify-center bg-black/45 px-4 pb-10 backdrop-blur-[var(--blur-overlay)] sm:items-center sm:pb-0"
       onMouseDown={onClose}
     >
       <div
@@ -1704,7 +1704,7 @@ function SidebarActionDialog({
             onClick={onConfirm}
             className={`rounded-2xl px-5 py-2 text-[14px] font-semibold transition disabled:cursor-wait disabled:opacity-60 ${
               state.danger
-                ? 'bg-red-500/12 text-red-600 hover:bg-red-500/18 dark:text-red-300'
+                ? 'bg-ds-danger-soft text-ds-danger hover:bg-ds-danger-soft'
                 : 'bg-accent text-white hover:brightness-110'
             }`}
           >
@@ -1737,7 +1737,7 @@ function ThreadContextMenuItem({
       onClick={onClick}
       className={`flex min-h-[30px] w-full items-center gap-2 rounded-md px-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
         danger
-          ? 'text-red-600 hover:bg-red-500/10 dark:text-red-300'
+          ? 'text-ds-danger hover:bg-ds-danger-soft'
           : 'text-ds-ink hover:bg-[var(--ds-sidebar-row-hover)]'
       }`}
     >
@@ -1774,7 +1774,7 @@ function ThreadActivityDot({
   if (unread) {
     return (
       <span
-        className="block h-2 w-2 shrink-0 rounded-full bg-accent shadow-[0_0_0_1px_rgba(79,124,255,0.2)]"
+        className="block h-2 w-2 shrink-0 rounded-full bg-accent shadow-[0_0_0_1px_color-mix(in_srgb,var(--ds-accent)_20%,transparent)]"
         title={unreadLabel}
       />
     )

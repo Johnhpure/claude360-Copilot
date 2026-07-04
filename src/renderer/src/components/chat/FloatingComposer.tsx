@@ -121,8 +121,8 @@ const CONTEXT_CAPACITY_RING_RADIUS = (CONTEXT_CAPACITY_RING_SIZE - CONTEXT_CAPAC
 const CONTEXT_CAPACITY_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_CAPACITY_RING_RADIUS
 
 function contextCapacityColor(usedRatio: number): string {
-  if (usedRatio >= 0.9) return '#d9544e'
-  if (usedRatio >= 0.75) return '#d9920f'
+  if (usedRatio >= 0.9) return 'var(--ds-danger)'
+  if (usedRatio >= 0.75) return 'var(--ds-warning)'
   return 'var(--ds-accent)'
 }
 
@@ -276,7 +276,7 @@ function ComposerImageAttachmentPreview({
         <button
           type="button"
           onClick={() => onRemoveAttachment(attachment.id)}
-          className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-950 text-white shadow-sm transition hover:bg-zinc-800"
+          className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-ds-ink text-ds-main shadow-sm transition hover:opacity-85"
           aria-label={t('composerRemoveAttachment')}
           title={t('composerRemoveAttachment')}
         >
@@ -1620,7 +1620,7 @@ export function FloatingComposer({
         <div className="pointer-events-none absolute inset-x-0 bottom-full z-30 mb-2 flex flex-col items-center gap-2">
           {runtimeReady ? <BackgroundShellOverlay /> : null}
           {showGoalFloater && activeThreadGoal && !pendingUserInputBlock ? (
-            <div className="pointer-events-auto flex min-h-11 w-full max-w-[46rem] items-center gap-2 rounded-full border border-ds-border bg-white px-3 py-1.5 text-ds-muted shadow-[0_12px_34px_rgba(20,47,95,0.10)] backdrop-blur-xl dark:bg-ds-card">
+            <div className="pointer-events-auto flex min-h-11 w-full max-w-[46rem] items-center gap-2 rounded-full border border-ds-border bg-ds-elevated px-3 py-1.5 text-ds-muted shadow-[var(--c360-shadow-sm)]">
               <Target className="h-3.5 w-3.5 shrink-0 text-ds-faint" strokeWidth={1.9} />
               <div className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] leading-5">
                 <span className="shrink-0 font-semibold text-ds-ink">
@@ -1680,7 +1680,7 @@ export function FloatingComposer({
         {composerMenuOpen && slashQuery == null ? (
           <div
             ref={composerMenuPanelRef}
-            className="absolute bottom-12 left-1 z-40 w-48 overflow-hidden rounded-[18px] border border-ds-border bg-white py-1.5 text-[13px] text-ds-muted shadow-[0_18px_48px_rgba(20,47,95,0.16)] dark:bg-ds-card"
+            className="absolute bottom-12 left-1 z-40 w-48 overflow-hidden rounded-[18px] border border-ds-border bg-ds-elevated py-1.5 text-[13px] text-ds-muted shadow-[var(--c360-shadow-overlay)]"
           >
             {fileReferenceEnabled ? (
               <button
@@ -1706,7 +1706,7 @@ export function FloatingComposer({
             ) : null}
             {attachmentUploadEnabled ? (
               <>
-                {fileReferenceEnabled ? <div className="my-1 h-px bg-ds-border-muted/70" /> : null}
+                {fileReferenceEnabled ? <div className="my-1 h-px bg-ds-border-muted" /> : null}
                 <button
                   type="button"
                   disabled={!canPickAttachment || !onPickAttachments}
@@ -1720,7 +1720,7 @@ export function FloatingComposer({
                   )}
                   <span className="min-w-0 flex-1 truncate">{t('composerAddImage')}</span>
                 </button>
-                <div className="my-1 h-px bg-ds-border-muted/70" />
+                <div className="my-1 h-px bg-ds-border-muted" />
               </>
             ) : null}
             <button
@@ -1736,14 +1736,14 @@ export function FloatingComposer({
                 aria-checked={mode === 'plan'}
                 className={`relative h-5 w-9 shrink-0 rounded-full ring-1 transition ${
                   mode === 'plan'
-                    ? 'bg-accent ring-accent/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]'
+                    ? 'bg-accent ring-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_24%,transparent)]'
                     : 'bg-ds-border-muted ring-ds-border-muted'
                 }`}
               >
                 <span
                   className={`absolute top-0.5 h-4 w-4 rounded-full bg-white ring-1 ring-black/5 transition ${
                     mode === 'plan' ? 'translate-x-[17px]' : 'translate-x-0.5'
-                  } shadow-[0_1px_4px_rgba(20,47,95,0.28)]`}
+                  } shadow-[0_1px_4px_color-mix(in_srgb,black_28%,transparent)]`}
                 />
               </span>
             </button>
@@ -1760,14 +1760,14 @@ export function FloatingComposer({
                 aria-checked={goalMenuChecked}
                 className={`relative h-5 w-9 shrink-0 rounded-full ring-1 transition ${
                   goalMenuChecked
-                    ? 'bg-accent ring-accent/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]'
+                    ? 'bg-accent ring-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_24%,transparent)]'
                     : 'bg-ds-border-muted ring-ds-border-muted'
                 }`}
               >
                 <span
                   className={`absolute top-0.5 h-4 w-4 rounded-full bg-white ring-1 ring-black/5 transition ${
                     goalMenuChecked ? 'translate-x-[17px]' : 'translate-x-0.5'
-                  } shadow-[0_1px_4px_rgba(20,47,95,0.28)]`}
+                  } shadow-[0_1px_4px_color-mix(in_srgb,black_28%,transparent)]`}
                 />
               </span>
             </button>
@@ -1787,14 +1787,14 @@ export function FloatingComposer({
                   aria-checked={useWorktreePool}
                   className={`relative h-5 w-9 shrink-0 rounded-full ring-1 transition ${
                     useWorktreePool
-                      ? 'bg-accent ring-accent/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]'
+                      ? 'bg-accent ring-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,white_24%,transparent)]'
                       : 'bg-ds-border-muted ring-ds-border-muted'
                   }`}
                 >
                   <span
                     className={`absolute top-0.5 h-4 w-4 rounded-full bg-white ring-1 ring-black/5 transition ${
                       useWorktreePool ? 'translate-x-[17px]' : 'translate-x-0.5'
-                    } shadow-[0_1px_4px_rgba(20,47,95,0.28)]`}
+                    } shadow-[0_1px_4px_color-mix(in_srgb,black_28%,transparent)]`}
                   />
                 </span>
               </button>
@@ -1803,7 +1803,7 @@ export function FloatingComposer({
         ) : null}
 
         {slashQuery != null ? (
-          <div className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 w-[calc(100%_-_1rem)] max-w-[760px] -translate-x-1/2 overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(20,47,95,0.14)]">
+          <div className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 w-[calc(100%_-_1rem)] max-w-[760px] -translate-x-1/2 overflow-hidden rounded-[16px] p-1.5 shadow-[var(--c360-shadow-overlay)]">
             <div className="flex h-7 items-center px-2.5 text-[11.5px] font-semibold text-ds-muted">
               {t('slashCommandMenuTitle')}
             </div>
@@ -1820,7 +1820,7 @@ export function FloatingComposer({
                       disabled={command.disabled}
                       className={`flex min-h-[52px] w-full items-center gap-2.5 rounded-[12px] px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
                         active && !command.disabled
-                          ? 'bg-ds-hover text-ds-ink shadow-[inset_0_0_0_1px_rgba(20,47,95,0.06)]'
+                          ? 'bg-ds-hover text-ds-ink shadow-[inset_0_0_0_1px_var(--ds-border-muted)]'
                           : 'text-ds-muted hover:bg-ds-hover hover:text-ds-ink disabled:hover:bg-transparent disabled:hover:text-ds-muted'
                       }`}
                     >
@@ -1862,7 +1862,7 @@ export function FloatingComposer({
         ) : null}
 
         {showFileMentionMenu ? (
-          <div className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 w-[calc(100%_-_1rem)] max-w-[680px] -translate-x-1/2 overflow-hidden rounded-[16px] p-1.5 shadow-[0_18px_46px_rgba(20,47,95,0.14)]">
+          <div className="ds-card-strong absolute bottom-full left-1/2 z-30 mb-2 w-[calc(100%_-_1rem)] max-w-[680px] -translate-x-1/2 overflow-hidden rounded-[16px] p-1.5 shadow-[var(--c360-shadow-overlay)]">
             <div className="flex h-7 items-center gap-2 px-2.5 text-[11.5px] font-semibold text-ds-muted">
               <FileText className="h-3.5 w-3.5 text-ds-faint" strokeWidth={1.9} />
               <span>{t('composerFileMentionMenuTitle')}</span>
@@ -1885,7 +1885,7 @@ export function FloatingComposer({
                       onClick={() => applyFileMention(reference)}
                       className={`flex min-h-[46px] w-full items-center gap-2.5 rounded-[12px] px-2.5 py-2 text-left transition ${
                         active
-                          ? 'bg-ds-hover text-ds-ink shadow-[inset_0_0_0_1px_rgba(20,47,95,0.06)]'
+                          ? 'bg-ds-hover text-ds-ink shadow-[inset_0_0_0_1px_var(--ds-border-muted)]'
                           : 'text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
                       }`}
                     >
@@ -1926,7 +1926,7 @@ export function FloatingComposer({
         {goalPanelOpen && slashQuery == null && !pendingUserInputBlock ? (
           <div
             ref={goalPanelRef}
-            className="absolute inset-x-2 bottom-full z-30 mb-3 overflow-hidden rounded-[26px] border border-ds-border bg-white p-3 shadow-[0_18px_52px_rgba(20,47,95,0.14)] backdrop-blur-xl dark:bg-ds-card"
+            className="absolute inset-x-2 bottom-full z-30 mb-3 overflow-hidden rounded-[26px] border border-ds-border bg-ds-elevated p-3 shadow-[var(--c360-shadow-overlay)]"
           >
             <div className="flex items-start gap-3">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ds-border-muted text-ds-muted">
@@ -2171,7 +2171,7 @@ export function FloatingComposer({
                 )
               ))}
               {attachmentUploadError ? (
-                <span className="min-w-0 break-words text-[12px] font-medium text-red-600 dark:text-red-300">
+                <span className="min-w-0 break-words text-[12px] font-medium text-ds-danger">
                   {attachmentUploadError}
                 </span>
               ) : null}
@@ -2189,7 +2189,7 @@ export function FloatingComposer({
           ) : null}
           {dictation.error ? (
             <div className="px-1">
-              <span className="min-w-0 break-words text-[12px] font-medium text-red-600 dark:text-red-300">
+              <span className="min-w-0 break-words text-[12px] font-medium text-ds-danger">
                 {dictation.error}
               </span>
             </div>
@@ -2269,7 +2269,7 @@ export function FloatingComposer({
                   <button
                     type="button"
                     onClick={() => dictation.stop('send')}
-                    className="ds-no-drag flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-white shadow-[0_10px_22px_rgba(20,47,95,0.22)] transition hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
+                    className="ds-no-drag flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ds-ink text-ds-main shadow-[var(--c360-shadow-sm)] transition hover:opacity-90"
                     aria-label={t('composerVoiceSend')}
                     title={t('composerVoiceSend')}
                   >
@@ -2377,7 +2377,7 @@ export function FloatingComposer({
                 <button
                   type="button"
                   onClick={() => onInterrupt()}
-                  className="ds-no-drag flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-white shadow-[0_10px_22px_rgba(20,47,95,0.22)] transition hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
+                  className="ds-no-drag flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ds-ink text-ds-main shadow-[var(--c360-shadow-sm)] transition hover:opacity-90"
                   aria-label={t('interrupt')}
                   title={t('interrupt')}
                 >
@@ -2388,7 +2388,7 @@ export function FloatingComposer({
                 type="button"
                 disabled={primaryActionDisabled}
                 onClick={handlePrimaryAction}
-                className="ds-no-drag flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-white shadow-[0_10px_22px_rgba(20,47,95,0.22)] transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-ds-card disabled:text-ds-faint disabled:shadow-none dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 dark:disabled:bg-ds-card dark:disabled:text-ds-faint"
+                className="ds-no-drag flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ds-ink text-ds-main shadow-[var(--c360-shadow-sm)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-ds-card disabled:text-ds-faint disabled:shadow-none disabled:opacity-100"
                 aria-label={primaryActionLabel}
                 title={primaryActionLabel}
               >
@@ -2469,7 +2469,7 @@ export function FloatingComposer({
                       <>
                         <span className="ds-composer-usage-context-savings-separator text-ds-faint">·</span>
                         <span
-                          className="ds-composer-usage-context-savings shrink-0 tabular-nums text-emerald-700 dark:text-emerald-300"
+                          className="ds-composer-usage-context-savings shrink-0 tabular-nums text-ds-success"
                           title={t('sessionUsageContextSavingsTitle', {
                             tokens: formatCompactNumber(threadUsage.tokenEconomySavingsTokens)
                           })}

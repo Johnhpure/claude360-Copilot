@@ -285,7 +285,7 @@ export function WorkbenchTopBar({
           type="button"
           onClick={() => void runGuiUpdateAction()}
           disabled={guiUpdateBusy}
-          className="chat-gui-update-button inline-flex items-center gap-1.5 rounded-full border border-amber-300/75 bg-amber-50/92 px-3 py-1.5 text-[12.5px] font-semibold text-amber-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-700/70 dark:bg-amber-950/35 dark:text-amber-100 dark:hover:bg-amber-900/45"
+          className="chat-gui-update-button inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft px-3 py-1.5 text-[12.5px] font-semibold text-ds-warning shadow-[inset_0_1px_0_color-mix(in_srgb,white_55%,transparent)] transition hover:bg-ds-warning-soft disabled:cursor-not-allowed disabled:opacity-60"
           aria-label={guiUpdateTitle}
           title={guiUpdateTitle}
         >
@@ -361,7 +361,7 @@ export function WorkbenchTopBar({
             </span>
           ) : null}
           {sideChatRunningCount > 0 ? (
-            <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 animate-pulse rounded-full bg-emerald-500 shadow-[0_0_0_2px_rgba(16,185,129,0.18)]" />
+            <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 animate-pulse rounded-full bg-ds-success shadow-[0_0_0_2px_color-mix(in_srgb,var(--ds-success)_18%,transparent)]" />
           ) : null}
         </button>
       ) : null}

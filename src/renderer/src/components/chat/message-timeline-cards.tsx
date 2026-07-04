@@ -35,9 +35,9 @@ export function ReviewPlanCard({
   return (
     <div
       title={relativePath}
-      className="flex min-h-[64px] w-full items-center gap-3 rounded-[18px] border border-ds-border-muted bg-white/[0.78] px-4 py-3 shadow-[0_12px_34px_rgba(20,47,95,0.07)] backdrop-blur-xl dark:border-white/[0.09] dark:bg-white/[0.045]"
+      className="flex min-h-[64px] w-full items-center gap-3 rounded-[18px] border border-ds-border-muted bg-ds-card px-4 py-3 shadow-[var(--c360-shadow-sm)]"
     >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent/20 bg-accent/10 text-accent">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--ds-accent)_20%,transparent)] bg-accent-soft text-accent">
         <ListTodo className="h-5 w-5" strokeWidth={1.9} />
       </div>
       <div className="min-w-0 flex-1">
@@ -59,7 +59,7 @@ export function ReviewPlanCard({
           type="button"
           onClick={onBuild}
           disabled={busy}
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-accent px-4 text-[13px] font-semibold text-white shadow-[0_10px_24px_rgba(59,130,216,0.22)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-accent px-4 text-[13px] font-semibold text-white shadow-[var(--c360-shadow-sm)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Hammer className="h-3.5 w-3.5" strokeWidth={1.9} />
           {t('planBuild')}
@@ -92,19 +92,19 @@ export function ReviewSummaryCard({ review }: { review: ReviewBlock }): ReactEle
         : t('reviewCardFindings', { count: findings.length })
 
   return (
-    <section className="overflow-hidden rounded-[20px] border border-ds-border bg-ds-card/80 shadow-[0_16px_40px_rgba(86,103,136,0.08)] backdrop-blur-xl">
+    <section className="overflow-hidden rounded-[20px] border border-ds-border bg-ds-card shadow-[var(--c360-shadow-sm)]">
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
-        className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-ds-hover/40"
+        className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-ds-hover"
       >
         <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] ${
           failed || incorrect
-            ? 'bg-red-500/10 text-red-600 dark:text-red-300'
+            ? 'bg-ds-danger-soft text-ds-danger'
             : running
-              ? 'bg-accent/10 text-accent'
-              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+              ? 'bg-accent-soft text-accent'
+              : 'bg-ds-success-soft text-ds-success'
         }`}>
           {icon}
         </span>
@@ -124,7 +124,7 @@ export function ReviewSummaryCard({ review }: { review: ReviewBlock }): ReactEle
       </button>
 
       {expanded ? (
-        <div className="border-t border-ds-border-muted/70 px-5 py-4">
+        <div className="border-t border-ds-border-muted px-5 py-4">
           {review.output?.overallExplanation?.trim() ? (
             <p className="whitespace-pre-wrap text-[14px] leading-6 text-ds-muted">
               {review.output.overallExplanation}
@@ -142,7 +142,7 @@ export function ReviewSummaryCard({ review }: { review: ReviewBlock }): ReactEle
               {findings.map((finding, index) => (
                 <article
                   key={`${finding.title}-${index}`}
-                  className="rounded-[12px] border border-ds-border-muted bg-ds-card-muted/45 px-3.5 py-3"
+                  className="rounded-[12px] border border-ds-border-muted bg-ds-subtle px-3.5 py-3"
                 >
                   <div className="flex min-w-0 items-start gap-2">
                     <span className="mt-0.5 shrink-0 rounded-md bg-ds-card px-1.5 py-0.5 font-mono text-[11px] text-ds-muted">
@@ -214,7 +214,7 @@ export function TurnChangeSummary({
 
   return (
     <section
-      className={`ds-card-strong overflow-hidden border border-ds-border shadow-[0_16px_40px_rgba(86,103,136,0.08)] ${
+      className={`ds-card-strong overflow-hidden border border-ds-border shadow-[var(--c360-shadow-sm)] ${
         compact ? 'rounded-[20px]' : 'rounded-[24px]'
       }`}
     >
@@ -222,7 +222,7 @@ export function TurnChangeSummary({
         type="button"
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
-        className={`flex w-full items-center text-left transition hover:bg-ds-hover/40 ${
+        className={`flex w-full items-center text-left transition hover:bg-ds-hover ${
           compact ? 'gap-3 px-4 py-3' : 'gap-4 px-5 py-4'
         }`}
       >
@@ -259,7 +259,7 @@ export function TurnChangeSummary({
       {expanded ? (
         <div
           ref={deferredBodyRef}
-          className="border-t border-ds-border-muted/70"
+          className="border-t border-ds-border-muted"
           style={{ contentVisibility: 'auto', containIntrinsicSize: compact ? 'auto 180px' : 'auto 280px' }}
         >
           {shouldRenderBody
@@ -269,13 +269,13 @@ export function TurnChangeSummary({
             const primary = change.filePath ?? t('toolActionFile')
 
             return (
-              <div key={change.id} className="border-b border-ds-border-muted/60 last:border-b-0">
+              <div key={change.id} className="border-b border-ds-border-muted last:border-b-0">
                 <button
                   type="button"
                   onClick={() => setActiveId(open ? null : change.id)}
                   aria-expanded={open}
                   className={`flex w-full items-start text-left transition ${
-                    open ? 'bg-ds-hover/45' : 'hover:bg-ds-hover/35'
+                    open ? 'bg-ds-hover' : 'hover:bg-ds-hover'
                   } ${compact ? 'gap-2.5 px-4 py-2.5' : 'gap-3 px-5 py-3'}`}
                 >
                   <span className="min-w-0 flex-1">
@@ -300,12 +300,12 @@ export function TurnChangeSummary({
                 </button>
 
                 {open && change.detail ? (
-                  <div className={`bg-ds-card-muted/45 ${compact ? 'px-3 pb-2.5 pt-1' : 'px-4 pb-3 pt-1'}`}>
+                  <div className={`bg-ds-subtle ${compact ? 'px-3 pb-2.5 pt-1' : 'px-4 pb-3 pt-1'}`}>
                     <DiffView
                       patch={change.detail}
                       filePath={change.filePath}
                       maxHeight={compact ? 148 : 260}
-                      className="border border-ds-border-muted/70"
+                      className="border border-ds-border-muted"
                     />
                   </div>
                 ) : null}
@@ -412,7 +412,7 @@ export function ModelMetaTag({
       className={`flex min-w-0 text-right ${className}`.trim()}
       title={t('turnModelBadgeTitle', { model: label })}
     >
-      <span className="truncate font-mono text-[12px] tracking-tight text-ds-faint/85">
+      <span className="truncate font-mono text-[12px] tracking-tight text-ds-faint">
         {label}
       </span>
     </div>
@@ -514,7 +514,7 @@ function WritePromptQuoteCard({ quote }: { quote: WritePromptDisplayQuote }): Re
   const rangeLabel = lineLabel ?? pageLabel
 
   return (
-    <figure className="rounded-xl border border-accent/15 bg-accent/[0.055] px-3 py-2.5 text-left shadow-sm">
+    <figure className="rounded-xl border border-[color-mix(in_srgb,var(--ds-accent)_15%,transparent)] bg-accent-soft px-3 py-2.5 text-left shadow-sm">
       <figcaption className="flex min-w-0 items-center gap-2 text-[12px] leading-5">
         <MessageSquareQuote className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.9} />
         <span className="min-w-0 flex-1 truncate font-medium text-ds-ink">
@@ -526,7 +526,7 @@ function WritePromptQuoteCard({ quote }: { quote: WritePromptDisplayQuote }): Re
           </span>
         ) : null}
       </figcaption>
-      <blockquote className="mt-2 max-h-36 overflow-auto border-l-2 border-accent/35 pl-3 text-[12.5px] font-normal leading-6 text-ds-muted">
+      <blockquote className="mt-2 max-h-36 overflow-auto border-l-2 border-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)] pl-3 text-[12.5px] font-normal leading-6 text-ds-muted">
         <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
           {quote.text}
         </div>
@@ -574,7 +574,7 @@ function WritePromptRetrievalCard({
             className="rounded-lg border border-black/5 bg-white/45 px-2.5 py-2 dark:border-white/8 dark:bg-white/4"
           >
             <div className="flex min-w-0 items-center gap-2 text-[11.5px] leading-4">
-              <span className="shrink-0 rounded-md bg-accent/10 px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-accent">
+              <span className="shrink-0 rounded-md bg-accent-soft px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-accent">
                 {index + 1}
               </span>
               <span className="min-w-0 flex-1 truncate font-mono text-ds-muted" title={snippet.location}>

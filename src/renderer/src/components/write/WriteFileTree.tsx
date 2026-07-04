@@ -171,9 +171,9 @@ export function WriteFileTree({
             {isDirectory ? (
               <Folder className="h-3.5 w-3.5 shrink-0 text-ds-muted" strokeWidth={1.75} />
             ) : imageEntry ? (
-              <Image className={`h-3.5 w-3.5 shrink-0 ${selected ? 'text-accent' : 'text-emerald-600/75 dark:text-emerald-300/80'}`} strokeWidth={1.8} />
+              <Image className={`h-3.5 w-3.5 shrink-0 ${selected ? 'text-accent' : 'text-ds-success'}`} strokeWidth={1.8} />
             ) : (
-              <FileText className={`h-3.5 w-3.5 shrink-0 ${selected ? 'text-accent' : 'text-ds-faint/90'}`} strokeWidth={1.8} />
+              <FileText className={`h-3.5 w-3.5 shrink-0 ${selected ? 'text-accent' : 'text-ds-faint'}`} strokeWidth={1.8} />
             )}
             <span className="min-w-0 flex-1 truncate">{entry.name}</span>
             {loading ? (
@@ -228,7 +228,7 @@ export function WriteFileTree({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">
         {error ? (
-          <div className="mx-2 mt-2 rounded-lg border border-red-200/70 bg-red-50/80 px-2.5 py-2 text-[12px] leading-5 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+          <div className="mx-2 mt-2 rounded-lg border border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-danger-soft px-2.5 py-2 text-[12px] leading-5 text-ds-danger">
             {error}
           </div>
         ) : rootLoading || !hasRootSnapshot ? (
@@ -236,13 +236,13 @@ export function WriteFileTree({
             {[0, 1, 2, 3, 4].map((item) => (
               <div
                 key={item}
-                className="h-8 animate-pulse rounded-lg bg-ds-hover/70"
+                className="h-8 animate-pulse rounded-lg bg-ds-hover"
                 style={{ width: `${92 - item * 8}%` }}
               />
             ))}
           </div>
         ) : rootEntries.length === 0 ? (
-          <div className="mx-2 mt-2 rounded-2xl border border-dashed border-ds-border-muted bg-ds-main/35 px-3 py-4">
+          <div className="mx-2 mt-2 rounded-2xl border border-dashed border-ds-border-muted bg-ds-main px-3 py-4">
             <p className="text-[14px] font-medium text-ds-muted">
               {t('writeWorkspaceEmpty')}
             </p>

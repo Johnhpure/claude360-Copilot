@@ -358,16 +358,18 @@ html[data-theme='dark'] .ds-markdown .ds-code-block-html > pre span {
 }
 
 .ds-code-sidebar {
+  /* 代码编辑器专属纸面/装订线色（编辑器域内容色，独立于 surface 阶梯，集中于此管理）；
+     active-line 高亮统一走 accent 衍生（阶段3 归一，清除旧 accent 与银灰残留）。 */
   --ds-code-sidebar-editor-bg: #fbfcff;
   --ds-code-sidebar-gutter-bg: #f3f6fb;
-  --ds-code-sidebar-active-line-bg: rgba(59, 130, 216, 0.13);
+  --ds-code-sidebar-active-line-bg: color-mix(in srgb, var(--ds-accent) 13%, transparent);
   background: var(--ds-bg-canvas);
 }
 
 html[data-theme='dark'] .ds-code-sidebar {
   --ds-code-sidebar-editor-bg: #101012;
   --ds-code-sidebar-gutter-bg: #18181b;
-  --ds-code-sidebar-active-line-bg: rgba(161, 161, 170, 0.18);
+  --ds-code-sidebar-active-line-bg: color-mix(in srgb, var(--ds-accent) 18%, transparent);
 }
 
 .ds-code-sidebar-topbar {
@@ -458,9 +460,9 @@ html[data-theme='dark'] .ds-code-sidebar {
   align-items: center;
   justify-content: center;
   border-radius: 5px;
-  background: #1b2338;
+  background: var(--c360-text-primary);
   padding: 0 0.3rem;
-  color: #ffffff;
+  color: white;
   font-family: 'SF Mono', 'JetBrains Mono', 'IBM Plex Mono', monospace;
   font-size: 9px;
   font-weight: 700;
@@ -468,7 +470,7 @@ html[data-theme='dark'] .ds-code-sidebar {
 }
 
 html[data-theme='dark'] .ds-code-sidebar-file-badge {
-  background: #18181b;
+  background: var(--ds-surface-elevated);
 }
 
 .ds-code-sidebar-actions {
@@ -697,11 +699,11 @@ html[data-theme='dark'] .ds-file-preview-code-html > pre span {
   justify-content: center;
   padding: clamp(18px, 4vw, 56px);
   background:
-    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.08), transparent 34%),
-    color-mix(in srgb, #000 64%, transparent);
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, white 8%, transparent), transparent 34%),
+    color-mix(in srgb, black 64%, transparent);
   color: var(--ds-text);
-  backdrop-filter: blur(24px) saturate(150%);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(var(--blur-overlay)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--blur-overlay)) saturate(150%);
 }
 
 [data-streamdown='table-fullscreen'] > div {
@@ -716,9 +718,7 @@ html[data-theme='dark'] .ds-file-preview-code-html > pre span {
   border: 1px solid var(--ds-border-strong);
   border-radius: 22px;
   background: var(--ds-card-strong);
-  box-shadow:
-    0 34px 90px rgba(2, 6, 16, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: var(--c360-shadow-overlay);
 }
 
 [data-streamdown='table-fullscreen'] > div > div:first-child {

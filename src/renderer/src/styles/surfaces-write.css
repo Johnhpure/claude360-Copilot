@@ -2,19 +2,20 @@
   content: '';
   position: absolute;
   inset: 0;
+  /* 装饰性 haze（p1 留存点）：accent 衍生已归一 token，白色高光为装饰语义 */
   background:
-    radial-gradient(circle at 50% -8%, rgba(59, 130, 216, 0.11), transparent 30%),
-    radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.8), transparent 22%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 26%);
+    radial-gradient(circle at 50% -8%, color-mix(in srgb, var(--ds-accent) 11%, transparent), transparent 30%),
+    radial-gradient(circle at 14% 0%, color-mix(in srgb, white 80%, transparent), transparent 22%),
+    linear-gradient(180deg, color-mix(in srgb, white 32%, transparent), transparent 26%);
   opacity: 0.8;
   pointer-events: none;
 }
 
 [data-theme='dark'] .ds-stage-surface::before {
   background:
-    radial-gradient(circle at 50% -8%, rgba(228, 228, 231, 0.05), transparent 30%),
-    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.06), transparent 24%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0) 24%);
+    radial-gradient(circle at 50% -8%, color-mix(in srgb, var(--ds-text) 5%, transparent), transparent 30%),
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, white 6%, transparent), transparent 24%),
+    linear-gradient(180deg, color-mix(in srgb, white 3%, transparent), transparent 24%);
   opacity: 1;
 }
 
@@ -70,7 +71,7 @@
   width: 42px;
   border: 0;
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--ds-surface-card);
   padding: 3px 6px;
   text-align: center;
   font-size: 12px;
@@ -80,7 +81,7 @@
 }
 
 [data-theme='dark'] .write-pdf-page-input {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--ds-surface-elevated);
 }
 
 .write-pdf-page {
@@ -91,8 +92,8 @@
   user-select: text;
   -webkit-user-select: text;
   box-shadow:
-    0 18px 50px rgba(20, 47, 95, 0.14),
-    0 0 0 1px rgba(15, 23, 42, 0.08);
+    var(--c360-shadow-sm),
+    0 0 0 1px var(--ds-border);
 }
 
 .write-pdf-canvas,
@@ -122,7 +123,8 @@
 }
 
 .write-pdf-text-layer :is(span, br) {
-  color: rgba(0, 0, 0, 0.01);
+  /* PDF.js 文本层技巧：近透明文字承载原生选区（功能色，非 UI 色） */
+  color: color-mix(in srgb, black 1%, transparent);
   position: absolute;
   white-space: pre;
   cursor: text;
@@ -218,17 +220,15 @@
   justify-self: end;
   border-radius: 999px;
   border: 1px solid var(--ds-border-muted);
-  background: rgba(255, 255, 255, 0.56);
+  background: var(--ds-surface-card);
   padding: 7px 10px;
   font-size: 12px;
   font-weight: 650;
   color: var(--ds-muted);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 [data-theme='dark'] .write-pdf-topbar-status {
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: none;
+  background: var(--ds-surface-elevated);
 }
 
 .write-pdf-topbar-dot {
@@ -335,25 +335,9 @@
   }
 }
 
-.ds-topbar-surface::after {
-  content: none;
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -24px;
-  height: 44px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 78%);
-  filter: blur(12px);
-  opacity: 0.8;
-  pointer-events: none;
-}
-
+/* 顶栏余晖 ::after 死代码已删（content:none 恒不渲染，阶段3 清理）。 */
 [data-theme='dark'] .ds-topbar-surface {
   border-color: transparent;
-}
-
-[data-theme='dark'] .ds-topbar-surface::after {
-  content: none;
 }
 
 .ds-sidebar-shell {
@@ -363,8 +347,7 @@
   border-width: 0;
   box-shadow: var(--ds-sidebar-shadow);
   isolation: isolate;
-  backdrop-filter: blur(14px) saturate(112%);
-  -webkit-backdrop-filter: blur(14px) saturate(112%);
+  /* 阶段3：侧栏 blur 移除（强约束5——blur 仅浮层；gradient 已近不透明，无露底） */
 }
 
 .ds-sidebar-shell::before {
@@ -406,7 +389,7 @@
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: #9b9b9b;
+  color: var(--ds-text-faint);
   box-shadow: none;
   opacity: 0.96;
   padding: 0;
@@ -420,27 +403,13 @@
 }
 
 .ds-titlebar-sidebar-toggle:hover {
-  background: rgba(2, 6, 16, 0.045);
-  color: #5f5f5f;
+  background: var(--ds-surface-hover);
+  color: var(--ds-text-muted);
 }
 
 .ds-titlebar-sidebar-toggle:active {
-  background: rgba(2, 6, 16, 0.07);
-  color: #3f3f3f;
-}
-
-[data-theme='dark'] .ds-titlebar-sidebar-toggle {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-[data-theme='dark'] .ds-titlebar-sidebar-toggle:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.72);
-}
-
-[data-theme='dark'] .ds-titlebar-sidebar-toggle:active {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.86);
+  background: var(--ds-surface-hover);
+  color: var(--ds-text);
 }
 
 .ds-sidebar-toggle-button {
@@ -450,12 +419,10 @@
   align-items: center;
   justify-content: center;
   border-radius: 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--ds-border-muted) 82%, white 18%);
-  background: rgba(255, 255, 255, 0.46);
+  border: 1px solid var(--ds-border-muted);
+  background: var(--ds-surface-card);
   color: var(--ds-text-faint);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.62),
-    0 8px 18px rgba(20, 47, 95, 0.05);
+  box-shadow: var(--c360-shadow-sm);
   transition:
     transform 0.15s ease,
     background 0.15s ease,
@@ -466,21 +433,12 @@
 .ds-sidebar-toggle-button:hover {
   transform: translateY(-1px);
   border-color: var(--ds-border-strong);
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--ds-surface-hover);
   color: var(--ds-text);
 }
 
 [data-theme='dark'] .ds-sidebar-toggle-button {
-  border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 10px 20px rgba(0, 0, 0, 0.16);
-}
-
-[data-theme='dark'] .ds-sidebar-toggle-button:hover {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--ds-surface-elevated);
 }
 
 .ds-card-soft {

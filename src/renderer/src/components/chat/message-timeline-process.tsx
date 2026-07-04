@@ -176,14 +176,14 @@ function processSectionErrorTone(blocks: ChatBlock[]): ProcessErrorTone {
 }
 
 function processErrorTextClass(tone: ProcessErrorTone): string {
-  if (tone === 'tool') return 'text-orange-700 dark:text-orange-300'
-  if (tone === 'error') return 'text-red-600 dark:text-red-300'
+  if (tone === 'tool') return 'text-ds-warning'
+  if (tone === 'error') return 'text-ds-danger'
   return 'text-ds-muted'
 }
 
 function processErrorDotClass(tone: ProcessErrorTone): string {
-  if (tone === 'tool') return 'bg-orange-500 dark:bg-orange-300'
-  if (tone === 'error') return 'bg-red-500 dark:bg-red-300'
+  if (tone === 'tool') return 'bg-ds-warning'
+  if (tone === 'error') return 'bg-ds-danger'
   return ''
 }
 
@@ -437,7 +437,7 @@ function ProcessStackRows({
                 isError
                   ? processErrorTextClass(errorTone)
                   : 'text-ds-faint hover:text-ds-muted'
-              } ${canToggle ? 'cursor-pointer hover:bg-ds-hover/45' : 'cursor-default'}`}
+              } ${canToggle ? 'cursor-pointer hover:bg-ds-hover' : 'cursor-default'}`}
             >
               {RowIcon ? <ProcessGlyph Icon={RowIcon} /> : null}
               <span className={`min-w-0 flex-1 truncate ${rowActive && !isError ? 'ds-shiny-text' : ''}`}>
@@ -451,7 +451,7 @@ function ProcessStackRows({
                   disabled={!canToggle}
                   onClick={handleToggleButton}
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition ${
-                    canToggle ? 'cursor-pointer hover:bg-ds-hover/70' : 'cursor-default'
+                    canToggle ? 'cursor-pointer hover:bg-ds-hover' : 'cursor-default'
                   }`}
                 >
                   {open ? (
@@ -540,7 +540,7 @@ function ProcessEntryRow({
             : 'text-ds-faint hover:text-ds-ink'
         } ${
           canToggle
-            ? 'cursor-pointer hover:bg-ds-hover/70'
+            ? 'cursor-pointer hover:bg-ds-hover'
             : 'cursor-default'
         }`}
       >
@@ -569,7 +569,7 @@ function ProcessEntryRow({
             disabled={!canToggle}
             onClick={handleToggleButton}
             className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition ${
-              canToggle ? 'cursor-pointer hover:bg-ds-hover/70' : 'cursor-default'
+              canToggle ? 'cursor-pointer hover:bg-ds-hover' : 'cursor-default'
             }`}
           >
             {open ? (
@@ -992,7 +992,7 @@ function RuntimeMetaBadges({
   ) {
     return null
   }
-  const chipClass = 'inline-flex max-w-full items-center gap-1 rounded-md border border-ds-border-muted bg-ds-card/75 px-1.5 py-0.5 text-[11px] font-medium text-ds-faint'
+  const chipClass = 'inline-flex max-w-full items-center gap-1 rounded-md border border-ds-border-muted bg-ds-card px-1.5 py-0.5 text-[11px] font-medium text-ds-faint'
   return (
     <div className="ml-7 mt-1 flex min-w-0 flex-wrap gap-1.5">
       {childLabel ? (
@@ -1174,13 +1174,13 @@ function ProcessEntryDetail({
     }
     if (detail.isError) {
       return (
-        <div className="overflow-hidden rounded-[10px] border border-orange-200/80 bg-orange-50/80 dark:border-orange-800/40 dark:bg-orange-500/10">
+        <div className="overflow-hidden rounded-[10px] border border-[color-mix(in_srgb,var(--ds-warning)_30%,transparent)] bg-ds-warning-soft">
           {detail.filePath ? (
-            <div className="border-b border-orange-200/70 bg-orange-100/50 px-3 py-1.5 font-mono text-[12px] text-orange-700 dark:border-orange-800/40 dark:bg-orange-500/15 dark:text-orange-300">
+            <div className="border-b border-[color-mix(in_srgb,var(--ds-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--ds-warning)_12%,transparent)] px-3 py-1.5 font-mono text-[12px] text-ds-warning">
               {detail.filePath}
             </div>
           ) : null}
-          <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words px-3 py-2.5 font-mono text-[12px] leading-6 text-orange-900 dark:text-orange-100">
+          <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words px-3 py-2.5 font-mono text-[12px] leading-6 text-ds-warning">
             {detail.text}
           </pre>
         </div>

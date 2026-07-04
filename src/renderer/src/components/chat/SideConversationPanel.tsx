@@ -329,7 +329,7 @@ export function SideConversationPanel({
         <MessageCircleMore className="h-4 w-4" strokeWidth={1.85} />
         <span className="text-[12px] font-semibold">{Math.max(sideIds.length, 1)}</span>
         {runningCount > 0 ? (
-          <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.18)]" />
+          <span className="h-2 w-2 animate-pulse rounded-full bg-ds-success shadow-[0_0_0_3px_color-mix(in_srgb,var(--ds-success)_18%,transparent)]" />
         ) : null}
       </button>
     )
@@ -381,7 +381,7 @@ export function SideConversationPanel({
                       {compactSideTitle(side.title)}
                     </span>
                     {side.busy ? (
-                      <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-emerald-500" />
+                      <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-ds-success" />
                     ) : null}
                   </button>
                 )
@@ -404,7 +404,7 @@ export function SideConversationPanel({
             <button
               type="button"
               onClick={discardActiveSide}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-ds-faint transition hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-ds-faint transition hover:bg-ds-danger-soft hover:text-ds-danger"
               aria-label={t('sidePanelDiscardTitle')}
               title={t('sidePanelDiscardTitle')}
             >
@@ -500,7 +500,7 @@ export function SideConversationPanel({
                 </div>
               ) : null}
               {activeSide.error ? (
-                <div className="rounded-[12px] border border-red-300/70 bg-red-500/10 px-3 py-2 text-[12px] text-red-700 dark:border-red-800/60 dark:bg-red-950/35 dark:text-red-200">
+                <div className="rounded-[12px] border border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-danger-soft px-3 py-2 text-[12px] text-ds-danger">
                   {activeSide.error}
                 </div>
               ) : null}

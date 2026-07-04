@@ -55,35 +55,35 @@ const APPROVAL_OPTIONS: ApprovalOption[] = [
     labelKey: 'toolPermissionAlwaysAskShort',
     descriptionKey: 'toolPermissionAlwaysAskDesc',
     Icon: Hand,
-    iconClass: 'border-sky-400/30 bg-sky-500/10 text-sky-700 dark:text-sky-200'
+    iconClass: 'border-[color-mix(in_srgb,var(--ds-accent)_30%,transparent)] bg-accent-soft text-accent'
   },
   {
     value: 'read-only',
     labelKey: 'toolPermissionReadOnlyShort',
     descriptionKey: 'toolPermissionReadOnlyDesc',
     Icon: Eye,
-    iconClass: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+    iconClass: 'border-[color-mix(in_srgb,var(--ds-success)_30%,transparent)] bg-ds-success-soft text-ds-success'
   },
   {
     value: 'sensitive-ask',
     labelKey: 'toolPermissionSensitiveAskShort',
     descriptionKey: 'toolPermissionSensitiveAskDesc',
     Icon: ShieldQuestion,
-    iconClass: 'border-amber-400/35 bg-amber-500/10 text-amber-700 dark:text-amber-200'
+    iconClass: 'border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft text-ds-warning'
   },
   {
     value: 'workspace-write',
     labelKey: 'toolPermissionWorkspaceWriteShort',
     descriptionKey: 'toolPermissionWorkspaceWriteDesc',
     Icon: FolderPen,
-    iconClass: 'border-indigo-400/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-200'
+    iconClass: 'border-[color-mix(in_srgb,var(--ds-skill)_30%,transparent)] bg-ds-skill-soft text-ds-skill'
   },
   {
     value: 'bypass',
     labelKey: 'toolPermissionBypassShort',
     descriptionKey: 'toolPermissionBypassDesc',
     Icon: LockKeyholeOpen,
-    iconClass: 'border-orange-400/35 bg-orange-500/10 text-orange-700 dark:text-orange-200'
+    iconClass: 'border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft text-ds-warning'
   }
 ]
 
@@ -172,7 +172,7 @@ export function FloatingComposerExecutionPicker({
         ref={menuRef}
         role="menu"
         style={menuStyle}
-        className="fixed z-50 overflow-hidden rounded-2xl border border-ds-border bg-white p-2 text-[13px] text-ds-ink shadow-[0_18px_48px_rgba(20,47,95,0.16)] dark:bg-ds-card"
+        className="fixed z-50 overflow-hidden rounded-xl border border-ds-border bg-ds-elevated p-2 text-[13px] text-ds-ink shadow-[var(--c360-shadow-overlay)]"
       >
         {APPROVAL_OPTIONS.map((option) => (
           <ExecutionRow
@@ -202,8 +202,8 @@ export function FloatingComposerExecutionPicker({
           onClick={() => toggleMenu('approval')}
           className={`inline-flex min-h-7 items-center gap-1.5 rounded-lg border px-2.5 py-0.5 text-[12.5px] font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-55 ${
             bypass
-              ? 'border-orange-300/70 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:border-orange-800/70 dark:bg-orange-950/30 dark:text-orange-200'
-              : 'border-ds-border-muted bg-ds-card/72 text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
+              ? 'border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft text-ds-warning hover:bg-[color-mix(in_srgb,var(--ds-warning)_20%,transparent)]'
+              : 'border-ds-border-muted bg-ds-card text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
           }`}
           title={`${t(permissionLabelKey(permissionMode))}. ${t(permissionDescriptionKey(permissionMode))}`}
           aria-expanded={openMenu === 'approval'}
@@ -246,7 +246,7 @@ function ExecutionRow({
       aria-checked={selected}
       onClick={onClick}
       className={`flex w-full cursor-pointer items-start gap-2 rounded-xl px-2.5 py-2 text-left text-ds-ink transition ${
-        selected ? 'bg-ds-hover' : 'hover:bg-ds-hover/70'
+        selected ? 'bg-ds-hover' : 'hover:bg-ds-hover'
       }`}
     >
       <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${iconClass}`}>

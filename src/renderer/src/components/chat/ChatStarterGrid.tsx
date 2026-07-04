@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next'
 type SuggestionTone = 'blue' | 'emerald' | 'violet'
 
 const SUGGESTION_TONE: Record<SuggestionTone, string> = {
-  blue: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
-  emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
-  violet: 'bg-violet-50 text-violet-600 dark:bg-ds-skill-soft dark:text-ds-skill'
+  blue: 'bg-accent-soft text-accent',
+  emerald: 'bg-ds-success-soft text-ds-success',
+  violet: 'bg-ds-skill-soft text-ds-skill'
 }
 
 const CHAT_STARTERS: Array<{
@@ -55,7 +55,7 @@ export function ChatStarterGrid({
           key={starter.titleKey}
           type="button"
           onClick={() => onSelectSuggestion?.(t(starter.promptKey))}
-          className={`ds-empty-hero-card group flex min-h-[112px] items-center gap-4 rounded-[16px] border border-[rgba(20,47,95,0.1)] bg-[rgba(255,255,255,0.92)] px-5 py-4 text-left shadow-[0_16px_38px_rgba(86,103,136,0.08)] transition duration-200 hover:-translate-y-0.5 hover:border-[rgba(59,130,216,0.18)] hover:shadow-[0_22px_48px_rgba(86,103,136,0.13)] dark:border-white/10 dark:bg-[rgba(24,24,24,0.9)] dark:shadow-[0_18px_44px_rgba(0,0,0,0.22)] ${compact ? 'min-h-[92px]' : ''}`}
+          className={`ds-empty-hero-card group flex min-h-[112px] items-center gap-4 rounded-[16px] border border-ds-border bg-ds-card px-5 py-4 text-left shadow-[var(--c360-shadow-sm)] transition duration-200 hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--ds-accent)_18%,transparent)] hover:bg-ds-elevated ${compact ? 'min-h-[92px]' : ''}`}
         >
           <span
             className={`ds-empty-hero-card-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] ${SUGGESTION_TONE[starter.tone]}`}

@@ -89,7 +89,7 @@ export function FloatingComposerAgentPicker({ compact = false, disabled }: Props
         <ChevronDown className="h-3 w-3 opacity-60" strokeWidth={1.75} />
       </button>
       {open ? (
-        <div className="absolute bottom-full right-0 z-30 mb-2 w-64 overflow-hidden rounded-lg border border-ds-border bg-ds-main shadow-xl">
+        <div className="absolute bottom-full right-0 z-30 mb-2 w-64 overflow-hidden rounded-xl border border-ds-border bg-ds-elevated shadow-[var(--c360-shadow-overlay)]">
           <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-ds-faint">Agent persona</div>
           <button
             type="button"
@@ -111,7 +111,7 @@ export function FloatingComposerAgentPicker({ compact = false, disabled }: Props
             >
               <span
                 className="mt-0.5 inline-block h-3.5 w-3.5 shrink-0 rounded-full"
-                style={{ backgroundColor: profile.color ?? '#3b82f6' }}
+                style={{ backgroundColor: profile.color ?? 'var(--ds-accent)' }}
               />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-ds-ink">{profile.name}</span>

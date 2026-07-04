@@ -18,7 +18,7 @@ export function FloatingComposerQueuedMessages({ messages, onRemove }: Props): R
   if (messages.length === 0) return null
 
   return (
-    <div className="mb-2 rounded-[22px] border border-ds-border bg-ds-card/88 px-4 py-3 shadow-sm backdrop-blur-xl">
+    <div className="mb-2 rounded-[22px] border border-ds-border bg-ds-card px-4 py-3 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex items-center gap-2 text-[13px] font-medium text-ds-ink">
           <Clock3 className="h-3.5 w-3.5 text-ds-muted" strokeWidth={1.9} />
@@ -30,7 +30,7 @@ export function FloatingComposerQueuedMessages({ messages, onRemove }: Props): R
         {messages.map((message, index) => (
           <div
             key={message.id}
-            className="flex min-w-0 max-w-full items-center gap-2 rounded-full border border-ds-border-muted bg-ds-main/80 px-3 py-1.5 text-[13px] text-ds-ink"
+            className="flex min-w-0 max-w-full items-center gap-2 rounded-full border border-ds-border-muted bg-ds-main px-3 py-1.5 text-[13px] text-ds-ink"
           >
             <span className="shrink-0 text-ds-faint">{index + 1}.</span>
             <span className="max-w-[360px] truncate">{message.displayText ?? message.text}</span>

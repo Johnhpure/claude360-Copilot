@@ -155,7 +155,7 @@ export function WriteWorkspaceToolbar({
               title={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')}
               ariaLabel={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')}
             />
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
               <FilePenLine className="h-4 w-4" strokeWidth={1.9} />
             </span>
             <div className="min-w-0 flex-1 leading-none">
@@ -175,7 +175,7 @@ export function WriteWorkspaceToolbar({
 
           <div
             ref={modeMenuRef}
-            className="write-workspace-toolbar-modes relative flex min-w-0 items-center justify-start gap-1 rounded-xl border border-ds-border-muted bg-white/68 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:bg-white/[0.06] dark:shadow-none"
+            className="write-workspace-toolbar-modes relative flex min-w-0 items-center justify-start gap-1 rounded-xl border border-ds-border-muted bg-ds-card p-1"
           >
             <button
               type="button"
@@ -206,7 +206,7 @@ export function WriteWorkspaceToolbar({
             {modeMenuOpen ? (
               <div
                 role="menu"
-                className="absolute left-0 top-full z-30 mt-2 min-w-[188px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_40px_rgba(20,47,95,0.12)] dark:border-white/10 dark:bg-[#131722]"
+                className="absolute left-0 top-full z-30 mt-2 min-w-[188px] overflow-hidden rounded-2xl border border-ds-border bg-ds-elevated p-1.5 shadow-[var(--c360-shadow-overlay)]"
               >
                 {modeMenuItems.map((item) => (
                   <button
@@ -220,8 +220,8 @@ export function WriteWorkspaceToolbar({
                     }}
                     className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-[13px] transition ${
                       item.active
-                        ? 'bg-accent/12 text-accent'
-                        : 'text-ds-ink hover:bg-slate-100'
+                        ? 'bg-accent-soft text-accent'
+                        : 'text-ds-ink hover:bg-ds-hover'
                     } ${!activeFileIsText ? 'cursor-not-allowed opacity-40' : ''}`}
                   >
                     <span className="flex items-center gap-2">
@@ -262,16 +262,16 @@ export function WriteWorkspaceToolbar({
             </button>
             <span className={`ml-1 inline-flex min-w-[64px] justify-center rounded-lg px-2.5 py-1 text-[11.5px] font-semibold ${
               reviewActive
-                ? 'bg-accent/12 text-accent'
+                ? 'bg-accent-soft text-accent'
                 : readOnly
-                ? 'bg-slate-500/12 text-slate-700 dark:text-slate-300'
+                ? 'bg-ds-subtle text-ds-muted'
                 : saveStatus === 'error'
-                ? 'bg-red-500/12 text-red-600 dark:text-red-300'
+                ? 'bg-ds-danger-soft text-ds-danger'
                 : saveStatus === 'dirty'
-                  ? 'bg-amber-500/12 text-amber-700 dark:text-amber-300'
+                  ? 'bg-ds-warning-soft text-ds-warning'
                   : saveStatus === 'saving'
-                    ? 'bg-sky-500/12 text-sky-700 dark:text-sky-300'
-                    : 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300'
+                    ? 'bg-accent-soft text-accent'
+                    : 'bg-ds-success-soft text-ds-success'
             }`}>
               {reviewActive ? t('writeReviewPending') : saveLabel}
             </span>
@@ -297,13 +297,13 @@ export function WriteWorkspaceToolbar({
               {exportMenuOpen ? (
                 <div
                   role="menu"
-                  className="absolute right-0 top-full z-30 mt-2 w-52 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-ds-border bg-ds-card/95 p-1.5 shadow-[0_22px_48px_rgba(20,47,95,0.16)] backdrop-blur-xl"
+                  className="absolute right-0 top-full z-30 mt-2 w-52 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-ds-border bg-ds-elevated p-1.5 shadow-[var(--c360-shadow-overlay)]"
                 >
                   <button
                     type="button"
                     role="menuitem"
                     onClick={onCopyRichText}
-                    className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[13px] text-ds-ink transition hover:bg-ds-hover/80"
+                    className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[13px] text-ds-ink transition hover:bg-ds-hover"
                   >
                     <span>{t('writeCopyRichText')}</span>
                     <Copy className="h-3.5 w-3.5 text-ds-faint" strokeWidth={1.9} />
@@ -315,7 +315,7 @@ export function WriteWorkspaceToolbar({
                       type="button"
                       role="menuitem"
                       onClick={() => onExportFile(format)}
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[13px] text-ds-ink transition hover:bg-ds-hover/80"
+                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[13px] text-ds-ink transition hover:bg-ds-hover"
                     >
                       <span>{exportFormatLabel(format, t)}</span>
                       <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-ds-faint">

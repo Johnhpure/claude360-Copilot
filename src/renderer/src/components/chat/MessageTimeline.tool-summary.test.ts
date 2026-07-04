@@ -320,11 +320,11 @@ describe('MessageTimeline Kun runtime metadata smoke', () => {
 
     const html = renderToStaticMarkup(createElement(MessageBubble, { block }))
 
-    expect(html).toContain('border-orange-300/80')
-    expect(html).toContain('bg-orange-500/10')
-    expect(html).toContain('text-orange-800')
-    expect(html).not.toContain('border-red-300/80')
-    expect(html).not.toContain('bg-red-500/10')
+    expect(html).toContain('border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)]')
+    expect(html).toContain('bg-ds-warning-soft')
+    expect(html).toContain('text-ds-warning')
+    expect(html).not.toContain('text-ds-danger')
+    expect(html).not.toContain('bg-ds-danger-soft')
   })
 
   it('renders tool-specific runtime metadata on process timeline rows', () => {
@@ -410,10 +410,10 @@ describe('MessageTimeline Kun runtime metadata smoke', () => {
     expect(html).toContain('Recognize image recognize_image')
     expect(html).toContain('model request failed with status 401')
     expect(html).toContain('role="button"')
-    expect(html).toContain('text-orange-700')
-    expect(html).toContain('border-orange-200/80')
-    expect(html).not.toContain('text-red-600')
-    expect(html).not.toContain('border-red-200/80')
+    expect(html).toContain('text-ds-warning')
+    expect(html).toContain('border-[color-mix(in_srgb,var(--ds-warning)_30%,transparent)]')
+    expect(html).not.toContain('text-ds-danger')
+    expect(html).not.toContain('bg-ds-danger-soft')
   })
 
   it('expands active reasoning so the current process is visible', () => {

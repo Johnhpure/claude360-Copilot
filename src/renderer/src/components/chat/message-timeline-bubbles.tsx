@@ -38,20 +38,20 @@ function BackgroundShellNoticeBubble({
   const canExpandOutput = outputPreview.length > 180
   const exitCodeTone =
     parsed && parsed.exitCode === 0
-      ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-      : 'border-orange-400/30 bg-orange-500/10 text-orange-800 dark:text-orange-200'
+      ? 'border-[color-mix(in_srgb,var(--ds-success)_22%,transparent)] bg-ds-success-soft text-ds-success'
+      : 'border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft text-ds-warning'
 
   return (
     <div className={nested ? 'min-w-0' : 'flex w-full justify-start'}>
-      <div className="w-full max-w-[min(640px,calc(100vw-3rem))] rounded-[18px] border border-accent/25 bg-[linear-gradient(180deg,rgba(79,124,255,0.06),rgba(79,124,255,0.1))] px-3.5 py-3 text-ds-muted shadow-sm">
+      <div className="w-full max-w-[min(640px,calc(100vw-3rem))] rounded-[18px] border border-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--ds-accent)_6%,transparent),color-mix(in_srgb,var(--ds-accent)_10%,transparent))] px-3.5 py-3 text-ds-muted shadow-sm">
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent">
+          <span className="rounded-full border border-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] bg-accent-soft px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent">
             {t('backgroundShellNotice.kindLabel', { defaultValue: 'Background callback' })}
           </span>
           {parsed ? (
             <>
               <span
-                className="inline-flex items-center gap-1 rounded-full border border-ds-border/80 bg-ds-card/70 px-2 py-0.5 font-mono text-[11px] text-ds-ink"
+                className="inline-flex items-center gap-1 rounded-full border border-ds-border bg-ds-card px-2 py-0.5 font-mono text-[11px] text-ds-ink"
                 title={parsed.sessionId}
               >
                 <span className="font-sans font-medium text-ds-muted">
@@ -104,7 +104,7 @@ function BackgroundShellNoticeBubble({
                   ) : null}
                 </button>
                 <pre
-                  className={`mt-1 overflow-auto whitespace-pre-wrap break-words rounded-[10px] border border-ds-border/70 bg-ds-card/70 px-2.5 py-2 font-mono text-[11.5px] leading-5 text-ds-ink ${
+                  className={`mt-1 overflow-auto whitespace-pre-wrap break-words rounded-[10px] border border-ds-border bg-ds-card px-2.5 py-2 font-mono text-[11.5px] leading-5 text-ds-ink ${
                     canExpandOutput && !outputExpanded ? 'max-h-24' : 'max-h-72'
                   }`}
                 >
@@ -198,7 +198,7 @@ function UserMessageBubble({
     return (
       <div className="ds-user-message">
         <UserAttachmentPreviews meta={block.meta} />
-        <div className="ds-user-message-bubble min-w-0 border border-accent/35 ring-1 ring-accent/15">
+        <div className="ds-user-message-bubble min-w-0 border border-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--ds-accent)_15%,transparent)]">
           <textarea
             ref={textareaRef}
             value={draft}
@@ -314,7 +314,7 @@ function ClawInboundMessageCard({
   ].filter(Boolean)
 
   return (
-    <div className="w-full max-w-[min(560px,calc(100vw-3rem))] rounded-[18px] border border-ds-border bg-ds-card px-4 py-3 text-left shadow-[0_14px_34px_rgba(86,103,136,0.08)]">
+    <div className="w-full max-w-[min(560px,calc(100vw-3rem))] rounded-[18px] border border-ds-border bg-ds-card px-4 py-3 text-left shadow-[var(--c360-shadow-sm)]">
       <div className="flex items-center gap-2 text-[12px] font-semibold text-ds-muted">
         <MessageSquareQuote className="h-3.5 w-3.5" strokeWidth={1.8} />
         <span>{t('clawTimelineInbound', { source: display.sourceLabel ?? t('claw') })}</span>
@@ -732,9 +732,9 @@ function MediaPreviewTile({
     }
   }
   const saveButtonClass =
-    'inline-flex h-7 items-center justify-center rounded-md border border-ds-border-muted bg-ds-card/90 px-2 text-[11.5px] font-medium text-ds-muted shadow-sm transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-50'
+    'inline-flex h-7 items-center justify-center rounded-md border border-ds-border-muted bg-ds-card px-2 text-[11.5px] font-medium text-ds-muted shadow-sm transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-50'
   const iconButtonClass =
-    'absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md border border-ds-border-muted bg-ds-card/92 text-ds-muted shadow-sm backdrop-blur transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-50'
+    'absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md border border-ds-border-muted bg-ds-card text-ds-muted shadow-sm transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-50'
   const saveIcon = saveState === 'saving'
     ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.9} />
     : saveState === 'saved'
@@ -852,7 +852,7 @@ function MediaAttachmentGallery({
     variant === 'conversation'
       ? `grid w-full max-w-2xl grid-cols-1 gap-2 ${media.length > 1 ? 'sm:grid-cols-2' : ''}`
       : variant === 'tool'
-        ? 'flex min-w-0 flex-wrap gap-2 border-t border-ds-border-muted/60 px-4 py-3'
+        ? 'flex min-w-0 flex-wrap gap-2 border-t border-ds-border-muted px-4 py-3'
         : 'flex max-w-[80%] flex-wrap justify-end gap-2'
 
   return (
@@ -984,7 +984,7 @@ function RuntimeMetaChips({
   ) {
     return null
   }
-  const chipClass = 'inline-flex max-w-full items-center gap-1 rounded-md border border-ds-border-muted bg-ds-card/75 px-1.5 py-0.5 text-[11px] font-medium text-ds-faint'
+  const chipClass = 'inline-flex max-w-full items-center gap-1 rounded-md border border-ds-border-muted bg-ds-card px-1.5 py-0.5 text-[11px] font-medium text-ds-faint'
   return (
     <div className={`mt-2 flex min-w-0 flex-wrap gap-1.5 ${align === 'right' ? 'justify-end' : ''}`}>
       {!hideAttachments && attachmentIds.length > 0 ? (
@@ -1081,9 +1081,9 @@ function CopyFeedbackButton({
           : 'gap-1 px-1.5 py-0.5 hover:bg-ds-hover'
       } ${
         success
-          ? 'text-emerald-500'
+          ? 'text-ds-success'
           : error
-            ? 'text-rose-400'
+            ? 'text-ds-danger'
             : 'text-ds-faint hover:text-ds-muted'
       }`}
     >
@@ -1151,37 +1151,37 @@ function UserInputBubble({
             : 'muted'
   const questionCount = block.questions.length
   const containerClass = nested
-    ? `overflow-hidden rounded-[14px] border px-3.5 py-3 text-[13px] leading-5 shadow-[0_8px_22px_rgba(20,47,95,0.035)] ${
+    ? `overflow-hidden rounded-[14px] border px-3.5 py-3 text-[13px] leading-5 shadow-[var(--c360-shadow-sm)] ${
         tone === 'error'
-          ? 'border-red-300/65 bg-ds-card/88 dark:border-red-800/55 dark:bg-red-950/20'
+          ? 'border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-card'
           : tone === 'success'
-            ? 'border-emerald-500/22 bg-ds-card/88 dark:border-emerald-600/30 dark:bg-ds-card/82'
+            ? 'border-[color-mix(in_srgb,var(--ds-success)_22%,transparent)] bg-ds-card'
             : tone === 'muted'
-              ? 'border-ds-border-muted bg-ds-card/78'
-              : 'border-accent/22 bg-ds-card/90'
+              ? 'border-ds-border-muted bg-ds-card'
+              : 'border-[color-mix(in_srgb,var(--ds-accent)_22%,transparent)] bg-ds-card'
       }`
-    : `overflow-hidden rounded-[16px] border px-4 py-4 text-[13px] leading-6 shadow-[0_14px_36px_rgba(20,47,95,0.055)] ${
+    : `overflow-hidden rounded-[16px] border px-4 py-4 text-[13px] leading-6 shadow-[var(--c360-shadow-sm)] ${
         tone === 'error'
-          ? 'border-red-300/70 bg-ds-card/90 dark:border-red-800/60 dark:bg-red-950/20'
+          ? 'border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-card'
           : tone === 'success'
-            ? 'border-emerald-500/24 bg-ds-card/90 dark:border-emerald-600/32 dark:bg-ds-card/84'
+            ? 'border-[color-mix(in_srgb,var(--ds-success)_22%,transparent)] bg-ds-card'
             : tone === 'muted'
-              ? 'border-ds-border bg-ds-card/82'
-              : 'border-accent/24 bg-ds-card/95 text-ds-ink'
+              ? 'border-ds-border bg-ds-card'
+              : 'border-[color-mix(in_srgb,var(--ds-accent)_24%,transparent)] bg-ds-card text-ds-ink'
       }`
   const iconFrameClass =
     tone === 'error'
-      ? 'border-red-300/60 bg-red-500/10 text-red-700 dark:border-red-800/45 dark:text-red-300'
+      ? 'border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-danger-soft text-ds-danger'
       : tone === 'success'
-        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+        ? 'border-[color-mix(in_srgb,var(--ds-success)_22%,transparent)] bg-ds-success-soft text-ds-success'
         : tone === 'active'
-          ? 'border-accent/20 bg-accent/10 text-accent'
+          ? 'border-[color-mix(in_srgb,var(--ds-accent)_20%,transparent)] bg-accent-soft text-accent'
           : 'border-ds-border-muted bg-ds-subtle text-ds-muted'
   const statusClass =
     tone === 'error'
-      ? 'text-red-700 dark:text-red-300'
+      ? 'text-ds-danger'
       : tone === 'success'
-        ? 'text-emerald-700 dark:text-emerald-300'
+        ? 'text-ds-success'
         : tone === 'active'
           ? 'text-accent'
           : 'text-ds-muted'
@@ -1231,8 +1231,8 @@ function UserInputBubble({
               key={question.id}
               className={`min-w-0 rounded-[12px] border px-3 py-3 ${
                 submittedAnswer
-                  ? 'border-ds-border-muted bg-ds-main/35'
-                  : 'border-ds-border-muted bg-ds-main/45'
+                  ? 'border-ds-border-muted bg-ds-main'
+                  : 'border-ds-border-muted bg-ds-main'
               }`}
             >
               {showHeader || showProgress ? (
@@ -1245,7 +1245,7 @@ function UserInputBubble({
                     ) : null}
                   </div>
                   {showProgress ? (
-                    <div className="rounded-full bg-ds-card/70 px-2 py-0.5 text-[11.5px] font-medium text-ds-faint">
+                    <div className="rounded-full bg-ds-card px-2 py-0.5 text-[11.5px] font-medium text-ds-faint">
                       {t('userInputQuestionProgress', {
                         current: index + 1,
                         total: block.questions.length
@@ -1263,8 +1263,8 @@ function UserInputBubble({
               </p>
 
               {submittedAnswer ? (
-                <div className="mt-3 flex min-w-0 items-start gap-2 rounded-[10px] border border-emerald-500/14 bg-ds-card/78 px-3 py-2.5">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-700 dark:text-emerald-300">
+                <div className="mt-3 flex min-w-0 items-start gap-2 rounded-[10px] border border-[color-mix(in_srgb,var(--ds-success)_22%,transparent)] bg-ds-card px-3 py-2.5">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ds-success-soft text-ds-success">
                     <Check className="h-3.5 w-3.5" strokeWidth={2.1} />
                   </span>
                   <span className="min-w-0 flex-1 break-words text-[13.5px] font-medium leading-5 text-ds-ink [overflow-wrap:anywhere]">
@@ -1272,7 +1272,7 @@ function UserInputBubble({
                   </span>
                 </div>
               ) : done ? (
-                <div className="mt-3 rounded-[10px] border border-ds-border-muted bg-ds-card/70 px-3 py-2 text-[12.5px] font-medium text-ds-muted">
+                <div className="mt-3 rounded-[10px] border border-ds-border-muted bg-ds-card px-3 py-2 text-[12.5px] font-medium text-ds-muted">
                   {statusLabel}
                 </div>
               ) : hasOptions ? (
@@ -1281,7 +1281,7 @@ function UserInputBubble({
                     <span
                       key={option.label}
                       title={option.description || undefined}
-                      className="inline-flex min-w-0 max-w-full items-center rounded-full border border-ds-border-muted bg-ds-card/70 px-2.5 py-1 text-[12px] text-ds-muted"
+                      className="inline-flex min-w-0 max-w-full items-center rounded-full border border-ds-border-muted bg-ds-card px-2.5 py-1 text-[12px] text-ds-muted"
                     >
                       <span className="truncate">{option.label}</span>
                     </span>
@@ -1294,7 +1294,7 @@ function UserInputBubble({
       </div>
 
       {block.errorMessage ? (
-        <p className="mt-3 text-[12px] text-red-700 dark:text-red-300">{block.errorMessage}</p>
+        <p className="mt-3 text-[12px] text-ds-danger">{block.errorMessage}</p>
       ) : null}
 
       {pending ? (
@@ -1305,7 +1305,7 @@ function UserInputBubble({
           </span>
           <button
             type="button"
-            className="min-h-8 rounded-[9px] border border-ds-border-muted bg-ds-card/80 px-3 py-1.5 text-[13px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
+            className="min-h-8 rounded-[9px] border border-ds-border-muted bg-ds-card px-3 py-1.5 text-[13px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
             onClick={cancel}
           >
             {t('userInputCancel')}
@@ -1439,10 +1439,10 @@ function MessageBubbleImpl({
               : t('approvalPending')
     return (
       <div
-        className={`rounded-[22px] border px-4 py-4 text-[13px] leading-6 shadow-[0_12px_30px_rgba(86,103,136,0.04)] ${
+        className={`rounded-[22px] border px-4 py-4 text-[13px] leading-6 shadow-[var(--c360-shadow-sm)] ${
           block.status === 'error'
-            ? 'border-red-300/80 bg-red-500/10 dark:border-red-800/60 dark:bg-red-950/35'
-            : 'border-accent/35 bg-[linear-gradient(180deg,rgba(79,124,255,0.08),rgba(79,124,255,0.12))] text-ds-ink'
+            ? 'border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-danger-soft'
+            : 'border-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--ds-accent)_8%,transparent),color-mix(in_srgb,var(--ds-accent)_12%,transparent))] text-ds-ink'
         }`}
       >
         <div className="font-semibold text-accent">{t('approvalTitle')}</div>
@@ -1453,14 +1453,14 @@ function MessageBubbleImpl({
         ) : null}
         <p className="mt-2 whitespace-pre-wrap text-[14px] text-ds-ink">{block.summary}</p>
         {block.errorMessage ? (
-          <p className="mt-2 text-[12px] text-red-700 dark:text-red-300">{block.errorMessage}</p>
+          <p className="mt-2 text-[12px] text-ds-danger">{block.errorMessage}</p>
         ) : null}
         {!done ? (
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
               disabled={submitting}
-              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
+              className="rounded-lg bg-ds-success px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[color-mix(in_srgb,var(--ds-success)_88%,black)] disabled:cursor-wait disabled:opacity-60"
               onClick={() => void resolveApproval(block.id, 'allow')}
             >
               {t('approvalAllow')}
@@ -1504,9 +1504,9 @@ function MessageBubbleImpl({
       <div
         className={`rounded-[18px] border px-3 py-2 text-[13.5px] leading-6 ${
           errorTone
-            ? 'border-red-300/80 bg-red-500/10 text-red-800 dark:border-red-800/60 dark:bg-red-950/35 dark:text-red-200'
+            ? 'border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-danger-soft text-ds-danger'
             : warningTone
-              ? 'border-amber-300/80 bg-amber-500/10 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/35 dark:text-amber-100'
+              ? 'border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft text-ds-warning'
               : 'border-ds-border bg-ds-subtle text-ds-muted'
         }`}
       >
@@ -1536,9 +1536,9 @@ function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boole
 
   const tone =
     block.status === 'error'
-      ? 'border-orange-300/80 bg-orange-500/10 text-orange-950 dark:border-orange-800/60 dark:bg-orange-950/35 dark:text-orange-100'
+      ? 'border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft text-ds-warning'
       : block.status === 'running'
-        ? 'border-amber-300/80 bg-amber-500/10 text-amber-950 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100'
+        ? 'border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft text-ds-warning'
         : 'border-ds-border bg-ds-subtle text-ds-ink'
 
   const toolName = typeof block.meta?.toolName === 'string' ? block.meta.toolName.trim() : ''
@@ -1567,7 +1567,7 @@ function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boole
   const canExpand = hasDetail || block.status === 'running'
 
   return (
-    <div className={`rounded-[22px] border shadow-[0_12px_30px_rgba(86,103,136,0.04)] ${tone}`}>
+    <div className={`rounded-[22px] border shadow-[var(--c360-shadow-sm)] ${tone}`}>
       <button
         type="button"
         onClick={() => {
@@ -1585,7 +1585,7 @@ function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boole
               {kindLabel}
             </span>
             {block.status === 'running' ? (
-              <span className="rounded-full bg-amber-200/40 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:bg-amber-700/30 dark:text-amber-100">
+              <span className="rounded-full bg-ds-warning-soft px-2 py-0.5 text-[11px] font-medium text-ds-warning">
                 {t('inspectorStatusRunning')}
               </span>
             ) : null}
@@ -1594,7 +1594,7 @@ function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boole
                 className={`rounded-full px-2 py-0.5 text-[11px] font-mono ${
                   exitCode === 0
                     ? 'bg-ds-success-soft text-ds-success'
-                    : 'bg-orange-500/10 text-orange-800 dark:text-orange-200'
+                    : 'bg-ds-warning-soft text-ds-warning'
                 }`}
               >
                 exit {exitCode}
@@ -1629,7 +1629,7 @@ function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boole
       </button>
       <ToolAttachmentPreviews meta={block.meta} />
       {effectiveOpen && hasDetail ? (
-        <div className="ds-panel-strip min-w-0 border-t border-ds-border-muted/60 px-4 py-3">
+        <div className="ds-panel-strip min-w-0 border-t border-ds-border-muted px-4 py-3">
           {patchText !== undefined ? (
             <DiffView patch={patchText} filePath={block.filePath} />
           ) : (

@@ -1,6 +1,35 @@
 /* Rich (Tiptap) write editor — mirrors the live-preview typography so
    switching between engines feels seamless. */
 
+/* ---- write 域状态/内容标注色（集中管理块，p6 lint 豁免） ----
+ * UI 框架色一律走 ds token；此处仅收敛「内容/领域标注色」：
+ * - --write-hl-code：markdown 行内代码文字色（内容色，非功能色语义）；
+ * - --sdd-status-*：SDD 需求四态。能映射功能 token 的引用 token
+ *   （building→warning / done→success / planned→accent），
+ *   verified 的 teal 无对应 token，作为领域色保留字面量并在此集中。 */
+:root {
+  --write-hl-code: #d44a4a;
+  --sdd-status-planned: var(--ds-accent);
+  --sdd-status-building: var(--ds-warning);
+  --sdd-status-done: var(--ds-success);
+  --sdd-status-verified: #0f9488;
+  /* pill 前景（亮色需比状态色深一档保证可读） */
+  --sdd-status-planned-fg: color-mix(in srgb, var(--sdd-status-planned) 74%, black);
+  --sdd-status-building-fg: color-mix(in srgb, var(--sdd-status-building) 78%, black);
+  --sdd-status-done-fg: color-mix(in srgb, var(--sdd-status-done) 76%, black);
+  --sdd-status-verified-fg: color-mix(in srgb, var(--sdd-status-verified) 78%, black);
+}
+
+[data-theme='dark'] {
+  --write-hl-code: #f47067;
+  --sdd-status-verified: #2dd4bf;
+  /* 暗色 pill 前景直接用状态色（功能 token 暗色档已提亮） */
+  --sdd-status-planned-fg: var(--sdd-status-planned);
+  --sdd-status-building-fg: var(--sdd-status-building);
+  --sdd-status-done-fg: var(--sdd-status-done);
+  --sdd-status-verified-fg: var(--sdd-status-verified);
+}
+
 .write-rich-host {
   background: transparent;
 }
@@ -101,14 +130,10 @@
 .write-rich-editor code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
   font-size: 0.88em;
-  color: #d44a4a;
+  color: var(--write-hl-code);
   background-color: color-mix(in srgb, var(--ds-text) 6%, transparent);
   border-radius: 5px;
   padding: 0.1em 0.35em;
-}
-
-[data-theme='dark'] .write-rich-editor code {
-  color: #f47067;
 }
 
 .write-rich-editor pre {
@@ -221,8 +246,8 @@
 .write-rich-editor img.write-rich-image-error {
   min-width: 8rem;
   min-height: 2rem;
-  border: 1px solid color-mix(in srgb, #dc2626 38%, var(--ds-border-muted));
-  background: color-mix(in srgb, #dc2626 8%, var(--ds-card));
+  border: 1px solid color-mix(in srgb, var(--ds-danger) 38%, var(--ds-border-muted));
+  background: color-mix(in srgb, var(--ds-danger) 8%, var(--ds-card));
 }
 
 .write-rich-editor img.write-rich-image.ProseMirror-selectednode {
@@ -258,43 +283,23 @@
 }
 
 .write-rich-editor .sdd-req-pill-planned {
-  background: color-mix(in srgb, #3b82f6 16%, transparent);
-  color: #1d4ed8;
+  background: color-mix(in srgb, var(--sdd-status-planned) 16%, transparent);
+  color: var(--sdd-status-planned-fg);
 }
 
 .write-rich-editor .sdd-req-pill-building {
-  background: color-mix(in srgb, #f59e0b 18%, transparent);
-  color: #b45309;
+  background: color-mix(in srgb, var(--sdd-status-building) 18%, transparent);
+  color: var(--sdd-status-building-fg);
 }
 
 .write-rich-editor .sdd-req-pill-done {
-  background: color-mix(in srgb, #22c55e 18%, transparent);
-  color: #15803d;
+  background: color-mix(in srgb, var(--sdd-status-done) 18%, transparent);
+  color: var(--sdd-status-done-fg);
 }
 
 .write-rich-editor .sdd-req-pill-verified {
-  background: color-mix(in srgb, #14b8a6 18%, transparent);
-  color: #0f766e;
-}
-
-[data-theme='dark'] .write-rich-editor .sdd-req-pill-planned {
-  background: color-mix(in srgb, #93c5fd 18%, transparent);
-  color: #93c5fd;
-}
-
-[data-theme='dark'] .write-rich-editor .sdd-req-pill-building {
-  background: color-mix(in srgb, #fcd34d 20%, transparent);
-  color: #fcd34d;
-}
-
-[data-theme='dark'] .write-rich-editor .sdd-req-pill-done {
-  background: color-mix(in srgb, #86efac 20%, transparent);
-  color: #86efac;
-}
-
-[data-theme='dark'] .write-rich-editor .sdd-req-pill-verified {
-  background: color-mix(in srgb, #5eead4 20%, transparent);
-  color: #5eead4;
+  background: color-mix(in srgb, var(--sdd-status-verified) 18%, transparent);
+  color: var(--sdd-status-verified-fg);
 }
 
 /* SDD requirement progress bar */
@@ -314,35 +319,19 @@
 }
 
 .sdd-req-progress-seg-verified {
-  background: #14b8a6;
+  background: var(--sdd-status-verified);
 }
 
 .sdd-req-progress-seg-done {
-  background: #22c55e;
+  background: var(--sdd-status-done);
 }
 
 .sdd-req-progress-seg-building {
-  background: #f59e0b;
+  background: var(--sdd-status-building);
 }
 
 .sdd-req-progress-seg-planned {
-  background: #3b82f6;
-}
-
-[data-theme='dark'] .sdd-req-progress-seg-verified {
-  background: #2dd4bf;
-}
-
-[data-theme='dark'] .sdd-req-progress-seg-done {
-  background: #4ade80;
-}
-
-[data-theme='dark'] .sdd-req-progress-seg-building {
-  background: #fbbf24;
-}
-
-[data-theme='dark'] .sdd-req-progress-seg-planned {
-  background: #60a5fa;
+  background: var(--sdd-status-planned);
 }
 
 /* Inline AI: ghost text suggestion (Phase 3) */
@@ -355,14 +344,14 @@
 
 /* Inline AI: pending edit diff preview (Phase 3) */
 .write-rich-inline-edit-original {
-  background-color: color-mix(in srgb, #ef4444 16%, transparent);
+  background-color: color-mix(in srgb, var(--ds-diff-removed) 16%, transparent);
   text-decoration: line-through;
-  text-decoration-color: color-mix(in srgb, #ef4444 60%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--ds-diff-removed) 60%, transparent);
   border-radius: 3px;
 }
 
 .write-rich-inline-edit-replacement {
-  background-color: color-mix(in srgb, #22c55e 16%, transparent);
+  background-color: color-mix(in srgb, var(--ds-diff-added) 16%, transparent);
   border-radius: 3px;
   white-space: pre-wrap;
 }

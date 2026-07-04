@@ -1005,7 +1005,7 @@ export function WriteWorkspaceView({
         onToggleLeftSidebar={onToggleLeftSidebar}
       />
       <div className="flex min-h-0 min-w-0 flex-1 gap-3 overflow-hidden pb-3 pt-3">
-        <div className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-ds-border-muted bg-ds-card/92 shadow-[0_12px_32px_rgba(20,47,95,0.04)] backdrop-blur-xl">
+        <div className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-ds-border-muted bg-ds-card shadow-[var(--c360-shadow-sm)]">
           <WriteWorkspaceDocumentPane
             activeFilePath={activeFilePath}
             activeFileIsImage={activeFileIsImage}
@@ -1092,16 +1092,16 @@ export function WriteWorkspaceView({
       ) : null}
 
       {fileError ? (
-        <div className="pointer-events-none fixed bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border border-red-200/70 bg-red-50/92 px-4 py-2 text-[13px] text-red-700 shadow-[0_14px_32px_rgba(20,47,95,0.12)] dark:border-red-900/60 dark:bg-red-950/84 dark:text-red-200">
+        <div className="pointer-events-none fixed bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-danger-soft px-4 py-2 text-[13px] text-ds-danger shadow-[var(--c360-shadow-sm)]">
           {fileError}
         </div>
       ) : null}
       {exportNotice ? (
         <div
-          className={`pointer-events-none fixed left-1/2 z-40 -translate-x-1/2 rounded-full border px-4 py-2 text-[13px] shadow-[0_14px_32px_rgba(20,47,95,0.12)] ${
+          className={`pointer-events-none fixed left-1/2 z-40 -translate-x-1/2 rounded-full border px-4 py-2 text-[13px] shadow-[var(--c360-shadow-sm)] ${
             exportNotice.tone === 'error'
-              ? 'border-red-200/70 bg-red-50/92 text-red-700 dark:border-red-900/60 dark:bg-red-950/84 dark:text-red-200'
-              : 'border-emerald-200/80 bg-emerald-50/92 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/84 dark:text-emerald-200'
+              ? 'border-[color-mix(in_srgb,var(--ds-danger)_32%,transparent)] bg-ds-danger-soft text-ds-danger'
+              : 'border-[color-mix(in_srgb,var(--ds-success)_32%,transparent)] bg-ds-success-soft text-ds-success'
           }`}
           style={{ bottom: fileError ? 68 : 20 }}
         >

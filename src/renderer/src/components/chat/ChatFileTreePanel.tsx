@@ -242,7 +242,7 @@ export function ChatFileTreePanel({
       return [
         <div
           key={`${path}-error`}
-          className="px-2.5 py-2 text-[12px] leading-5 text-red-700 dark:text-red-300"
+          className="px-2.5 py-2 text-[12px] leading-5 text-ds-danger"
           style={{ paddingLeft: depth * 14 + 10 }}
           title={state.error}
         >
