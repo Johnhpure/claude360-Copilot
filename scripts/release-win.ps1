@@ -52,7 +52,10 @@ function Require-Command([string]$Name) {
 }
 
 function Load-LocalReleaseEnv([string]$RootPath) {
-  $configured = [Environment]::GetEnvironmentVariable('KUN_RELEASE_ENV', 'Process')
+  $configured = [Environment]::GetEnvironmentVariable('CLAUDE360_RELEASE_ENV', 'Process')
+  if (-not $configured) {
+    $configured = [Environment]::GetEnvironmentVariable('KUN_RELEASE_ENV', 'Process')
+  }
   if (-not $configured) {
     $configured = [Environment]::GetEnvironmentVariable('DEEPSEEK_GUI_RELEASE_ENV', 'Process')
   }
@@ -97,6 +100,8 @@ $RequestedChannel = if ($Stable) {
   $Channel
 } elseif ($env:RELEASE_CHANNEL) {
   $env:RELEASE_CHANNEL
+} elseif ($env:CLAUDE360_UPDATE_CHANNEL) {
+  $env:CLAUDE360_UPDATE_CHANNEL
 } elseif ($env:KUN_UPDATE_CHANNEL) {
   $env:KUN_UPDATE_CHANNEL
 } elseif ($env:DEEPSEEK_GUI_UPDATE_CHANNEL) {
@@ -143,12 +148,14 @@ Write-Info "GitHub release tag: $TagName"
 Write-Info "Release channel: $ReleaseChannel"
 $ReleaseVersion = $TagName.TrimStart('v')
 Assert-Semver $ReleaseVersion
+$env:CLAUDE360_APP_VERSION = $ReleaseVersion
 $env:KUN_APP_VERSION = $ReleaseVersion
 $env:DEEPSEEK_GUI_APP_VERSION = $ReleaseVersion
 $env:RELEASE_CHANNEL = $ReleaseChannel
+$env:CLAUDE360_UPDATE_CHANNEL = $ReleaseChannel
 $env:KUN_UPDATE_CHANNEL = $ReleaseChannel
 $env:DEEPSEEK_GUI_UPDATE_CHANNEL = $ReleaseChannel
-Write-Info "App version: $env:KUN_APP_VERSION"
+Write-Info "App version: $env:CLAUDE360_APP_VERSION"
 
 & gh release view $TagName 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
@@ -165,6 +172,7 @@ Remove-Item -Recurse -Force -ErrorAction SilentlyContinue `
   (Join-Path $Root 'dist\mac-arm64'), `
   (Join-Path $Root 'dist\linux-unpacked')
 Remove-Item -Force -ErrorAction SilentlyContinue `
+  (Join-Path $Root 'dist\Claude360-Copilot-*'), `
   (Join-Path $Root 'dist\Kun-*'), `
   (Join-Path $Root 'dist\DeepSeek-GUI-*'), `
   (Join-Path $Root 'dist\DeepSeek GUI-*'), `

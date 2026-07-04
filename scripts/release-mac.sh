@@ -20,7 +20,7 @@ set -euo pipefail
 # Speed knobs:
 #   MAC_RELEASE_PARALLEL=force      force parallel arm64/x64 builds even when signing
 #   RELEASE_UPLOAD_CONCURRENCY=4    GitHub/R2 upload concurrency
-#   KUN_RUNTIME_CACHE=0             disable bundled runtime cache
+#   CLAUDE360_RUNTIME_CACHE=0       disable bundled runtime cache
 #
 # After this completes, run on Windows (same version):
 #   ./scripts/release-win.sh --tag v<RELEASE_VERSION from output> --r2 --r2-promote --publish
@@ -82,10 +82,10 @@ build_mac_arch() {
 
   mkdir -p "${output_dir}" "$(dirname "${log_file}")"
   cyan "  ${arch}: building dmg + zip -> ${output_dir}"
-  KUN_DIST_DIR="${output_dir}" \
+  CLAUDE360_DIST_DIR="${output_dir}" \
     npx --yes electron-builder@26.8.1 --config electron-builder.config.cjs --publish never --mac dmg "--${arch}" \
     >"${log_file}" 2>&1
-  KUN_DIST_DIR="${output_dir}" \
+  CLAUDE360_DIST_DIR="${output_dir}" \
     node "${ROOT}/scripts/zip-mac-app.cjs" "${arch}" \
     >>"${log_file}" 2>&1
 }
@@ -96,7 +96,7 @@ copy_mac_arch_artifacts() {
   local files=()
 
   shopt -s nullglob
-  files=("${output_dir}"/Kun-*-mac-"${arch}".*)
+  files=("${output_dir}"/Claude360-Copilot-*-mac-"${arch}".*)
   shopt -u nullglob
 
   [[ ${#files[@]} -gt 0 ]] || die "No macOS ${arch} artifacts found in ${output_dir}"
@@ -247,12 +247,12 @@ collect_optional() {
   done
 }
 
-# artifactName: Kun-${version}-mac-${arch}.dmg|zip
-collect "macOS arm64 dmg" "dist/Kun-*-mac-arm64.dmg"
-collect "macOS x64 dmg" "dist/Kun-*-mac-x64.dmg"
-collect "macOS arm64 zip" "dist/Kun-*-mac-arm64.zip"
-collect "macOS x64 zip" "dist/Kun-*-mac-x64.zip"
-collect_optional "macOS blockmap" "dist/Kun-*-mac-*.zip.blockmap"
+# artifactName: Claude360-Copilot-${version}-mac-${arch}.dmg|zip
+collect "macOS arm64 dmg" "dist/Claude360-Copilot-*-mac-arm64.dmg"
+collect "macOS x64 dmg" "dist/Claude360-Copilot-*-mac-x64.dmg"
+collect "macOS arm64 zip" "dist/Claude360-Copilot-*-mac-arm64.zip"
+collect "macOS x64 zip" "dist/Claude360-Copilot-*-mac-x64.zip"
+collect_optional "macOS blockmap" "dist/Claude360-Copilot-*-mac-*.zip.blockmap"
 
 upload_github_assets() {
   local tag="$1"

@@ -122,10 +122,9 @@ import { createTelegramRuntime, type TelegramRuntime, verifyTelegramBotToken } f
 import { isKunHealthResponseBody } from './kun-health'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-// 品牌升级为 Kun 后仍保留旧 AppUserModelId:它必须和 electron-builder
-// 的 appId 一致才能让 Windows 通知 / 任务栏分组在升级前后连续,而
-// appId 因为 NSIS 升级 GUID 与 macOS 更新签名校验的原因永远不改。
-const APP_USER_MODEL_ID = 'com.xingyuzhong.deepseekgui'
+// Windows 通知 / 任务栏分组使用新的 Claude360 Copilot 应用身份。
+// 该值必须和 electron-builder 的 appId 保持一致。
+const APP_USER_MODEL_ID = 'xyz.claude360.copilot'
 const startupTraceEnabled =
   process.env.KUN_STARTUP_TRACE === '1' || process.env.DEEPSEEK_GUI_STARTUP_TRACE === '1'
 const startupTraceStart = Date.now()
@@ -212,9 +211,9 @@ if (runningClawScheduleMcpServer && process.platform === 'darwin') {
 configureAppIdentity()
 
 // 数据目录策略:Claude360 Copilot 换了全新 appId,被视为全新应用,userData 目录
-// 由 productName 派生成全新目录。第一阶段默认不自动导入旧 Kun / DeepSeek GUI 数据
+// 由 productName 派生成全新目录。第一阶段默认不自动导入旧品牌数据
 // (AUTO_IMPORT_LEGACY_DATA=false):既不搬旧目录,也不清理旧目录,旧数据原地保留,
-// 后续如需可显式触发。runLegacyKunDataMigration 函数完整保留(隐藏≠删除),仅默认
+// 后续如需可显式触发。legacy-data-migration 函数完整保留(隐藏≠删除),仅默认
 // 关闭启动期自动触发。
 //
 // 迁移必须发生在 requestSingleInstanceLock() 之前:单实例锁文件放在 userData 里,

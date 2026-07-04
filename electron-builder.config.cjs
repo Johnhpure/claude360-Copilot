@@ -1,17 +1,19 @@
 const { existsSync, readFileSync } = require('node:fs')
 const { join } = require('node:path')
 
-// 品牌升级后构建环境变量改用 KUN_* 前缀;旧的 DEEPSEEK_GUI_* 仍然
-// 兼容读取,避免 CI / 本地发布脚本一刀切失效。
-function envWithLegacyFallback(kunName, legacyName) {
-  const value = process.env[kunName]
-  if (value !== undefined && value !== '') return value
-  return process.env[legacyName]
+// 品牌升级后构建环境变量改用 CLAUDE360_* 前缀；旧前缀仍兼容读取，
+// 避免 CI / 本地发布脚本一刀切失效。
+function envFirst(...names) {
+  for (const name of names) {
+    const value = process.env[name]
+    if (value !== undefined && value !== '') return value
+  }
+  return undefined
 }
 
 function loadLocalReleaseEnv() {
   const candidates = [
-    envWithLegacyFallback('KUN_RELEASE_ENV', 'DEEPSEEK_GUI_RELEASE_ENV'),
+    envFirst('CLAUDE360_RELEASE_ENV', 'KUN_RELEASE_ENV', 'DEEPSEEK_GUI_RELEASE_ENV'),
     join(__dirname, 'scripts', 'release.local.env'),
     join(__dirname, 'release.local.env')
   ].filter(Boolean)
@@ -57,13 +59,13 @@ const hasNotaryToolCredentials = Boolean(
 const githubUpdateOwner = 'Johnhpure'
 const githubUpdateRepo = 'claude360-Copilot'
 const updateChannel = normalizeUpdateChannel(
-  envWithLegacyFallback('KUN_UPDATE_CHANNEL', 'DEEPSEEK_GUI_UPDATE_CHANNEL') || 'stable'
+  envFirst('CLAUDE360_UPDATE_CHANNEL', 'KUN_UPDATE_CHANNEL', 'DEEPSEEK_GUI_UPDATE_CHANNEL') || 'stable'
 )
 const releaseAppVersion = (
-  envWithLegacyFallback('KUN_APP_VERSION', 'DEEPSEEK_GUI_APP_VERSION') || ''
+  envFirst('CLAUDE360_APP_VERSION', 'KUN_APP_VERSION', 'DEEPSEEK_GUI_APP_VERSION') || ''
 ).trim()
 const releaseArtifactVersion = (
-  envWithLegacyFallback('KUN_ARTIFACT_VERSION', 'DEEPSEEK_GUI_ARTIFACT_VERSION') || ''
+  envFirst('CLAUDE360_ARTIFACT_VERSION', 'KUN_ARTIFACT_VERSION', 'DEEPSEEK_GUI_ARTIFACT_VERSION') || ''
 ).trim()
 const artifactVersion = releaseArtifactVersion || releaseAppVersion || '${version}'
 const semverVersionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/
@@ -72,27 +74,25 @@ const artifactVersionPattern = /^[0-9A-Za-z][0-9A-Za-z._-]*$/
 function normalizeUpdateChannel(raw) {
   const value = String(raw || '').trim()
   if (value === 'stable' || value === 'frontier') return value
-  throw new Error(`KUN_UPDATE_CHANNEL (or legacy DEEPSEEK_GUI_UPDATE_CHANNEL) must be "stable" or "frontier", got: ${raw}`)
+  throw new Error(`CLAUDE360_UPDATE_CHANNEL must be "stable" or "frontier", got: ${raw}`)
 }
 
 if (releaseAppVersion && !semverVersionPattern.test(releaseAppVersion)) {
   throw new Error(
-    `KUN_APP_VERSION (or legacy DEEPSEEK_GUI_APP_VERSION) must be a valid semver for electron-updater, got: ${releaseAppVersion}`
+    `CLAUDE360_APP_VERSION must be a valid semver for electron-updater, got: ${releaseAppVersion}`
   )
 }
 
 if (releaseArtifactVersion && !artifactVersionPattern.test(releaseArtifactVersion)) {
   throw new Error(
-    `KUN_ARTIFACT_VERSION (or legacy DEEPSEEK_GUI_ARTIFACT_VERSION) must use only letters, numbers, dots, dashes, and underscores, got: ${releaseArtifactVersion}`
+    `CLAUDE360_ARTIFACT_VERSION must use only letters, numbers, dots, dashes, and underscores, got: ${releaseArtifactVersion}`
   )
 }
 
 module.exports = {
-  // appId 已按 Claude360 决策换成全新 id(xyz.claude360.copilot):
-  //  - 用户已明确决定将 Claude360 Copilot 视为一个全新应用,不再要求从旧
-  //    Kun / DeepSeek GUI 版本平滑升级,因此无需继续锚定旧 bundle id;
-  //  - 系统会把它当作新应用:macOS 的 Squirrel.Mac 更新、TCC 权限、通知授权,
-  //    以及 Windows NSIS 卸载 GUID 都基于这个新 id 独立管理。
+  // appId 已按 Claude360 决策换成全新 id(xyz.claude360.copilot)。
+  // 系统会把它当作新应用：macOS 更新、TCC 权限、通知授权，以及 Windows
+  // NSIS 卸载 GUID 都基于这个新 id 独立管理。
   appId: 'xyz.claude360.copilot',
   productName: 'Claude360 Copilot',
   asar: true,
@@ -111,7 +111,7 @@ module.exports = {
   ],
   npmRebuild: true,
   directories: {
-    output: envWithLegacyFallback('KUN_DIST_DIR', 'DEEPSEEK_GUI_DIST_DIR') || 'dist'
+    output: envFirst('CLAUDE360_DIST_DIR', 'KUN_DIST_DIR', 'DEEPSEEK_GUI_DIST_DIR') || 'dist'
   },
   files: [
     'out/**/*',

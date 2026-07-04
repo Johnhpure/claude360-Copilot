@@ -13,8 +13,10 @@ if (arch !== 'arm64' && arch !== 'x64') {
 const root = resolve(__dirname, '..')
 const pkg = require(join(root, 'package.json'))
 const version = (
+  process.env.CLAUDE360_ARTIFACT_VERSION ||
   process.env.KUN_ARTIFACT_VERSION ||
   process.env.DEEPSEEK_GUI_ARTIFACT_VERSION ||
+  process.env.CLAUDE360_APP_VERSION ||
   process.env.KUN_APP_VERSION ||
   process.env.DEEPSEEK_GUI_APP_VERSION ||
   pkg.version ||
@@ -25,7 +27,12 @@ if (!version) {
   process.exit(1)
 }
 
-const distDir = resolve(process.env.KUN_DIST_DIR || process.env.DEEPSEEK_GUI_DIST_DIR || join(root, 'dist'))
+const distDir = resolve(
+  process.env.CLAUDE360_DIST_DIR ||
+    process.env.KUN_DIST_DIR ||
+    process.env.DEEPSEEK_GUI_DIST_DIR ||
+    join(root, 'dist')
+)
 const appOutDir = join(distDir, arch === 'arm64' ? 'mac-arm64' : 'mac')
 // 品牌已升级为 Claude360 Copilot：.app 与 zip 名须与 electron-builder.config.cjs 的
 // productName / artifactName 保持一致（旧值 Kun.app 会导致 App bundle not found）。

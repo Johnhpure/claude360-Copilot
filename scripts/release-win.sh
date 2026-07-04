@@ -107,8 +107,8 @@ collect() {
   done
 }
 
-collect "Windows exe" "dist/Kun-*-win-*.exe"
-collect "Windows blockmap" "dist/Kun-*-win-*.exe.blockmap"
+collect "Windows exe" "dist/Claude360-Copilot-*-win-*.exe"
+collect "Windows blockmap" "dist/Claude360-Copilot-*-win-*.exe.blockmap"
 
 cyan "Uploading ${#ASSETS[@]} Windows asset(s) to ${TAG_NAME}..."
 for asset in "${ASSETS[@]}"; do

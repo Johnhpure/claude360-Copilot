@@ -43,7 +43,7 @@ jobs:
           dev_version="$(date +'%Y%m%d.%H%M')"
           app_version="0.0.0-dev-${dev_version//./-}"
           tag="dev-${dev_version}"
-          release_name="Kun Dev ${dev_version}"
+          release_name="Claude360 Copilot Dev ${dev_version}"
           head_sha="$(git rev-parse HEAD)"
 
           {
@@ -63,12 +63,9 @@ jobs:
     runs-on: macos-latest
     needs: prepare
     env:
-      KUN_APP_VERSION: ${{ needs.prepare.outputs.app_version }}
-      KUN_ARTIFACT_VERSION: ${{ needs.prepare.outputs.dev_version }}
-      KUN_UPDATE_CHANNEL: frontier
-      DEEPSEEK_GUI_APP_VERSION: ${{ needs.prepare.outputs.app_version }}
-      DEEPSEEK_GUI_ARTIFACT_VERSION: ${{ needs.prepare.outputs.dev_version }}
-      DEEPSEEK_GUI_UPDATE_CHANNEL: frontier
+      CLAUDE360_APP_VERSION: ${{ needs.prepare.outputs.app_version }}
+      CLAUDE360_ARTIFACT_VERSION: ${{ needs.prepare.outputs.dev_version }}
+      CLAUDE360_UPDATE_CHANNEL: frontier
       RELEASE_CHANNEL: frontier
     steps:
       - name: Check out develop commit
@@ -96,9 +93,9 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           path: |
-            dist/Kun-*-mac-*.dmg
-            dist/Kun-*-mac-*.zip
-            dist/Kun-*-mac-*.blockmap
+            dist/Claude360-Copilot-*-mac-*.dmg
+            dist/Claude360-Copilot-*-mac-*.zip
+            dist/Claude360-Copilot-*-mac-*.blockmap
             dist/latest-mac.yml
 
   build-windows:
@@ -106,12 +103,9 @@ jobs:
     runs-on: windows-latest
     needs: prepare
     env:
-      KUN_APP_VERSION: ${{ needs.prepare.outputs.app_version }}
-      KUN_ARTIFACT_VERSION: ${{ needs.prepare.outputs.dev_version }}
-      KUN_UPDATE_CHANNEL: frontier
-      DEEPSEEK_GUI_APP_VERSION: ${{ needs.prepare.outputs.app_version }}
-      DEEPSEEK_GUI_ARTIFACT_VERSION: ${{ needs.prepare.outputs.dev_version }}
-      DEEPSEEK_GUI_UPDATE_CHANNEL: frontier
+      CLAUDE360_APP_VERSION: ${{ needs.prepare.outputs.app_version }}
+      CLAUDE360_ARTIFACT_VERSION: ${{ needs.prepare.outputs.dev_version }}
+      CLAUDE360_UPDATE_CHANNEL: frontier
       RELEASE_CHANNEL: frontier
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
@@ -140,8 +134,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           path: |
-            dist/Kun-*-win-x64.exe
-            dist/Kun-*-win-x64.exe.blockmap
+            dist/Claude360-Copilot-*-win-x64.exe
+            dist/Claude360-Copilot-*-win-x64.exe.blockmap
             dist/latest.yml
 
   build-linux:
@@ -149,12 +143,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: prepare
     env:
-      KUN_APP_VERSION: ${{ needs.prepare.outputs.app_version }}
-      KUN_ARTIFACT_VERSION: ${{ needs.prepare.outputs.dev_version }}
-      KUN_UPDATE_CHANNEL: frontier
-      DEEPSEEK_GUI_APP_VERSION: ${{ needs.prepare.outputs.app_version }}
-      DEEPSEEK_GUI_ARTIFACT_VERSION: ${{ needs.prepare.outputs.dev_version }}
-      DEEPSEEK_GUI_UPDATE_CHANNEL: frontier
+      CLAUDE360_APP_VERSION: ${{ needs.prepare.outputs.app_version }}
+      CLAUDE360_ARTIFACT_VERSION: ${{ needs.prepare.outputs.dev_version }}
+      CLAUDE360_UPDATE_CHANNEL: frontier
       RELEASE_CHANNEL: frontier
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
@@ -188,8 +179,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           path: |
-            dist/Kun-*-linux-x86_64.AppImage
-            dist/Kun-*-linux-x86_64.AppImage.blockmap
+            dist/Claude360-Copilot-*-linux-x86_64.AppImage
+            dist/Claude360-Copilot-*-linux-x86_64.AppImage.blockmap
             dist/latest-linux.yml
 
   publish:
@@ -224,12 +215,12 @@ jobs:
         run: |
           set -euo pipefail
           required=(
-            "Kun-${DEV_VERSION}-mac-arm64.dmg"
-            "Kun-${DEV_VERSION}-mac-x64.dmg"
-            "Kun-${DEV_VERSION}-mac-arm64.zip"
-            "Kun-${DEV_VERSION}-mac-x64.zip"
-            "Kun-${DEV_VERSION}-win-x64.exe"
-            "Kun-${DEV_VERSION}-linux-x86_64.AppImage"
+            "Claude360-Copilot-${DEV_VERSION}-mac-arm64.dmg"
+            "Claude360-Copilot-${DEV_VERSION}-mac-x64.dmg"
+            "Claude360-Copilot-${DEV_VERSION}-mac-arm64.zip"
+            "Claude360-Copilot-${DEV_VERSION}-mac-x64.zip"
+            "Claude360-Copilot-${DEV_VERSION}-win-x64.exe"
+            "Claude360-Copilot-${DEV_VERSION}-linux-x86_64.AppImage"
           )
 
           for file in "${required[@]}"; do
@@ -298,7 +289,7 @@ jobs:
           set -euo pipefail
           mapfile -d '' assets < <(
             find release-artifacts -type f \
-              \( -name 'Kun-*' -o -name 'latest*.yml' \) \
+              \( -name 'Claude360-Copilot-*' -o -name 'latest*.yml' \) \
               -print0
           )
 
