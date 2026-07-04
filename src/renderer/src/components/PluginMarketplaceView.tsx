@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Check,
-  ChevronDown,
   Download,
   FolderOpen,
   Info,
@@ -29,6 +28,7 @@ import type {
 } from '../agent/kun-contract'
 import { useChatStore } from '../store/chat-store'
 import { NoticeView, TabButton, type MarketplaceNotice } from './PluginMarketplaceParts'
+import { Button, Card, Input, Modal, Select, Textarea, type SelectOption } from './ui'
 import {
   buildMcpMarketplaceOverlay,
   type McpMarketplaceOverlay,
@@ -1280,7 +1280,7 @@ export function PluginMarketplaceView({ leftSidebarCollapsed, onToggleLeftSideba
       <main className="ds-no-drag min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-7 md:px-10 lg:px-14">
         <div className="mx-auto max-w-6xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex rounded-xl bg-ds-subtle p-1">
+          <div className="inline-flex rounded-full bg-ds-subtle p-1">
             <TabButton active={activeKind === 'mcp'} onClick={() => setActiveKind('mcp')}>
               {t('pluginTabMcp')}
             </TabButton>
@@ -1289,37 +1289,31 @@ export function PluginMarketplaceView({ leftSidebarCollapsed, onToggleLeftSideba
             </TabButton>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void openManageTarget()}
-              className="inline-flex items-center gap-2 rounded-xl bg-ds-subtle px-3 py-2 text-[13px] font-semibold text-ds-ink transition hover:bg-ds-hover"
-            >
-              <Settings className="h-4 w-4" strokeWidth={1.75} />
+            <Button variant="secondary" onClick={() => void openManageTarget()}>
+              <Settings className="h-4 w-4" strokeWidth={1.75} aria-hidden />
               {t('pluginManage')}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="primary"
               onClick={() => {
                 setCustomOpen((value) => !value)
                 setGithubImportOpen(false)
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-ds-userbubble px-3 py-2 text-[13px] font-semibold text-ds-userbubbleFg shadow-sm transition hover:opacity-90"
             >
-              <Plus className="h-4 w-4" strokeWidth={1.9} />
+              <Plus className="h-4 w-4" strokeWidth={1.9} aria-hidden />
               {t('pluginCreate')}
-            </button>
+            </Button>
             {activeKind === 'skill' ? (
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={() => {
                   setGithubImportOpen((value) => !value)
                   setCustomOpen(false)
                 }}
-                className="inline-flex items-center gap-2 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] font-semibold text-ds-ink shadow-sm transition hover:bg-ds-hover"
               >
-                <Download className="h-4 w-4" strokeWidth={1.9} />
+                <Download className="h-4 w-4" strokeWidth={1.9} aria-hidden />
                 {t('pluginGithubImport')}
-              </button>
+              </Button>
             ) : null}
           </div>
         </div>
@@ -1332,65 +1326,60 @@ export function PluginMarketplaceView({ leftSidebarCollapsed, onToggleLeftSideba
 
         <div className="mt-9 flex flex-col gap-3 md:flex-row md:items-center">
           <label className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ds-faint" />
-            <input
+            <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-ds-faint" aria-hidden />
+            <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className="h-11 w-full rounded-2xl border border-ds-border bg-ds-card pl-11 pr-4 text-[15px] text-ds-ink shadow-sm outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/30"
+              className="h-11 pl-11"
               placeholder={activeKind === 'mcp' ? t('pluginSearchMcp') : t('pluginSearchSkill')}
             />
           </label>
-          <label className="relative w-full md:w-[168px]">
-            <select
+          <div className="w-full md:w-[168px]">
+            <Select<PluginFilter>
               value={filter}
-              onChange={(event) => setFilter(event.target.value as PluginFilter)}
-              className="h-11 w-full appearance-none rounded-2xl border border-ds-border bg-ds-card px-4 pr-9 text-[15px] font-medium text-ds-ink shadow-sm outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/30"
-            >
-              <option value="all">{t('pluginFilterAll')}</option>
-              <option value="recommended">{t('pluginFilterRecommended')}</option>
-              <option value="installed">{t('pluginFilterInstalled')}</option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ds-faint" />
-          </label>
+              onChange={setFilter}
+              className="h-11"
+              aria-label={t('pluginFilterAll')}
+              options={[
+                { value: 'all', label: t('pluginFilterAll') },
+                { value: 'recommended', label: t('pluginFilterRecommended') },
+                { value: 'installed', label: t('pluginFilterInstalled') }
+              ]}
+            />
+          </div>
         </div>
 
         {activeKind === 'skill' ? (
           <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center">
-            <select
-              value={selectedSkillRoot?.id ?? ''}
-              onChange={(event) => setSkillRootId(event.target.value as SkillRootId)}
-              disabled={skillRootOptions.length === 0}
-              className="h-10 rounded-xl border border-ds-border bg-ds-card px-3 text-[13px] text-ds-ink shadow-sm outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {skillRootOptions.length === 0 ? (
-                <option value="">{t('pluginSkillRootNone')}</option>
-              ) : (
-                skillRootOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.enabled ? option.label : `${option.label} · ${t('pluginSkillStatusDisabled')}`}
-                  </option>
-                ))
-              )}
-            </select>
-            <button
-              type="button"
-              onClick={() => void openManageTarget()}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-ds-border bg-ds-card px-3 text-[13px] font-medium text-ds-ink shadow-sm transition hover:bg-ds-hover"
-            >
-              <FolderOpen className="h-4 w-4" />
+            <div className="w-full md:w-[240px]">
+              <Select
+                value={selectedSkillRoot?.id ?? null}
+                onChange={(value) => setSkillRootId(value as SkillRootId)}
+                disabled={skillRootOptions.length === 0}
+                placeholder={t('pluginSkillRootNone')}
+                aria-label={t('pluginSkillRootNone')}
+                options={skillRootOptions.map<SelectOption>((option) => ({
+                  value: option.id,
+                  label: option.enabled
+                    ? option.label
+                    : `${option.label} · ${t('pluginSkillStatusDisabled')}`
+                }))}
+              />
+            </div>
+            <Button variant="secondary" onClick={() => void openManageTarget()}>
+              <FolderOpen className="h-4 w-4" aria-hidden />
               {t('pluginOpenLocation')}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
+              loading={skillListLoading}
               onClick={() => void Promise.all([refreshSkillList(), refreshSkillRoots()])}
-              disabled={skillListLoading}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-ds-border bg-ds-card px-3 text-[13px] font-medium text-ds-ink shadow-sm transition hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {skillListLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {skillListLoading ? null : <RefreshCw className="h-4 w-4" aria-hidden />}
               {t('pluginSkillRefresh')}
-            </button>
+            </Button>
             {skillListError ? (
-              <span className="text-[12px] text-red-700 dark:text-red-300">
+              <span className="text-[12px] text-ds-danger">
                 {skillListError}
               </span>
             ) : (
@@ -1531,24 +1520,20 @@ function GitHubSkillImportPanel({
 }): ReactElement {
   const { t } = useTranslation('common')
   return (
-    <section className="mt-6 rounded-2xl border border-ds-border bg-ds-card/95 p-4 shadow-sm">
+    <Card variant="elevated" className="mt-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <input
-          value={url}
-          onChange={(event) => onUrlChange(event.target.value)}
-          className="h-10 min-w-0 flex-1 rounded-xl border border-ds-border bg-ds-main/45 px-3 text-[14px] text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/30"
-          placeholder={t('pluginGithubImportPlaceholder')}
-          spellCheck={false}
-        />
-        <button
-          type="button"
-          onClick={onImport}
-          disabled={busy}
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-ds-userbubble px-4 text-[13px] font-semibold text-ds-userbubbleFg shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55"
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <Download className="h-4 w-4" strokeWidth={2} />}
+        <div className="min-w-0 flex-1">
+          <Input
+            value={url}
+            onChange={(event) => onUrlChange(event.target.value)}
+            placeholder={t('pluginGithubImportPlaceholder')}
+            spellCheck={false}
+          />
+        </div>
+        <Button variant="primary" loading={busy} onClick={onImport} className="shrink-0">
+          {busy ? null : <Download className="h-4 w-4" strokeWidth={2} aria-hidden />}
           {t('pluginGithubImportAction')}
-        </button>
+        </Button>
       </div>
       <p className="mt-2 text-[12px] text-ds-faint">
         {t('pluginGithubImportHint')}
@@ -1561,7 +1546,7 @@ function GitHubSkillImportPanel({
           })}
         </p>
       ) : null}
-    </section>
+    </Card>
   )
 }
 
@@ -1580,14 +1565,14 @@ function McpRuntimeOverlayPanel({
 }): ReactElement {
   const status = mcpRuntimeStatusLabel(overlay.status, t)
   return (
-    <section className="mt-4 rounded-lg border border-ds-border bg-ds-card px-4 py-3 shadow-sm">
+    <Card unpadded className="mt-4 px-4 py-3">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-ds-muted" strokeWidth={1.8} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[13px] font-semibold text-ds-ink">{t('pluginMcpRuntimeOverlay')}</span>
-              <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${mcpRuntimeStatusTone(overlay.status)}`}>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${mcpRuntimeStatusTone(overlay.status)}`}>
                 {status}
               </span>
             </div>
@@ -1610,7 +1595,7 @@ function McpRuntimeOverlayPanel({
                 {overlay.serverIds.map((id) => (
                   <span
                     key={id}
-                    className="rounded-md border border-ds-border-muted bg-ds-subtle px-2 py-0.5 font-mono text-[11px] text-ds-muted"
+                    className="rounded-full border border-ds-border-muted bg-ds-subtle px-2 py-0.5 font-mono text-[11px] text-ds-muted"
                   >
                     {id}
                   </span>
@@ -1618,23 +1603,24 @@ function McpRuntimeOverlayPanel({
               </div>
             ) : null}
             {error || overlay.lastError ? (
-              <div className="mt-2 truncate text-[12px] text-red-700 dark:text-red-300">
+              <div className="mt-2 truncate text-[12px] text-ds-danger">
                 {error || t('pluginMcpRuntimeLastError', { message: overlay.lastError })}
               </div>
             ) : null}
           </div>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
+          loading={loading}
           onClick={onRefresh}
-          disabled={loading}
-          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-ds-border bg-ds-subtle px-3 text-[12px] font-semibold text-ds-ink transition hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-60"
+          className="shrink-0"
         >
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          {loading ? null : <RefreshCw className="h-3.5 w-3.5" aria-hidden />}
           {t('pluginMcpRuntimeRefresh')}
-        </button>
+        </Button>
       </div>
-    </section>
+    </Card>
   )
 }
 
@@ -1658,16 +1644,17 @@ function mcpRuntimeStatusLabel(
   }
 }
 
+/* 状态 chip 功能色映射：色相走 --c360-* 功能 token，soft 底 + 强色字，小面积原则（父任务 §4.9） */
 function mcpRuntimeStatusTone(status: McpMarketplaceOverlayStatus): string {
   switch (status) {
     case 'connected':
-      return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200'
+      return 'bg-ds-success-soft text-ds-success'
     case 'configured':
-      return 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-200'
+      return 'bg-accent-soft text-accent'
     case 'drift':
-      return 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-200'
+      return 'bg-ds-warning-soft text-ds-warning'
     case 'error':
-      return 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-200'
+      return 'bg-ds-danger-soft text-ds-danger'
     case 'disabled':
     case 'offline':
       return 'bg-ds-subtle text-ds-muted'
@@ -1677,11 +1664,11 @@ function mcpRuntimeStatusTone(status: McpMarketplaceOverlayStatus): string {
 function marketplaceSourceTone(tone: MarketplaceItem['statusTone']): string {
   switch (tone) {
     case 'success':
-      return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200'
+      return 'bg-ds-success-soft text-ds-success'
     case 'warning':
-      return 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-200'
+      return 'bg-ds-warning-soft text-ds-warning'
     case 'error':
-      return 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300'
+      return 'bg-ds-danger-soft text-ds-danger'
     case 'default':
     default:
       return 'bg-ds-subtle text-ds-muted'
@@ -1717,102 +1704,89 @@ function OAuthConnectorPreviewDialog({
   if (!oauth) return <></>
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-8 backdrop-blur-sm">
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label={t('pluginOAuthPreviewTitle', { name: title })}
-        className="max-h-full w-full max-w-2xl overflow-y-auto rounded-3xl border border-ds-border bg-ds-card p-5 shadow-2xl"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-ds-subtle text-ds-ink">
-              <Info className="h-5 w-5" strokeWidth={1.8} />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-[18px] font-semibold text-ds-ink">
-                {t('pluginOAuthPreviewTitle', { name: title })}
-              </h2>
-              <p className="mt-1 text-[13px] leading-5 text-ds-muted">
-                {t('pluginOAuthPreviewDesc')}
-              </p>
-            </div>
+    <Modal
+      open
+      onClose={onClose}
+      ariaLabel={t('pluginOAuthPreviewTitle', { name: title })}
+      size="lg"
+      className="max-h-[85vh] overflow-y-auto"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-ds-subtle text-ds-ink">
+            <Info className="h-5 w-5" strokeWidth={1.8} aria-hidden />
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
-            aria-label={t('pluginOAuthClose')}
-          >
-            <span aria-hidden="true" className="text-[18px] leading-none">x</span>
-          </button>
-        </div>
-
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-ds-border bg-ds-main/35 p-4">
-            <div className="text-[13px] font-semibold text-ds-ink">{t('pluginOAuthPermissionsTitle')}</div>
-            <ul className="mt-3 grid gap-2 text-[13px] leading-5 text-ds-muted">
-              {oauth.permissionKeys.map((key) => (
-                <li key={key} className="flex gap-2">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-ds-muted/70" />
-                  <span>{t(key)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-2xl border border-ds-border bg-ds-main/35 p-4">
-            <div className="text-[13px] font-semibold text-ds-ink">{t('pluginOAuthSetupTitle')}</div>
-            <ol className="mt-3 grid gap-2 text-[13px] leading-5 text-ds-muted">
-              {oauth.setupKeys.map((key, index) => (
-                <li key={key} className="flex gap-2">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ds-subtle text-[11px] font-semibold text-ds-ink">
-                    {index + 1}
-                  </span>
-                  <span>{t(key)}</span>
-                </li>
-              ))}
-            </ol>
+          <div className="min-w-0">
+            <h2 className="text-[18px] font-semibold text-ds-ink">
+              {t('pluginOAuthPreviewTitle', { name: title })}
+            </h2>
+            <p className="mt-1 text-[13px] leading-5 text-ds-muted">
+              {t('pluginOAuthPreviewDesc')}
+            </p>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
+          aria-label={t('pluginOAuthClose')}
+        >
+          <span aria-hidden="true" className="text-[18px] leading-none">x</span>
+        </button>
+      </div>
 
-        {oauth.noteKey ? (
-          <div className="mt-4 rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-[13px] leading-5 text-amber-800 dark:border-amber-800/70 dark:bg-amber-950/25 dark:text-amber-200">
-            {t(oauth.noteKey)}
-          </div>
-        ) : null}
-
-        <div className="mt-5 rounded-2xl border border-ds-border bg-ds-main/35 p-4">
-          <div className="text-[13px] font-semibold text-ds-ink">{t('pluginOAuthConfigPreviewTitle')}</div>
-          <pre className="mt-3 max-h-52 overflow-auto rounded-xl bg-ds-sidebar/70 p-3 text-[12px] leading-5 text-ds-muted">
-            {item.mcpConfig ? JSON.stringify(item.mcpConfig(''), null, 2) : '{}'}
-          </pre>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <div className="rounded-xl border border-ds-border-muted bg-ds-subtle p-4">
+          <div className="text-[13px] font-semibold text-ds-ink">{t('pluginOAuthPermissionsTitle')}</div>
+          <ul className="mt-3 grid gap-2 text-[13px] leading-5 text-ds-muted">
+            {oauth.permissionKeys.map((key) => (
+              <li key={key} className="flex gap-2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-ds-faint" />
+                <span>{t(key)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
-
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-          <button
-            type="button"
-            onClick={openDocs}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-ds-border bg-ds-card px-4 py-2 text-[13px] font-semibold text-ds-ink transition hover:bg-ds-hover"
-          >
-            {t('pluginOAuthOpenDocs')}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex items-center justify-center rounded-xl bg-ds-subtle px-4 py-2 text-[13px] font-semibold text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
-          >
-            {t('pluginOAuthCancel')}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="inline-flex items-center justify-center rounded-xl bg-ds-userbubble px-4 py-2 text-[13px] font-semibold text-ds-userbubbleFg shadow-sm transition hover:opacity-90"
-          >
-            {t('pluginOAuthInstall')}
-          </button>
+        <div className="rounded-xl border border-ds-border-muted bg-ds-subtle p-4">
+          <div className="text-[13px] font-semibold text-ds-ink">{t('pluginOAuthSetupTitle')}</div>
+          <ol className="mt-3 grid gap-2 text-[13px] leading-5 text-ds-muted">
+            {oauth.setupKeys.map((key, index) => (
+              <li key={key} className="flex gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ds-card text-[11px] font-semibold text-ds-ink">
+                  {index + 1}
+                </span>
+                <span>{t(key)}</span>
+              </li>
+            ))}
+          </ol>
         </div>
-      </section>
-    </div>
+      </div>
+
+      {oauth.noteKey ? (
+        <div className="mt-4 rounded-xl border border-[color-mix(in_srgb,var(--ds-warning)_40%,transparent)] bg-ds-warning-soft px-4 py-3 text-[13px] leading-5 text-ds-warning">
+          {t(oauth.noteKey)}
+        </div>
+      ) : null}
+
+      <div className="mt-5 rounded-xl border border-ds-border-muted bg-ds-subtle p-4">
+        <div className="text-[13px] font-semibold text-ds-ink">{t('pluginOAuthConfigPreviewTitle')}</div>
+        <pre className="mt-3 max-h-52 overflow-auto rounded-[var(--radius-md)] bg-ds-card p-3 text-[12px] leading-5 text-ds-muted">
+          {item.mcpConfig ? JSON.stringify(item.mcpConfig(''), null, 2) : '{}'}
+        </pre>
+      </div>
+
+      <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <Button variant="secondary" onClick={openDocs}>
+          {t('pluginOAuthOpenDocs')}
+        </Button>
+        <Button variant="ghost" onClick={onClose}>
+          {t('pluginOAuthCancel')}
+        </Button>
+        <Button variant="primary" onClick={onConfirm}>
+          {t('pluginOAuthInstall')}
+        </Button>
+      </div>
+    </Modal>
   )
 }
 
@@ -1878,23 +1852,23 @@ function PluginSection({
                     </span>
                     {item.sourceLabel ? (
                       <span
-                        className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold ${marketplaceSourceTone(item.statusTone)}`}
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${marketplaceSourceTone(item.statusTone)}`}
                       >
                         {item.sourceLabel}
                       </span>
                     ) : null}
                     {skillDisabled ? (
-                      <span className="shrink-0 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-200">
+                      <span className="shrink-0 rounded-full bg-ds-warning-soft px-2 py-0.5 text-[11px] font-semibold text-ds-warning">
                         {t('pluginSkillStatusDisabled')}
                       </span>
                     ) : null}
                     {mcpDisabled ? (
-                      <span className="shrink-0 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-200">
+                      <span className="shrink-0 rounded-full bg-ds-warning-soft px-2 py-0.5 text-[11px] font-semibold text-ds-warning">
                         {t('pluginMcpStatusDisabled')}
                       </span>
                     ) : null}
                     {item.oauth ? (
-                      <span className="shrink-0 rounded-md bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:text-sky-200">
+                      <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">
                         {t('pluginOAuthBadge')}
                       </span>
                     ) : null}
@@ -1914,7 +1888,7 @@ function PluginSection({
                     disabled={toggleBusy}
                     onClick={() => void onToggleSkillEnabled(item.id, skillDisabled)}
                     title={skillDisabled ? t('pluginSkillEnable') : t('pluginSkillDisable')}
-                    className={`inline-flex h-9 shrink-0 items-center justify-center rounded-xl px-3 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    className={`inline-flex h-9 shrink-0 items-center justify-center rounded-full px-3 text-[12px] font-semibold transition-colors duration-[var(--motion-fast)] disabled:cursor-not-allowed disabled:opacity-60 ${
                       skillDisabled
                         ? 'bg-ds-subtle text-ds-ink hover:bg-ds-hover'
                         : 'bg-ds-skill-soft text-ds-skill hover:opacity-85'
@@ -1934,7 +1908,7 @@ function PluginSection({
                     disabled={mcpBusy}
                     onClick={() => void onToggleMcpEnabled(item.id, mcpDisabled)}
                     title={mcpDisabled ? t('pluginMcpEnable') : t('pluginMcpDisable')}
-                    className={`inline-flex h-9 shrink-0 items-center justify-center rounded-xl px-3 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    className={`inline-flex h-9 shrink-0 items-center justify-center rounded-full px-3 text-[12px] font-semibold transition-colors duration-[var(--motion-fast)] disabled:cursor-not-allowed disabled:opacity-60 ${
                       mcpDisabled
                         ? 'bg-ds-subtle text-ds-ink hover:bg-ds-hover'
                         : 'bg-ds-subtle text-ds-muted hover:bg-ds-hover'
@@ -1954,7 +1928,7 @@ function PluginSection({
                     disabled={installed || busy}
                     onClick={() => void onAdd(item)}
                     title={installed ? t('pluginAdded') : t('pluginAdd')}
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition ${
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors duration-[var(--motion-fast)] ${
                       installed
                         ? 'text-ds-faint'
                         : 'bg-ds-subtle text-ds-ink hover:bg-ds-hover disabled:opacity-60'
@@ -2013,66 +1987,61 @@ function CustomPluginPanel({
 }): ReactElement {
   const { t } = useTranslation('common')
   return (
-    <section className="mt-6 rounded-2xl border border-ds-border bg-ds-card/95 p-4 shadow-sm">
+    <Card variant="elevated" className="mt-6">
       <div className="grid gap-3 md:grid-cols-2">
-        <input
+        <Input
           value={customName}
           onChange={(event) => onNameChange(event.target.value)}
-          className="h-10 rounded-xl border border-ds-border bg-ds-main/45 px-3 text-[14px] text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/30"
           placeholder={t('pluginCustomName')}
         />
-        <input
+        <Input
           value={customDescription}
           onChange={(event) => onDescriptionChange(event.target.value)}
-          className="h-10 rounded-xl border border-ds-border bg-ds-main/45 px-3 text-[14px] text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/30"
           placeholder={t('pluginCustomDescription')}
         />
       </div>
       {activeKind === 'mcp' ? (
         <div className="mt-3 grid gap-3">
           <div className="grid gap-3 md:grid-cols-2">
-            <input
+            <Input
               value={customCommand}
               onChange={(event) => onCommandChange(event.target.value)}
-              className="h-10 rounded-xl border border-ds-border bg-ds-main/45 px-3 text-[14px] text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/30"
               placeholder={t('pluginCustomCommand')}
             />
-            <textarea
+            <Textarea
               value={customArgs}
               onChange={(event) => onArgsChange(event.target.value)}
-              className="min-h-[80px] rounded-xl border border-ds-border bg-ds-main/45 px-3 py-2 font-mono text-[13px] leading-5 text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/30"
+              rows={3}
+              className="font-mono"
               placeholder={t('pluginCustomArgs')}
               spellCheck={false}
             />
           </div>
-          <textarea
+          <Textarea
             value={customConfig}
             onChange={(event) => onConfigChange(event.target.value)}
-            className="min-h-[120px] rounded-xl border border-ds-border bg-ds-main/45 px-3 py-2 font-mono text-[13px] leading-5 text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/30"
+            rows={5}
+            className="font-mono"
             placeholder={t('pluginCustomMcpConfig')}
             spellCheck={false}
           />
         </div>
       ) : (
-        <textarea
+        <Textarea
           value={customSkillBody}
           onChange={(event) => onSkillBodyChange(event.target.value)}
-          className="mt-3 min-h-[140px] w-full rounded-xl border border-ds-border bg-ds-main/45 px-3 py-2 font-mono text-[13px] leading-5 text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/30"
+          rows={6}
+          className="mt-3 font-mono"
           placeholder={t('pluginCustomSkillBody')}
           spellCheck={false}
         />
       )}
       <div className="mt-3 flex justify-end">
-        <button
-          type="button"
-          onClick={onAdd}
-          disabled={busy}
-          className="inline-flex items-center gap-2 rounded-xl bg-ds-userbubble px-4 py-2 text-[13px] font-semibold text-ds-userbubbleFg shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55"
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <Plus className="h-4 w-4" strokeWidth={2} />}
+        <Button variant="primary" loading={busy} onClick={onAdd}>
+          {busy ? null : <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />}
           {t('pluginAddCustom')}
-        </button>
+        </Button>
       </div>
-    </section>
+    </Card>
   )
 }
