@@ -2,6 +2,7 @@ import { mkdir, rm, access } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { homedir } from 'node:os'
 import { runGit } from './git-service'
+import { DEFAULT_MANAGED_WORKTREE_ROOT } from '../../shared/app-brand'
 import {
   MAX_WORKTREE_POOL_SIZE,
   WORKTREE_BRANCH_PREFIX,
@@ -44,9 +45,18 @@ function worktreePath(poolDir: string, poolIndex: number): string {
   return join(poolDir, `pool-${poolIndex}`)
 }
 
+function expandHomePath(raw: string): string {
+  const value = raw.trim()
+  if (value === '~') return homedir()
+  if (value.startsWith('~/') || value.startsWith('~\\')) {
+    return join(homedir(), value.slice(2))
+  }
+  return value
+}
+
 function resolvePoolDir(projectPath: string, worktreeRoot?: string): string {
   const projectBasename = basename(projectPath) || 'project'
-  const root = worktreeRoot?.trim() || join(homedir(), '.kun')
+  const root = expandHomePath(worktreeRoot?.trim() || DEFAULT_MANAGED_WORKTREE_ROOT)
   return join(root, projectBasename)
 }
 

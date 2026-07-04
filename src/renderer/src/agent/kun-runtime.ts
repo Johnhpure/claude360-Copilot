@@ -8,7 +8,7 @@ import type {
   ThreadUsageSnapshot,
   UserInputAnswer
 } from './types'
-import { getKunRuntimeSettings } from '@shared/app-settings'
+import { APP_PRODUCT_NAME, getKunRuntimeSettings } from '@shared/app-settings'
 import {
   KUN_ATTACHMENT_DIAGNOSTICS_PATH,
   KUN_ATTACHMENTS_PATH,
@@ -111,7 +111,7 @@ function readRuntimeJson<T>(body: string, fallback: string): T {
  */
 export class KunRuntimeProvider implements AgentProvider {
   readonly id = 'kun' as const
-  readonly displayName = 'Kun'
+  readonly displayName = APP_PRODUCT_NAME
 
   getCapabilities(): {
     interrupt: boolean

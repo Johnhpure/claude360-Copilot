@@ -7,7 +7,7 @@ import {
   type KeyboardShortcutBindingsV1,
   type KeyboardShortcutCommandId
 } from '@shared/keyboard-shortcuts'
-import kunLogo from '../../../asset/img/claude360.png'
+import appLogo from '../../../asset/img/claude360.png'
 import { useKeyboardShortcutSettings } from '../lib/keyboard-shortcut-settings'
 import { useChatStore } from '../store/chat-store'
 
@@ -279,7 +279,7 @@ export function WindowsTitleBar({ platform, actions }: Props): ReactElement | nu
   return (
     <div ref={rootRef} data-cursor-spotlight-target className="ds-windows-titlebar ds-drag">
       <div className="ds-windows-titlebar-content">
-        <img src={kunLogo} alt="" aria-hidden="true" className="ds-windows-titlebar-icon" />
+        <img src={appLogo} alt="" aria-hidden="true" className="ds-windows-titlebar-icon" />
         <nav className="ds-windows-menu ds-no-drag" aria-label={t('windowsMenuAriaLabel')}>
           {menus.map((menu) => {
             const open = activeMenuId === menu.id

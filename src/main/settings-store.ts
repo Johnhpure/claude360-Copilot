@@ -9,8 +9,11 @@ import {
   DEFAULT_CHECKPOINT_CLEANUP_ENABLED,
   DEFAULT_CHECKPOINT_CLEANUP_INTERVAL_DAYS,
   DEFAULT_CURSOR_SPOTLIGHT_COLOR,
+  DEFAULT_CLAW_CHANNELS_ROOT as DEFAULT_CLAW_CHANNELS_ROOT_SETTING,
+  DEFAULT_CODE_WORKSPACE_ROOT,
   DEFAULT_LOG_RETENTION_DAYS,
   DEFAULT_WRITE_WORKSPACE_ROOT,
+  defaultConversationWorkspaceRootForPlatform,
   defaultClawSettings,
   defaultKunRuntimeSettings,
   defaultModelProviderSettings,
@@ -39,22 +42,24 @@ import {
   type AppSettingsPatch,
   type AppSettingsV1,
   type ClawImChannelV1,
-  type ClawImConversationV1
+  type ClawImConversationV1,
+  LEGACY_DEFAULT_CLAW_CHANNELS_ROOTS,
+  LEGACY_DEFAULT_CODE_WORKSPACE_ROOTS,
+  LEGACY_DEFAULT_CONVERSATION_WORKSPACE_ROOTS,
+  LEGACY_DEFAULT_WRITE_WORKSPACE_ROOTS
 } from '../shared/app-settings'
 
 export type { AppSettingsV1 }
 
-// 数据默认根目录从 ~/.deepseekgui 升级为 ~/.kun。老安装的既有目录由
-// legacy-data-migration.ts 在启动期搬迁并留兼容链接;settings 里存的旧
-// 绝对路径也在那里按迁移结果重写,这里只负责“新值”。
-const DEFAULT_WORKSPACE_ROOT = join(homedir(), '.kun', 'default_workspace')
+// 新建默认目录统一落在 Claude360 Copilot 家目录。旧默认路径只在精确命中
+// 产品自有默认值时归一到这里,不搬动用户自定义的旧目录。
+const DEFAULT_WORKSPACE_ROOT = expandHomePath(DEFAULT_CODE_WORKSPACE_ROOT)
 // 对话会话不绑定项目文件夹,每个新会话在此目录下自动创建时间戳子目录作为工作目录。
 // macOS/Windows 用系统 Documents 文件夹;Linux 没有 Documents 约定,改用 XDG 风格目录。
-const DEFAULT_CONVERSATION_WORKSPACE_ROOT_ABSOLUTE =
-  process.platform === 'linux'
-    ? join(homedir(), '.local', 'share', 'Kun', 'conversations')
-    : join(homedir(), 'Documents', 'Kun')
-const DEFAULT_CLAW_CHANNELS_ROOT = join(homedir(), '.kun', 'claw')
+const DEFAULT_CONVERSATION_WORKSPACE_ROOT_ABSOLUTE = expandHomePath(
+  defaultConversationWorkspaceRootForPlatform(process.platform)
+)
+const DEFAULT_CLAW_CHANNELS_ROOT = expandHomePath(DEFAULT_CLAW_CHANNELS_ROOT_SETTING)
 const DEFAULT_WRITE_WORKSPACE_ROOT_ABSOLUTE = expandHomePath(DEFAULT_WRITE_WORKSPACE_ROOT)
 const SETTINGS_FILE_NAME = 'kun-settings.json'
 // 旧版设置文件名。userData 整目录迁移后旧文件会原样留在新目录里,
@@ -84,15 +89,75 @@ export function expandHomePath(raw: string | null | undefined): string {
   return value
 }
 
+function normalizePathForDefaultMatch(raw: string): string {
+  return expandHomePath(raw).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+}
+
+function candidateHomeSuffix(candidate: string): string {
+  const normalized = normalizePathForDefaultMatch(candidate)
+  const home = normalizePathForDefaultMatch('~')
+  if (!home || !normalized.startsWith(`${home}/`)) return ''
+  return normalized.slice(home.length)
+}
+
+function isKnownDefaultPath(raw: string | null | undefined, candidates: readonly string[]): boolean {
+  const value = typeof raw === 'string' ? raw.trim() : ''
+  if (!value) return false
+  const normalized = normalizePathForDefaultMatch(value)
+  return candidates.some((candidate) => {
+    const normalizedCandidate = normalizePathForDefaultMatch(candidate)
+    if (normalized === normalizedCandidate) return true
+    const suffix = candidateHomeSuffix(candidate)
+    return Boolean(suffix) && normalized.endsWith(suffix)
+  })
+}
+
+function normalizeLegacyDefaultRootPrefix(
+  raw: string | null | undefined,
+  legacyRoots: readonly string[],
+  nextRoot: string
+): string | null {
+  const value = typeof raw === 'string' ? raw.trim() : ''
+  if (!value) return null
+  const expanded = expandHomePath(value).replace(/\\/g, '/').replace(/\/+$/, '')
+  const normalized = expanded.toLowerCase()
+  for (const legacyRoot of legacyRoots) {
+    const expandedLegacy = expandHomePath(legacyRoot).replace(/\\/g, '/').replace(/\/+$/, '')
+    const normalizedLegacy = expandedLegacy.toLowerCase()
+    if (normalized !== normalizedLegacy && !normalized.startsWith(`${normalizedLegacy}/`)) continue
+    const suffix = expanded.slice(expandedLegacy.length).replace(/^\/+/, '')
+    return suffix ? join(nextRoot, ...suffix.split('/').filter(Boolean)) : nextRoot
+  }
+  return null
+}
+
 function normalizeWorkspaceRoot(raw: string | null | undefined): string {
+  if (isKnownDefaultPath(raw, [
+    DEFAULT_CODE_WORKSPACE_ROOT,
+    ...LEGACY_DEFAULT_CODE_WORKSPACE_ROOTS
+  ])) {
+    return DEFAULT_WORKSPACE_ROOT
+  }
   return expandHomePath(raw) || DEFAULT_WORKSPACE_ROOT
 }
 
 function normalizeWriteWorkspaceRoot(raw: string | null | undefined): string {
+  if (isKnownDefaultPath(raw, [
+    DEFAULT_WRITE_WORKSPACE_ROOT,
+    ...LEGACY_DEFAULT_WRITE_WORKSPACE_ROOTS
+  ])) {
+    return DEFAULT_WRITE_WORKSPACE_ROOT_ABSOLUTE
+  }
   return expandHomePath(raw) || DEFAULT_WRITE_WORKSPACE_ROOT_ABSOLUTE
 }
 
 function normalizeConversationWorkspaceRoot(raw: string | null | undefined): string {
+  if (isKnownDefaultPath(raw, [
+    defaultConversationWorkspaceRootForPlatform(process.platform),
+    ...LEGACY_DEFAULT_CONVERSATION_WORKSPACE_ROOTS
+  ])) {
+    return DEFAULT_CONVERSATION_WORKSPACE_ROOT_ABSOLUTE
+  }
   return expandHomePath(raw) || DEFAULT_CONVERSATION_WORKSPACE_ROOT_ABSOLUTE
 }
 
@@ -122,7 +187,11 @@ function defaultClawChannelWorkspaceRoot(channel: ClawImChannelV1): string {
 }
 
 function normalizeClawChannelWorkspaceRoot(channel: ClawImChannelV1): string {
-  return expandHomePath(channel.workspaceRoot) || defaultClawChannelWorkspaceRoot(channel)
+  return normalizeLegacyDefaultRootPrefix(
+    channel.workspaceRoot,
+    LEGACY_DEFAULT_CLAW_CHANNELS_ROOTS,
+    DEFAULT_CLAW_CHANNELS_ROOT
+  ) || expandHomePath(channel.workspaceRoot) || defaultClawChannelWorkspaceRoot(channel)
 }
 
 function sanitizeConversationWorkspaceSegment(conversation: ClawImConversationV1): string {
@@ -143,7 +212,11 @@ function normalizeClawConversationWorkspaceRoot(
   channel: ClawImChannelV1,
   conversation: ClawImConversationV1
 ): string {
-  return expandHomePath(conversation.workspaceRoot) || defaultClawConversationWorkspaceRoot(channel, conversation)
+  return normalizeLegacyDefaultRootPrefix(
+    conversation.workspaceRoot,
+    LEGACY_DEFAULT_CLAW_CHANNELS_ROOTS,
+    DEFAULT_CLAW_CHANNELS_ROOT
+  ) || expandHomePath(conversation.workspaceRoot) || defaultClawConversationWorkspaceRoot(channel, conversation)
 }
 
 function normalizeStoredSettings(settings: AppSettingsV1): AppSettingsV1 {

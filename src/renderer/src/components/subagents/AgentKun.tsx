@@ -1,27 +1,18 @@
 import type { ReactElement } from 'react'
-import kunClip from '../../../../asset/img/kun_clip.png'
-import kunSearch from '../../../../asset/img/kun_search.png'
-import kunLaptop from '../../../../asset/img/kun_laptop.png'
-import kunMagic from '../../../../asset/img/kun_magic.png'
-import kunCheer from '../../../../asset/img/kun_cheer.png'
-import kunHeadset from '../../../../asset/img/kun_headset.png'
-import kunWrench from '../../../../asset/img/kun_wrench.png'
-import kunRest from '../../../../asset/img/kun_rest.png'
+import {
+  Headphones,
+  Laptop,
+  PartyPopper,
+  Search,
+  Sparkles,
+  WandSparkles,
+  Wrench,
+  type LucideIcon
+} from 'lucide-react'
 
 /**
- * Animated kun mascot avatar. Each role id maps to a distinct real kun PNG pose
- * with a per-role CSS animation (float / sway / breathe / bob). Disabled rows
- * render the resting kun in grayscale.
- *
- * Pose map:
- *   design-reviewer            → kun_clip    (写字板·审查,  bob)
- *   over-engineering-reviewer  → kun_search  (放大镜·审视,  float)
- *   code-review                → kun_laptop  (笔记本·看代码, breathe)
- *   compaction                 → kun_magic   (魔法棒·压缩,  sway)
- *   title                      → kun_cheer   (庆祝·命名,    bob)
- *   summary                    → kun_headset (耳麦·复述,    float)
- *   custom / fallback          → kun_wrench  (工具·自定义,  breathe)
- *   disabled                   → kun_rest    (抱枕睡, grayscale, no motion)
+ * Animated Claude360 Copilot agent avatar. Each role id maps to a small
+ * branded icon with a per-role CSS animation (float / sway / breathe / bob).
  */
 
 type Anim = 'float' | 'sway' | 'breathe' | 'bob'
@@ -32,14 +23,14 @@ const STYLE = `
 @keyframes dsKunSway{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
 @keyframes dsKunBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 @keyframes dsKunBob{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-2.5px) rotate(3deg)}}
-.ds-agent-kun{display:inline-flex;align-items:center;justify-content:center}
-.ds-agent-kun img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 3px var(--ds-border-muted))}
-.ds-agent-kun.is-disabled img{filter:grayscale(1) opacity(.7)}
-.ds-agent-kun-float img{animation:dsKunFloat 2.4s ease-in-out infinite}
-.ds-agent-kun-sway img{animation:dsKunSway 2.1s ease-in-out infinite;transform-origin:50% 90%}
-.ds-agent-kun-breathe img{animation:dsKunBreathe 3s ease-in-out infinite}
-.ds-agent-kun-bob img{animation:dsKunBob 2.7s ease-in-out infinite}
-@media (prefers-reduced-motion:reduce){.ds-agent-kun img{animation:none!important}}
+.ds-agent-kun{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;border:1px solid var(--ds-border-muted);background:var(--ds-surface);color:var(--ds-accent);box-shadow:var(--c360-shadow-sm)}
+.ds-agent-kun svg{width:58%;height:58%;filter:drop-shadow(0 2px 3px var(--ds-border-muted))}
+.ds-agent-kun.is-disabled{color:var(--ds-muted);filter:grayscale(1) opacity(.72)}
+.ds-agent-kun-float svg{animation:dsKunFloat 2.4s ease-in-out infinite}
+.ds-agent-kun-sway svg{animation:dsKunSway 2.1s ease-in-out infinite;transform-origin:50% 90%}
+.ds-agent-kun-breathe svg{animation:dsKunBreathe 3s ease-in-out infinite}
+.ds-agent-kun-bob svg{animation:dsKunBob 2.7s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.ds-agent-kun svg{animation:none!important}}
 `
 
 function ensureStyle(): void {
@@ -51,18 +42,18 @@ function ensureStyle(): void {
   document.head.appendChild(el)
 }
 
-const POSE: Record<string, { src: string; anim: Anim }> = {
-  general: { src: kunLaptop, anim: 'breathe' },
-  explore: { src: kunSearch, anim: 'float' },
-  'design-reviewer': { src: kunClip, anim: 'bob' },
-  'over-engineering-reviewer': { src: kunWrench, anim: 'sway' },
-  'code-review': { src: kunClip, anim: 'breathe' },
-  compaction: { src: kunMagic, anim: 'sway' },
-  title: { src: kunCheer, anim: 'bob' },
-  summary: { src: kunHeadset, anim: 'float' }
+const POSE: Record<string, { Icon: LucideIcon; anim: Anim }> = {
+  general: { Icon: Laptop, anim: 'breathe' },
+  explore: { Icon: Search, anim: 'float' },
+  'design-reviewer': { Icon: Sparkles, anim: 'bob' },
+  'over-engineering-reviewer': { Icon: Wrench, anim: 'sway' },
+  'code-review': { Icon: Sparkles, anim: 'breathe' },
+  compaction: { Icon: WandSparkles, anim: 'sway' },
+  title: { Icon: PartyPopper, anim: 'bob' },
+  summary: { Icon: Headphones, anim: 'float' }
 }
 
-const FALLBACK: { src: string; anim: Anim } = { src: kunWrench, anim: 'breathe' }
+const FALLBACK: { Icon: LucideIcon; anim: Anim } = { Icon: Wrench, anim: 'breathe' }
 
 /**
  * @param id      role id (drives the pose); unknown ids → fallback (custom kun)
@@ -84,14 +75,15 @@ export function AgentKun({
   if (disabled) {
     return (
       <span className={`ds-agent-kun is-disabled ${className ?? ''}`}>
-        <img src={kunRest} alt="" aria-hidden="true" />
+        <Wrench aria-hidden="true" strokeWidth={1.8} />
       </span>
     )
   }
   const pose = POSE[id] ?? FALLBACK
+  const Icon = pose.Icon
   return (
     <span className={`ds-agent-kun ds-agent-kun-${pose.anim} ${className ?? ''}`}>
-      <img src={pose.src} alt="" aria-hidden="true" />
+      <Icon aria-hidden="true" strokeWidth={1.8} />
     </span>
   )
 }

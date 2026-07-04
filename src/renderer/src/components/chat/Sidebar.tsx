@@ -8,10 +8,7 @@ import {
   LayoutGrid,
   Moon,
   Plus,
-  Settings,
-  Smartphone,
   Sun,
-  User,
   Workflow
 } from 'lucide-react'
 import type { NormalizedThread } from '../../agent/types'
@@ -35,6 +32,7 @@ import {
   SidebarFrame,
   SidebarIconButton
 } from '../sidebar/SidebarPrimitives'
+import { SidebarFooterNav } from '../sidebar/SidebarFooterNav'
 
 type Props = {
   threads: NormalizedThread[]
@@ -152,8 +150,12 @@ export function Sidebar({
     <SidebarFrame
       title={t('appName')}
       footer={
-        <div className="space-y-1">
-          <div className="flex min-h-[42px] items-center justify-center gap-2.5 pb-1">
+        <SidebarFooterNav
+          onOpenMy={onOpenMy}
+          myActive={myActive}
+          onOpenSettings={() => onOpenSettings('general')}
+          before={
+            <div className="flex min-h-[42px] items-center justify-center gap-2.5 pb-1">
             <FocusModeToggle
               enabled={focusModeEnabled}
               onToggle={() => onFocusModeChange(!focusModeEnabled)}
@@ -162,33 +164,9 @@ export function Sidebar({
               title={t('focusModeToggleTitle')}
               ariaLabel={t('focusModeToggleLabel')}
             />
-          </div>
-          {/* 隐藏≠删除:第一阶段不暴露连接手机(Claw)入口,保留 onToggleConnectPhone 与相关 props/handler。 */}
-          {isPrimaryRouteVisible('claw') ? (
-            <SidebarCommandRow
-              icon={<Smartphone className="h-4 w-4" strokeWidth={1.75} />}
-              label={t('claw')}
-              onClick={onToggleConnectPhone}
-              active={connectPhoneSidebarOpen}
-              variant="footer"
-            />
-          ) : null}
-          <SidebarCommandRow
-            icon={<User className="h-4 w-4" strokeWidth={1.75} />}
-            label={t('myPage')}
-            onClick={onOpenMy}
-            active={myActive}
-            variant="footer"
-          />
-          <div className="flex items-center gap-1">
-            <div className="min-w-0 flex-1">
-              <SidebarCommandRow
-                icon={<Settings className="h-4 w-4" strokeWidth={1.75} />}
-                label={t('settings')}
-                onClick={() => onOpenSettings('general')}
-                variant="footer"
-              />
             </div>
+          }
+          settingsAccessory={
             <SidebarIconButton
               title={isDarkMode ? t('switchToLight') : t('switchToDark')}
               ariaLabel={t('toggleTheme')}
@@ -200,8 +178,8 @@ export function Sidebar({
                 <Moon className="h-4 w-4" strokeWidth={1.75} />
               )}
             </SidebarIconButton>
-          </div>
-        </div>
+          }
+        />
       }
     >
       <div className="ds-no-drag flex flex-col px-1">

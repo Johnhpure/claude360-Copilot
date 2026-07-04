@@ -5,6 +5,7 @@ import {
   DEFAULT_KUN_DATA_DIR,
   DEFAULT_KUN_MODEL,
   DEFAULT_KUN_PORT,
+  LEGACY_DEFAULT_RUNTIME_DATA_DIRS,
   DEFAULT_MUSIC_GENERATION_PROTOCOL,
   MIN_KUN_LOCAL_PORT,
   DEFAULT_MODEL_ENDPOINT_FORMAT,
@@ -1050,10 +1051,16 @@ function upgradeLegacyKunDefaultDataDir(value: unknown): string {
   if (typeof value !== 'string') return DEFAULT_KUN_DATA_DIR
   const trimmed = value.trim()
   const normalized = trimmed.replace(/\\/g, '/').toLowerCase()
+  const legacyDefault = LEGACY_DEFAULT_RUNTIME_DATA_DIRS.some((path) => {
+    const legacy = path.replace(/\\/g, '/').toLowerCase()
+    const legacySuffix = legacy.startsWith('~/') ? legacy.slice(1) : legacy
+    return normalized === legacy || normalized.endsWith(legacySuffix)
+  })
   if (
     !trimmed ||
     normalized === LEGACY_COREAGENT_DATA_DIR ||
-    normalized.endsWith('/.deepseekgui/coreagent')
+    normalized.endsWith('/.deepseekgui/coreagent') ||
+    legacyDefault
   ) {
     return DEFAULT_KUN_DATA_DIR
   }

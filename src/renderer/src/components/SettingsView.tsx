@@ -2,6 +2,7 @@ import type { ComponentProps, ReactElement } from 'react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  APP_HOME_DIR_NAME,
   DEFAULT_WRITE_INLINE_COMPLETION_BASE_URL,
   kunSettingsPatch,
   DEFAULT_WRITE_WORKSPACE_ROOT,
@@ -100,6 +101,8 @@ const WriteDebugLogModal = lazy(() =>
   import('./settings-debug-log').then((module) => ({ default: module.WriteDebugLogModal }))
 )
 
+const DEFAULT_MCP_CONFIG_PATH = `~/${APP_HOME_DIR_NAME}/mcp.json`
+
 function LoadedAgentsSettingsSection({
   onReady,
   ...props
@@ -164,7 +167,7 @@ export function SettingsView(): ReactElement {
   const [skillRoots, setSkillRoots] = useState<SkillRootListItem[]>([])
   const [skillRootsLoading, setSkillRootsLoading] = useState(false)
   const [skillNotice, setSkillNotice] = useState<InlineNotice | null>(null)
-  const [mcpConfigPath, setMcpConfigPath] = useState('~/.kun/mcp.json')
+  const [mcpConfigPath, setMcpConfigPath] = useState(DEFAULT_MCP_CONFIG_PATH)
   const [mcpConfigText, setMcpConfigText] = useState('')
   const [mcpConfigExists, setMcpConfigExists] = useState(false)
   const [mcpLoading, setMcpLoading] = useState(false)

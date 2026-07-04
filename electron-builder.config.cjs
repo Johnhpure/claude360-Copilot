@@ -168,8 +168,8 @@ module.exports = {
       // 语音输入：渲染进程通过 getUserMedia 录音做语音转文字。
       NSMicrophoneUsageDescription: 'Claude360 Copilot uses the microphone for voice-to-text input.'
     },
-    // macOS 不会自动套圆角遮罩,图标文件本身需要是「圆角方块 + 透明边距」
-    // 当前 claude360_mac.png 为旧 kun_mac.png 的占位副本,待替换真实设计资源。
+    // macOS 不会自动套圆角遮罩,图标文件本身需要是「圆角方块 + 透明边距」。
+    // claude360_mac.png 由 Claude360 Copilot 官方 Logo 生成。
     icon: './src/asset/img/claude360_mac.png',
     // arm64 (Apple Silicon) + x64 (Intel). On M 系列 Mac 本地打包会各出一组 dmg/zip。
     target: [
@@ -183,10 +183,8 @@ module.exports = {
   win: {
     // Windows does not mask app icons for us; use the rounded asset so
     // desktop/start-menu/taskbar shortcuts do not show a hard square edge.
-    // Ship a multi-size .ico (16/24/32/48/64/72/96/128/256) so Explorer and
-    // the desktop render crisp icons at small sizes (#222). Regenerate with:
-    // npx --yes png2icons src/asset/img/claude360_mac.png build/icon-claude360 -icowe -bc
-    // 当前 icon-claude360.ico 为旧 icon.ico 的占位副本,待替换真实设计资源。
+    // Ship a multi-size .ico so Explorer and the desktop render crisp icons at
+    // small sizes. It is generated from the Claude360 Copilot official Logo.
     icon: './build/icon-claude360.ico',
     // x64：nsis 安装包（双击安装）+ zip 便携包（免安装，解压后运行内含的
     // "Claude360 Copilot.exe"）。二者均在 Windows/CI 上产出。
@@ -211,7 +209,7 @@ module.exports = {
   },
   linux: {
     category: 'Development',
-    // 占位:claude360.png 为旧 kun.png 的副本,待替换真实设计资源。
+    // Linux AppImage icon uses the Claude360 Copilot official Logo.
     icon: './src/asset/img/claude360.png',
     target: [{ target: 'AppImage', arch: ['x64'] }]
   },

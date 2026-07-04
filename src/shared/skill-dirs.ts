@@ -1,3 +1,5 @@
+import { APP_HOME_DIR_NAME } from './app-brand'
+
 export type SkillDirScope = 'project' | 'global'
 
 export type CommonSkillDir = {
@@ -34,7 +36,12 @@ export const COMMON_GLOBAL_SKILL_DIRS: readonly CommonSkillDir[] = [
   { id: 'global-agents', scope: 'global', relativePath: '.agents/skills', labelKey: 'pluginSkillRootGlobalAgents' },
   { id: 'global-claude', scope: 'global', relativePath: '.claude/skills', labelKey: 'pluginSkillRootGlobalClaude' },
   { id: 'global-codex', scope: 'global', relativePath: '.codex/skills', labelKey: 'pluginSkillRootGlobalCodex' },
-  { id: 'global-deepseek', scope: 'global', relativePath: '.kun/skills', labelKey: 'pluginSkillRootGlobalDeepseek' }
+  {
+    id: 'global-claude360',
+    scope: 'global',
+    relativePath: `${APP_HOME_DIR_NAME}/skills`,
+    labelKey: 'pluginSkillRootGlobalClaude360'
+  }
 ]
 
 /**

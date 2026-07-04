@@ -1,5 +1,5 @@
 // Structured model + (de)serialization for the MCP server config edited in
-// settings. The on-disk file (`~/.kun/mcp.json`) is the single source of
+// settings. The on-disk file (`~/Claude360 Copilot/mcp.json`) is the single source of
 // truth; this module is the lossless-ish bridge between that JSON text and a
 // form the user can fill in without knowing the schema.
 //

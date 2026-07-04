@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import { MessageSquare, QrCode, Settings } from 'lucide-react'
+import { DEFAULT_CLAW_CHANNELS_ROOT } from '@shared/app-settings'
 import type {
   ClawImAgentProfileV1,
   ClawImChannelV1,
@@ -149,7 +150,7 @@ export const CLAW_AGENT_TABS: Array<{
   }
 ]
 
-export const DEFAULT_CLAW_WORKSPACE_ROOT = '~/.kun/claw'
+export const DEFAULT_CLAW_WORKSPACE_ROOT = DEFAULT_CLAW_CHANNELS_ROOT
 
 export const CLAW_DIALOG_STEPS: Array<{
   id: ClawDialogStep

@@ -434,7 +434,7 @@ function windowCloseLabels(locale: AppSettingsV1['locale']): {
     return {
       title: '关闭窗口',
       message: '关闭窗口时要怎么处理？',
-      detail: '选择最小化到托盘时，Kun 会继续在后台运行；选择退出应用会结束后台服务。',
+      detail: `选择最小化到托盘时，${APP_PRODUCT_NAME} 会继续在后台运行；选择退出应用会结束后台服务。`,
       minimizeToTray: '最小化到托盘',
       quit: '退出应用',
       cancel: '取消',
@@ -443,8 +443,8 @@ function windowCloseLabels(locale: AppSettingsV1['locale']): {
   }
   return {
     title: 'Close window',
-    message: 'What should Kun do when this window closes?',
-    detail: 'Minimize to tray keeps Kun running in the background. Quit app stops the background service.',
+    message: `What should ${APP_PRODUCT_NAME} do when this window closes?`,
+    detail: `Minimize to tray keeps ${APP_PRODUCT_NAME} running in the background. Quit app stops the background service.`,
     minimizeToTray: 'Minimize to tray',
     quit: 'Quit app',
     cancel: 'Cancel',

@@ -1,5 +1,5 @@
 /**
- * Path helpers for Kun-managed conversation worktrees created by git-service
+ * Path helpers for app-managed conversation worktrees created by git-service
  * under `<worktreeRoot>/<4-hex-id>/<repo-basename>`.
  */
 
@@ -22,14 +22,15 @@ export function parseKunBranchWorktreeLayout(path: string): KunBranchWorktreeLay
   if (!poolId || !repoName) return null
   const prefix = normalized.slice(0, -(poolId.length + repoName.length + 2))
   // Branch worktrees are created by git-service's resolveBranchWorktreeRoot under
-  // the default Kun worktree root `~/.kun/worktrees`, i.e.
-  // `<home>/.kun/worktrees/<4-hex-id>/<repo-basename>`. Anchor on that exact
-  // `.kun/worktrees` root so an unrelated user project that merely happens to sit
+  // the default Claude360 Copilot worktree root, i.e.
+  // `<home>/Claude360 Copilot/worktrees/<4-hex-id>/<repo-basename>`. Keep the
+  // old `.kun/worktrees` root for existing records. Anchor on those exact roots
+  // so an unrelated user project that merely happens to sit
   // under some other `worktrees/<hex>/<name>` directory (e.g.
-  // `/work/worktrees/2024/app`) is not misclassified and hidden as a Kun
+  // `/work/worktrees/2024/app`) is not misclassified and hidden as an app-managed
   // worktree. The scheduled-agent pool uses a different layout
   // (`<root>/<basename>/pool-N`) and is intentionally not matched here.
-  if (!/(?:^|\/)\.kun\/worktrees$/i.test(prefix)) return null
+  if (!/(?:^|\/)(?:\.kun|Claude360 Copilot)\/worktrees$/i.test(prefix)) return null
   return { poolId, repoName }
 }
 

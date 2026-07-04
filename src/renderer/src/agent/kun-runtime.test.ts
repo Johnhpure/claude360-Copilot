@@ -69,10 +69,10 @@ afterEach(() => {
 })
 
 describe('KunRuntimeProvider', () => {
-  it('reports the kun id and Kun display name', () => {
+  it('reports the kun id and Claude360 Copilot display name', () => {
     const provider = new KunRuntimeProvider()
     expect(provider.id).toBe('kun')
-    expect(provider.displayName).toBe('Kun')
+    expect(provider.displayName).toBe('Claude360 Copilot')
   })
 
   it('exposes the local HTTP/SSE capabilities', () => {

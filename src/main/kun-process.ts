@@ -707,7 +707,7 @@ async function skillCapabilityConfigForRuntime(
     enabled: roots.length > 0 || existing.enabled === true,
     roots,
     workspaceRoots: guiSkillWorkspaceRootsForRuntime(settings),
-    // #149: Pass global skill roots from settings (e.g. ~/.kun/skills)
+    // #149: Pass global skill roots from settings (e.g. ~/Claude360 Copilot/skills)
     globalRoots: existing.globalRoots ?? [],
     // Skills the user disabled in the GUI. Forwarded so the runtime drops them
     // from discovery — without this they stay loadable via load_skill and keep

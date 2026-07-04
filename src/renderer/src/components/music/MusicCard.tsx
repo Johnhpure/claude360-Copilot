@@ -187,7 +187,7 @@ export function MusicCard({
         {overlay}
       </button>
 
-      {/* 信息区：标题 + 时长 + 副文案 + 元信息 + 操作行 */}
+      {/* 信息区：标题 + 时长 + 简短描述 + 操作行 */}
       <div className="flex flex-1 flex-col gap-1.5 px-1 pb-1">
         <div className="flex items-baseline justify-between gap-2">
           <h3 className="min-w-0 truncate text-[13.5px] font-semibold text-ds-ink" title={title}>
@@ -198,7 +198,7 @@ export function MusicCard({
           ) : null}
         </div>
         {subtitle ? (
-          <p className="line-clamp-2 min-h-9 text-[12px] leading-[18px] text-ds-muted" title={subtitle}>
+          <p className="line-clamp-1 text-[12px] leading-[18px] text-ds-muted" title={subtitle}>
             {subtitle}
           </p>
         ) : null}

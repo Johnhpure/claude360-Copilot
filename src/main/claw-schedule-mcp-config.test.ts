@@ -15,6 +15,7 @@ import {
   type ClawScheduleMcpLaunchConfig
 } from './claw-schedule-mcp-config'
 import {
+  APP_HOME_DIR_NAME,
   defaultClawSettings,
   defaultKeyboardShortcuts,
   defaultKunRuntimeSettings,
@@ -88,9 +89,9 @@ const launch: ClawScheduleMcpLaunchConfig = {
 }
 
 describe('claw schedule MCP config', () => {
-  it('uses Kun config files by default', () => {
-    expect(resolveKunConfigPath()).toBe(join(homedir(), '.kun', 'config.toml'))
-    expect(resolveKunMcpJsonPath()).toBe(join(homedir(), '.kun', 'mcp.json'))
+  it('uses Claude360 Copilot config files by default', () => {
+    expect(resolveKunConfigPath()).toBe(join(homedir(), APP_HOME_DIR_NAME, 'config.toml'))
+    expect(resolveKunMcpJsonPath()).toBe(join(homedir(), APP_HOME_DIR_NAME, 'mcp.json'))
     expect(resolveDeepseekConfigPath()).toBe(resolveKunConfigPath())
   })
 

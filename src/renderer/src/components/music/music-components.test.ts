@@ -171,7 +171,7 @@ describe('MusicTaskList · 作品管理栏 + 宫格', () => {
     expect(html).toContain('musicWorksEmpty')
   })
 
-  it('成功歌曲以 MusicCard 展示封面、状态、标题、提示词、模型、标签、时长和操作按钮', () => {
+  it('成功歌曲以 MusicCard 展示封面、状态、标题、简短描述、时长和操作按钮', () => {
     const task: MusicGenTask = {
       id: 'x',
       taskId: 't',
@@ -186,11 +186,12 @@ describe('MusicTaskList · 作品管理栏 + 宫格', () => {
     expect(html).toContain('music-work-card')
     expect(html).toContain('musicStatusSuccess')
     expect(html).toContain('歌曲-a')
-    expect(html).toContain('城市夜晚的合成波')
-    expect(html).toContain('Suno V5.5')
     expect(html).toContain('synthwave')
     expect(html).toContain('2:06')
-    expect(html).toContain('musicInstrumental')
+    expect(html).not.toContain('城市夜晚的合成波')
+    expect(html).not.toContain('Suno V5.5')
+    expect(html).not.toContain('chirp-fenix')
+    expect(html).not.toContain('musicInstrumental')
     expect(html).not.toContain('https://cdn.example/a.mp3')
     expect(html).toContain('https://cdn.example/a.png')
     expect(html).toContain('musicPlay')
@@ -410,19 +411,16 @@ describe('LyricsAssistantDrawer · AI 写词模态', () => {
     const html = renderToStaticMarkup(createElement(LyricsAssistantDrawer, { ...drawerBase, open: false }))
     expect(html).toBe('')
   })
-  it('open=true 渲染 AI 写词模态（模型/主题/结构/生成/结果）', () => {
-    const html = renderToStaticMarkup(createElement(LyricsAssistantDrawer, { ...drawerBase, open: true }))
-    expect(html).toContain('music-lyrics-drawer')
-    expect(html).toContain('musicLyricsAiTitle')
-    expect(html).toContain('lyrics-ai-model')
-    expect(html).toContain('lyrics-ai-generate')
-    expect(html).toContain('lyrics-ai-result')
-    expect(html).toContain('lyrics-ai-apply')
-    // 文本模型下拉来自注入的 textModels（触发器显示当前值）
-    expect(html).toContain('gpt-4o')
-    // 结构选项
-    expect(html).toContain('主歌-副歌')
-    // 遮罩 blur 走 token（浮层唯一 blur 场景，随 data-blur 降级）
-    expect(html).toContain('backdrop-blur-[var(--blur-overlay)]')
+  it('open=true 使用居中 Modal 承载 AI 写词内容', () => {
+    const source = LyricsAssistantDrawer.toString()
+    expect(source).toContain('Modal')
+    expect(source).toContain('music-lyrics-drawer')
+    expect(source).toContain('musicLyricsAiTitle')
+    expect(source).toContain('lyrics-ai-model')
+    expect(source).toContain('lyrics-ai-generate')
+    expect(source).toContain('lyrics-ai-result')
+    expect(source).toContain('lyrics-ai-apply')
+    expect(source).toContain('STRUCTURE_OPTIONS')
+    expect(source).not.toContain('fixed inset-0 z-[200]')
   })
 })

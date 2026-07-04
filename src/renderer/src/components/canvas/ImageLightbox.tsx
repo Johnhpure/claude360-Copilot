@@ -1,5 +1,6 @@
-import type { ReactElement } from 'react'
-import { ClipboardType, Copy, Download, Trash2, X } from 'lucide-react'
+import type { PointerEvent as ReactPointerEvent, ReactElement, WheelEvent as ReactWheelEvent } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ClipboardType, Copy, Download, RotateCcw, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { Button, Modal } from '../ui'
 
 /**
@@ -25,6 +26,21 @@ type ImageLightboxProps = {
   t: TFn
 }
 
+type Point = { x: number; y: number }
+type NaturalSize = { width: number; height: number }
+
+const MIN_SCALE = 1
+const MAX_SCALE = 4
+const SCALE_STEP = 0.25
+
+function clampScale(value: number): number {
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(value * 100) / 100))
+}
+
+function nextZoom(value: number, direction: 'in' | 'out'): number {
+  return clampScale(value + (direction === 'in' ? SCALE_STEP : -SCALE_STEP))
+}
+
 export function ImageLightbox({
   open,
   src,
@@ -36,7 +52,62 @@ export function ImageLightbox({
   onDelete,
   t
 }: ImageLightboxProps): ReactElement | null {
+  const [scale, setScale] = useState(MIN_SCALE)
+  const [offset, setOffset] = useState<Point>({ x: 0, y: 0 })
+  const [naturalSize, setNaturalSize] = useState<NaturalSize | null>(null)
+  const dragStartRef = useRef<Point | null>(null)
+  const dragOffsetRef = useRef<Point>({ x: 0, y: 0 })
+
+  const resetZoom = useCallback((): void => {
+    setScale(MIN_SCALE)
+    setOffset({ x: 0, y: 0 })
+  }, [])
+
+  useEffect(() => {
+    resetZoom()
+    setNaturalSize(null)
+  }, [resetZoom, src])
+
+  const zoomBy = useCallback((direction: 'in' | 'out'): void => {
+    setScale((current) => {
+      const next = nextZoom(current, direction)
+      if (next === MIN_SCALE) setOffset({ x: 0, y: 0 })
+      return next
+    })
+  }, [])
+
+  const handleWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>): void => {
+    event.preventDefault()
+    zoomBy(event.deltaY < 0 ? 'in' : 'out')
+  }, [zoomBy])
+
+  const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (scale <= MIN_SCALE) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    dragStartRef.current = { x: event.clientX, y: event.clientY }
+    dragOffsetRef.current = offset
+  }, [offset, scale])
+
+  const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>): void => {
+    const start = dragStartRef.current
+    if (!start || scale <= MIN_SCALE) return
+    setOffset({
+      x: dragOffsetRef.current.x + event.clientX - start.x,
+      y: dragOffsetRef.current.y + event.clientY - start.y
+    })
+  }, [scale])
+
+  const stopDragging = useCallback((event: ReactPointerEvent<HTMLDivElement>): void => {
+    dragStartRef.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }, [])
+
   if (!open || !src) return null
+
+  const canDrag = scale > MIN_SCALE
+  const resolutionText = naturalSize ? `${naturalSize.width} × ${naturalSize.height}` : ''
 
   return (
     <Modal
@@ -47,12 +118,66 @@ export function ImageLightbox({
       className="overflow-hidden !p-0"
     >
       <div data-testid="canvas-lightbox" className="flex min-h-0 flex-col">
-        {/* 无 padding 图片容器 */}
-        <img
-          src={src}
-          alt={t('canvasImageAlt', { prompt })}
-          className="max-h-[68vh] w-full bg-ds-main object-contain"
-        />
+        <div
+          data-testid="canvas-lightbox-viewport"
+          className={`relative flex max-h-[68vh] min-h-[320px] w-full touch-none select-none items-center justify-center overflow-hidden bg-ds-main ${canDrag ? 'cursor-grab active:cursor-grabbing' : ''}`}
+          onWheel={handleWheel}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={stopDragging}
+          onPointerCancel={stopDragging}
+        >
+          <img
+            src={src}
+            alt={t('canvasImageAlt', { prompt })}
+            className="max-h-[68vh] max-w-full object-contain will-change-transform"
+            style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}
+            draggable={false}
+            onLoad={(event) => {
+              setNaturalSize({
+                width: event.currentTarget.naturalWidth,
+                height: event.currentTarget.naturalHeight
+              })
+            }}
+          />
+          {resolutionText ? (
+            <span className="pointer-events-none absolute bottom-3 left-3 rounded-full border border-ds-border bg-black/45 px-2.5 py-1 text-[12px] font-medium text-white shadow-[var(--c360-shadow-sm)]">
+              {resolutionText}
+            </span>
+          ) : null}
+          <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full border border-ds-border bg-black/45 p-1 shadow-[var(--c360-shadow-sm)]">
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+              onClick={() => zoomBy('out')}
+              disabled={scale <= MIN_SCALE}
+              title={t('canvasLightboxZoomOut')}
+              aria-label={t('canvasLightboxZoomOut')}
+            >
+              <ZoomOut className="h-4 w-4" strokeWidth={1.8} />
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+              onClick={() => zoomBy('in')}
+              disabled={scale >= MAX_SCALE}
+              title={t('canvasLightboxZoomIn')}
+              aria-label={t('canvasLightboxZoomIn')}
+            >
+              <ZoomIn className="h-4 w-4" strokeWidth={1.8} />
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+              onClick={resetZoom}
+              disabled={scale === MIN_SCALE && offset.x === 0 && offset.y === 0}
+              title={t('canvasLightboxResetZoom')}
+              aria-label={t('canvasLightboxResetZoom')}
+            >
+              <RotateCcw className="h-4 w-4" strokeWidth={1.8} />
+            </button>
+          </div>
+        </div>
 
         {/* 底部操作条：提示词 + 动作按钮 */}
         <div className="flex flex-col gap-3 border-t border-ds-border p-4">

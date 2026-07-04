@@ -47,17 +47,6 @@ export function toTaskCardStatus(status: MusicGenTask['status']): TaskCardStatus
   return 'running'
 }
 
-function formatCreatedAt(createdAt: number): string {
-  const date = new Date(createdAt)
-  if (!Number.isFinite(createdAt) || Number.isNaN(date.getTime())) return ''
-  return date.toLocaleString(undefined, {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
 function promptText(task: MusicGenTask): string {
   const prompt = task.params.prompt?.trim()
   if (prompt) return prompt
@@ -109,14 +98,16 @@ function cardTitle(card: WorkCard, t: TFn): string {
   return card.task.title || fallbackTitle(card.task, t)
 }
 
-function cardModel(card: WorkCard): string {
-  if (card.kind === 'song' && card.song.modelName?.trim()) return card.song.modelName.trim()
-  return String(card.task.params.model || '').trim()
-}
-
 function cardTags(card: WorkCard): string {
   if (card.kind === 'song' && card.song.tags?.trim()) return card.song.tags.trim()
   return card.task.params.style?.trim() ?? ''
+}
+
+function compactDescription(card: WorkCard, t: TFn): string {
+  const source = cardTags(card) || (card.task.params.instrumental ? t('musicInstrumental') : '')
+  const text = source.replace(/\s+/g, ' ').trim()
+  if (!text) return ''
+  return text.length > 64 ? `${text.slice(0, 64)}...` : text
 }
 
 function playableSongsForTask(task: MusicGenTask): Claude360Song[] {
@@ -383,12 +374,6 @@ export function MusicTaskList({
             const isPlaying = Boolean(playing && currentSongId === song.id)
             const queue = playableSongsForTask(task)
             const canPlay = Boolean(song.audioUrl.trim())
-            const meta = [
-              cardModel(card),
-              cardTags(card),
-              formatCreatedAt(task.createdAt),
-              task.params.instrumental ? t('musicInstrumental') : ''
-            ].filter(Boolean)
             return (
               <MusicCard
                 key={card.id}
@@ -396,9 +381,8 @@ export function MusicTaskList({
                 data-status={status}
                 data-playing={isPlaying ? 'true' : undefined}
                 title={title}
-                subtitle={prompt || t('musicPromptEmpty')}
+                subtitle={compactDescription(card, t)}
                 duration={formatSongDuration(song)}
-                metaItems={meta}
                 coverUrl={song.imageUrl}
                 playing={isPlaying}
                 selected={selected}

@@ -10,8 +10,13 @@ import {
   runLegacyKunDataMigration,
   USER_DATA_MIGRATION_MARKER
 } from './legacy-data-migration'
+import { APP_HOME_DIR_NAME } from '../shared/app-brand'
 
 const tempRoots: string[] = []
+
+function brandHomePath(home: string, ...parts: string[]): string {
+  return join(home, APP_HOME_DIR_NAME, ...parts)
+}
 
 async function makeTempRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'kun-migration-'))
@@ -109,7 +114,7 @@ describe('migrateLegacyUserDataDir', () => {
 })
 
 describe('migrateLegacyHomeDataDirs', () => {
-  it('moves all known legacy dirs under ~/.kun and links the old locations', async () => {
+  it('moves all known legacy dirs under ~/Claude360 Copilot and links the old locations', async () => {
     const home = await makeTempRoot()
     for (const child of ['kun', 'default_workspace', 'claw', 'write_workspace']) {
       await mkdir(join(home, '.deepseekgui', child), { recursive: true })
@@ -119,59 +124,59 @@ describe('migrateLegacyHomeDataDirs', () => {
     const results = migrateLegacyHomeDataDirs({ homeDir: home })
 
     expect(results.map((r) => r.outcome)).toEqual(['migrated', 'migrated', 'migrated', 'migrated'])
-    expect(await readFile(join(home, '.kun', 'data', 'marker.txt'), 'utf8')).toBe('kun')
-    expect(await readFile(join(home, '.kun', 'claw', 'marker.txt'), 'utf8')).toBe('claw')
-    expect(await isSymlinkTo(join(home, '.deepseekgui', 'kun'), join(home, '.kun', 'data'))).toBe(true)
-    expect(await isSymlinkTo(join(home, '.deepseekgui', 'claw'), join(home, '.kun', 'claw'))).toBe(true)
+    expect(await readFile(brandHomePath(home, 'data', 'marker.txt'), 'utf8')).toBe('kun')
+    expect(await readFile(brandHomePath(home, 'claw', 'marker.txt'), 'utf8')).toBe('claw')
+    expect(await isSymlinkTo(join(home, '.deepseekgui', 'kun'), brandHomePath(home, 'data'))).toBe(true)
+    expect(await isSymlinkTo(join(home, '.deepseekgui', 'claw'), brandHomePath(home, 'claw'))).toBe(true)
     // 旧路径透过链接仍然可读(老版本回滚、sqlite 里的旧绝对路径都靠它)。
     expect(await readFile(join(home, '.deepseekgui', 'kun', 'marker.txt'), 'utf8')).toBe('kun')
-    expect(await readFile(join(home, '.deepseekgui', 'MIGRATED.txt'), 'utf8')).toContain('.kun')
+    expect(await readFile(join(home, '.deepseekgui', 'MIGRATED.txt'), 'utf8')).toContain(APP_HOME_DIR_NAME)
   })
 
-  it('merges into an existing ~/.kun without touching its other children', async () => {
+  it('merges into an existing Claude360 Copilot home dir without touching its other children', async () => {
     const home = await makeTempRoot()
-    await mkdir(join(home, '.kun', 'skills'), { recursive: true })
-    await writeFile(join(home, '.kun', 'config.toml'), 'x = 1', 'utf8')
+    await mkdir(brandHomePath(home, 'skills'), { recursive: true })
+    await writeFile(brandHomePath(home, 'config.toml'), 'x = 1', 'utf8')
     await mkdir(join(home, '.deepseekgui', 'kun'), { recursive: true })
     await writeFile(join(home, '.deepseekgui', 'kun', 'db.sqlite'), 'db', 'utf8')
 
     const results = migrateLegacyHomeDataDirs({ homeDir: home })
 
-    const kunMapping = results.find((r) => r.nextPath === join(home, '.kun', 'data'))
+    const kunMapping = results.find((r) => r.nextPath === brandHomePath(home, 'data'))
     expect(kunMapping?.outcome).toBe('migrated')
-    expect(await readFile(join(home, '.kun', 'data', 'db.sqlite'), 'utf8')).toBe('db')
-    expect(await readFile(join(home, '.kun', 'config.toml'), 'utf8')).toBe('x = 1')
+    expect(await readFile(brandHomePath(home, 'data', 'db.sqlite'), 'utf8')).toBe('db')
+    expect(await readFile(brandHomePath(home, 'config.toml'), 'utf8')).toBe('x = 1')
   })
 
   it('leaves both dirs alone when old and new both contain data', async () => {
     const home = await makeTempRoot()
     await mkdir(join(home, '.deepseekgui', 'claw'), { recursive: true })
     await writeFile(join(home, '.deepseekgui', 'claw', 'old.txt'), 'old', 'utf8')
-    await mkdir(join(home, '.kun', 'claw'), { recursive: true })
-    await writeFile(join(home, '.kun', 'claw', 'new.txt'), 'new', 'utf8')
+    await mkdir(brandHomePath(home, 'claw'), { recursive: true })
+    await writeFile(brandHomePath(home, 'claw', 'new.txt'), 'new', 'utf8')
 
     const results = migrateLegacyHomeDataDirs({ homeDir: home })
 
-    const clawMapping = results.find((r) => r.nextPath === join(home, '.kun', 'claw'))
+    const clawMapping = results.find((r) => r.nextPath === brandHomePath(home, 'claw'))
     expect(clawMapping?.outcome).toBe('next-exists')
     expect(clawMapping?.rewriteSafe).toBe(false)
     expect(await readFile(join(home, '.deepseekgui', 'claw', 'old.txt'), 'utf8')).toBe('old')
-    expect(await readFile(join(home, '.kun', 'claw', 'new.txt'), 'utf8')).toBe('new')
+    expect(await readFile(brandHomePath(home, 'claw', 'new.txt'), 'utf8')).toBe('new')
   })
 
   it('replaces an empty new home dir with migrated legacy data', async () => {
     const home = await makeTempRoot()
     await mkdir(join(home, '.deepseekgui', 'kun'), { recursive: true })
     await writeFile(join(home, '.deepseekgui', 'kun', 'db.sqlite'), 'db', 'utf8')
-    await mkdir(join(home, '.kun', 'data'), { recursive: true })
+    await mkdir(brandHomePath(home, 'data'), { recursive: true })
 
     const results = migrateLegacyHomeDataDirs({ homeDir: home })
 
-    const kunMapping = results.find((r) => r.nextPath === join(home, '.kun', 'data'))
+    const kunMapping = results.find((r) => r.nextPath === brandHomePath(home, 'data'))
     expect(kunMapping?.outcome).toBe('migrated')
     expect(kunMapping?.rewriteSafe).toBe(true)
-    expect(await readFile(join(home, '.kun', 'data', 'db.sqlite'), 'utf8')).toBe('db')
-    expect(await isSymlinkTo(join(home, '.deepseekgui', 'kun'), join(home, '.kun', 'data'))).toBe(true)
+    expect(await readFile(brandHomePath(home, 'data', 'db.sqlite'), 'utf8')).toBe('db')
+    expect(await isSymlinkTo(join(home, '.deepseekgui', 'kun'), brandHomePath(home, 'data'))).toBe(true)
   })
 
   it('reports missing legacy dirs as rewrite-safe no-ops', async () => {
@@ -215,9 +220,9 @@ describe('rewriteLegacyPathsInSettingsFile', () => {
 
     expect(rewritten).toBe(true)
     const updated = JSON.parse(await readFile(join(userData, 'deepseek-gui-settings.json'), 'utf8'))
-    expect(updated.workspaceRoot).toBe(join(home, '.kun', 'default_workspace'))
-    expect(updated.agents.kun.dataDir).toBe('~/.kun/data')
-    expect(updated.claw.channels[0].workspaceRoot).toBe(join(home, '.kun', 'claw', 'feishu', 'app1'))
+    expect(updated.workspaceRoot).toBe(brandHomePath(home, 'default_workspace'))
+    expect(updated.agents.kun.dataDir).toBe(`~/${APP_HOME_DIR_NAME}/data`)
+    expect(updated.claw.channels[0].workspaceRoot).toBe(brandHomePath(home, 'claw', 'feishu', 'app1'))
     // write_workspace 映射没有传入 → 不重写;未知子目录永远不重写。
     expect(updated.write.workspaces[0]).toBe(join(home, '.deepseekgui', 'write_workspace'))
     expect(updated.write.workspaces[1]).toBe(join(home, '.deepseekgui', 'custom_dir'))
@@ -260,7 +265,7 @@ describe('rewriteLegacyPathsInSettingsFile', () => {
 
     expect(rewritten).toBe(true)
     const updated = JSON.parse(await readFile(join(userData, 'kun-settings.json'), 'utf8'))
-    expect(updated.agents.kun.dataDir).toBe(`${join(home, '.kun', 'data').replace(/\//g, '\\')}\\sessions`)
+    expect(updated.agents.kun.dataDir).toBe(`${brandHomePath(home, 'data').replace(/\//g, '\\')}\\sessions`)
   })
 })
 
@@ -291,9 +296,9 @@ describe('runLegacyKunDataMigration', () => {
     const settings = JSON.parse(
       await readFile(join(appData, 'Kun', 'deepseek-gui-settings.json'), 'utf8')
     )
-    expect(settings.agents.kun.dataDir).toBe('~/.kun/data')
-    expect(settings.workspaceRoot).toBe(join(home, '.kun', 'default_workspace'))
-    expect(await readFile(join(home, '.kun', 'data', 'db.sqlite'), 'utf8')).toBe('db')
+    expect(settings.agents.kun.dataDir).toBe(`~/${APP_HOME_DIR_NAME}/data`)
+    expect(settings.workspaceRoot).toBe(brandHomePath(home, 'default_workspace'))
+    expect(await readFile(brandHomePath(home, 'data', 'db.sqlite'), 'utf8')).toBe('db')
   })
 
   it('never throws even when nothing exists', () => {

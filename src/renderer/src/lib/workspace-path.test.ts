@@ -10,19 +10,19 @@ describe('defaultConversationWorkspaceRoot', () => {
     vi.unstubAllGlobals()
   })
 
-  it('uses ~/Documents/Kun on macOS', () => {
+  it('uses ~/Documents/Claude360 Copilot on macOS', () => {
     vi.stubGlobal('window', { kunGui: { platform: 'darwin' } })
-    expect(defaultConversationWorkspaceRoot()).toBe('~/Documents/Kun')
+    expect(defaultConversationWorkspaceRoot()).toBe('~/Documents/Claude360 Copilot')
   })
 
-  it('uses ~/.local/share/Kun/conversations on Linux', () => {
+  it('uses ~/.local/share/Claude360 Copilot/conversations on Linux', () => {
     vi.stubGlobal('window', { kunGui: { platform: 'linux' } })
-    expect(defaultConversationWorkspaceRoot()).toBe('~/.local/share/Kun/conversations')
+    expect(defaultConversationWorkspaceRoot()).toBe('~/.local/share/Claude360 Copilot/conversations')
   })
 
-  it('falls back to ~/Documents/Kun when platform is unknown', () => {
+  it('falls back to ~/Documents/Claude360 Copilot when platform is unknown', () => {
     vi.stubGlobal('window', { kunGui: { platform: '' } })
-    expect(defaultConversationWorkspaceRoot()).toBe('~/Documents/Kun')
+    expect(defaultConversationWorkspaceRoot()).toBe('~/Documents/Claude360 Copilot')
   })
 
   it('DEFAULT_CONVERSATION_WORKSPACE_ROOT resolves at import time from the platform', () => {
@@ -76,7 +76,7 @@ describe('isConversationWorkspacePath', () => {
   it('falls back to the platform default when no root is given', () => {
     vi.stubGlobal('window', { kunGui: { platform: 'linux', homeDir: '/home/alice' } })
     expect(
-      isConversationWorkspacePath('/home/alice/.local/share/Kun/conversations/20260626-153012')
+      isConversationWorkspacePath('/home/alice/.local/share/Claude360 Copilot/conversations/20260626-153012')
     ).toBe(true)
   })
 })

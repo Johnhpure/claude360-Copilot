@@ -26,6 +26,7 @@ import type {
   ModelProviderProfileV1
 } from '../shared/app-settings'
 import {
+  APP_PRODUCT_NAME,
   DEFAULT_CLAW_MODEL,
   DEFAULT_MODEL_PROVIDER_ID,
   buildClawRuntimePrompt,
@@ -391,11 +392,11 @@ function imNewTopicText(settings: AppSettingsV1): string {
  */
 export function imWelcomeText(settings: AppSettingsV1, channel?: ClawImChannelV1): string {
   const profile = channel?.agentProfile
-  const name = profile?.name.trim() || channel?.label.trim() || 'Kun'
+  const name = profile?.name.trim() || channel?.label.trim() || APP_PRODUCT_NAME
   const description = profile?.description.trim() ?? ''
   if (isChineseLocale(settings)) {
     return [
-      `你好，我是 ${name}，通过 Kun 连接到这个对话的 AI 助手。`,
+      `你好，我是 ${name}，通过 ${APP_PRODUCT_NAME} 连接到这个对话的 AI 助手。`,
       ...(description ? [description] : []),
       '你可以直接发消息让我帮忙：回答问题、查资料、读写已连接电脑工作区里的文件、生成文档等，完成后我会在这里回复你。',
       imCommandHelpText(settings),
@@ -403,7 +404,7 @@ export function imWelcomeText(settings: AppSettingsV1, channel?: ClawImChannelV1
     ].join('\n\n')
   }
   return [
-    `Hi, I am ${name}, an AI assistant connected to this chat through Kun.`,
+    `Hi, I am ${name}, an AI assistant connected to this chat through ${APP_PRODUCT_NAME}.`,
     ...(description ? [description] : []),
     'Send me a message and I will handle it on the connected computer: answering questions, research, reading and writing workspace files, generating documents — I reply here once done.',
     imCommandHelpText(settings),

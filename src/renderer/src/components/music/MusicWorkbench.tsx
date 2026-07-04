@@ -115,7 +115,7 @@ function NowPlayingCard({
         <h3 className="text-[15px] font-semibold leading-snug text-ds-ink">{song.title}</h3>
         {song.tags?.trim() ? <p className="text-[12px] text-ds-muted">{song.tags.trim()}</p> : null}
         {song.text?.trim() ? (
-          <p className="whitespace-pre-wrap text-[12.5px] leading-6 text-ds-muted">{song.text.trim()}</p>
+          <p className="whitespace-pre-wrap text-[13px] leading-7 text-ds-muted">{song.text.trim()}</p>
         ) : null}
       </div>
     </Card>
@@ -586,7 +586,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
         </section>
 
         {current ? (
-          <aside className="hidden w-[300px] shrink-0 flex-col gap-4 xl:flex xl:overflow-y-auto xl:border-l xl:border-ds-border xl:pl-4">
+          <aside className="hidden shrink-0 flex-col gap-4 xl:flex xl:w-[340px] xl:overflow-y-auto xl:border-l xl:border-ds-border xl:pl-4 2xl:w-[360px]">
             <NowPlayingCard song={current} resolveCover={resolveCoverObjectUrl} t={t} />
           </aside>
         ) : null}

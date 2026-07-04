@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { Sparkles, X } from 'lucide-react'
 import { generateLyrics, type LyricsStreamApi, type LyricsStreamHandle } from '../../music/lyrics-ai'
-import { Button, Card, Input, Select } from '../ui'
+import { Button, Card, Input, Modal, Select } from '../ui'
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string
 
@@ -21,10 +21,8 @@ type Props = {
 
 const STRUCTURE_OPTIONS = ['主歌-副歌', '含 Bridge', '自由发挥']
 
-// ✨ AI 写词助手（overlay 抽屉模态，阶段4 迁移）：主题/语言/情绪/结构 → 流式生成歌词 → 采用并填入。
-// 维持抽屉交互（Esc/遮罩关闭、原地渲染便于静态测试），视觉归一 Calm Blue：
-// 遮罩 = bg-black/45 + blur(var(--blur-overlay))（浮层唯一 blur 场景，随 data-blur 降级）；
-// 面板 = surface-elevated + --radius-2xl；表单控件走 ui/ 原语；结果容器接 ui/Card。
+// ✨ AI 写词助手（标准居中 Modal）：主题/语言/情绪/结构 → 流式生成歌词 → 采用并填入。
+// 遮罩、Esc/遮罩关闭、portal 居中和 blur 降级由 ui/Modal 统一负责。
 // 生成副作用走注入的 streamApi（generateLyrics），组件本身保持 props 注入可静态渲染测试。
 export function LyricsAssistantDrawer({
   open,
@@ -49,16 +47,11 @@ export function LyricsAssistantDrawer({
 
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
     return () => {
-      window.removeEventListener('keydown', onKey)
       handleRef.current?.cancel()
       handleRef.current = null
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 
@@ -83,18 +76,16 @@ export function LyricsAssistantDrawer({
   }
 
   return (
-    <>
-      <div
-        className="ds-ui-anim-overlay-fade fixed inset-0 z-[200] bg-black/45 backdrop-blur-[var(--blur-overlay)]"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+    <Modal
+      open={open}
+      onClose={onClose}
+      ariaLabel={t('musicLyricsAiTitle')}
+      size="lg"
+      className="flex max-h-[calc(100dvh-48px)] w-[560px] max-w-[calc(100vw-32px)] flex-col overflow-hidden !p-0"
+    >
       <div
         data-testid="music-lyrics-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="lyrics-ai-title"
-        className="ds-ui-anim-modal-panel fixed left-1/2 top-1/2 z-[201] flex max-h-[calc(100dvh-48px)] w-[560px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-ds-border bg-ds-elevated shadow-[var(--c360-shadow-overlay)]"
+        className="flex min-h-0 w-full flex-col"
       >
         <header className="flex items-start gap-3 border-b border-ds-border px-5 py-4">
           <div className="min-w-0">
@@ -222,6 +213,6 @@ export function LyricsAssistantDrawer({
           </Card>
         </div>
       </div>
-    </>
+    </Modal>
   )
 }

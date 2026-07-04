@@ -50,7 +50,8 @@ describe('JsonSettingsStore', () => {
     const store = new JsonSettingsStore(userDataDir)
     const loaded = await store.load()
 
-    expect(loaded.write.defaultWorkspaceRoot).toContain('.kun')
+    expect(loaded.write.defaultWorkspaceRoot).toContain('Claude360 Copilot')
+    expect(loaded.write.defaultWorkspaceRoot).not.toContain('.kun')
     expect(loaded.write.workspaces).toContain(loaded.write.defaultWorkspaceRoot)
     expect(loaded.write.inlineCompletion.enabled).toBe(true)
     expect(loaded.write.inlineCompletion.retrievalEnabled).toBe(true)

@@ -2601,13 +2601,12 @@ export function Workbench(): ReactElement {
             <Suspense fallback={<WorkbenchPaneFallback />}>
               <WriteSidebar
                 activeView="write"
-                connectPhoneSidebarOpen={connectPhoneSidebarOpen}
                 onCodeOpen={openCodeMode}
                 onWriteOpen={openWriteMode}
                 onOpenCanvas={() => setRoute('canvas')}
                 onOpenMusic={() => setRoute('music')}
+                onOpenMy={() => setRoute('my')}
                 onOpenSettings={(section) => openSettings(section)}
-                onToggleConnectPhone={toggleConnectPhone}
               />
             </Suspense>
           ) : (

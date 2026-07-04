@@ -10,8 +10,6 @@ import {
   FolderPlus,
   Plus,
   RefreshCw,
-  Settings,
-  Smartphone,
   Trash2
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -26,9 +24,9 @@ import {
   writeJoinPath,
   writeRelativeToWorkspace
 } from '../../write/write-workspace-store'
-import { ConnectPhoneSidebarPanel } from '../chat/ConnectPhoneView'
 import { FeatureSwitcher } from '../shell/FeatureSwitcher'
 import { isPrimaryRouteVisible } from '../../lib/feature-visibility'
+import { SidebarFooterNav } from '../sidebar/SidebarFooterNav'
 import {
   SidebarCommandRow,
   SidebarFrame,
@@ -40,15 +38,14 @@ import { WriteFileTree } from './WriteFileTree'
 
 type Props = {
   activeView: 'chat' | 'write' | 'claw' | 'schedule'
-  connectPhoneSidebarOpen: boolean
   onCodeOpen: () => void
   onWriteOpen: () => void
   /** 打开生图工作台。四个功能入口（Code/写作/生图/音乐）在所有页面固定显示。 */
   onOpenCanvas: () => void
   /** 打开音乐工作台。 */
   onOpenMusic: () => void
+  onOpenMy: () => void
   onOpenSettings: (section?: SettingsRouteSection) => void
-  onToggleConnectPhone: () => void
 }
 
 type EntryDialog =
@@ -61,18 +58,14 @@ type Translate = (key: string, opts?: Record<string, unknown>) => string
 
 export function WriteSidebar({
   activeView,
-  connectPhoneSidebarOpen,
   onCodeOpen,
   onWriteOpen,
   onOpenCanvas,
   onOpenMusic,
-  onOpenSettings,
-  onToggleConnectPhone
+  onOpenMy,
+  onOpenSettings
 }: Props): ReactElement {
   const { t } = useTranslation('common')
-  const clawChannels = useChatStore((s) => s.clawChannels)
-  const addClawChannel = useChatStore((s) => s.addClawChannel)
-  const deleteClawChannel = useChatStore((s) => s.deleteClawChannel)
   const ensureWriteThreadForWorkspace = useChatStore((s) => s.ensureWriteThreadForWorkspace)
   const runtimeConnection = useChatStore((s) => s.runtimeConnection)
   const [entryDialog, setEntryDialog] = useState<EntryDialog | null>(null)
@@ -265,21 +258,10 @@ export function WriteSidebar({
     <SidebarFrame
       title={t('appName')}
       footer={
-        <div className="space-y-1">
-          <SidebarCommandRow
-            icon={<Smartphone className="h-4 w-4" strokeWidth={1.75} />}
-            label={t('claw')}
-            onClick={onToggleConnectPhone}
-            active={connectPhoneSidebarOpen}
-            variant="footer"
-          />
-          <SidebarCommandRow
-            icon={<Settings className="h-4 w-4" strokeWidth={1.75} />}
-            label={t('settings')}
-            onClick={() => onOpenSettings('write')}
-            variant="footer"
-          />
-        </div>
+        <SidebarFooterNav
+          onOpenMy={onOpenMy}
+          onOpenSettings={() => onOpenSettings('write')}
+        />
       }
     >
       <div className="ds-no-drag flex flex-col px-0.5">
@@ -313,17 +295,6 @@ export function WriteSidebar({
 
       <div className="ds-no-drag mx-1.5 my-3" />
 
-      {connectPhoneSidebarOpen ? (
-        <ConnectPhoneSidebarPanel
-          channels={clawChannels}
-          onAddProvider={async (provider, agentProfile, platformCredential, options) => {
-            await addClawChannel(provider, agentProfile, platformCredential, options)
-            onToggleConnectPhone()
-          }}
-          onDisconnect={(channelId) => deleteClawChannel(channelId)}
-          onOpenSettings={() => onOpenSettings('claw')}
-        />
-      ) : (
       <div className="ds-no-drag flex min-h-0 flex-1 flex-col">
         <SidebarSectionHeader
           label={t('writeSpaces')}
@@ -464,7 +435,6 @@ export function WriteSidebar({
           })}
         </div>
       </div>
-      )}
     </SidebarFrame>
     {entryDialog ? (
       <WriteEntryDialog

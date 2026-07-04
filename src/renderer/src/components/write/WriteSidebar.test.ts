@@ -15,9 +15,6 @@ vi.mock('react-i18next', async (importOriginal) => ({
 }))
 
 const chatState: Record<string, unknown> = {
-  clawChannels: [],
-  addClawChannel: vi.fn(),
-  deleteClawChannel: vi.fn(),
   ensureWriteThreadForWorkspace: vi.fn(async () => 'thread-1'),
   runtimeConnection: 'ready'
 }
@@ -61,9 +58,6 @@ vi.mock('../../write/write-workspace-store', async (importOriginal) => {
 
 // 隔离重型子组件，聚焦入口区可见性断言（与 chat/Sidebar.test.ts 同款策略）。
 // FeatureSwitcher 为轻量纯展示组件，直接真渲染（阶段2 统一四工作台切换入口）。
-vi.mock('../chat/ConnectPhoneView', () => ({
-  ConnectPhoneSidebarPanel: () => createElement('div', { 'data-testid': 'connect-phone-panel' })
-}))
 vi.mock('./WriteFileTree', () => ({
   WriteFileTree: () => createElement('div', { 'data-testid': 'write-file-tree' })
 }))
@@ -74,13 +68,12 @@ function renderWriteSidebar(): string {
   return renderToStaticMarkup(
     createElement(WriteSidebar, {
       activeView: 'write',
-      connectPhoneSidebarOpen: false,
       onCodeOpen: vi.fn(),
       onWriteOpen: vi.fn(),
       onOpenCanvas: vi.fn(),
       onOpenMusic: vi.fn(),
-      onOpenSettings: vi.fn(),
-      onToggleConnectPhone: vi.fn()
+      onOpenMy: vi.fn(),
+      onOpenSettings: vi.fn()
     })
   )
 }
@@ -100,5 +93,13 @@ describe('WriteSidebar 功能入口', () => {
     // activeView='write' → 只有写作 tab aria-selected="true"。
     expect(html.match(/aria-selected="true"/g)?.length).toBe(1)
     expect(html.match(/aria-selected="false"/g)?.length).toBe(3)
+  })
+
+  it('底部统一显示我的和设置，不再显示连接手机入口', () => {
+    const html = renderWriteSidebar()
+    expect(html).toContain('myPage')
+    expect(html).toContain('settings')
+    expect(html).not.toContain('claw')
+    expect(html).not.toContain('connect-phone-panel')
   })
 })

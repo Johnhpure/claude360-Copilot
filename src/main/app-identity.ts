@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { APP_PRODUCT_NAME as SHARED_APP_PRODUCT_NAME } from '../shared/app-brand'
 
 /**
  * 项目对外展示的产品名,需要和:
@@ -16,7 +17,7 @@ import { app } from 'electron'
  * 注意:electron-builder 的 appId 已按 Claude360 决策同步换成
  * xyz.claude360.copilot,不再沿用旧 com.xingyuzhong.deepseekgui。
  */
-export const APP_PRODUCT_NAME = 'Claude360 Copilot'
+export const APP_PRODUCT_NAME = SHARED_APP_PRODUCT_NAME
 
 /**
  * 第一阶段数据目录策略开关:是否在启动期自动导入旧 Kun / DeepSeek GUI 数据。

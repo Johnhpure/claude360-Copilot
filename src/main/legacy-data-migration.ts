@@ -9,9 +9,10 @@ import {
   writeFileSync
 } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
+import { APP_HOME_DIR_NAME } from '../shared/app-brand'
 
 /**
- * 一次性把 “DeepSeek GUI” 时代的本地数据搬到 Kun 的新命名下。
+ * 一次性把 “DeepSeek GUI” 时代的本地数据搬到 Claude360 Copilot 的新命名下。
  *
  * 设计约束(都来自“老版本必须无痛升级、还要能回滚”):
  *   1. 整目录 rename 而不是逐文件拷贝 —— userData 里有 Chromium 的
@@ -34,12 +35,12 @@ export type MigrationLogger = (message: string, detail?: unknown) => void
 export const LEGACY_USER_DATA_DIR_NAMES = ['DeepSeek GUI', 'deepseek-gui'] as const
 
 export const LEGACY_HOME_DATA_ROOT = '.deepseekgui'
-export const NEW_HOME_DATA_ROOT = '.kun'
+export const NEW_HOME_DATA_ROOT = APP_HOME_DIR_NAME
 
 export type HomeDataMigrationMapping = {
   /** 相对 home 的旧路径段,如 ['.deepseekgui', 'kun'] */
   legacySegments: readonly string[]
-  /** 相对 home 的新路径段,如 ['.kun', 'data'] */
+  /** 相对 home 的新路径段,如 ['Claude360 Copilot', 'data'] */
   nextSegments: readonly string[]
 }
 
@@ -49,7 +50,7 @@ export type HomeDataMigrationMapping = {
  * 指向它们的路径也不会被重写。
  */
 export const HOME_DATA_MIGRATION_MAPPINGS: readonly HomeDataMigrationMapping[] = [
-  // kun 运行时数据(sqlite、线程、config.json)。新家叫 data,避免 ~/.kun/kun。
+  // runtime 数据(sqlite、线程、config.json)。新家叫 data,避免品牌目录下再套旧名。
   { legacySegments: [LEGACY_HOME_DATA_ROOT, 'kun'], nextSegments: [NEW_HOME_DATA_ROOT, 'data'] },
   { legacySegments: [LEGACY_HOME_DATA_ROOT, 'default_workspace'], nextSegments: [NEW_HOME_DATA_ROOT, 'default_workspace'] },
   { legacySegments: [LEGACY_HOME_DATA_ROOT, 'claw'], nextSegments: [NEW_HOME_DATA_ROOT, 'claw'] },

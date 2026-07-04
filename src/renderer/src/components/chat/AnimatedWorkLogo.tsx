@@ -1,10 +1,6 @@
 import type { ReactElement } from 'react'
 import { useEffect, useState } from 'react'
-import kunLogo from '../../../../asset/img/kun_bird.png'
-import kunSurfFigure from '../../../../asset/img/kun_surf.png'
-import kunGreetFigure from '../../../../asset/img/kun_greet.png'
-import kunSleepFigure from '../../../../asset/img/kun_sleep.png'
-import kunSitFigure from '../../../../asset/img/kun_sit.png'
+import claude360Logo from '../../../../asset/img/claude360.png'
 
 export type WorkLogoSwimMode = 'propel' | 'sprint' | 'dive' | 'surf'
 
@@ -43,13 +39,7 @@ export function useWorkLogoSwimMode(active: boolean): WorkLogoSwimMode {
 
 export type KunStateFigureKind = 'greet' | 'sleep' | 'sit'
 
-const KUN_STATE_FIGURES: Record<KunStateFigureKind, string> = {
-  greet: kunGreetFigure,
-  sleep: kunSleepFigure,
-  sit: kunSitFigure
-}
-
-/** 静态场景里的形象:打招呼(欢迎)、睡觉(运行时待唤醒)、坐着(空状态) */
+/** 静态场景里的品牌标识:欢迎、运行时待唤醒、空状态。 */
 export function KunStateFigure({
   kind,
   className = ''
@@ -64,10 +54,11 @@ export function KunStateFigure({
     >
       <img
         className="ds-kun-state-figure"
-        src={KUN_STATE_FIGURES[kind]}
+        src={claude360Logo}
         alt=""
         draggable={false}
         decoding="async"
+        data-brand-state={kind}
       />
     </span>
   )
@@ -88,7 +79,6 @@ export function AnimatedWorkLogo({
 }): ReactElement {
   const rotatedSwimMode = useWorkLogoSwimMode(active && mode === undefined)
   const swimMode = mode ?? rotatedSwimMode
-  const figureSrc = swimMode === 'surf' ? kunSurfFigure : kunLogo
 
   return (
     <span
@@ -117,10 +107,10 @@ export function AnimatedWorkLogo({
       <span className="ds-work-logo-splash" />
       <span className="ds-work-logo-spray" />
       <span className="ds-work-logo-bubbles" />
-      <img className="ds-work-logo-echo" src={figureSrc} alt="" draggable={false} decoding="async" />
+      <img className="ds-work-logo-echo" src={claude360Logo} alt="" draggable={false} decoding="async" />
       <span className="ds-work-logo-track">
         <span className="ds-work-logo-body">
-          <img className="ds-work-logo-image" src={figureSrc} alt="" draggable={false} decoding="async" />
+          <img className="ds-work-logo-image" src={claude360Logo} alt="" draggable={false} decoding="async" />
         </span>
       </span>
     </span>

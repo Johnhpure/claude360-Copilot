@@ -2,6 +2,7 @@ import {
   DEFAULT_CHECKPOINT_CLEANUP_INTERVAL_DAYS,
   DEFAULT_LOG_RETENTION_DAYS,
   DEFAULT_GUI_UPDATE_CHANNEL,
+  DEFAULT_CODE_WORKSPACE_ROOT,
   MIN_KUN_LOCAL_PORT,
   defaultKunRuntimeSettings,
   applyKunRuntimePatch,
@@ -38,7 +39,7 @@ import type { GuiUpdateInfo } from '@shared/gui-update'
 type RendererSettingsShape = AppSettingsPatch
 type SettingsPatch = AppSettingsPatch
 
-export const DEFAULT_WORKSPACE_ROOT = '~/.kun/default_workspace'
+export const DEFAULT_WORKSPACE_ROOT = DEFAULT_CODE_WORKSPACE_ROOT
 
 export function splitSettingsList(raw: string): string[] {
   return raw

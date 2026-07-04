@@ -4,6 +4,7 @@ import { access, mkdir, realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
+import { DEFAULT_MANAGED_WORKTREE_ROOT } from '../../shared/app-brand'
 import type {
   GitBranchesResult,
   GitBranchWorktreeRow,
@@ -73,8 +74,17 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+function expandHomePath(raw: string): string {
+  const value = raw.trim()
+  if (value === '~') return homedir()
+  if (value.startsWith('~/') || value.startsWith('~\\')) {
+    return join(homedir(), value.slice(2))
+  }
+  return value
+}
+
 function resolveBranchWorktreeRoot(worktreeRoot?: string): string {
-  return worktreeRoot?.trim() || join(homedir(), '.kun', 'worktrees')
+  return expandHomePath(worktreeRoot?.trim() || DEFAULT_MANAGED_WORKTREE_ROOT)
 }
 
 async function allocateBranchWorktreePath(
