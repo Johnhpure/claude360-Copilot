@@ -5,6 +5,9 @@ import { useStore } from 'zustand'
 import { Music2 } from 'lucide-react'
 import type { Claude360Song } from '@shared/claude360-music'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
+import { PageHeader } from '../shell'
+import { Card, toast } from '../ui'
+import { confirmDialog } from '../../lib/confirm-dialog'
 import { emptyForm } from '../../music/suno-params'
 import type { Claude360MusicCreateForm } from '@shared/claude360-music'
 import {
@@ -33,7 +36,8 @@ import { ensureGroupKeyForSelection } from '../../lib/group-key-ensure'
 import { useGroupKeyPromptStore } from '../../store/group-key-prompt-store'
 import { MusicCreatePanel } from './MusicCreatePanel'
 import { MusicTaskList } from './MusicTaskList'
-import { MusicPlayer } from './MusicPlayer'
+import { MiniPlayerBar } from './MiniPlayerBar'
+import { MusicCoverImage } from './MusicCard'
 import { LyricsAssistantDrawer } from './LyricsAssistantDrawer'
 
 type Props = {
@@ -86,6 +90,38 @@ function blobFromBase64(base64: string, mimeType: string): Blob {
   return new Blob([bytes], { type: mimeType || 'audio/mpeg' })
 }
 
+type TFn = (key: string, opts?: Record<string, unknown>) => string
+
+// 「正在播放 + 歌词」右栏（阶段4 design §3.2）：当前歌曲封面 + 标题/曲风 + 歌词（song.text）。
+// 纯展示；歌词缺失时只展示封面与标题，不引入新文案 key。
+function NowPlayingCard({
+  song,
+  resolveCover,
+  t
+}: {
+  song: Claude360Song
+  resolveCover?: (url: string) => Promise<string | null>
+  t: TFn
+}): ReactElement {
+  return (
+    <Card unpadded data-testid="music-now-playing" className="flex min-h-0 flex-col overflow-hidden">
+      <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-ds-main">
+        <MusicCoverImage src={song.imageUrl} title={song.title} active resolveCover={resolveCover} t={t} />
+      </div>
+      <div className="flex min-h-0 flex-col gap-2 overflow-y-auto p-4">
+        <span className="self-start rounded-full bg-ds-accent-soft px-2 py-0.5 text-[11px] font-medium text-ds-accent">
+          {t('musicPlaying')}
+        </span>
+        <h3 className="text-[15px] font-semibold leading-snug text-ds-ink">{song.title}</h3>
+        {song.tags?.trim() ? <p className="text-[12px] text-ds-muted">{song.tags.trim()}</p> : null}
+        {song.text?.trim() ? (
+          <p className="whitespace-pre-wrap text-[12.5px] leading-6 text-ds-muted">{song.text.trim()}</p>
+        ) : null}
+      </div>
+    </Card>
+  )
+}
+
 // 音乐工作台容器：拥有表单 state 与副作用编排（提交 / 轮询 / 播放 / 下载）。
 // 具体副作用委托给 music-workbench-actions.ts（可注入依赖），本容器只做 state/effect 编排，
 // 便于 node 单测直接测 actions 与展示子组件。renderer 全程不持有 / 输入 API Key。
@@ -105,7 +141,6 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [lyricsOpen, setLyricsOpen] = useState(false)
-  const [copyNotice, setCopyNotice] = useState<string | null>(null)
   const [playbackError, setPlaybackError] = useState<string | null>(null)
   // 写词助手用的文本模型列表（来自 text 分组）。
   const [textModels, setTextModels] = useState<string[]>([])
@@ -439,38 +474,35 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
     setProgress(time, audioRef.current?.duration ?? duration)
   }, [duration, setProgress])
 
-  const showCopyNotice = useCallback((message: string): void => {
-    setCopyNotice(message)
-    window.setTimeout(() => setCopyNotice(null), 1800)
-  }, [])
-
   // 下载：只下载、绝不打开窗口/页面。main 经 media-blob 代取鉴权音频 →
   // file:save-as 弹系统保存对话框写盘；取消静默，失败给可见提示 + 控制台真实错误。
+  // 一次性反馈走全局 toast（Toaster 已挂 AppShell，勿重复挂载）。
   const handleDownload = useCallback((song: Claude360Song): void => {
     const k = api()
     if (!k) return
     void downloadSong(k, song).then((result) => {
       if (result.ok) {
-        showCopyNotice(t('musicDownloadSaved'))
+        toast.success(t('musicDownloadSaved'))
         return
       }
       if (result.canceled) return
-      showCopyNotice(t('musicDownloadFailed', { message: result.message }))
+      toast.error(t('musicDownloadFailed', { message: result.message }))
     })
-  }, [showCopyNotice, t])
+  }, [t])
 
   const handleCopyPrompt = useCallback((prompt: string): void => {
     if (!navigator?.clipboard?.writeText) return
     void navigator.clipboard
       .writeText(prompt)
-      .then(() => showCopyNotice(t('musicPromptCopied')))
-      .catch(() => showCopyNotice(t('musicPromptCopyFailed')))
-  }, [showCopyNotice, t])
+      .then(() => toast.success(t('musicPromptCopied')))
+      .catch(() => toast.error(t('musicPromptCopyFailed')))
+  }, [t])
 
   const handleClearFinished = useCallback((): void => {
     if (tasks.length === 0) return
-    const ok = window.confirm(t('musicClearConfirm'))
-    if (ok) clearFinishedTasks()
+    void confirmDialog(t('musicClearConfirm')).then((ok) => {
+      if (ok) clearFinishedTasks()
+    })
   }, [clearFinishedTasks, tasks.length, t])
 
   const handleRegenerate = useCallback((task: MusicGenTask): void => {
@@ -491,23 +523,25 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
 
   return (
     <div className="ds-drag flex h-full min-h-0 flex-col bg-ds-main" data-testid="music-workbench">
-      <div className="ds-stage-inset shrink-0">
-        <header className="ds-topbar-surface relative z-10 mt-3 flex min-h-[46px] w-full items-stretch overflow-visible rounded-[24px]">
-          <div className="grid w-full min-w-0 items-center gap-2.5 px-3 py-2 sm:px-4 md:pl-5 md:pr-2">
-            <div className={`flex min-w-0 items-center gap-2.5 ${headerInset}`}>
-              <SidebarTitlebarToggleButton
-                onClick={onToggleLeftSidebar}
-                title={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')}
-                ariaLabel={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')}
-              />
-              <Music2 className="h-4 w-4 text-ds-muted" strokeWidth={1.75} />
-              <h1 className="min-w-0 flex-1 truncate text-[15px] font-medium text-ds-muted">{t('musicWorkbenchTitle')}</h1>
-            </div>
+      {/* 统一页头（shell/PageHeader）：大标题 + 侧栏折叠开关；窗口控制留白沿用 inset 类 */}
+      <PageHeader
+        title={t('musicWorkbenchTitle')}
+        leading={
+          <div className={`flex items-center gap-2.5 ${headerInset}`}>
+            <SidebarTitlebarToggleButton
+              onClick={onToggleLeftSidebar}
+              title={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')}
+              ariaLabel={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')}
+            />
+            <Music2 className="h-4 w-4 text-ds-muted" strokeWidth={1.75} aria-hidden />
           </div>
-        </header>
-      </div>
+        }
+      />
 
-      <main className="ds-no-drag flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 pb-5 pt-4 lg:flex-row lg:overflow-hidden">
+      {/* 主区（design §3.2）：左=创作面板（固定宽、独立滚动），中=任务列表/作品宫格
+          （running→TaskCard、done→MusicCard），右=正在播放+歌词（有当前歌曲时，宽屏显示）。
+          小屏（<lg）回退为上下排布并整体滚动。页边距 24px / 卡间距 16px（Calm Blue 语义常量）。 */}
+      <main className="ds-no-drag flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-4 pt-1 lg:flex-row lg:overflow-hidden">
         <aside
           data-testid="music-create-pane"
           className="flex w-full shrink-0 flex-col gap-4 lg:w-[360px] lg:overflow-y-auto lg:pr-1"
@@ -525,50 +559,37 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
 
         <section
           data-testid="music-works-pane"
-          className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:border-l lg:border-ds-border lg:pl-4"
+          className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 lg:border-l lg:border-ds-border lg:pl-4"
         >
-          <MusicTaskList
-            tasks={tasks}
-            currentSongId={current?.id ?? null}
-            playing={playing}
-            onPlay={(song, list) => playSong(song, list)}
-            onPause={pauseAction}
-            onDownload={handleDownload}
-            onRemoveTask={removeTask}
-            onRemoveSong={removeSong}
-            onClear={handleClearFinished}
-            onCopyPrompt={handleCopyPrompt}
-            onRegenerate={handleRegenerate}
-            resolveCover={resolveCoverObjectUrl}
-            t={t}
-          />
-          {copyNotice ? (
-            <div className="self-center rounded-full border border-ds-border bg-ds-card px-3 py-1.5 text-[12px] text-ds-ink shadow-sm">
-              {copyNotice}
-            </div>
-          ) : null}
+          <div className="min-h-0 flex-1 lg:overflow-y-auto lg:pr-1">
+            <MusicTaskList
+              tasks={tasks}
+              currentSongId={current?.id ?? null}
+              playing={playing}
+              onPlay={(song, list) => playSong(song, list)}
+              onPause={pauseAction}
+              onDownload={handleDownload}
+              onRemoveTask={removeTask}
+              onRemoveSong={removeSong}
+              onClear={handleClearFinished}
+              onCopyPrompt={handleCopyPrompt}
+              onRegenerate={handleRegenerate}
+              resolveCover={resolveCoverObjectUrl}
+              t={t}
+            />
+          </div>
           {playbackError ? (
-            <div className="self-center rounded-full border border-ds-border bg-ds-danger-soft px-3 py-1.5 text-[12px] text-ds-danger shadow-sm">
+            <div className="self-center rounded-full border border-ds-border bg-ds-danger-soft px-3 py-1.5 text-[12px] text-ds-danger">
               {playbackError}
             </div>
           ) : null}
-          <MusicPlayer
-            current={current}
-            playing={playing}
-            currentTime={currentTime}
-            duration={duration}
-            volume={volume}
-            hasPrev={playerHasPrev({ index: playIndex })}
-            hasNext={playerHasNext({ queue, index: playIndex })}
-            onTogglePlay={togglePlayerPlayback}
-            onSeek={handleSeek}
-            onVolume={setVolume}
-            onPrev={prevAction}
-            onNext={nextAction}
-            onDownload={handleDownload}
-            t={t}
-          />
         </section>
+
+        {current ? (
+          <aside className="hidden w-[300px] shrink-0 flex-col gap-4 xl:flex xl:overflow-y-auto xl:border-l xl:border-ds-border xl:pl-4">
+            <NowPlayingCard song={current} resolveCover={resolveCoverObjectUrl} t={t} />
+          </aside>
+        ) : null}
 
         <LyricsAssistantDrawer
           open={lyricsOpen}
@@ -580,6 +601,26 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
           t={t}
         />
       </main>
+
+      {/* 底部常驻迷你播放条（胶囊，design §2.5）：仅 music 工作台内常驻 */}
+      <div className="ds-no-drag shrink-0 px-6 pb-6">
+        <MiniPlayerBar
+          current={current}
+          playing={playing}
+          currentTime={currentTime}
+          duration={duration}
+          volume={volume}
+          hasPrev={playerHasPrev({ index: playIndex })}
+          hasNext={playerHasNext({ queue, index: playIndex })}
+          onTogglePlay={togglePlayerPlayback}
+          onSeek={handleSeek}
+          onVolume={setVolume}
+          onPrev={prevAction}
+          onNext={nextAction}
+          onDownload={handleDownload}
+          t={t}
+        />
+      </div>
 
       {/* 隐藏的 audio 元素，播放器条通过 store 状态桥接控制。 */}
       <audio

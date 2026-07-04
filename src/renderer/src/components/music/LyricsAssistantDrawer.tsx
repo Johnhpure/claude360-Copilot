@@ -1,7 +1,8 @@
 import type { ReactElement } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Sparkles, X } from 'lucide-react'
+import { Sparkles, X } from 'lucide-react'
 import { generateLyrics, type LyricsStreamApi, type LyricsStreamHandle } from '../../music/lyrics-ai'
+import { Button, Card, Input, Select } from '../ui'
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string
 
@@ -20,9 +21,11 @@ type Props = {
 
 const STRUCTURE_OPTIONS = ['主歌-副歌', '含 Bridge', '自由发挥']
 
-// ✨ AI 写词助手（overlay 模态）：主题/语言/情绪/结构 → 流式生成歌词 → 采用并填入。
-// 参考 claude360-music-web LyricsAiDrawer。生成副作用走注入的 streamApi（generateLyrics），
-// 组件本身保持 props 注入可静态渲染测试。
+// ✨ AI 写词助手（overlay 抽屉模态，阶段4 迁移）：主题/语言/情绪/结构 → 流式生成歌词 → 采用并填入。
+// 维持抽屉交互（Esc/遮罩关闭、原地渲染便于静态测试），视觉归一 Calm Blue：
+// 遮罩 = bg-black/45 + blur(var(--blur-overlay))（浮层唯一 blur 场景，随 data-blur 降级）；
+// 面板 = surface-elevated + --radius-2xl；表单控件走 ui/ 原语；结果容器接 ui/Card。
+// 生成副作用走注入的 streamApi（generateLyrics），组件本身保持 props 注入可静态渲染测试。
 export function LyricsAssistantDrawer({
   open,
   onClose,
@@ -79,13 +82,10 @@ export function LyricsAssistantDrawer({
     )
   }
 
-  const inputCls =
-    'w-full rounded-lg border border-ds-border bg-ds-main px-2.5 py-2 text-[12.5px] text-ds-ink'
-
   return (
     <>
       <div
-        className="fixed inset-0 z-[200] bg-[rgba(15,20,34,0.55)] backdrop-blur-[2px]"
+        className="ds-ui-anim-overlay-fade fixed inset-0 z-[200] bg-black/45 backdrop-blur-[var(--blur-overlay)]"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -94,7 +94,7 @@ export function LyricsAssistantDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby="lyrics-ai-title"
-        className="fixed left-1/2 top-1/2 z-[201] flex max-h-[calc(100dvh-48px)] w-[560px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-ds-border bg-ds-card shadow-xl"
+        className="ds-ui-anim-modal-panel fixed left-1/2 top-1/2 z-[201] flex max-h-[calc(100dvh-48px)] w-[560px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-ds-border bg-ds-elevated shadow-[var(--c360-shadow-overlay)]"
       >
         <header className="flex items-start gap-3 border-b border-ds-border px-5 py-4">
           <div className="min-w-0">
@@ -107,29 +107,23 @@ export function LyricsAssistantDrawer({
             type="button"
             aria-label={t('musicClose')}
             onClick={onClose}
-            className="ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ds-faint transition hover:bg-ds-hover hover:text-ds-ink"
+            className="ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-sm)] text-ds-faint transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
           >
             <X className="h-4 w-4" strokeWidth={1.75} />
           </button>
         </header>
 
         <div className="flex flex-col gap-3 overflow-y-auto px-5 py-4">
-          <label className="flex flex-col gap-1 text-[12px] text-ds-muted">
-            {t('musicLyricsAiModel')}
-            <select
-              data-testid="lyrics-ai-model"
-              value={usedModel}
-              onChange={(e) => setModel(e.target.value)}
-              className={inputCls}
-            >
-              {textModels.length === 0 ? <option value="">—</option> : null}
-              {textModels.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div data-testid="lyrics-ai-model" className="flex flex-col gap-1 text-[12px] text-ds-muted">
+            <span>{t('musicLyricsAiModel')}</span>
+            <Select
+              value={usedModel || null}
+              options={textModels.map((m) => ({ value: m, label: m }))}
+              onChange={setModel}
+              placeholder="—"
+              aria-label={t('musicLyricsAiModel')}
+            />
+          </div>
 
           <label className="flex flex-col gap-1 text-[12px] text-ds-muted">
             <span className="flex items-center justify-between">
@@ -137,22 +131,26 @@ export function LyricsAssistantDrawer({
               <button
                 type="button"
                 onClick={() => setTheme(defaultTheme)}
-                className="rounded-md px-1.5 py-0.5 text-[11px] text-ds-muted hover:bg-ds-hover hover:text-ds-ink"
+                className="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[11px] text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
               >
                 {t('musicLyricsAiThemeFromDesc')}
               </button>
             </span>
-            <input value={theme} onChange={(e) => setTheme(e.target.value)} placeholder="城市夜晚 · 霓虹 · 孤独又自由" className={inputCls} />
+            <Input
+              value={theme}
+              onChange={(e) => setTheme(e.target.value)}
+              placeholder="城市夜晚 · 霓虹 · 孤独又自由"
+            />
           </label>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1 text-[12px] text-ds-muted">
               {t('musicLyricsAiLang')}
-              <input value={lang} onChange={(e) => setLang(e.target.value)} className={inputCls} />
+              <Input value={lang} onChange={(e) => setLang(e.target.value)} />
             </label>
             <label className="flex flex-col gap-1 text-[12px] text-ds-muted">
               {t('musicLyricsAiMood')}
-              <input value={mood} onChange={(e) => setMood(e.target.value)} className={inputCls} />
+              <Input value={mood} onChange={(e) => setMood(e.target.value)} />
             </label>
           </div>
 
@@ -165,10 +163,10 @@ export function LyricsAssistantDrawer({
                   type="button"
                   aria-pressed={s === structure}
                   onClick={() => setStructure(s)}
-                  className={`rounded-full border px-2.5 py-1 text-[11.5px] transition ${
+                  className={`rounded-full border px-2.5 py-1 text-[11.5px] transition-colors duration-[var(--motion-fast)] ${
                     s === structure
                       ? 'border-ds-accent bg-ds-accent-soft font-semibold text-ds-accent'
-                      : 'border-ds-border bg-ds-main text-ds-muted hover:text-ds-ink'
+                      : 'border-ds-border bg-ds-main text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
                   }`}
                 >
                   {s}
@@ -177,22 +175,25 @@ export function LyricsAssistantDrawer({
             </div>
           </div>
 
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="lg"
             data-testid="lyrics-ai-generate"
             onClick={generate}
-            disabled={busy || !usedModel || !streamApi}
-            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-ds-ink px-4 text-[13px] font-semibold text-ds-main shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!usedModel || !streamApi}
+            loading={busy}
+            className="w-full"
           >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} /> : <Sparkles className="h-4 w-4" strokeWidth={1.75} />}
+            {busy ? null : <Sparkles className="h-4 w-4" strokeWidth={1.75} aria-hidden />}
             {busy ? t('musicLyricsAiGenerating') : t('musicLyricsAiGenerate')}
-          </button>
+          </Button>
 
-          <section className="rounded-xl border border-ds-border bg-ds-main p-3">
+          {/* 生成结果容器（接 ui/Card） */}
+          <Card unpadded className="p-3">
             <div className="mb-2 text-[11.5px] font-medium text-ds-muted">{t('musicLyricsAiResult')}</div>
             <div
               data-testid="lyrics-ai-result"
-              className="min-h-[120px] whitespace-pre-wrap rounded-lg border border-ds-border bg-ds-card p-2.5 text-[12.5px] leading-6 text-ds-ink"
+              className="min-h-[120px] whitespace-pre-wrap rounded-[var(--radius-md)] border border-ds-border bg-ds-main p-2.5 text-[12.5px] leading-6 text-ds-ink"
             >
               {text ? text : <span className="text-ds-faint">{t('musicLyricsAiResultEmpty')}</span>}
             </div>
@@ -202,28 +203,23 @@ export function LyricsAssistantDrawer({
               </p>
             ) : null}
             <div className="mt-3 flex gap-2">
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 data-testid="lyrics-ai-apply"
                 disabled={!text || busy}
                 onClick={() => {
                   onInsert(text)
                   onClose()
                 }}
-                className="flex-1 rounded-lg bg-ds-ink px-3 py-2 text-[12.5px] font-semibold text-ds-main transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1"
               >
                 {t('musicLyricsAiApply')}
-              </button>
-              <button
-                type="button"
-                disabled={busy || !usedModel || !streamApi}
-                onClick={generate}
-                className="rounded-lg border border-ds-border px-3 py-2 text-[12.5px] font-medium text-ds-ink transition hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-60"
-              >
+              </Button>
+              <Button variant="secondary" disabled={busy || !usedModel || !streamApi} onClick={generate}>
                 {t('musicLyricsAiRegenerate')}
-              </button>
+              </Button>
             </div>
-          </section>
+          </Card>
         </div>
       </div>
     </>

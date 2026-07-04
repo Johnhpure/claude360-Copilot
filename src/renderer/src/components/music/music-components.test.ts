@@ -1,7 +1,8 @@
-// 音乐工作台展示组件的静态渲染测试（Task 6）。
+// 音乐工作台展示组件的静态渲染测试（阶段4 Calm Blue 迁移后）。
 // 按仓库约定：node 环境、无 jsdom，用 renderToStaticMarkup + 注入 props/mock t。
 // 容器 MusicWorkbench 的副作用（提交/轮询/下载）已在 music-workbench-actions.test.ts 覆盖，
-// 这里只验证「是创作台、有表单/任务列表/播放器、成功歌曲有标题/audioUrl/cover/下载」。
+// 这里只验证「是创作台、有表单/任务列表/播放条、成功歌曲有标题/cover/下载、
+// 生成任务走 TaskCard 三态、成功作品走 MusicCard」。
 import { describe, it, expect } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -9,8 +10,9 @@ import type { Claude360Song } from '@shared/claude360-music'
 import type { MusicGenTask } from '../../music/music-task-store'
 import { emptyForm } from '../../music/suno-params'
 import { MusicCreatePanel } from './MusicCreatePanel'
-import { MusicTaskList } from './MusicTaskList'
-import { MusicPlayer } from './MusicPlayer'
+import { MusicTaskList, toTaskCardStatus } from './MusicTaskList'
+import { MiniPlayerBar } from './MiniPlayerBar'
+import { MusicCard, formatSongDuration } from './MusicCard'
 import { LyricsAssistantDrawer } from './LyricsAssistantDrawer'
 
 // 直通式 t：返回 key（含插值 title），便于断言文案 key 已接入。
@@ -109,6 +111,34 @@ describe('MusicCreatePanel · 创作配置区', () => {
     )
     expect(html).toContain('请填写歌曲描述')
   })
+
+  it('控件走 token 类，不输出字面量色值', () => {
+    const html = renderToStaticMarkup(
+      createElement(MusicCreatePanel, {
+        form: { ...emptyForm(), mode: 'standard' },
+        submitting: false,
+        onChange: () => undefined,
+        onSubmit: () => undefined,
+        onOpenLyricsAssistant: () => undefined,
+        errors: ['e'],
+        t
+      })
+    )
+    expect(html).toContain('bg-ds-card')
+    expect(html).toContain('text-ds-danger')
+    expect(html).not.toContain('border-red-')
+    expect(html).not.toContain('bg-red-')
+  })
+})
+
+describe('toTaskCardStatus · 任务状态映射（纯函数）', () => {
+  it('submitting/queued/in_progress → running；failure → error；success → success', () => {
+    expect(toTaskCardStatus('submitting')).toBe('running')
+    expect(toTaskCardStatus('queued')).toBe('running')
+    expect(toTaskCardStatus('in_progress')).toBe('running')
+    expect(toTaskCardStatus('failure')).toBe('error')
+    expect(toTaskCardStatus('success')).toBe('success')
+  })
 })
 
 function renderTasks(tasks: MusicGenTask[], extra: Partial<Parameters<typeof MusicTaskList>[0]> = {}): string {
@@ -141,7 +171,7 @@ describe('MusicTaskList · 作品管理栏 + 宫格', () => {
     expect(html).toContain('musicWorksEmpty')
   })
 
-  it('成功歌曲以作品卡展示封面、状态、标题、提示词、模型、标签、时长和操作按钮', () => {
+  it('成功歌曲以 MusicCard 展示封面、状态、标题、提示词、模型、标签、时长和操作按钮', () => {
     const task: MusicGenTask = {
       id: 'x',
       taskId: 't',
@@ -168,7 +198,6 @@ describe('MusicTaskList · 作品管理栏 + 宫格', () => {
     expect(html).toContain('musicCopyPrompt')
     expect(html).toContain('musicRegenerate')
     expect(html).toContain('musicDelete')
-    expect(html).toContain('musicMoreActions')
   })
 
   it('无封面时显示默认封面占位，无音频地址时显示明确错误提示', () => {
@@ -187,7 +216,7 @@ describe('MusicTaskList · 作品管理栏 + 宫格', () => {
     expect(html).toContain('disabled')
   })
 
-  it('当前播放中的卡片有播放中状态', () => {
+  it('当前播放中的卡片有播放中状态与波形动效', () => {
     const task: MusicGenTask = {
       id: 'x',
       taskId: 't',
@@ -200,9 +229,10 @@ describe('MusicTaskList · 作品管理栏 + 宫格', () => {
     const html = renderTasks([task], { currentSongId: 'a', playing: true })
     expect(html).toContain('data-playing="true"')
     expect(html).toContain('musicPlaying')
+    expect(html).toContain('ds-ui-wave')
   })
 
-  it('生成中任务显示宫格 loading 卡片', () => {
+  it('生成中任务显示 TaskCard 呼吸态（running + 不确定进度扫动）', () => {
     const task: MusicGenTask = {
       id: 'x',
       taskId: 't',
@@ -214,11 +244,14 @@ describe('MusicTaskList · 作品管理栏 + 宫格', () => {
     }
     const html = renderTasks([task])
     expect(html).toContain('music-work-card')
+    expect(html).toContain('data-status="running"')
     expect(html).toContain('musicStatusInProgress')
     expect(html).toContain('musicWorkGenerating')
+    expect(html).toContain('ds-ui-breathe')
+    expect(html).toContain('ds-ui-progress-sweep')
   })
 
-  it('失败任务显示失败原因和重试按钮', () => {
+  it('失败任务显示 TaskCard error 态、失败原因和重试按钮', () => {
     const task: MusicGenTask = {
       id: 'x',
       taskId: 't',
@@ -231,27 +264,14 @@ describe('MusicTaskList · 作品管理栏 + 宫格', () => {
     }
     const html = renderTasks([task])
     expect(html).toContain('余额不足')
+    expect(html).toContain('data-status="error"')
     expect(html).toContain('musicStatusFailure')
     expect(html).toContain('musicRetry')
+    expect(html).toContain('musicDelete')
   })
 
   it('工具栏包含状态筛选、清空和批量选择入口', () => {
-    const html = renderToStaticMarkup(
-      createElement(MusicTaskList, {
-        tasks: [],
-        currentSongId: null,
-        playing: false,
-        onPlay: () => undefined,
-        onPause: () => undefined,
-        onDownload: () => undefined,
-        onRemoveTask: () => undefined,
-        onRemoveSong: () => undefined,
-        onClear: () => undefined,
-        onCopyPrompt: () => undefined,
-        onRegenerate: () => undefined,
-        t
-      })
-    )
+    const html = renderTasks([])
     expect(html).toContain('musicFilterAll')
     expect(html).toContain('musicFilterSuccess')
     expect(html).toContain('musicFilterGenerating')
@@ -283,7 +303,43 @@ describe('MusicTaskList · 作品管理栏 + 宫格', () => {
   })
 })
 
-describe('MusicPlayer · 播放器区', () => {
+describe('MusicCard · 音乐作品卡（Feature）', () => {
+  it('渲染封面（12px 圆角）、标题、时长；播放态显示波形角标', () => {
+    const html = renderToStaticMarkup(
+      createElement(MusicCard, {
+        title: '深夜城市',
+        subtitle: '一首合成波',
+        duration: '2:06',
+        coverUrl: 'https://cdn.example/cover.png',
+        playing: true,
+        t
+      })
+    )
+    expect(html).toContain('深夜城市')
+    expect(html).toContain('2:06')
+    expect(html).toContain('https://cdn.example/cover.png')
+    expect(html).toContain('rounded-[var(--radius-md)]')
+    expect(html).toContain('music-playing-wave')
+    expect(html).toContain('ds-ui-wave')
+    expect(html).toContain('bg-accent')
+  })
+
+  it('非播放态不渲染波形；无封面时回占位图', () => {
+    const html = renderToStaticMarkup(
+      createElement(MusicCard, { title: '安静的卡', t })
+    )
+    expect(html).not.toContain('music-playing-wave')
+    expect(html).toContain('music-cover-placeholder')
+  })
+
+  it('formatSongDuration：秒 → m:ss，缺失返回空串', () => {
+    expect(formatSongDuration(song('a'))).toBe('2:06')
+    expect(formatSongDuration({ ...song('a'), duration: undefined })).toBe('')
+    expect(formatSongDuration({ ...song('a'), duration: 0 })).toBe('')
+  })
+})
+
+describe('MiniPlayerBar · 底部迷你播放条', () => {
   const playerBase = {
     playing: false,
     currentTime: 0,
@@ -299,14 +355,15 @@ describe('MusicPlayer · 播放器区', () => {
     onDownload: () => undefined,
     t
   }
-  it('无当前歌曲显示空态', () => {
-    const html = renderToStaticMarkup(createElement(MusicPlayer, { ...playerBase, current: null }))
+  it('无当前歌曲显示胶囊空态', () => {
+    const html = renderToStaticMarkup(createElement(MiniPlayerBar, { ...playerBase, current: null }))
     expect(html).toContain('music-player')
     expect(html).toContain('musicPlayerEmpty')
+    expect(html).toContain('rounded-full')
   })
-  it('有当前歌曲显示标题 / 副标题 / 进度条 / 音量 / 下载（不暴露 audioUrl）', () => {
+  it('有当前歌曲显示标题 / 副标题 / 进度滑块 / 音量 / 下载（不暴露 audioUrl）', () => {
     const html = renderToStaticMarkup(
-      createElement(MusicPlayer, {
+      createElement(MiniPlayerBar, {
         ...playerBase,
         current: { ...song('b'), tags: undefined },
         playing: true,
@@ -325,11 +382,13 @@ describe('MusicPlayer · 播放器区', () => {
     expect(html).toContain('music-player-volume')
     expect(html).toContain('musicPrev')
     expect(html).toContain('musicNext')
+    // 粗胶囊滑块：accent 已播放段
+    expect(html).toContain('bg-accent')
   })
 
-  it('播放器无封面时显示默认封面占位', () => {
+  it('播放条无封面时显示默认封面占位', () => {
     const html = renderToStaticMarkup(
-      createElement(MusicPlayer, {
+      createElement(MiniPlayerBar, {
         ...playerBase,
         current: { ...song('c'), imageUrl: undefined }
       })
@@ -359,9 +418,11 @@ describe('LyricsAssistantDrawer · AI 写词模态', () => {
     expect(html).toContain('lyrics-ai-generate')
     expect(html).toContain('lyrics-ai-result')
     expect(html).toContain('lyrics-ai-apply')
-    // 文本模型下拉来自注入的 textModels
+    // 文本模型下拉来自注入的 textModels（触发器显示当前值）
     expect(html).toContain('gpt-4o')
     // 结构选项
     expect(html).toContain('主歌-副歌')
+    // 遮罩 blur 走 token（浮层唯一 blur 场景，随 data-blur 降级）
+    expect(html).toContain('backdrop-blur-[var(--blur-overlay)]')
   })
 })

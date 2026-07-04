@@ -1,19 +1,11 @@
 import type { ReactElement } from 'react'
 import { useMemo, useState } from 'react'
-import {
-  Copy,
-  Download,
-  Loader2,
-  MoreHorizontal,
-  Music4,
-  Pause,
-  Play,
-  RefreshCw,
-  Trash2,
-  XCircle
-} from 'lucide-react'
+import { Copy, Download, Music4, Pause, Play, RefreshCw, Trash2 } from 'lucide-react'
 import type { Claude360Song } from '@shared/claude360-music'
 import type { MusicGenTask } from '../../music/music-task-store'
+import { Button, Card, EmptyState } from '../ui'
+import { TaskCard, type TaskCardStatus } from '../task'
+import { MusicCard, formatSongDuration } from './MusicCard'
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string
 
@@ -44,26 +36,15 @@ const STATUS_LABEL_KEY: Record<MusicGenTask['status'], string> = {
   failure: 'musicStatusFailure'
 }
 
-const STATUS_CLASS: Record<MusicGenTask['status'], string> = {
-  submitting: 'bg-accent-soft text-accent',
-  queued: 'bg-accent-soft text-accent',
-  in_progress: 'bg-accent-soft text-accent',
-  success: 'bg-ds-success-soft text-ds-success',
-  failure: 'bg-ds-danger-soft text-ds-danger'
-}
-
 function isGenerating(status: MusicGenTask['status']): boolean {
   return status === 'submitting' || status === 'queued' || status === 'in_progress'
 }
 
-function formatDuration(song: Claude360Song): string {
-  if (typeof song.duration === 'number' && song.duration > 0) {
-    const total = Math.round(song.duration)
-    const mm = Math.floor(total / 60)
-    const ss = String(total % 60).padStart(2, '0')
-    return `${mm}:${ss}`
-  }
-  return ''
+/** 任务状态 → TaskCard 三态映射（阶段4 design §4：纯函数收敛，便于测试）。 */
+export function toTaskCardStatus(status: MusicGenTask['status']): TaskCardStatus {
+  if (status === 'failure') return 'error'
+  if (status === 'success') return 'success'
+  return 'running'
 }
 
 function formatCreatedAt(createdAt: number): string {
@@ -142,6 +123,43 @@ function playableSongsForTask(task: MusicGenTask): Claude360Song[] {
   return task.songs.filter((song) => Boolean(song.audioUrl.trim()))
 }
 
+/** 工具栏胶囊 chip（筛选/清空/批量入口）：Calm Blue 小控件走 pill。 */
+function ToolbarChip({
+  active,
+  danger,
+  disabled,
+  onClick,
+  role,
+  ariaSelected,
+  children
+}: {
+  active?: boolean
+  danger?: boolean
+  disabled?: boolean
+  onClick?: () => void
+  role?: string
+  ariaSelected?: boolean
+  children: ReactElement | string
+}): ReactElement {
+  const tone = active
+    ? 'bg-ds-accent-soft font-medium text-ds-accent'
+    : danger
+      ? 'text-ds-danger hover:bg-ds-danger-soft'
+      : 'text-ds-muted hover:bg-ds-hover hover:text-ds-ink'
+  return (
+    <button
+      type="button"
+      role={role}
+      aria-selected={ariaSelected}
+      disabled={disabled}
+      onClick={onClick}
+      className={`rounded-full px-2.5 py-1 text-[12px] transition-colors duration-[var(--motion-fast)] disabled:cursor-not-allowed disabled:opacity-40 ${tone}`}
+    >
+      {children}
+    </button>
+  )
+}
+
 function ActionButton({
   label,
   onClick,
@@ -160,78 +178,24 @@ function ActionButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="grid h-8 w-8 place-items-center rounded-lg text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-40"
+      className="grid h-8 w-8 place-items-center rounded-[var(--radius-sm)] text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </button>
   )
 }
 
-function CoverPlaceholder({ active, testId = 'music-cover-placeholder' }: { active?: boolean; testId?: string }): ReactElement {
+/** 批量选择角标（封面右上角覆盖层）。 */
+function SelectBox({ selected }: { selected: boolean }): ReactElement {
   return (
-    <div
-      data-testid={testId}
-      className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_30%_20%,var(--ds-accent-soft),transparent_36%),linear-gradient(135deg,var(--ds-surface-subtle),var(--ds-bg-canvas))]"
+    <span
+      aria-hidden="true"
+      className={`absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-[var(--radius-sm)] border text-[11px] ${
+        selected ? 'border-ds-accent bg-ds-accent text-white' : 'border-ds-border bg-ds-card text-transparent'
+      }`}
     >
-      <Music4 className="h-9 w-9 text-ds-muted" strokeWidth={1.4} />
-      {active ? (
-        <span className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-end gap-1" aria-hidden="true">
-          <span className="h-3 w-1 rounded-full bg-accent animate-pulse" />
-          <span className="h-5 w-1 rounded-full bg-accent animate-pulse" />
-          <span className="h-4 w-1 rounded-full bg-accent animate-pulse" />
-        </span>
-      ) : null}
-    </div>
-  )
-}
-
-function MusicCoverImage({
-  src,
-  title,
-  active,
-  resolveCover,
-  t
-}: {
-  src?: string
-  title: string
-  active?: boolean
-  /** 直连加载失败时的代理兜底（容器注入 media-blob → objectURL）；再失败才回占位图。 */
-  resolveCover?: (url: string) => Promise<string | null>
-  t: TFn
-}): ReactElement {
-  // forSrc 绑定当前封面地址：src 变化（换卡片复用组件）时自动重置兜底状态。
-  // proxyUrl === null 表示代理也失败，回占位图。
-  const [fallback, setFallback] = useState<{ forSrc: string; proxyUrl: string | null } | null>(null)
-  const proxyUrl = fallback && fallback.forSrc === src ? fallback.proxyUrl : undefined
-  if (!src || proxyUrl === null) return <CoverPlaceholder active={active} />
-  const displaySrc = proxyUrl ?? src
-  const handleError = (): void => {
-    // 打印失败 URL，方便排查（鉴权/跨域/字段映射错误）。
-    if (proxyUrl) {
-      console.error('[claude360-music] cover proxy objectURL load failed', { coverUrl: src })
-      setFallback({ forSrc: src, proxyUrl: null })
-      return
-    }
-    console.error('[claude360-music] cover image load failed, trying media-blob proxy', { coverUrl: src })
-    if (!resolveCover) {
-      setFallback({ forSrc: src, proxyUrl: null })
-      return
-    }
-    resolveCover(src)
-      .then((url) => setFallback({ forSrc: src, proxyUrl: url }))
-      .catch((error) => {
-        console.error('[claude360-music] cover proxy fetch threw', { coverUrl: src, error })
-        setFallback({ forSrc: src, proxyUrl: null })
-      })
-  }
-  return (
-    <img
-      src={displaySrc}
-      alt={t('musicCoverAlt', { title })}
-      loading="lazy"
-      onError={handleError}
-      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-    />
+      ✓
+    </span>
   )
 }
 
@@ -252,7 +216,12 @@ type Props = {
   t: TFn
 }
 
-// 音乐作品宫格。纯 UI 状态（筛选/批量选择）留在组件内；生成、播放、删除等副作用由容器注入。
+// 音乐作品宫格（阶段4 迁移）：生成任务全链路走统一视觉——
+//   submitting/queued/in_progress → TaskCard（running 呼吸 + 不确定进度扫动）
+//   failure → TaskCard（error 态 + 失败原因 + 重试/删除）
+//   success → MusicCard（封面 12px 圆角 + 播放态波形）
+// 状态映射用纯函数 toTaskCardStatus；卡间距 16px（Calm Blue 语义常量）。
+// 纯 UI 状态（筛选/批量选择）留在组件内；生成、播放、删除等副作用由容器注入。
 export function MusicTaskList({
   tasks,
   currentSongId,
@@ -301,204 +270,189 @@ export function MusicTaskList({
   }
 
   return (
-    <section data-testid="music-task-list" className="flex min-h-0 flex-col gap-3">
+    <section data-testid="music-task-list" className="flex min-h-0 flex-col gap-4">
+      {/* 作品管理栏：标题/数量 + 状态筛选（胶囊 chip）+ 清空 / 批量选择 */}
       <div
         data-testid="music-works-toolbar"
-        className="flex flex-wrap items-center gap-2 rounded-xl border border-ds-border bg-ds-card px-3 py-2 shadow-sm"
+        className="flex flex-wrap items-center gap-2 rounded-xl border border-ds-border bg-ds-card px-3 py-2"
       >
-        <h2 className="text-[14px] font-semibold text-ds-ink">{t('musicWorksTitle')}</h2>
+        <h2 className="text-[13.5px] font-medium text-ds-ink">{t('musicWorksTitle')}</h2>
         <span className="text-[12px] text-ds-muted">{t('musicWorksCount', { count: allCards.length })}</span>
         <div className="ml-auto flex flex-wrap items-center gap-1" role="tablist">
           {FILTERS.map((item) => (
-            <button
+            <ToolbarChip
               key={item}
-              type="button"
               role="tab"
-              aria-selected={filter === item}
+              ariaSelected={filter === item}
+              active={filter === item}
               onClick={() => setFilter(item)}
-              className={`rounded-md px-2 py-1 text-[12px] transition ${
-                filter === item ? 'bg-ds-hover font-medium text-ds-ink' : 'text-ds-muted hover:text-ds-ink'
-              }`}
             >
               {filterLabel(item, t)}
-            </button>
+            </ToolbarChip>
           ))}
           <span className="mx-1 h-4 w-px bg-ds-border" aria-hidden="true" />
-          <button
-            type="button"
-            onClick={onClear}
-            className="rounded-md px-2 py-1 text-[12px] text-ds-muted transition hover:text-ds-ink"
-          >
-            {t('musicClearAll')}
-          </button>
+          <ToolbarChip onClick={onClear}>{t('musicClearAll')}</ToolbarChip>
           {selectMode ? (
             <>
-              <button
-                type="button"
-                disabled={selectedCount === 0}
-                onClick={removeSelected}
-                className="rounded-md px-2 py-1 text-[12px] text-red-300 transition hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
-              >
+              <ToolbarChip danger disabled={selectedCount === 0} onClick={removeSelected}>
                 {t('musicBatchDelete', { count: selectedCount })}
-              </button>
-              <button
-                type="button"
-                onClick={toggleSelectMode}
-                className="rounded-md px-2 py-1 text-[12px] text-ds-muted transition hover:text-ds-ink"
-              >
-                {t('musicBatchCancel')}
-              </button>
+              </ToolbarChip>
+              <ToolbarChip onClick={toggleSelectMode}>{t('musicBatchCancel')}</ToolbarChip>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={toggleSelectMode}
-              className="rounded-md px-2 py-1 text-[12px] text-ds-muted transition hover:text-ds-ink"
-            >
-              {t('musicBatchSelect')}
-            </button>
+            <ToolbarChip onClick={toggleSelectMode}>{t('musicBatchSelect')}</ToolbarChip>
           )}
         </div>
       </div>
 
       {allCards.length === 0 ? (
-        <div
+        <Card
           data-testid="music-works-empty"
-          className="flex min-h-[260px] flex-1 items-center justify-center rounded-2xl border border-dashed border-ds-border bg-ds-card px-6 text-center"
+          className="flex min-h-[260px] flex-1 items-center justify-center border-dashed"
         >
-          <div className="max-w-[280px]">
-            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-accent-soft text-accent">
-              <Music4 className="h-6 w-6" strokeWidth={1.5} />
-            </div>
-            <p className="mt-3 text-[13px] leading-5 text-ds-muted">{t('musicWorksEmpty')}</p>
-          </div>
-        </div>
+          <EmptyState icon={Music4} title={t('musicWorksEmpty')} />
+        </Card>
       ) : visibleCards.length === 0 ? (
-        <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-ds-border bg-ds-card px-6 text-center text-[13px] text-ds-muted">
-          {t('musicFilterEmpty')}
-        </div>
+        <Card className="flex min-h-[220px] items-center justify-center border-dashed">
+          <EmptyState icon={Music4} title={t('musicFilterEmpty')} />
+        </Card>
       ) : (
         <div
           data-testid="music-song-grid"
-          className="grid min-h-0 gap-3.5"
+          className="grid min-h-0 items-start gap-4"
           style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}
         >
           {visibleCards.map((card) => {
             const task = card.task
-            const isSong = card.kind === 'song'
-            const song = isSong ? card.song : null
             const prompt = promptText(task)
             const status = card.status
-            const isPlaying = Boolean(song && playing && currentSongId === song.id)
             const title = cardTitle(card, t)
-            const model = cardModel(card)
-            const tags = cardTags(card)
-            const duration = song ? formatDuration(song) : ''
-            const createdAt = formatCreatedAt(task.createdAt)
+            const selected = Boolean(selectedIds[card.id])
+
+            // 非 success：统一 TaskCard 表达（running 呼吸 / failure 重试）
+            if (card.kind !== 'song') {
+              const failed = status === 'failure'
+              return (
+                <div
+                  key={card.id}
+                  data-testid="music-work-card"
+                  data-status={status}
+                  onClick={selectMode ? () => toggleSelected(card.id) : undefined}
+                  className={`relative ${selected ? 'rounded-xl ring-2 ring-ds-accent' : ''} ${
+                    selectMode ? 'cursor-pointer' : ''
+                  }`}
+                >
+                  <TaskCard
+                    status={toTaskCardStatus(status)}
+                    title={title}
+                    meta={t(STATUS_LABEL_KEY[status])}
+                  >
+                    {failed ? (
+                      <div className="flex flex-col gap-2">
+                        <p className="line-clamp-3 text-[12px] leading-[18px] text-ds-danger">
+                          {task.failReason || t('musicStatusFailure')}
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                          {/* TaskCard 内置 Retry 文案未接 i18n，操作在展开区用本地化按钮表达 */}
+                          <Button variant="secondary" size="sm" onClick={() => onRegenerate(task)}>
+                            <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                            {t('musicRetry')}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-ds-danger hover:text-ds-danger"
+                            onClick={() => onRemoveTask(task.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                            {t('musicDelete')}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[12px] text-ds-muted">{t('musicWorkGenerating')}</p>
+                    )}
+                  </TaskCard>
+                  {selectMode ? <SelectBox selected={selected} /> : null}
+                </div>
+              )
+            }
+
+            // success：MusicCard 焦点块
+            const song = card.song
+            const isPlaying = Boolean(playing && currentSongId === song.id)
+            const queue = playableSongsForTask(task)
+            const canPlay = Boolean(song.audioUrl.trim())
             const meta = [
-              model,
-              tags,
-              duration,
-              createdAt,
+              cardModel(card),
+              cardTags(card),
+              formatCreatedAt(task.createdAt),
               task.params.instrumental ? t('musicInstrumental') : ''
             ].filter(Boolean)
-            const selected = Boolean(selectedIds[card.id])
-            const queue = playableSongsForTask(task)
-            const canPlay = Boolean(song?.audioUrl.trim())
             return (
-              <article
+              <MusicCard
                 key={card.id}
                 data-testid="music-work-card"
                 data-status={status}
                 data-playing={isPlaying ? 'true' : undefined}
-                className={`group flex min-h-0 flex-col overflow-hidden rounded-xl border bg-ds-card transition ${
-                  isPlaying ? 'border-accent ring-2 ring-accent/20 shadow-panel' : selected ? 'border-accent ring-2 ring-accent/20' : 'border-ds-border hover:border-accent hover:bg-ds-hover'
-                }`}
-              >
-                <div className="relative aspect-square overflow-hidden bg-ds-main">
-                  <MusicCoverImage
-                    src={song?.imageUrl}
-                    title={title}
-                    active={isPlaying || isGenerating(status)}
-                    resolveCover={resolveCover}
-                    t={t}
-                  />
-                  <span
-                    className={`absolute left-2 top-2 rounded-md px-2 py-1 text-[11px] font-medium backdrop-blur ${STATUS_CLASS[status]}`}
-                  >
-                    {t(STATUS_LABEL_KEY[status])}
-                  </span>
-                  {isGenerating(status) ? (
-                    <span className="absolute inset-x-3 bottom-3 flex items-center justify-center gap-2 rounded-lg border border-ds-border bg-ds-card px-3 py-2 text-[12px] text-ds-ink shadow-sm">
-                      <Loader2 className="h-4 w-4 animate-spin text-accent" strokeWidth={1.75} />
-                      {t('musicWorkGenerating')}
+                title={title}
+                subtitle={prompt || t('musicPromptEmpty')}
+                duration={formatSongDuration(song)}
+                metaItems={meta}
+                coverUrl={song.imageUrl}
+                playing={isPlaying}
+                selected={selected}
+                resolveCover={resolveCover}
+                openLabel={
+                  selectMode ? t('musicBatchToggle') : isPlaying ? t('musicPause') : t('musicPlay')
+                }
+                onOpen={
+                  selectMode
+                    ? () => toggleSelected(card.id)
+                    : canPlay
+                      ? () => (isPlaying ? onPause() : onPlay(song, queue))
+                      : undefined
+                }
+                overlay={
+                  <>
+                    <span className="absolute left-2 top-2 rounded-[var(--radius-sm)] bg-ds-card px-1.5 py-0.5 text-[10.5px] font-medium text-ds-success">
+                      {t(STATUS_LABEL_KEY[status])}
                     </span>
-                  ) : null}
-                  {isPlaying ? (
-                    <span className="absolute right-2 top-2 rounded-md bg-accent px-2 py-1 text-[11px] font-semibold text-white">
-                      {t('musicPlaying')}
-                    </span>
-                  ) : null}
-                  {selectMode ? (
-                    <button
-                      type="button"
-                      aria-label={t('musicBatchToggle')}
-                      onClick={() => toggleSelected(card.id)}
-                      className={`absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-md border text-[11px] ${
-                        selected ? 'border-accent bg-accent text-white' : 'border-ds-border bg-ds-card text-transparent'
-                      }`}
-                    >
-                      ✓
-                    </button>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-1 flex-col gap-2 p-3">
-                  <div className="min-w-0">
-                    <h3 className="truncate text-[13.5px] font-semibold text-ds-ink" title={title}>
-                      {title}
-                    </h3>
-                    <p className="mt-1 line-clamp-2 min-h-9 text-[12px] leading-[18px] text-ds-muted" title={prompt}>
-                      {prompt || t('musicPromptEmpty')}
-                    </p>
-                  </div>
-
-                  {status === 'failure' ? (
-                    <div className="rounded-lg border border-red-500/20 bg-red-500/[0.08] px-2.5 py-2 text-[12px] leading-4 text-red-200">
-                      <div className="flex items-start gap-2">
-                        <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
-                        <span>{task.failReason || t('musicStatusFailure')}</span>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {song && !canPlay ? (
+                    {isPlaying && !selectMode ? (
+                      <span className="absolute right-2 top-2 rounded-[var(--radius-sm)] bg-accent px-1.5 py-0.5 text-[10.5px] font-semibold text-white">
+                        {t('musicPlaying')}
+                      </span>
+                    ) : null}
+                    {selectMode ? <SelectBox selected={selected} /> : null}
+                  </>
+                }
+                notice={
+                  !canPlay ? (
                     <div
                       data-testid="music-audio-missing"
-                      className="rounded-lg border border-ds-border bg-accent-soft px-2.5 py-2 text-[12px] leading-4 text-accent"
+                      className="rounded-[var(--radius-sm)] border border-ds-border bg-ds-accent-soft px-2.5 py-2 text-[12px] leading-4 text-ds-accent"
                     >
                       {t('musicAudioMissing')}
                     </div>
-                  ) : null}
-
-                  <p className="flex min-h-9 flex-wrap gap-x-2 gap-y-0.5 text-[11px] leading-4 text-ds-faint">
-                    {meta.map((item, index) => (
-                      <span key={`${item}-${index}`}>{item}</span>
-                    ))}
-                  </p>
-
-                  <div className="mt-auto flex items-center gap-0.5 pt-1">
+                  ) : null
+                }
+                actions={
+                  <>
                     <ActionButton
                       label={isPlaying ? t('musicPause') : t('musicPlay')}
                       disabled={!canPlay}
-                      onClick={song && canPlay ? () => (isPlaying ? onPause() : onPlay(song, queue)) : undefined}
+                      onClick={canPlay ? () => (isPlaying ? onPause() : onPlay(song, queue)) : undefined}
                     >
-                      {isPlaying ? <Pause className="h-3.5 w-3.5" strokeWidth={1.75} /> : <Play className="h-3.5 w-3.5" strokeWidth={1.75} />}
+                      {isPlaying ? (
+                        <Pause className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      ) : (
+                        <Play className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      )}
                     </ActionButton>
                     <ActionButton
                       label={t('musicDownload')}
                       disabled={!canPlay}
-                      onClick={song ? () => onDownload(song) : undefined}
+                      onClick={() => onDownload(song)}
                     >
                       <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
                     </ActionButton>
@@ -509,21 +463,16 @@ export function MusicTaskList({
                     >
                       <Copy className="h-3.5 w-3.5" strokeWidth={1.75} />
                     </ActionButton>
-                    <ActionButton label={status === 'failure' ? t('musicRetry') : t('musicRegenerate')} onClick={() => onRegenerate(task)}>
+                    <ActionButton label={t('musicRegenerate')} onClick={() => onRegenerate(task)}>
                       <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />
                     </ActionButton>
-                    <ActionButton
-                      label={t('musicDelete')}
-                      onClick={() => (song ? onRemoveSong(song.id) : onRemoveTask(task.id))}
-                    >
+                    <ActionButton label={t('musicDelete')} onClick={() => onRemoveSong(song.id)}>
                       <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                     </ActionButton>
-                    <ActionButton label={t('musicMoreActions')}>
-                      <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    </ActionButton>
-                  </div>
-                </div>
-              </article>
+                  </>
+                }
+                t={t}
+              />
             )
           })}
         </div>

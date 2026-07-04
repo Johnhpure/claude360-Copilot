@@ -158,3 +158,29 @@ html[data-blur='off'] {
     animation: none;
   }
 }
+
+/* ---------- 播放态波形（阶段4：components/music/MusicCard 播放角标） ----------
+ * 蓝色 3-bar 波形：颜色由使用方以 token 类（bg-accent）提供，本处只管节奏；
+ * bar 间相位差由使用方以 animation-delay: calc(var(--motion-fast) * n) 表达。
+ * 1s 为循环节奏周期，非交互过渡时长（同 skeleton / breathe 的豁免说明）。 */
+@keyframes ds-ui-wave {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.ds-ui-wave {
+  transform-origin: bottom;
+  animation: ds-ui-wave 1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-ui-wave {
+    animation: none;
+    transform: scaleY(0.6);
+  }
+}
