@@ -1,5 +1,5 @@
 /* ============================================================
- * ui-primitives.css — Calm Blue 组件库（components/ui/ + shell/）专属样式
+ * ui-primitives.css — Calm Blue 组件库（components/ui/ + shell/ + task/）专属样式
  *
  * 职责边界（阶段2 落地，父任务 07-03-oneui-redesign §4.8/§5）：
  *   1. 浮层动画 keyframes：时长/缓动一律引用 base-shell.css 的
@@ -109,6 +109,40 @@ html[data-blur='off'] {
   animation: ds-ui-skeleton-sweep 1.4s linear infinite;
 }
 
+/* ---------- 生成任务呼吸动效（阶段4：components/task/TaskCard 与 canvas ImageCard 共用） ----------
+ * 父任务 §4.8：进行中的任务是全应用唯一持续动效。keyframes 定义一次（DRY），
+ * 颜色由使用方以 token 类（border-accent / bg-accent / surface）提供，本处只管节奏。 */
+
+/* 呼吸：透明度脉动（running 状态环 / 生成中占位共用） */
+@keyframes ds-ui-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.ds-ui-breathe {
+  /* 1.8s 为循环节奏周期，非交互过渡时长（同 skeleton 的豁免说明）。 */
+  animation: ds-ui-breathe 1.8s ease-in-out infinite;
+}
+
+/* 不确定进度：accent 短条（宽 40%）在轨道内往复扫动 */
+@keyframes ds-ui-progress-sweep {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(360%);
+  }
+}
+
+.ds-ui-progress-sweep {
+  animation: ds-ui-progress-sweep 1.8s var(--ease-oneui) infinite;
+}
+
 /* ---------- 可访问性：减少动效 ---------- */
 @media (prefers-reduced-motion: reduce) {
   .ds-ui-anim-overlay-fade,
@@ -118,7 +152,9 @@ html[data-blur='off'] {
     animation-duration: 0.01ms;
   }
 
-  .ds-ui-skeleton {
+  .ds-ui-skeleton,
+  .ds-ui-breathe,
+  .ds-ui-progress-sweep {
     animation: none;
   }
 }
