@@ -66,7 +66,7 @@ function ActionButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </button>
@@ -79,7 +79,7 @@ function SelectBox({ selected }: { selected: boolean }): ReactElement {
     <span
       aria-hidden="true"
       data-testid="artwork-select-box"
-      className={`absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-md border text-[11px] ${
+      className={`absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-[var(--radius-sm)] border text-[11px] ${
         selected
           ? 'border-ds-accent bg-ds-accent text-white'
           : 'border-ds-border bg-ds-card text-transparent'
@@ -218,7 +218,7 @@ export function ArtworkGrid({
               <>
                 <span
                   data-testid="artwork-status-badge"
-                  className="absolute left-1.5 top-1.5 rounded-md bg-ds-card px-1.5 py-0.5 text-[10.5px] font-medium text-ds-success"
+                  className="absolute left-1.5 top-1.5 rounded-[var(--radius-sm)] bg-ds-card px-1.5 py-0.5 text-[10.5px] font-medium text-ds-success"
                 >
                   {t(`canvasStatus_${artwork.status}`)}
                 </span>
