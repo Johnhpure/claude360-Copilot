@@ -9,6 +9,7 @@ import type {
   Claude360TopupOrder
 } from '@shared/claude360'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
+import { Button } from '../ui'
 import { MyAccountOverview } from './MyAccountOverview'
 import { MyBillingPanel, type BillingPollPhase } from './MyBillingPanel'
 import { MyUsagePanel } from './MyUsagePanel'
@@ -25,6 +26,8 @@ type Props = {
 // 「我的」页容器:账号 / 余额 / 今日用量概览 + 充值 + 退出登录。
 // API Key 的分组管理已归口到「设置 → 分组及 Key」，本页不再展示 Key 分组表。
 // 所有 window.kunGui 调用都做存在性守卫。
+// Calm Blue 三层卡片结构（父任务 07-03-oneui-redesign design §4.7）:
+// 账户卡 → 用量卡（唯一强色区域）→ 账单/充值卡；卡间距 16px(gap-4)。
 export function MyPage({
   leftSidebarCollapsed,
   onToggleLeftSidebar,
@@ -127,7 +130,7 @@ export function MyPage({
   return (
     <div className="ds-drag flex h-full min-h-0 flex-col bg-ds-main">
       <div className="ds-stage-inset shrink-0">
-        <header className="ds-topbar-surface relative z-10 mt-3 flex min-h-[46px] w-full items-stretch overflow-visible rounded-[24px]">
+        <header className="ds-topbar-surface relative z-10 mt-3 flex min-h-[46px] w-full items-stretch overflow-visible rounded-[var(--radius-2xl)]">
           <div className="grid w-full min-w-0 items-center gap-2.5 px-3 py-2 sm:px-4 md:pl-5 md:pr-2">
             <div className={`flex min-w-0 items-center gap-2.5 ${headerInset}`}>
               <SidebarTitlebarToggleButton
@@ -135,38 +138,42 @@ export function MyPage({
                 title={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')}
                 ariaLabel={leftSidebarCollapsed ? t('sidebarExpand') : t('sidebarCollapse')}
               />
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
+                className="ds-no-drag"
                 onClick={onBack}
-                className="ds-no-drag flex items-center gap-1.5 rounded-lg border border-ds-border bg-ds-card px-2.5 py-1.5 text-[12.5px] font-medium text-ds-muted shadow-sm transition hover:bg-ds-hover hover:text-ds-ink"
               >
-                <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} />
+                <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
                 {t('myBackToWorkbench')}
-              </button>
+              </Button>
               <h1 className="min-w-0 flex-1 truncate text-[15px] font-medium text-ds-muted">{t('myPage')}</h1>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 data-testid="my-logout"
+                className="ds-no-drag shrink-0 hover:text-ds-danger"
                 onClick={onLogout}
-                className="ds-no-drag flex shrink-0 items-center gap-1.5 rounded-lg border border-ds-border bg-ds-card px-2.5 py-1.5 text-[12.5px] font-medium text-ds-muted shadow-sm transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:hover:border-red-500/40 dark:hover:bg-red-950/30 dark:hover:text-red-300"
               >
-                <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
+                <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
                 {t('myLogout')}
-              </button>
+              </Button>
             </div>
           </div>
         </header>
       </div>
 
       <main className="ds-no-drag min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-6">
-        <div className="mx-auto flex w-full max-w-[880px] flex-col gap-5">
+        <div className="mx-auto flex w-full max-w-[880px] flex-col gap-4">
           {error ? (
-            <p className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-[13px] text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300">
+            <p className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft px-4 py-3 text-[13px] text-ds-danger">
               {error}
             </p>
           ) : null}
 
           <MyAccountOverview me={me} onTopup={scrollToBilling} t={t} />
+
+          <MyUsagePanel stats={usageStats} t={t} />
 
           <div id="my-billing-panel">
             <MyBillingPanel
@@ -180,8 +187,6 @@ export function MyPage({
               t={t}
             />
           </div>
-
-          <MyUsagePanel stats={usageStats} t={t} />
         </div>
       </main>
     </div>
