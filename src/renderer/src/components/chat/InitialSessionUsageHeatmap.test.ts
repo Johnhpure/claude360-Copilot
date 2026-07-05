@@ -97,7 +97,8 @@ describe('InitialSessionUsageHeatmap', () => {
   it('renders populated usage with accessible day summaries without starter actions', () => {
     const html = render(state({ usage: usage(), loaded: true }))
 
-    expect(html).toContain('ds-runtime-wake-stage')
+    expect(html).toContain('ds-brand-hero')
+    expect(html).toContain('Claude360')
     expect(html).toContain('Overview')
     expect(html).toContain('Models')
     expect(html).toContain('All')
@@ -222,12 +223,12 @@ describe('InitialSessionUsageHeatmap', () => {
     expect(errorHtml).not.toContain('Explain this project&#x27;s structure')
   })
 
-  it('renders the Kun hero with a collapsed calendar card', () => {
+  it('renders the brand hero with a collapsed calendar card', () => {
     const html = render(state({ usage: usage(), loaded: true }), { initialCollapsed: true })
 
     expect(html).toContain('Expand calendar')
-    expect(html).toContain('ds-runtime-wake-stage')
-    expect(html).toContain('ds-kun-state-sleep')
+    expect(html).toContain('ds-brand-hero')
+    expect(html).toContain('Copilot')
     expect(html).not.toContain('Keep the canvas clear')
     expect(html).not.toContain('Daily agent usage calendar')
   })

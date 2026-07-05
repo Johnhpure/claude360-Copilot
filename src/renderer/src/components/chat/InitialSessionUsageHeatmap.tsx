@@ -16,7 +16,7 @@ import {
   type ModelUsageState,
   useModelUsageState
 } from '../../hooks/use-model-usage'
-import { KunHeroStage } from './KunHeroStage'
+import { BrandHero } from './BrandHero'
 
 type CalendarCell = DailyUsageBucket | null
 type CalendarWeek = {
@@ -710,9 +710,8 @@ function UsageHeroSection({
 }): ReactElement {
   return (
     <div className="flex w-full min-w-0 flex-col items-center text-center">
-      <div>
-        <KunHeroStage />
-      </div>
+      {/* 07-05：品牌欢迎区由 Logo 图片（KunHeroStage）改为动态文字 Claude360 Copilot */}
+      <BrandHero />
       {showText ? (
         <>
           <h1 className="max-w-[620px] text-[28px] font-semibold leading-tight tracking-[0] text-ds-ink sm:text-[32px]">
