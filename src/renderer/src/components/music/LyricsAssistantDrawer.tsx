@@ -81,7 +81,7 @@ export function LyricsAssistantDrawer({
       onClose={onClose}
       ariaLabel={t('musicLyricsAiTitle')}
       size="lg"
-      className="flex max-h-[calc(100dvh-48px)] w-[560px] max-w-[calc(100vw-32px)] flex-col overflow-hidden !p-0"
+      className="flex max-h-[82dvh] w-[460px] max-w-[520px] flex-col overflow-hidden !p-0"
     >
       <div
         data-testid="music-lyrics-drawer"
@@ -184,7 +184,7 @@ export function LyricsAssistantDrawer({
             <div className="mb-2 text-[11.5px] font-medium text-ds-muted">{t('musicLyricsAiResult')}</div>
             <div
               data-testid="lyrics-ai-result"
-              className="min-h-[120px] whitespace-pre-wrap rounded-[var(--radius-md)] border border-ds-border bg-ds-main p-2.5 text-[12.5px] leading-6 text-ds-ink"
+              className="h-[160px] overflow-y-auto whitespace-pre-wrap rounded-[var(--radius-md)] border border-ds-border bg-ds-main p-2.5 text-[12.5px] leading-6 text-ds-ink"
             >
               {text ? text : <span className="text-ds-faint">{t('musicLyricsAiResultEmpty')}</span>}
             </div>
