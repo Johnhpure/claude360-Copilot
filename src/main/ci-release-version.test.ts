@@ -33,7 +33,7 @@ describe('CI release version computation', () => {
     ).toEqual({
       version: '0.1.1',
       tag: 'v0.1.1',
-      releaseName: 'Kun 0.1.1',
+      releaseName: 'Claude360 Copilot 0.1.1',
       previousTag: '',
       existingTag: false
     })

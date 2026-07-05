@@ -1,6 +1,6 @@
 import type { Dispatch, ReactElement, SetStateAction } from 'react'
 import { Archive, AudioLines, Bot, BrainCircuit, GitBranch, Bug, ChevronLeft, Globe, Keyboard, Mic, PencilLine, RefreshCw, ServerCog, Settings, Smartphone, TerminalSquare } from 'lucide-react'
-import { isPrimaryRouteVisible } from '../lib/feature-visibility'
+import { isPrimaryRouteVisible, isSettingsCategoryVisible } from '../lib/feature-visibility'
 
 type SettingsCategory = 'general' | 'providers' | 'write' | 'mediaGeneration' | 'speechToText' | 'agents' | 'archives' | 'permissions' | 'worktree' | 'memory' | 'shortcuts' | 'claw' | 'updates' | 'debug' | 'terminal'
 
@@ -66,15 +66,19 @@ export function SettingsSidebar({
           <PencilLine className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
           {t('write')}
         </button>
-        <button
-          type="button"
-          data-cursor-spotlight-target
-          className={catCls('mediaGeneration')}
-          onClick={() => setCategory('mediaGeneration')}
-        >
-          <AudioLines className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
-          {t('mediaGeneration')}
-        </button>
+        {/* 隐藏≠删除:媒体生成(TTS/音乐/视频)在 claude360 供应商形态下无法配置可用,
+            暂不暴露导航项,保留 mediaGeneration 分类与其 section(见 feature-visibility)。 */}
+        {isSettingsCategoryVisible('mediaGeneration') ? (
+          <button
+            type="button"
+            data-cursor-spotlight-target
+            className={catCls('mediaGeneration')}
+            onClick={() => setCategory('mediaGeneration')}
+          >
+            <AudioLines className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
+            {t('mediaGeneration')}
+          </button>
+        ) : null}
         <button
           type="button"
           data-cursor-spotlight-target

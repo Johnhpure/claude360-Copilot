@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { AppRoute } from '../store/chat-store-types'
 import {
   PRIMARY_VISIBLE_ROUTES,
-  isPrimaryRouteVisible
+  isPrimaryRouteVisible,
+  isSettingsCategoryVisible
 } from './feature-visibility'
 
 describe('feature-visibility 第一阶段可见性策略', () => {
@@ -29,5 +30,12 @@ describe('feature-visibility 第一阶段可见性策略', () => {
     for (const route of hidden) {
       expect(PRIMARY_VISIBLE_ROUTES).not.toContain(route)
     }
+  })
+
+  it('设置类目门控:隐藏媒体生成,其余类目保持可见', () => {
+    expect(isSettingsCategoryVisible('mediaGeneration')).toBe(false)
+    expect(isSettingsCategoryVisible('general')).toBe(true)
+    expect(isSettingsCategoryVisible('providers')).toBe(true)
+    expect(isSettingsCategoryVisible('speechToText')).toBe(true)
   })
 })

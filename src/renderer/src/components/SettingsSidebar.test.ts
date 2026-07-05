@@ -29,4 +29,9 @@ describe('SettingsSidebar 第一阶段导航可见性(plan-04 Task7)', () => {
     // 隐藏后不再渲染 claw 导航按钮文案。
     expect(html).not.toContain('>claw<')
   })
+
+  it('隐藏媒体生成导航项(claude360 供应商形态下不可配置)', () => {
+    const html = renderNav()
+    expect(html).not.toContain('>mediaGeneration<')
+  })
 })

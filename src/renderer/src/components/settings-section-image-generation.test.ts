@@ -68,7 +68,7 @@ describe('ImageGenerationSettingsSection', () => {
     expect(html).not.toContain('value="240000"')
   })
 
-  it('uses the media generation tab for image generation settings', () => {
+  it('hides the media generation tab from the settings sidebar (claude360 phase 1)', () => {
     const html = renderToStaticMarkup(createElement(SettingsSidebar, {
       category: 'mediaGeneration',
       goBack: () => undefined,
@@ -76,13 +76,14 @@ describe('ImageGenerationSettingsSection', () => {
       t
     }))
 
+    // 隐藏≠删除:导航入口不渲染,但 Write→AI assistant 等其余项保持原有顺序。
     const writeIndex = html.indexOf('Write')
     const mediaIndex = html.indexOf('Media generation')
     const imageIndex = html.indexOf('Image generation')
     const agentsIndex = html.indexOf('AI assistant')
     expect(writeIndex).toBeGreaterThanOrEqual(0)
-    expect(mediaIndex).toBeGreaterThan(writeIndex)
+    expect(mediaIndex).toBe(-1)
     expect(imageIndex).toBe(-1)
-    expect(agentsIndex).toBeGreaterThan(mediaIndex)
+    expect(agentsIndex).toBeGreaterThan(writeIndex)
   })
 })

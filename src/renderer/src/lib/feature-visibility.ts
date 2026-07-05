@@ -28,3 +28,20 @@ const VISIBLE_ROUTE_SET: ReadonlySet<AppRoute> = new Set(PRIMARY_VISIBLE_ROUTES)
 export function isPrimaryRouteVisible(route: AppRoute): boolean {
   return VISIBLE_ROUTE_SET.has(route)
 }
+
+/**
+ * 第一阶段从设置导航隐藏的类目集合。
+ *
+ * 隐藏 ≠ 删除:类目组件/深链路由/类型均保留,仅不渲染侧栏入口,便于二期恢复。
+ * - mediaGeneration: TTS/音乐/视频区块依赖 claude360:* 供应商声明对应能力,而
+ *   buildClaude360ProviderProfiles 生成的 profile 仅含 image 能力,用户无法配出
+ *   可用状态,暂不暴露;图片生成由首次运行向导自动接线,不受影响。
+ */
+const HIDDEN_SETTINGS_CATEGORIES: ReadonlySet<string> = new Set(['mediaGeneration'])
+
+/**
+ * 判断某设置类目在第一阶段是否应从设置侧栏暴露。
+ */
+export function isSettingsCategoryVisible(category: string): boolean {
+  return !HIDDEN_SETTINGS_CATEGORIES.has(category)
+}
