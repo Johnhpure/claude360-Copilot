@@ -388,7 +388,7 @@ describe('showPostUpdateReleaseNotes', () => {
     })
   })
 
-  it('shows downloaded release notes once after the version changes', async () => {
+  it('emits a themed updated prompt once after the version changes', async () => {
     appVersion = '0.2.0'
     mockedFiles.set(
       versionStatePath,
@@ -396,27 +396,46 @@ describe('showPostUpdateReleaseNotes', () => {
         lastSeenVersion: '0.1.0',
         pendingUpdate: {
           version: '0.2.0',
-          releaseNotes: '修复更新流程并改进启动体验。'
+          releaseNotes: '<p>更新内容：</p><ul><li>修复更新流程</li><li>改进启动体验</li></ul>'
         }
       })
     )
-    showMessageBox.mockResolvedValue({ response: 0 })
+    const send = vi.fn()
     const module = await import('./gui-updater')
-    module.initializeGuiUpdater(() => null, () => 'stable', undefined, () => 'zh')
-
-    await module.showPostUpdateReleaseNotes()
-    await module.showPostUpdateReleaseNotes()
-
-    expect(showMessageBox).toHaveBeenCalledTimes(1)
-    expect(showMessageBox).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Claude360 Copilot 已更新',
-        message: '已更新到 Claude360 Copilot 0.2.0',
-        detail: '修复更新流程并改进启动体验。',
-        buttons: ['查看更新日志', '稍后']
-      })
+    module.initializeGuiUpdater(
+      () => ({
+        isDestroyed: () => false,
+        webContents: {
+          isDestroyed: () => false,
+          send
+        }
+      }) as never,
+      () => 'stable',
+      undefined,
+      () => 'zh'
     )
-    expect(openExternal).toHaveBeenCalledWith('https://github.com/Johnhpure/claude360-Copilot/releases')
+
+    await module.showPostUpdateReleaseNotes()
+    await module.showPostUpdateReleaseNotes()
+
+    expect(showMessageBox).not.toHaveBeenCalled()
+    expect(openExternal).not.toHaveBeenCalled()
+    const updatedCalls = send.mock.calls.filter(
+      ([channel, payload]) => channel === 'gui:update-state' && payload?.status === 'updated'
+    )
+    expect(updatedCalls).toHaveLength(1)
+    expect(updatedCalls[0]).toEqual([
+      'gui:update-state',
+      expect.objectContaining({
+        status: 'updated',
+        info: expect.objectContaining({
+          currentVersion: '0.2.0',
+          releaseUrl: 'https://github.com/Johnhpure/claude360-Copilot/releases',
+          releaseNotes: '<p>更新内容：</p><ul><li>修复更新流程</li><li>改进启动体验</li></ul>',
+          channel: 'stable'
+        })
+      })
+    ])
     expect(JSON.parse(mockedFiles.get(versionStatePath) ?? '{}')).toEqual({
       lastSeenVersion: '0.2.0'
     })

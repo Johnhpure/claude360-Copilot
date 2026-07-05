@@ -1,5 +1,4 @@
-import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, dialog, shell } from 'electron'
-import type { MessageBoxOptions } from 'electron'
+import { app, autoUpdater as nativeAutoUpdater, BrowserWindow } from 'electron'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -641,34 +640,28 @@ export async function showPostUpdateReleaseNotes(): Promise<void> {
 
   const pendingUpdate =
     state.pendingUpdate?.version === currentVersion ? state.pendingUpdate : undefined
-  await writeGuiVersionState({ lastSeenVersion: currentVersion })
-
   const locale = await selectedLocale()
-  const isZh = locale === 'zh'
-  const options: MessageBoxOptions = {
-    type: 'info',
-    title: isZh ? 'Claude360 Copilot 已更新' : 'Claude360 Copilot updated',
-    message: isZh
-      ? `已更新到 Claude360 Copilot ${currentVersion}`
-      : `Claude360 Copilot has been updated to ${currentVersion}`,
-    detail:
-      pendingUpdate?.releaseNotes ??
-      (isZh
-        ? '此版本的完整更新内容可在 Claude360 Copilot 更新日志中查看。'
-        : 'See the Claude360 Copilot changelog for the complete release notes.'),
-    buttons: isZh ? ['查看更新日志', '稍后'] : ['View changelog', 'Later'],
-    defaultId: 0,
-    cancelId: 1,
-    noLink: true
+  const releaseNotes =
+    pendingUpdate?.releaseNotes ??
+    (locale === 'zh'
+      ? '此版本的完整更新内容可在 Claude360 Copilot 更新日志中查看。'
+      : 'See the Claude360 Copilot changelog for the complete release notes.')
+  let channel = configuredChannel
+  try {
+    channel = await resolveUpdateChannel()
+  } catch {
+    channel = configuredChannel
   }
-  const window = getMainWindow?.()
-  const result =
-    window && !window.isDestroyed()
-      ? await dialog.showMessageBox(window, options)
-      : await dialog.showMessageBox(options)
-  if (result.response === 0) {
-    await shell.openExternal(changelogUrl())
-  }
+  await writeGuiVersionState({ lastSeenVersion: currentVersion })
+  emitGuiUpdateState({
+    status: 'updated',
+    info: {
+      currentVersion,
+      releaseUrl: changelogUrl(),
+      releaseNotes,
+      channel
+    }
+  })
 }
 
 export function getGuiUpdateState(): GuiUpdateState {

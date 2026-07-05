@@ -107,5 +107,41 @@ describe('GuiUpdatePromptPanel', () => {
     expect(html).toContain('guiUpdatePromptInstall')
     expect(html).not.toContain('guiUpdatePromptLater')
   })
-})
 
+  it('renders completed update release notes without exposing html tags', () => {
+    const html = renderToStaticMarkup(
+      createElement(GuiUpdatePromptPanel, {
+        state: {
+          status: 'updated',
+          info: {
+            currentVersion: '0.2.0',
+            releaseUrl: 'https://github.com/Johnhpure/claude360-Copilot/releases',
+            releaseNotes: '<p>更新内容：</p><ul><li>修复 AI 写词助手弹窗</li><li>优化更新提示</li></ul>',
+            channel: 'stable'
+          }
+        },
+        error: null,
+        onDownload: vi.fn(),
+        onInstall: vi.fn(),
+        onLater: vi.fn(),
+        t
+      })
+    )
+
+    expect(html).toContain('role="dialog"')
+    expect(html).toContain('guiUpdatePromptUpdatedTitle:version=0.2.0')
+    expect(html).toContain('guiUpdatePromptReleaseNotesHeading')
+    expect(html).toContain('修复 AI 写词助手弹窗')
+    expect(html).toContain('优化更新提示')
+    expect(html).toContain('guiUpdatePromptViewChangelog')
+    expect(html).toContain('guiUpdatePromptLater')
+    expect(html).toContain('max-h-')
+    expect(html).toContain('overflow-y-auto')
+    expect(html).not.toContain('&lt;p&gt;')
+    expect(html).not.toContain('&lt;ul&gt;')
+    expect(html).not.toContain('&lt;li&gt;')
+    expect(html).not.toContain('<p>')
+    expect(html).not.toContain('<ul>')
+    expect(html).not.toContain('<li>')
+  })
+})

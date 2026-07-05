@@ -51,6 +51,13 @@ export type GuiUpdateInfo =
       repo?: string
     }
 
+export type GuiUpdateCompletedInfo = {
+  currentVersion: string
+  releaseUrl: string
+  releaseNotes?: string
+  channel: GuiUpdateChannel
+}
+
 export type GuiUpdateState =
   | { status: 'idle'; info?: GuiUpdateInfo }
   | { status: 'checking'; info?: GuiUpdateInfo }
@@ -63,6 +70,7 @@ export type GuiUpdateState =
       progress: GuiUpdateProgress
     }
   | { status: 'downloaded'; info: Extract<GuiUpdateInfo, { ok: true }> }
+  | { status: 'updated'; info: GuiUpdateCompletedInfo }
   | { status: 'error'; info?: GuiUpdateInfo; message: string; code?: GuiUpdateFailureCode }
 
 export type GuiUpdateDownloadResult =

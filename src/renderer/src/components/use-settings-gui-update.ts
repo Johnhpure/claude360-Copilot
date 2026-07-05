@@ -36,6 +36,15 @@ export function useSettingsGuiUpdate({
   }, [])
 
   const applyGuiUpdateState = useCallback((state: GuiUpdateState): void => {
+    if (state.status === 'updated') {
+      setCheckingGuiUpdate(false)
+      setDownloadingGuiUpdate(false)
+      setInstallingGuiUpdate(false)
+      setGuiUpdateDownloaded(false)
+      setGuiUpdateProgress(null)
+      setGuiUpdateError(null)
+      return
+    }
     if ('info' in state && state.info) {
       setGuiUpdateInfo(state.info)
     }
