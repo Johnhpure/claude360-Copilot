@@ -207,10 +207,24 @@ jobs:
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
           else
+            notes_args=()
+            tag_object_type="$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(objecttype)')"
+            if [[ "$tag_object_type" == "tag" ]]; then
+              tag_message="$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)')"
+              if printf '%s' "$tag_message" | grep -q '[^[:space:]]'; then
+                notes_file="${RUNNER_TEMP}/release-notes-${tag}.md"
+                printf '%s\n' "$tag_message" > "$notes_file"
+                notes_args=(--notes-file "$notes_file")
+              fi
+            fi
+            if [[ "${#notes_args[@]}" -eq 0 ]]; then
+              notes_args=(--generate-notes)
+            fi
+
             gh release create "$tag" "${assets[@]}" \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "$tag" \
-              --notes "Automated Windows build for ${tag}." \
+              "${notes_args[@]}" \
               "${prerelease_args[@]}"
           fi

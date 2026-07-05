@@ -97,7 +97,11 @@ describe('checkGuiUpdate feed configuration', () => {
   it('uses the GitHub provider for the stable channel without prereleases', async () => {
     process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES = '1'
     updater.checkForUpdates.mockResolvedValue({
-      updateInfo: { version: '0.2.0', releaseDate: '2026-06-06T00:00:00.000Z' },
+      updateInfo: {
+        version: '0.2.0',
+        releaseDate: '2026-06-06T00:00:00.000Z',
+        releaseNotes: '修复更新流程并改进启动体验。'
+      },
       isUpdateAvailable: true
     })
 
@@ -107,7 +111,8 @@ describe('checkGuiUpdate feed configuration', () => {
     await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
       ok: true,
       latestVersion: '0.2.0',
-      hasUpdate: true
+      hasUpdate: true,
+      releaseNotes: '修复更新流程并改进启动体验。'
     })
     expect(updater.allowPrerelease).toBe(false)
     expect(updater.setFeedURL).toHaveBeenLastCalledWith({
@@ -203,7 +208,8 @@ describe('checkGuiUpdate manual fallback', () => {
           prerelease: false,
           draft: false,
           published_at: '2026-07-01T00:00:00.000Z',
-          html_url: 'https://github.com/Johnhpure/claude360-Copilot/releases/tag/v0.3.0'
+          html_url: 'https://github.com/Johnhpure/claude360-Copilot/releases/tag/v0.3.0',
+          body: '正式版 v0.3.0：\n- 新增应用内更新提醒'
         }
       ]
     })
@@ -218,7 +224,8 @@ describe('checkGuiUpdate manual fallback', () => {
       latestVersion: '0.3.0',
       hasUpdate: true,
       manualOnly: true,
-      releaseUrl: 'https://github.com/Johnhpure/claude360-Copilot/releases/tag/v0.3.0'
+      releaseUrl: 'https://github.com/Johnhpure/claude360-Copilot/releases/tag/v0.3.0',
+      releaseNotes: '正式版 v0.3.0：\n- 新增应用内更新提醒'
     })
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.github.com/repos/Johnhpure/claude360-Copilot/releases?per_page=30',
@@ -245,6 +252,36 @@ describe('checkGuiUpdate manual fallback', () => {
     await expect(module.checkGuiUpdate('frontier')).resolves.toMatchObject({
       ok: true,
       latestVersion: '0.4.0-test.2',
+      hasUpdate: true,
+      manualOnly: true
+    })
+  })
+
+  it('treats a formal release as newer than the old claude360 prerelease line with the same base version', async () => {
+    process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES = '1'
+    appVersion = '0.1.0-claude360.20260705.3'
+    updater.checkForUpdates.mockResolvedValue(null)
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          tag_name: 'v0.1.0',
+          prerelease: false,
+          draft: false,
+          published_at: '2026-07-05T00:00:00.000Z',
+          html_url: 'https://github.com/Johnhpure/claude360-Copilot/releases/tag/v0.1.0'
+        }
+      ]
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
+      ok: true,
+      currentVersion: '0.1.0-claude360.20260705.3',
+      latestVersion: '0.1.0',
       hasUpdate: true,
       manualOnly: true
     })
@@ -297,6 +334,39 @@ describe('installGuiUpdate', () => {
     finishCleanup()
     await expect(installing).resolves.toEqual({ ok: true })
     expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true)
+  })
+})
+
+describe('dismissed GUI update version', () => {
+  const versionStatePath = join(
+    '/tmp/deepseek-gui-updater-test-user-data',
+    'gui-version-state.json'
+  )
+
+  it('persists the ignored update version without dropping existing version state', async () => {
+    mockedFiles.set(
+      versionStatePath,
+      JSON.stringify({
+        lastSeenVersion: '0.1.0',
+        pendingUpdate: {
+          version: '0.2.0',
+          releaseNotes: '历史更新内容'
+        }
+      })
+    )
+    const module = await import('./gui-updater')
+
+    await module.dismissGuiUpdateVersion('v0.2.0')
+
+    await expect(module.getDismissedGuiUpdateVersion()).resolves.toBe('0.2.0')
+    expect(JSON.parse(mockedFiles.get(versionStatePath) ?? '{}')).toEqual({
+      lastSeenVersion: '0.1.0',
+      pendingUpdate: {
+        version: '0.2.0',
+        releaseNotes: '历史更新内容'
+      },
+      dismissedUpdateVersion: '0.2.0'
+    })
   })
 })
 

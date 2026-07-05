@@ -616,9 +616,11 @@ export type KunGuiApi = {
   ) => Promise<SystemNotificationResult>
   getAppVersion: () => Promise<string>
   getGuiUpdateState: () => Promise<GuiUpdateState>
+  getDismissedGuiUpdateVersion: () => Promise<string | undefined>
   checkGuiUpdate: (channel?: GuiUpdateChannel) => Promise<GuiUpdateInfo>
   downloadGuiUpdate: (channel?: GuiUpdateChannel) => Promise<GuiUpdateDownloadResult>
   installGuiUpdate: () => Promise<GuiUpdateInstallResult>
+  dismissGuiUpdateVersion: (version: string) => Promise<void>
   onGuiUpdateState: (handler: (payload: GuiUpdateState) => void) => () => void
   logError: (category: string, message: string, detail?: unknown) => Promise<void>
   getLogPath: () => Promise<string>

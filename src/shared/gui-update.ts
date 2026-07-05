@@ -34,6 +34,7 @@ export type GuiUpdateInfo =
       latestVersion: string
       hasUpdate: boolean
       releaseUrl: string
+      releaseNotes?: string
       releaseDate?: string
       channel: GuiUpdateChannel
       manualOnly?: boolean

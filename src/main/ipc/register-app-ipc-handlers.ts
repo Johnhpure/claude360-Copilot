@@ -1791,6 +1791,10 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   )
   ipcMain.handle('app:version', async () => getAppVersion())
   ipcMain.handle('gui:update-state', async () => readGuiUpdateState())
+  ipcMain.handle('gui:update-dismissed-version', async (): Promise<string | undefined> => {
+    const module = await loadGuiUpdaterModule()
+    return module.getDismissedGuiUpdateVersion()
+  })
   ipcMain.handle('gui:update-check', async (_, channel: unknown): Promise<GuiUpdateInfo> => {
     const module = await loadGuiUpdaterModule()
     return module.checkGuiUpdate(
@@ -1814,6 +1818,15 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('gui:update-install', async (): Promise<GuiUpdateInstallResult> => {
     const module = await loadGuiUpdaterModule()
     return module.installGuiUpdate()
+  })
+  ipcMain.handle('gui:update-dismiss', async (_, payload: unknown): Promise<void> => {
+    const module = await loadGuiUpdaterModule()
+    const request = parseIpcPayload(
+      'gui:update-dismiss',
+      z.object({ version: z.string().trim().min(1) }).strict(),
+      payload
+    )
+    await module.dismissGuiUpdateVersion(request.version)
   })
 
   ipcMain.handle('log:error', async (_, payload: unknown) => {

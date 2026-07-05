@@ -51,6 +51,7 @@ const DEFAULT_CHANGELOG_URL = GITHUB_RELEASES_URL
 
 type GuiVersionState = {
   lastSeenVersion?: string
+  dismissedUpdateVersion?: string
   pendingUpdate?: {
     version: string
     releaseNotes?: string
@@ -108,6 +109,10 @@ function normalizeReleaseNotes(value: unknown): string | undefined {
     })
     .filter(Boolean)
   return notes.length > 0 ? notes.join('\n\n') : undefined
+}
+
+function normalizeUpdateVersion(value: string): string {
+  return value.trim().replace(/^v/i, '')
 }
 
 async function recordPendingUpdate(updateInfo: UpdateInfo): Promise<void> {
@@ -336,6 +341,7 @@ function toGuiInfo(updateInfo: UpdateInfo, hasUpdate: boolean, manualOnly = fals
     latestVersion,
     hasUpdate,
     releaseUrl: releaseUrlForVersion(latestVersion),
+    releaseNotes: normalizeReleaseNotes(updateInfo.releaseNotes),
     releaseDate: updateInfo.releaseDate,
     channel: configuredChannel,
     manualOnly,
@@ -449,6 +455,7 @@ type ManualUpdateMetadata = {
   latestVersion: string
   releaseDate?: string
   releaseUrl?: string
+  releaseNotes?: string
 }
 
 // 手动检查(如未签名 mac 构建)不经过 electron-updater:
@@ -486,6 +493,7 @@ async function fetchManualUpdateMetadata(channel: GuiUpdateChannel): Promise<Man
     prerelease?: boolean
     published_at?: string
     html_url?: string
+    body?: string
   }>
   if (!Array.isArray(releases)) return { latestVersion: '' }
   const allowPrerelease = channel === 'frontier'
@@ -496,7 +504,8 @@ async function fetchManualUpdateMetadata(channel: GuiUpdateChannel): Promise<Man
   return {
     latestVersion: latest.tag_name.trim().replace(/^v/i, ''),
     releaseDate: latest.published_at,
-    releaseUrl: latest.html_url
+    releaseUrl: latest.html_url,
+    releaseNotes: normalizeReleaseNotes(latest.body)
   }
 }
 
@@ -524,6 +533,7 @@ async function checkManualUpdate(
       latestVersion,
       hasUpdate: isVersionGreater(latestVersion, currentVersion),
       releaseUrl: metadata.releaseUrl || releaseUrlForVersion(latestVersion),
+      releaseNotes: metadata.releaseNotes,
       releaseDate: metadata.releaseDate ?? '',
       channel,
       manualOnly: true,
@@ -663,6 +673,22 @@ export async function showPostUpdateReleaseNotes(): Promise<void> {
 
 export function getGuiUpdateState(): GuiUpdateState {
   return lastState
+}
+
+export async function getDismissedGuiUpdateVersion(): Promise<string | undefined> {
+  const state = await readGuiVersionState()
+  const version = typeof state.dismissedUpdateVersion === 'string' ? normalizeUpdateVersion(state.dismissedUpdateVersion) : ''
+  return version || undefined
+}
+
+export async function dismissGuiUpdateVersion(version: string): Promise<void> {
+  const normalized = normalizeUpdateVersion(version)
+  if (!normalized) return
+  const state = await readGuiVersionState()
+  await writeGuiVersionState({
+    ...state,
+    dismissedUpdateVersion: normalized
+  })
 }
 
 export async function checkGuiUpdate(channel?: GuiUpdateChannel): Promise<GuiUpdateInfo> {

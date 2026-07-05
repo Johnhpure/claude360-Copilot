@@ -166,6 +166,22 @@ describe('registerAppIpcHandlers', () => {
     expect(applySettingsPatch).toHaveBeenCalledWith(payload)
   })
 
+  it('routes GUI update dismiss requests through the updater module with boundary validation', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const dismissGuiUpdateVersion = vi.fn(async () => undefined)
+    const loadGuiUpdaterModule = vi.fn(async () => ({
+      getDismissedGuiUpdateVersion: vi.fn(async () => undefined),
+      dismissGuiUpdateVersion
+    }))
+
+    registerAppIpcHandlers(registerOptions({ loadGuiUpdaterModule: loadGuiUpdaterModule as never }))
+
+    const handler = handlers.get('gui:update-dismiss')
+    await expect(handler?.({}, { version: ' v0.2.0 ' })).resolves.toBeUndefined()
+    expect(dismissGuiUpdateVersion).toHaveBeenCalledWith('v0.2.0')
+    await expect(handler?.({}, { version: '' })).rejects.toThrow(/Invalid payload for gui:update-dismiss/)
+  })
+
   it('accepts checkpoint cleanup settings patches', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const applySettingsPatch = vi.fn(async () => settings())

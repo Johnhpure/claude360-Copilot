@@ -356,11 +356,15 @@ const api = {
   showTurnCompleteNotification: (payload) => ipcRenderer.invoke('notification:turn-complete', payload),
   getAppVersion: () => ipcRenderer.invoke('app:version'),
   getGuiUpdateState: () => ipcRenderer.invoke('gui:update-state'),
+  getDismissedGuiUpdateVersion: () =>
+    ipcRenderer.invoke('gui:update-dismissed-version'),
   checkGuiUpdate: (channel) =>
     ipcRenderer.invoke('gui:update-check', channel),
   downloadGuiUpdate: (channel) =>
     ipcRenderer.invoke('gui:update-download', channel),
   installGuiUpdate: () => ipcRenderer.invoke('gui:update-install'),
+  dismissGuiUpdateVersion: (version) =>
+    ipcRenderer.invoke('gui:update-dismiss', { version }),
   onGuiUpdateState: (handler) => {
     const wrapped = (
       _: Electron.IpcRendererEvent,

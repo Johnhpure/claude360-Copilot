@@ -111,10 +111,6 @@ export function GuiUpdateControl({
           <div className="min-w-0">
             <div className="break-words text-[13px] font-semibold">
               {title}
-              {/* 阶段9 安装包指纹标记:验证新 renderer 已进入产物(验收后按用户决定保留/移除) */}
-              <span className="ml-2 inline-flex items-center rounded-full bg-accent-soft px-2 py-0.5 align-middle text-[11px] font-semibold text-accent">
-                UI-REFRESH-TEST
-              </span>
             </div>
             {detail ? (
               <div className="mt-0.5 break-words text-[12px] leading-5 opacity-75">{detail}</div>
