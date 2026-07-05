@@ -720,7 +720,59 @@ export function createThreadActions(
     const previousTurnDurationByUserId = get().turnDurationByUserId
     const previousTurnReasoningFirstAtByUserId = get().turnReasoningFirstAtByUserId
     const previousTurnReasoningLastAtByUserId = get().turnReasoningLastAtByUserId
-    const previousQueuedMessages = get().queuedMessages
+    // 乐观发送失败的统一回滚（审查 I1）。queuedMessages 一律函数式合并：失败前的
+    // 网络窗口内用户可能又排队了新消息，整体覆盖快照会静默吞掉它们——只把本次
+    // drain 的 queued 消息（若尚不在队列）放回队首。
+    // keepThread=true 用于已进入线程阶段的失败（事件订阅可能已活跃）：不回滚
+    // activeThreadId/lastSeq，且只摘除本次乐观痕迹，保留并发写入的 blocks/计时。
+    const rollbackOptimisticSend = (opts?: {
+      keepThread?: boolean
+      error?: string | null
+      openAgentsSettings?: boolean
+    }): void => {
+      set((s) => {
+        const { [userBlockId]: _startedAt, ...turnStartedWithoutUser } = s.turnStartedAtByUserId
+        const { [userBlockId]: _duration, ...turnDurationWithoutUser } = s.turnDurationByUserId
+        const { [userBlockId]: _reasoningFirst, ...turnReasoningFirstWithoutUser } =
+          s.turnReasoningFirstAtByUserId
+        const { [userBlockId]: _reasoningLast, ...turnReasoningLastWithoutUser } =
+          s.turnReasoningLastAtByUserId
+        const nextQueuedMessages =
+          queued && !s.queuedMessages.some((message) => message.id === queued.id)
+            ? [queued, ...s.queuedMessages]
+            : s.queuedMessages
+        return {
+          busy: false,
+          ...(opts?.keepThread
+            ? {
+                blocks: s.blocks.filter((block) => block.id !== userBlockId),
+                turnStartedAtByUserId: turnStartedWithoutUser,
+                turnDurationByUserId: turnDurationWithoutUser,
+                turnReasoningFirstAtByUserId: turnReasoningFirstWithoutUser,
+                turnReasoningLastAtByUserId: turnReasoningLastWithoutUser,
+                currentTurnId: previousCurrentTurnId,
+                currentTurnUserId: previousCurrentTurnUserId
+              }
+            : {
+                // 线程阶段之前失败：订阅未建立、无并发写入者，整体回快照安全。
+                activeThreadId: previousActiveThreadId,
+                lastSeq: previousLastSeq,
+                blocks: previousBlocks,
+                currentTurnId: previousCurrentTurnId,
+                currentTurnUserId: previousCurrentTurnUserId,
+                turnStartedAtByUserId: previousTurnStartedAtByUserId,
+                turnDurationByUserId: previousTurnDurationByUserId,
+                turnReasoningFirstAtByUserId: previousTurnReasoningFirstAtByUserId,
+                turnReasoningLastAtByUserId: previousTurnReasoningLastAtByUserId
+              }),
+          queuedMessages: nextQueuedMessages,
+          ...(opts?.error !== undefined ? { error: opts.error } : {}),
+          ...(opts?.openAgentsSettings
+            ? { route: 'settings' as const, settingsSection: 'agents' as const }
+            : {})
+        }
+      })
+    }
     resetBusyRecoveryAttempts()
     set((s) => ({
       busy: true,
@@ -779,22 +831,7 @@ export function createThreadActions(
       perf.mark('key-ensured')
       if (!keyReady) {
         // 用户取消/建 Key 失败：完整回滚乐观 UI；不置 error——主动取消不是错误。
-        // queuedMessages 用函数式恢复而非快照覆盖：检测的网络窗口内用户可能又排队了
-        // 新消息，快照覆盖会静默吞掉它们；这里只把本次 drain 的消息放回队首。
-        set((s) => ({
-          blocks: previousBlocks,
-          busy: false,
-          currentTurnId: previousCurrentTurnId,
-          currentTurnUserId: previousCurrentTurnUserId,
-          turnStartedAtByUserId: previousTurnStartedAtByUserId,
-          turnDurationByUserId: previousTurnDurationByUserId,
-          turnReasoningFirstAtByUserId: previousTurnReasoningFirstAtByUserId,
-          turnReasoningLastAtByUserId: previousTurnReasoningLastAtByUserId,
-          queuedMessages:
-            queued && !s.queuedMessages.some((message) => message.id === queued.id)
-              ? [queued, ...s.queuedMessages]
-              : s.queuedMessages
-        }))
+        rollbackOptimisticSend()
         perf.done('aborted:key-not-ready')
         return false
       }
@@ -804,18 +841,7 @@ export function createThreadActions(
         const settings = await rendererRuntimeClient.getSettings()
         const workspaceRoot = normalizeWorkspaceRoot(settings.workspaceRoot)
         if (!workspaceRoot) {
-          set({
-            blocks: previousBlocks,
-            busy: false,
-            currentTurnId: previousCurrentTurnId,
-            currentTurnUserId: previousCurrentTurnUserId,
-            turnStartedAtByUserId: previousTurnStartedAtByUserId,
-            turnDurationByUserId: previousTurnDurationByUserId,
-            turnReasoningFirstAtByUserId: previousTurnReasoningFirstAtByUserId,
-            turnReasoningLastAtByUserId: previousTurnReasoningLastAtByUserId,
-            queuedMessages: previousQueuedMessages,
-            error: i18n.t('common:workspaceRequiredToCreateThread')
-          })
+          rollbackOptimisticSend({ error: i18n.t('common:workspaceRequiredToCreateThread') })
           return false
         }
         const codeWorkspaceRoots = rememberCodeWorkspaceRoots(get().codeWorkspaceRoots, [workspaceRoot])
@@ -869,22 +895,9 @@ export function createThreadActions(
         void window.kunGui.logError('create-thread', 'Failed to create thread', {
           message: e instanceof Error ? e.message : String(e)
         }).catch(() => undefined)
-        set({
-          activeThreadId: previousActiveThreadId,
-          blocks: previousBlocks,
-          lastSeq: previousLastSeq,
-          busy: false,
-          currentTurnId: previousCurrentTurnId,
-          currentTurnUserId: previousCurrentTurnUserId,
-          turnStartedAtByUserId: previousTurnStartedAtByUserId,
-          turnDurationByUserId: previousTurnDurationByUserId,
-          turnReasoningFirstAtByUserId: previousTurnReasoningFirstAtByUserId,
-          turnReasoningLastAtByUserId: previousTurnReasoningLastAtByUserId,
-          queuedMessages: previousQueuedMessages,
+        rollbackOptimisticSend({
           error: formatRuntimeError(e),
-          ...(shouldOpenSettingsForError(e)
-            ? { route: 'settings' as const, settingsSection: 'agents' as const }
-            : {})
+          openAgentsSettings: shouldOpenSettingsForError(e)
         })
         return false
       }
@@ -1096,30 +1109,17 @@ export function createThreadActions(
         threadId: activeThreadId
       }).catch(() => undefined)
       if (looksLikeActiveTurnError(e)) {
-        set({
-          blocks: previousBlocks,
-          busy: false,
-          currentTurnId: previousCurrentTurnId,
-          currentTurnUserId: previousCurrentTurnUserId,
-          turnStartedAtByUserId: previousTurnStartedAtByUserId,
-          turnDurationByUserId: previousTurnDurationByUserId,
-          turnReasoningFirstAtByUserId: previousTurnReasoningFirstAtByUserId,
-          turnReasoningLastAtByUserId: previousTurnReasoningLastAtByUserId,
-          queuedMessages: previousQueuedMessages,
-          error: i18n.t('common:runtimeActiveTurn')
-        })
+        // 线程已进入发送阶段：保留 activeThreadId/lastSeq（recoverActiveTurn 依赖），
+        // 函数式摘除本次乐观 user block 与计时痕迹。
+        rollbackOptimisticSend({ keepThread: true, error: i18n.t('common:runtimeActiveTurn') })
         await get().recoverActiveTurn()
         await get().refreshThreads()
         return false
       }
-      set({
+      rollbackOptimisticSend({
+        keepThread: true,
         error: formatRuntimeError(e),
-        busy: false,
-        currentTurnId: null,
-        queuedMessages: previousQueuedMessages,
-        ...(shouldOpenSettingsForError(e)
-          ? { route: 'settings' as const, settingsSection: 'agents' as const }
-          : {})
+        openAgentsSettings: shouldOpenSettingsForError(e)
       })
       await get().refreshThreads()
       return false

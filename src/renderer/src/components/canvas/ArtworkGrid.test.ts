@@ -93,6 +93,17 @@ describe('ArtworkGrid', () => {
     expect(html).toContain('png')
   })
 
+  it('本地文件缺失但远程回退可用时显示缺失徽标并继续展示图片', () => {
+    const html = renderGrid([
+      artwork('missing-local', {
+        localPath: 'assets/images/missing-local.png',
+        fileMissing: true
+      })
+    ])
+    expect(html).toContain('https://cdn.example/missing-local.png')
+    expect(html).toContain('canvasAssetMissing')
+  })
+
   it('pending 卡片：TaskCard running 呼吸 + 不确定进度扫动，无 view/download/delete 操作', () => {
     const html = renderGrid([artwork('run', { status: 'pending', image: undefined })])
     expect(html).toContain('data-status="pending"')

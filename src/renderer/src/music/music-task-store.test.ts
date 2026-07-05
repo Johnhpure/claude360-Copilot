@@ -302,4 +302,28 @@ describe('磁盘持久化恢复（07-05）', () => {
     store.getState().attachSongAsset('fresh', { localAudioPath: 'assets/music/fresh.mp3' })
     expect(store.getState().songAssets['fresh']?.localAudioPath).toBe('assets/music/fresh.mp3')
   })
+
+  it('hydrateFromDisk：删除墓碑阻止迟到歌曲复活，且不误伤其他 workspace 同 id', () => {
+    const store = createMusicTaskStore({
+      initialTasks: [{
+        id: 'disk-T1',
+        taskId: 'T1',
+        status: 'success',
+        createdAt: 1,
+        title: 'old',
+        params: payload(),
+        songs: [song('gone')]
+      }]
+    })
+    store.getState().setDiskWorkspaceRoot('/workspace/A')
+    store.getState().removeSong('gone')
+
+    store.getState().hydrateFromDisk([diskMusicRecord('gone', { taskId: 'T1' })], '/workspace/A')
+    expect(store.getState().tasks.flatMap((task) => task.songs).some((item) => item.id === 'gone')).toBe(false)
+    expect(store.getState().songAssets['gone']).toBeUndefined()
+
+    store.getState().hydrateFromDisk([diskMusicRecord('gone', { taskId: 'T1' })], '/workspace/B')
+    expect(store.getState().tasks.flatMap((task) => task.songs).some((item) => item.id === 'gone')).toBe(true)
+    expect(store.getState().songAssets['gone']?.localAudioPath).toBe('assets/music/gone.mp3')
+  })
 })

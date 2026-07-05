@@ -217,6 +217,33 @@ describe('MusicTaskList · 作品管理栏 + 宫格', () => {
     expect(html).toContain('disabled')
   })
 
+  it('本地音频/封面缺失但远程地址可用时显示本地缺失标注且不禁用播放', () => {
+    const task: MusicGenTask = {
+      id: 'x',
+      taskId: 't',
+      status: 'success',
+      createdAt: 1,
+      title: '本地缺失',
+      params: { prompt: 'p', model: 'V5_5' },
+      songs: [song('local-missing')]
+    }
+    const html = renderTasks([task], {
+      songAssets: {
+        'local-missing': {
+          localAudioPath: 'assets/music/local-missing.mp3',
+          localCoverPath: 'assets/covers/local-missing.jpg',
+          audioMissing: true,
+          coverMissing: true
+        }
+      }
+    })
+    expect(html).toContain('music-local-audio-missing')
+    expect(html).toContain('music-local-cover-missing')
+    expect(html).toContain('musicLocalAudioMissing')
+    expect(html).toContain('musicLocalCoverMissing')
+    expect(html).not.toContain('musicAudioMissing')
+  })
+
   it('当前播放中的卡片有播放中状态与波形动效', () => {
     const task: MusicGenTask = {
       id: 'x',

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -125,6 +125,10 @@ function registerOptions(overrides: Partial<Parameters<typeof import('./register
 }
 
 describe('registerAppIpcHandlers', () => {
+  beforeAll(async () => {
+    await import('./register-app-ipc-handlers')
+  }, 120_000)
+
   beforeEach(() => {
     handlers.clear()
   })

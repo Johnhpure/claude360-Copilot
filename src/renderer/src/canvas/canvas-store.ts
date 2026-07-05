@@ -99,6 +99,10 @@ export interface CanvasState {
   statusFilter: CanvasArtworkFilter
   selectMode: boolean
   selectedIds: Record<string, true>
+  /** 07-05：当前磁盘 hydrate 所属 workspace；删除墓碑按该 root 分区。 */
+  diskWorkspaceRoot: string
+  /** 会话内删除墓碑：防 hydrate 在途结果把已删磁盘记录复活。 */
+  deletedArtworkKeys: Record<string, true>
   // actions —— 表单
   setPrompt: (prompt: string) => void
   setModel: (model: string) => void
@@ -126,7 +130,9 @@ export interface CanvasState {
   clearError: () => void
   // actions —— 07-05 本地持久化
   /** 磁盘资产记录并入作品列表（启动 / 切工作空间时调用）。 */
-  hydrateFromDisk: (records: DiskImageRecord[]) => void
+  hydrateFromDisk: (records: DiskImageRecord[], workspaceRoot?: string) => void
+  /** hydrate 请求发出前写入当前 workspaceRoot，供删除墓碑打 key。 */
+  setDiskWorkspaceRoot: (workspaceRoot: string) => void
   /** 落盘成功后回写本地路径（清除缺失标记）。 */
   attachLocalArtifact: (id: string, localPath: string) => void
 }
@@ -135,6 +141,26 @@ let artworkSeq = 0
 function nextArtworkId(): string {
   artworkSeq += 1
   return `art_${artworkSeq}_${Date.now().toString(36)}`
+}
+
+function normalizeDiskWorkspaceRoot(workspaceRoot: string): string {
+  return workspaceRoot.trim().replaceAll('\\', '/')
+}
+
+function deletedArtworkKey(workspaceRoot: string, id: string): string {
+  return `${normalizeDiskWorkspaceRoot(workspaceRoot)}::${id}`
+}
+
+function markDeletedArtworkKeys(
+  current: Record<string, true>,
+  workspaceRoot: string,
+  ids: string[]
+): Record<string, true> {
+  const root = normalizeDiskWorkspaceRoot(workspaceRoot)
+  if (!root || ids.length === 0) return current
+  const next = { ...current }
+  for (const id of ids) next[deletedArtworkKey(root, id)] = true
+  return next
 }
 
 /** 夹逼张数到 [CANVAS_MIN_N, CANVAS_MAX_N]。 */
@@ -433,6 +459,8 @@ export function createCanvasStore(
     statusFilter: 'all',
     selectMode: false,
     selectedIds: {},
+    diskWorkspaceRoot: '',
+    deletedArtworkKeys: {},
     setPrompt: (prompt) => set({ prompt }),
     setModel: (model) => set({ model }),
     setAspectPreset: (aspectPreset) =>
@@ -494,24 +522,43 @@ export function createCanvasStore(
     removeArtwork: (id) =>
       set((s) => {
         const { [id]: _removed, ...selectedIds } = s.selectedIds
-        return { artworks: s.artworks.filter((artwork) => artwork.id !== id), selectedIds }
+        const removed = s.artworks.find((artwork) => artwork.id === id && artwork.status !== 'pending')
+        return {
+          artworks: s.artworks.filter((artwork) => artwork.id !== id),
+          selectedIds,
+          deletedArtworkKeys: removed
+            ? markDeletedArtworkKeys(s.deletedArtworkKeys, s.diskWorkspaceRoot, [id])
+            : s.deletedArtworkKeys
+        }
       }),
     // 批量删除/清空一律豁免 pending 占位（与单删禁用语义一致）：飞行中批次的
     // 占位被删后，结果回来会因 pendingId 无匹配而被静默丢弃。
     removeSelected: () =>
-      set((s) => ({
-        artworks: s.artworks.filter(
-          (artwork) => artwork.status === 'pending' || !s.selectedIds[artwork.id]
-        ),
-        selectedIds: {},
-        selectMode: false
-      })),
+      set((s) => {
+        const removedIds = s.artworks
+          .filter((artwork) => artwork.status !== 'pending' && s.selectedIds[artwork.id])
+          .map((artwork) => artwork.id)
+        return {
+          artworks: s.artworks.filter(
+            (artwork) => artwork.status === 'pending' || !s.selectedIds[artwork.id]
+          ),
+          selectedIds: {},
+          selectMode: false,
+          deletedArtworkKeys: markDeletedArtworkKeys(s.deletedArtworkKeys, s.diskWorkspaceRoot, removedIds)
+        }
+      }),
     clearArtworks: () =>
-      set((s) => ({
-        artworks: s.artworks.filter((artwork) => artwork.status === 'pending'),
-        selectedIds: {},
-        selectMode: false
-      })),
+      set((s) => {
+        const removedIds = s.artworks
+          .filter((artwork) => artwork.status !== 'pending')
+          .map((artwork) => artwork.id)
+        return {
+          artworks: s.artworks.filter((artwork) => artwork.status === 'pending'),
+          selectedIds: {},
+          selectMode: false,
+          deletedArtworkKeys: markDeletedArtworkKeys(s.deletedArtworkKeys, s.diskWorkspaceRoot, removedIds)
+        }
+      }),
     setStatusFilter: (statusFilter) => set({ statusFilter }),
     toggleSelectMode: () =>
       set((s) => ({ selectMode: !s.selectMode, selectedIds: s.selectMode ? {} : s.selectedIds })),
@@ -524,7 +571,21 @@ export function createCanvasStore(
         return { selectedIds: { ...s.selectedIds, [id]: true } }
       }),
     clearError: () => set({ error: null }),
-    hydrateFromDisk: (records) => set((s) => ({ artworks: mergeDiskRecords(s.artworks, records) })),
+    setDiskWorkspaceRoot: (workspaceRoot) =>
+      set({ diskWorkspaceRoot: normalizeDiskWorkspaceRoot(workspaceRoot) }),
+    hydrateFromDisk: (records, workspaceRoot) =>
+      set((s) => {
+        const root = workspaceRoot === undefined
+          ? s.diskWorkspaceRoot
+          : normalizeDiskWorkspaceRoot(workspaceRoot)
+        const visibleRecords = root
+          ? records.filter((record) => !s.deletedArtworkKeys[deletedArtworkKey(root, record.id)])
+          : records
+        return {
+          diskWorkspaceRoot: root,
+          artworks: mergeDiskRecords(s.artworks, visibleRecords)
+        }
+      }),
     attachLocalArtifact: (id, localPath) =>
       set((s) => ({
         artworks: s.artworks.map((artwork) =>

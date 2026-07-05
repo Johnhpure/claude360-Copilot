@@ -257,7 +257,7 @@ function SuccessArtworkCard({
 }): ReactElement {
   const fallbackSrc = artwork.image ? imageDataUrl(artwork.image) : null
   const src = useLocalAssetSrc(workspaceRoot, artwork.localPath, fallbackSrc) || null
-  const missingLocal = Boolean(artwork.localPath) && !src
+  const missingLocal = artwork.fileMissing === true
   return (
           <ImageCard
             data-testid="artwork-card"

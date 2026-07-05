@@ -134,6 +134,8 @@
   "musicPromptCopied": "提示词已复制",
   "musicPromptCopyFailed": "复制失败",
   "musicAudioMissing": "缺少音频地址，无法播放。",
+  "musicLocalAudioMissing": "本地音频文件缺失，已使用远程地址回退。",
+  "musicLocalCoverMissing": "本地封面文件缺失，已使用远程封面回退。",
   "musicAudioPlayFailed": "音频播放失败，请稍后重试。",
   "musicAudioPlayerUnavailable": "播放器未就绪，请稍后重试。",
   "musicStatusSubmitting": "提交中",

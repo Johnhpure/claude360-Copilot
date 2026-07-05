@@ -372,4 +372,18 @@ describe('磁盘持久化恢复（07-05）', () => {
     store.getState().attachLocalArtifact('run', 'assets/images/run.png')
     expect(store.getState().artworks.find((x) => x.id === 'run')?.localPath).toBe('assets/images/run.png')
   })
+
+  it('hydrateFromDisk：删除墓碑阻止迟到磁盘记录复活，且不误伤其他 workspace 同 id', () => {
+    const store = createCanvasStore({
+      initialArtworks: [successArtwork('gone', { localPath: 'assets/images/gone.png', diskOrigin: true })]
+    })
+    store.getState().setDiskWorkspaceRoot('/workspace/A')
+    store.getState().removeArtwork('gone')
+
+    store.getState().hydrateFromDisk([diskRecord('gone', { localPath: 'assets/images/gone.png' })], '/workspace/A')
+    expect(store.getState().artworks.some((artwork) => artwork.id === 'gone')).toBe(false)
+
+    store.getState().hydrateFromDisk([diskRecord('gone', { localPath: 'assets/images/gone.png' })], '/workspace/B')
+    expect(store.getState().artworks.some((artwork) => artwork.id === 'gone')).toBe(true)
+  })
 })

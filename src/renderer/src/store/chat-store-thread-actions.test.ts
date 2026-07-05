@@ -35,6 +35,7 @@ function buildHarness(): {
     blocks: [],
     busy: true,
     clawChannels: [],
+    codeWorkspaceRoots: [],
     composerModel: '',
     composerProviderId: '',
     currentTurnId: null,
@@ -246,6 +247,124 @@ describe('chat-store-thread-actions queued messages', () => {
       'make a prototype',
       expect.objectContaining({ model: 'MiniMax-M3' })
     )
+  })
+})
+
+describe('chat-store-thread-actions send failure rollback (review I1)', () => {
+  beforeEach(() => {
+    rendererRuntimeClient.invalidateSettings()
+    registryMock.getProvider.mockReset()
+  })
+
+  afterEach(() => {
+    rendererRuntimeClient.invalidateSettings()
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps messages queued during the send when sendUserMessage fails', async () => {
+    let stateRef: ChatState | null = null
+    const provider = {
+      connect: vi.fn(async () => undefined),
+      sendUserMessage: vi.fn(async () => {
+        // 模拟网络等待期间用户又排队了一条新消息，然后发送失败。
+        if (stateRef) {
+          const optimisticUser = stateRef.blocks.find((block) => block.kind === 'user' && block.text === 'hello-fail')
+          if (optimisticUser) {
+            stateRef.turnDurationByUserId = { ...stateRef.turnDurationByUserId, [optimisticUser.id]: 1200 }
+            stateRef.turnReasoningFirstAtByUserId = {
+              ...stateRef.turnReasoningFirstAtByUserId,
+              [optimisticUser.id]: 1300
+            }
+            stateRef.turnReasoningLastAtByUserId = {
+              ...stateRef.turnReasoningLastAtByUserId,
+              [optimisticUser.id]: 1400
+            }
+          }
+          stateRef.queuedMessages = [
+            ...stateRef.queuedMessages,
+            { id: 'q-live', text: 'typed while sending', mode: 'agent' as const }
+          ]
+        }
+        throw new Error('network exploded')
+      }),
+      subscribeThreadEvents: vi.fn(async () => undefined)
+    }
+    registryMock.getProvider.mockReturnValue(provider)
+    vi.stubGlobal('window', {
+      kunGui: {
+        getSettings: vi.fn(async () => ({
+          agents: { kun: { providerId: '', model: '' } },
+          codePromptPrefix: ''
+        })),
+        saveSettingsSilent: vi.fn(async () => ({})),
+        restartRuntime: vi.fn(async () => undefined),
+        logError: vi.fn(async () => undefined)
+      }
+    })
+    const { actions, state } = buildHarness()
+    stateRef = state
+    state.busy = false
+
+    await expect(actions.sendMessage('hello-fail', 'agent')).resolves.toBe(false)
+
+    // 并发排队的新消息不能被快照覆盖吞掉。
+    expect(state.queuedMessages.some((message) => message.id === 'q-live')).toBe(true)
+    // 乐观 user block 被摘除、busy 复位、计时映射无残留。
+    expect(state.blocks.some((block) => block.kind === 'user' && block.text === 'hello-fail')).toBe(false)
+    expect(state.busy).toBe(false)
+    expect(state.turnStartedAtByUserId).toEqual({})
+    expect(state.turnDurationByUserId).toEqual({})
+    expect(state.turnReasoningFirstAtByUserId).toEqual({})
+    expect(state.turnReasoningLastAtByUserId).toEqual({})
+    expect(state.error).toBeTruthy()
+  })
+
+  it('restores the drained queued message to the front when createThread fails', async () => {
+    let stateRef: ChatState | null = null
+    const provider = {
+      connect: vi.fn(async () => undefined),
+      listThreads: vi.fn(async () => []),
+      createThread: vi.fn(async () => {
+        if (stateRef) {
+          stateRef.queuedMessages = [
+            ...stateRef.queuedMessages,
+            { id: 'q-live2', text: 'typed during create', mode: 'agent' as const }
+          ]
+        }
+        throw new Error('create failed')
+      }),
+      sendUserMessage: vi.fn(async () => ({ threadId: 't', turnId: 'u', userMessageItemId: 'x' })),
+      subscribeThreadEvents: vi.fn(async () => undefined)
+    }
+    registryMock.getProvider.mockReturnValue(provider)
+    vi.stubGlobal('window', {
+      kunGui: {
+        getSettings: vi.fn(async () => ({
+          workspaceRoot: '/workspace/deepseek-gui',
+          agents: { kun: { providerId: '', model: '' } },
+          codePromptPrefix: ''
+        })),
+        saveSettingsSilent: vi.fn(async () => ({})),
+        restartRuntime: vi.fn(async () => undefined),
+        logError: vi.fn(async () => undefined)
+      }
+    })
+    const { actions, state } = buildHarness()
+    stateRef = state
+    state.busy = false
+    state.activeThreadId = null
+    state.threads = []
+    const queued = { id: 'q-drained', text: 'queued original', mode: 'agent' as const }
+    state.queuedMessages = [queued]
+
+    await expect(actions.sendMessage('queued original', 'agent', { queued })).resolves.toBe(false)
+
+    // 本次 drain 的消息回到队首，发送期间新排队的消息保留在其后。
+    expect(state.queuedMessages[0]?.id).toBe('q-drained')
+    expect(state.queuedMessages[1]?.text).toBe('typed during create')
+    expect(state.blocks).toEqual([])
+    expect(state.busy).toBe(false)
+    expect(state.activeThreadId).toBeNull()
   })
 })
 

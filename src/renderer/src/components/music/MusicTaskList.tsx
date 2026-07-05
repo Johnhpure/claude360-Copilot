@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { useMemo, useState } from 'react'
 import { Copy, Download, Music4, Pause, Play, RefreshCw, Trash2 } from 'lucide-react'
 import type { Claude360Song } from '@shared/claude360-music'
-import type { MusicGenTask } from '../../music/music-task-store'
+import type { MusicGenTask, SongAssetInfo } from '../../music/music-task-store'
 import { Button, Card, EmptyState } from '../ui'
 import { TaskCard, type TaskCardStatus } from '../task'
 import { MusicCard, formatSongDuration } from './MusicCard'
@@ -192,6 +192,7 @@ function SelectBox({ selected }: { selected: boolean }): ReactElement {
 
 type Props = {
   tasks: MusicGenTask[]
+  songAssets?: Record<string, SongAssetInfo>
   currentSongId: string | null
   playing: boolean
   onPlay: (song: Claude360Song, queue: Claude360Song[]) => void
@@ -215,6 +216,7 @@ type Props = {
 // 纯 UI 状态（筛选/批量选择）留在组件内；生成、播放、删除等副作用由容器注入。
 export function MusicTaskList({
   tasks,
+  songAssets = {},
   currentSongId,
   playing,
   onPlay,
@@ -374,6 +376,11 @@ export function MusicTaskList({
             const isPlaying = Boolean(playing && currentSongId === song.id)
             const queue = playableSongsForTask(task)
             const canPlay = Boolean(song.audioUrl.trim())
+            const assetInfo = songAssets[song.id]
+            const audioMissing = assetInfo?.audioMissing === true
+            const coverMissing = assetInfo?.coverMissing === true
+            const localMissingNoticeClass =
+              'rounded-[var(--radius-sm)] border border-ds-border bg-ds-accent-soft px-2.5 py-2 text-[12px] leading-4 text-ds-accent'
             return (
               <MusicCard
                 key={card.id}
@@ -411,12 +418,23 @@ export function MusicTaskList({
                   </>
                 }
                 notice={
-                  !canPlay ? (
-                    <div
-                      data-testid="music-audio-missing"
-                      className="rounded-[var(--radius-sm)] border border-ds-border bg-ds-accent-soft px-2.5 py-2 text-[12px] leading-4 text-ds-accent"
-                    >
-                      {t('musicAudioMissing')}
+                  !canPlay || audioMissing || coverMissing ? (
+                    <div className="space-y-1.5">
+                      {audioMissing ? (
+                        <div data-testid="music-local-audio-missing" className={localMissingNoticeClass}>
+                          {t('musicLocalAudioMissing')}
+                        </div>
+                      ) : null}
+                      {coverMissing ? (
+                        <div data-testid="music-local-cover-missing" className={localMissingNoticeClass}>
+                          {t('musicLocalCoverMissing')}
+                        </div>
+                      ) : null}
+                      {!canPlay ? (
+                        <div data-testid="music-audio-missing" className={localMissingNoticeClass}>
+                          {t('musicAudioMissing')}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null
                 }

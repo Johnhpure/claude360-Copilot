@@ -23,6 +23,7 @@ import {
   hasPrev as playerHasPrev,
   useMusicPlayerStore
 } from '../../music/music-player-store'
+import { revokeMusicSongObjectUrls, type PlaybackSource } from '../../music/music-object-url-cache'
 import {
   debugProbeSongs,
   downloadSong,
@@ -46,12 +47,6 @@ import { LyricsAssistantDrawer } from './LyricsAssistantDrawer'
 type Props = {
   leftSidebarCollapsed: boolean
   onToggleLeftSidebar: () => void
-}
-
-type PlaybackSource = {
-  songId: string
-  url: string
-  objectUrl?: string
 }
 
 function formFromTask(task: { title: string; params: MusicGenTask['params'] }): Claude360MusicCreateForm {
@@ -132,6 +127,7 @@ function NowPlayingCard({
 export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Props): ReactElement {
   const { t } = useTranslation('common')
   const tasks = useStore(useMusicTaskStore, (s) => s.tasks)
+  const songAssets = useStore(useMusicTaskStore, (s) => s.songAssets)
   const addSubmitting = useStore(useMusicTaskStore, (s) => s.addSubmitting)
   const markSubmitted = useStore(useMusicTaskStore, (s) => s.markSubmitted)
   const markFailed = useStore(useMusicTaskStore, (s) => s.markFailed)
@@ -314,6 +310,18 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
     }
   }, [workspaceRoot])
 
+  const revokeSongObjectUrls = useCallback((songIds: string[]): void => {
+    const state = useMusicTaskStore.getState()
+    playbackSourceRef.current = revokeMusicSongObjectUrls(songIds, {
+      tasks: state.tasks,
+      songAssets: state.songAssets,
+      localAudioObjectUrls: localAudioObjectUrlsRef.current,
+      coverObjectUrls: coverObjectUrlsRef.current,
+      playbackSource: playbackSourceRef.current,
+      revokeObjectUrl: (url) => URL.revokeObjectURL(url)
+    })
+  }, [])
+
   // 调试探针：任务转 success 后对每首歌验证 coverUrl / audioUrl 可访问性与
   // content-type（结果打控制台，不影响业务）。每首歌只探测一次。
   const probedSongIdsRef = useRef<Set<string>>(new Set())
@@ -342,7 +350,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
           setMusicGroup((s.claude360?.selectedMusicGroup ?? '').trim())
           const root = (s.workspaceRoot ?? '').trim()
           setWorkspaceRoot(root)
-          if (root && w.mediaAssetsList) {
+          if (root) {
             void hydrateMusicFromDisk(
               w as unknown as MusicPersistenceApi,
               useMusicTaskStore.getState(),
@@ -645,26 +653,31 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
       const finished = useMusicTaskStore
         .getState()
         .tasks.filter((task) => task.status === 'success' || task.status === 'failure')
+      const songIds = finished.flatMap((task) => task.songs.map((song) => song.id))
+      revokeSongObjectUrls(songIds)
+      deleteSongAssets(songIds)
       clearFinishedTasks()
-      deleteSongAssets(finished.flatMap((task) => task.songs.map((song) => song.id)))
     })
-  }, [clearFinishedTasks, deleteSongAssets, tasks.length, t])
+  }, [clearFinishedTasks, deleteSongAssets, revokeSongObjectUrls, tasks.length, t])
 
   const handleRemoveSong = useCallback(
     (id: string): void => {
-      removeSong(id)
+      revokeSongObjectUrls([id])
       deleteSongAssets([id])
+      removeSong(id)
     },
-    [removeSong, deleteSongAssets]
+    [deleteSongAssets, removeSong, revokeSongObjectUrls]
   )
 
   const handleRemoveTask = useCallback(
     (id: string): void => {
       const task = useMusicTaskStore.getState().tasks.find((item) => item.id === id)
+      const songIds = task?.songs.map((song) => song.id) ?? []
+      revokeSongObjectUrls(songIds)
+      deleteSongAssets(songIds)
       removeTask(id)
-      if (task) deleteSongAssets(task.songs.map((song) => song.id))
     },
-    [removeTask, deleteSongAssets]
+    [deleteSongAssets, removeTask, revokeSongObjectUrls]
   )
 
   const handleRegenerate = useCallback((task: MusicGenTask): void => {
@@ -726,6 +739,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
           <div className="min-h-0 flex-1 lg:overflow-y-auto lg:pr-1">
             <MusicTaskList
               tasks={tasks}
+              songAssets={songAssets}
               currentSongId={current?.id ?? null}
               playing={playing}
               onPlay={(song, list) => playSong(song, list)}

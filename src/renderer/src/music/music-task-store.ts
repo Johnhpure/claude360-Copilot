@@ -71,6 +71,10 @@ export interface MusicTasksState {
   tasks: MusicGenTask[]
   /** 07-05：song.id → 本地资产信息（落盘回写 + 磁盘恢复时填充）。 */
   songAssets: Record<string, SongAssetInfo>
+  /** 当前磁盘 hydrate 所属 workspace；删除墓碑按该 root 分区。 */
+  diskWorkspaceRoot: string
+  /** 会话内删除墓碑：防 hydrate 在途结果把已删歌曲复活。 */
+  deletedSongKeys: Record<string, true>
   addSubmitting: (tempId: string, title: string, params: Claude360MusicSubmitPayload) => void
   markSubmitted: (tempId: string, taskId: string) => void
   markFailed: (id: string, message: string) => void
@@ -79,7 +83,9 @@ export interface MusicTasksState {
   removeSong: (id: string) => void
   clearFinishedTasks: () => void
   /** 07-05：磁盘资产记录并入任务列表 + songAssets（启动 / 切工作空间时调用）。 */
-  hydrateFromDisk: (records: DiskMusicRecord[]) => void
+  hydrateFromDisk: (records: DiskMusicRecord[], workspaceRoot?: string) => void
+  /** hydrate 请求发出前写入当前 workspaceRoot，供删除墓碑打 key。 */
+  setDiskWorkspaceRoot: (workspaceRoot: string) => void
   /** 07-05：单曲落盘成功后回写本地路径。 */
   attachSongAsset: (songId: string, info: SongAssetInfo) => void
 }
@@ -105,6 +111,36 @@ export function selectActiveTaskIds(tasks: MusicGenTask[]): string[] {
 
 // 占用中的任务状态：提交网络请求中 / 上游排队 / 生成中。
 const IN_FLIGHT_STATUSES: Claude360MusicTaskStatus[] = ['submitting', 'queued', 'in_progress']
+
+function normalizeDiskWorkspaceRoot(workspaceRoot: string): string {
+  return workspaceRoot.trim().replaceAll('\\', '/')
+}
+
+function deletedSongKey(workspaceRoot: string, id: string): string {
+  return `${normalizeDiskWorkspaceRoot(workspaceRoot)}::${id}`
+}
+
+function markDeletedSongKeys(
+  current: Record<string, true>,
+  workspaceRoot: string,
+  ids: string[]
+): Record<string, true> {
+  const root = normalizeDiskWorkspaceRoot(workspaceRoot)
+  if (!root || ids.length === 0) return current
+  const next = { ...current }
+  for (const id of ids) next[deletedSongKey(root, id)] = true
+  return next
+}
+
+function removeSongAssets(
+  current: Record<string, SongAssetInfo>,
+  ids: string[]
+): Record<string, SongAssetInfo> {
+  if (ids.length === 0) return current
+  const next = { ...current }
+  for (const id of ids) delete next[id]
+  return next
+}
 
 /** 是否存在“占用中”的任务（提交中/排队/生成中），用于阻止重复提交。 */
 export function hasActiveTask(tasks: MusicGenTask[]): boolean {
@@ -245,6 +281,8 @@ export function createMusicTaskStore(
   const store = create<MusicTasksState>((set) => ({
     tasks: options.initialTasks ?? [],
     songAssets: {},
+    diskWorkspaceRoot: '',
+    deletedSongKeys: {},
     addSubmitting: (tempId, title, params) =>
       set((s) => ({
         tasks: [
@@ -263,7 +301,17 @@ export function createMusicTaskStore(
         )
       })),
     applyFetched: (results) => set((s) => ({ tasks: reduceFetched(s.tasks, results) })),
-    removeTask: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
+    removeTask: (id) =>
+      set((s) => {
+        const removedSongIds = s.tasks
+          .filter((task) => task.id === id)
+          .flatMap((task) => task.songs.map((song) => song.id))
+        return {
+          tasks: s.tasks.filter((t) => t.id !== id),
+          songAssets: removeSongAssets(s.songAssets, removedSongIds),
+          deletedSongKeys: markDeletedSongKeys(s.deletedSongKeys, s.diskWorkspaceRoot, removedSongIds)
+        }
+      }),
     removeSong: (id) =>
       set((s) => ({
         tasks: s.tasks
@@ -272,16 +320,38 @@ export function createMusicTaskStore(
               ? { ...t, songs: t.songs.filter((song) => song.id !== id) }
               : t
           )
-          .filter((t) => t.status !== 'success' || t.songs.length > 0)
+          .filter((t) => t.status !== 'success' || t.songs.length > 0),
+        songAssets: removeSongAssets(s.songAssets, [id]),
+        deletedSongKeys: markDeletedSongKeys(s.deletedSongKeys, s.diskWorkspaceRoot, [id])
       })),
     clearFinishedTasks: () =>
-      set((s) => ({ tasks: s.tasks.filter((t) => IN_FLIGHT_STATUSES.includes(t.status)) })),
-    hydrateFromDisk: (records) =>
-      set((s) => ({
-        tasks: mergeDiskTasks(s.tasks, diskRecordsToTasks(records)),
-        // songAssets 全量重建：切换工作空间后旧空间的本地映射不再有效。
-        songAssets: diskRecordsToSongAssets(records)
-      })),
+      set((s) => {
+        const removedSongIds = s.tasks
+          .filter((task) => !IN_FLIGHT_STATUSES.includes(task.status))
+          .flatMap((task) => task.songs.map((song) => song.id))
+        return {
+          tasks: s.tasks.filter((t) => IN_FLIGHT_STATUSES.includes(t.status)),
+          songAssets: removeSongAssets(s.songAssets, removedSongIds),
+          deletedSongKeys: markDeletedSongKeys(s.deletedSongKeys, s.diskWorkspaceRoot, removedSongIds)
+        }
+      }),
+    setDiskWorkspaceRoot: (workspaceRoot) =>
+      set({ diskWorkspaceRoot: normalizeDiskWorkspaceRoot(workspaceRoot) }),
+    hydrateFromDisk: (records, workspaceRoot) =>
+      set((s) => {
+        const root = workspaceRoot === undefined
+          ? s.diskWorkspaceRoot
+          : normalizeDiskWorkspaceRoot(workspaceRoot)
+        const visibleRecords = root
+          ? records.filter((record) => !s.deletedSongKeys[deletedSongKey(root, record.id)])
+          : records
+        return {
+          diskWorkspaceRoot: root,
+          tasks: mergeDiskTasks(s.tasks, diskRecordsToTasks(visibleRecords)),
+          // songAssets 全量重建：切换工作空间后旧空间的本地映射不再有效。
+          songAssets: diskRecordsToSongAssets(visibleRecords)
+        }
+      }),
     attachSongAsset: (songId, info) =>
       set((s) => ({
         songAssets: {

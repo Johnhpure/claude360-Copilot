@@ -180,14 +180,15 @@ export async function persistCompletedSongs(
 /** 启动 / 切换工作空间时从磁盘恢复音乐任务列表与本地资产映射（失败静默）。 */
 export async function hydrateMusicFromDisk(
   api: Pick<MusicPersistenceApi, 'mediaAssetsList'>,
-  store: Pick<MusicTasksState, 'hydrateFromDisk'>,
+  store: Pick<MusicTasksState, 'hydrateFromDisk' | 'setDiskWorkspaceRoot'>,
   workspaceRoot: string
 ): Promise<void> {
   const root = workspaceRoot.trim()
   if (!root) return
+  store.setDiskWorkspaceRoot(root)
   try {
     const result = await api.mediaAssetsList({ workspaceRoot: root })
-    if (result.ok) store.hydrateFromDisk(result.music)
+    if (result.ok) store.hydrateFromDisk(result.music, root)
   } catch (error) {
     console.warn('[media-assets] 音乐资产恢复失败:', error)
   }

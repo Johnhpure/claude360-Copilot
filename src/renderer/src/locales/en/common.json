@@ -134,6 +134,8 @@
   "musicPromptCopied": "Prompt copied",
   "musicPromptCopyFailed": "Copy failed",
   "musicAudioMissing": "Audio URL is missing, so this song cannot be played.",
+  "musicLocalAudioMissing": "Local audio file is missing. Falling back to the remote URL.",
+  "musicLocalCoverMissing": "Local cover file is missing. Falling back to the remote cover.",
   "musicAudioPlayFailed": "Audio playback failed. Please try again later.",
   "musicAudioPlayerUnavailable": "The player is not ready yet. Please try again.",
   "musicStatusSubmitting": "Submitting",

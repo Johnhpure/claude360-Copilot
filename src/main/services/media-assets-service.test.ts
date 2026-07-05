@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -215,5 +215,138 @@ describe('MediaAssetsService list / read / delete', () => {
     expect(list.ok && list.images).toHaveLength(0)
     expect(list.ok && list.music).toHaveLength(0)
     expect(existsSync(join(workspace, 'assets'))).toBe(false)
+  })
+})
+
+describe('MediaAssetsService symlink boundary (review C2)', () => {
+  let outside: string
+
+  beforeEach(async () => {
+    outside = await mkdtemp(join(tmpdir(), 'media-assets-outside-'))
+  })
+
+  afterEach(async () => {
+    await rm(outside, { recursive: true, force: true })
+  })
+
+  it('refuses to read through a symlink that points outside the workspace', async () => {
+    const secret = join(outside, 'secret.txt')
+    await writeFile(secret, 'top-secret', 'utf8')
+    await mkdir(join(workspace, 'assets/images'), { recursive: true })
+    await symlink(secret, join(workspace, 'assets/images/link.png'))
+    const service = new MediaAssetsService({ log: silentLog })
+    const blob = await service.readAssetBlob({ workspaceRoot: workspace, relativePath: 'assets/images/link.png' })
+    expect(blob.ok).toBe(false)
+  })
+
+  it('refuses to read when a parent directory is a symlink escaping the workspace', async () => {
+    await writeFile(join(outside, 'file.png'), 'outside-bytes', 'utf8')
+    await mkdir(join(workspace, 'assets'), { recursive: true })
+    await symlink(outside, join(workspace, 'assets/images'))
+    const service = new MediaAssetsService({ log: silentLog })
+    const blob = await service.readAssetBlob({ workspaceRoot: workspace, relativePath: 'assets/images/file.png' })
+    expect(blob.ok).toBe(false)
+  })
+
+  it('refuses to read when the assets root itself is a symlink escaping the workspace', async () => {
+    await mkdir(join(outside, 'images'), { recursive: true })
+    await writeFile(join(outside, 'images/file.png'), 'outside-bytes', 'utf8')
+    await symlink(outside, join(workspace, 'assets'))
+    const service = new MediaAssetsService({ log: silentLog })
+    const blob = await service.readAssetBlob({ workspaceRoot: workspace, relativePath: 'assets/images/file.png' })
+    expect(blob.ok).toBe(false)
+  })
+
+  it('does not delete the external target behind an escaping symlink', async () => {
+    const external = join(outside, 'keep-me.png')
+    await writeFile(external, 'precious', 'utf8')
+    const service = new MediaAssetsService({ log: silentLog })
+    const saved = await service.saveImageAsset({
+      workspaceRoot: workspace,
+      record: { id: 'img-link', prompt: 'p', model: 'm', createdAt: 'now' },
+      source: { b64: Buffer.from('x').toString('base64'), mimeType: 'image/png' }
+    })
+    if (!saved.ok || !saved.record.localPath) throw new Error('save failed')
+    // 把落盘文件替换为指向外部文件的链接，再带 deleteFiles 删除。
+    await rm(join(workspace, saved.record.localPath))
+    await symlink(external, join(workspace, saved.record.localPath))
+    const result = await service.deleteAssets({
+      workspaceRoot: workspace,
+      kind: 'image',
+      ids: ['img-link'],
+      deleteFiles: true
+    })
+    expect(result.ok && result.removed).toBe(1)
+    // 外部目标必须原样保留；metadata 记录仍被删除。
+    expect(existsSync(external)).toBe(true)
+    const list = await service.listAssets({ workspaceRoot: workspace })
+    expect(list.ok && list.images).toHaveLength(0)
+  })
+
+  it('still reads regular files inside assets/ after the boundary hardening', async () => {
+    const service = new MediaAssetsService({ log: silentLog })
+    const saved = await service.saveImageAsset({
+      workspaceRoot: workspace,
+      record: { id: 'img-ok', prompt: 'p', model: 'm', createdAt: 'now' },
+      source: { b64: Buffer.from('legit').toString('base64'), mimeType: 'image/png' }
+    })
+    if (!saved.ok || !saved.record.localPath) throw new Error('save failed')
+    const blob = await service.readAssetBlob({ workspaceRoot: workspace, relativePath: saved.record.localPath })
+    expect(blob.ok).toBe(true)
+    if (!blob.ok) return
+    expect(Buffer.from(blob.base64, 'base64').toString()).toBe('legit')
+  })
+})
+
+describe('MediaAssetsService download size limit (review I5)', () => {
+  const LIMIT = 64 * 1024 * 1024
+
+  it('rejects by Content-Length before reading the body', async () => {
+    const arrayBuffer = vi.fn(async () => new ArrayBuffer(4))
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-length': String(LIMIT + 1), 'content-type': 'image/png' }),
+      body: null,
+      arrayBuffer
+    }))
+    const service = new MediaAssetsService({ fetchImpl: fetchImpl as unknown as typeof fetch, log: silentLog })
+    const result = await service.saveImageAsset({
+      workspaceRoot: workspace,
+      record: { id: 'img-big', prompt: 'p', model: 'm', createdAt: 'now' },
+      source: { url: 'https://cdn.example.com/huge.png' }
+    })
+    expect(result.ok && result.record.status).toBe('failed')
+    expect(result.ok && result.record.remoteUrl).toBe('https://cdn.example.com/huge.png')
+    // 声明超限时不应再读取响应体。
+    expect(arrayBuffer).not.toHaveBeenCalled()
+  })
+
+  it('aborts a streaming body once the accumulated size exceeds the limit', async () => {
+    const smallChunk = new Uint8Array(8)
+    // 假 chunk 只带 byteLength：超限判断发生在拷贝之前，不需要真分配 64MB。
+    const hugeChunk = { byteLength: LIMIT } as unknown as Uint8Array
+    const reads = [
+      { done: false as const, value: smallChunk },
+      { done: false as const, value: hugeChunk },
+      { done: true as const, value: undefined }
+    ]
+    let readIndex = 0
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'image/png' }),
+      body: { getReader: () => ({ read: async () => reads[readIndex++] }) },
+      arrayBuffer: vi.fn(async () => new ArrayBuffer(4))
+    }))
+    const service = new MediaAssetsService({ fetchImpl: fetchImpl as unknown as typeof fetch, log: silentLog })
+    const result = await service.saveImageAsset({
+      workspaceRoot: workspace,
+      record: { id: 'img-stream', prompt: 'p', model: 'm', createdAt: 'now' },
+      source: { url: 'https://cdn.example.com/stream.png' }
+    })
+    expect(result.ok && result.record.status).toBe('failed')
+    // 第二个 chunk 触发超限中止，不会读到 done。
+    expect(readIndex).toBe(2)
   })
 })

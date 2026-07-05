@@ -162,7 +162,7 @@ export function CanvasWorkbench({
         setImageGroup((settings.claude360?.selectedImageGroup ?? '').trim())
         const root = (settings.workspaceRoot ?? '').trim()
         setWorkspaceRoot(root)
-        if (root && w.mediaAssetsList) {
+        if (root) {
           void hydrateCanvasArtworksFromDisk(
             w as unknown as CanvasPersistenceApi,
             useCanvasStore.getState(),

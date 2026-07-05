@@ -256,14 +256,15 @@ export async function persistGeneratedImages(
 /** 启动 / 切换工作空间时从磁盘恢复生图作品列表（失败静默，保留内存态）。 */
 export async function hydrateCanvasArtworksFromDisk(
   api: Pick<CanvasPersistenceApi, 'mediaAssetsList'>,
-  store: Pick<CanvasState, 'hydrateFromDisk'>,
+  store: Pick<CanvasState, 'hydrateFromDisk' | 'setDiskWorkspaceRoot'>,
   workspaceRoot: string
 ): Promise<void> {
   const root = workspaceRoot.trim()
   if (!root) return
+  store.setDiskWorkspaceRoot(root)
   try {
     const result = await api.mediaAssetsList({ workspaceRoot: root })
-    if (result.ok) store.hydrateFromDisk(result.images)
+    if (result.ok) store.hydrateFromDisk(result.images, root)
   } catch (error) {
     console.warn('[media-assets] 生图资产恢复失败:', error)
   }
