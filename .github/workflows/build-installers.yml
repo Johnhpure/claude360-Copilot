@@ -216,9 +216,11 @@ jobs:
           fi
 
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            edit_args=(--repo "$GITHUB_REPOSITORY" --title "$tag" --target "$GITHUB_SHA")
             if [[ -n "$notes_file" ]]; then
-              gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "$tag" --notes-file "$notes_file"
+              edit_args+=(--notes-file "$notes_file")
             fi
+            gh release edit "$tag" "${edit_args[@]}"
             gh release upload "$tag" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
           else
             notes_args=(--generate-notes)
