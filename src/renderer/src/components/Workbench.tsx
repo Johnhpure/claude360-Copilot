@@ -95,6 +95,7 @@ import { useKeyboardShortcutSettings } from '../lib/keyboard-shortcut-settings'
 import { collectComposerChangeSummary } from '../lib/composer-change-summary'
 import { formatWorkspacePickerError } from '../lib/format-workspace-picker-error'
 import { readFocusModePreference, writeFocusModePreference } from '../lib/focus-mode'
+import { invalidateGroupKeyCache } from '../lib/group-key-ensure'
 import {
   buildComposerFileContextPrompt,
   composerFileReferenceFromPath,
@@ -2697,6 +2698,8 @@ export function Workbench(): ReactElement {
                       /* 忽略登出网络错误，本地态照常清理 */
                     }
                   }
+                  // 账号已切换/登出：失效「已验证有 Key」缓存（07-05）。
+                  invalidateGroupKeyCache()
                   const store = useChatStore.getState()
                   await store.reloadUiSettings()
                   setRoute('chat')

@@ -21,6 +21,7 @@ import {
   Trash2
 } from 'lucide-react'
 import type { Claude360TokenListItem, Claude360TokenPurpose } from '@shared/claude360'
+import { invalidateGroupKeyCache } from '../lib/group-key-ensure'
 import { Button } from './ui'
 
 // 「设置 → 分组及 Key」页(Master-Detail)。
@@ -653,6 +654,8 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
     if (!confirmed) return
     try {
       await window.kunGui.claude360TokensDelete({ tokenId })
+      // Key 已删除：失效「已验证有 Key」缓存，下次发送重新实时检测（07-05）。
+      invalidateGroupKeyCache()
       if (abortedRef.current) return
       clearRevealed(tokenId)
       await refreshTokens()

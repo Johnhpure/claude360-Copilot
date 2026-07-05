@@ -1,6 +1,7 @@
 import type i18next from 'i18next'
 import type { AppSettingsV1 } from '@shared/app-settings'
 import { rendererRuntimeClient } from '../agent/runtime-client'
+import { invalidateGroupKeyCache } from '../lib/group-key-ensure'
 import type { ChatState, ChatStoreGet, ChatStoreSet, InitialSetupMode, PluginHostRoute, SettingsRouteSection } from './chat-store-types'
 import type { ComposerPlanMode } from './chat-store-helpers'
 import {
@@ -137,6 +138,8 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
     loadComposerModels: async () => {
       if (getComposerModelLoadPromise()) return getComposerModelLoadPromise()!
       if (typeof window.kunGui === 'undefined') return
+      // 刷新分组列表 = 分组/Key 配置可能已变，失效「已验证有 Key」缓存（07-05）。
+      invalidateGroupKeyCache()
       const task = (async () => {
         const res = await window.kunGui.fetchUpstreamModels()
         const pick = mergeComposerPickList(res.ok, res.ok ? res.modelIds : [])

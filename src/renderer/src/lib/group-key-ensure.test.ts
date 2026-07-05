@@ -1,5 +1,15 @@
-import { describe, expect, it, vi } from 'vitest'
-import { ensureGroupKeyForSelection, groupNameFromProviderId } from './group-key-ensure'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  GROUP_KEY_CACHE_TTL_MS,
+  ensureGroupKeyForSelection,
+  groupNameFromProviderId,
+  invalidateGroupKeyCache
+} from './group-key-ensure'
+
+// 模块级「已验证分组」缓存会跨用例泄漏，每个用例前必须清空。
+beforeEach(() => {
+  invalidateGroupKeyCache()
+})
 
 describe('groupNameFromProviderId', () => {
   it('extracts the group name from claude360 provider ids (colon or hyphen form)', () => {
@@ -124,5 +134,132 @@ describe('ensureGroupKeyForSelection', () => {
     // 检测失败时放行：请求走出去由运行时/服务端报可见错误，而不是静默吞掉任务。
     expect(ok).toBe(true)
     expect(promptCreateAndEnsure).not.toHaveBeenCalled()
+  })
+})
+
+describe('ensureGroupKeyForSelection verified-group cache (07-05)', () => {
+  const successDeps = (listTokens: ReturnType<typeof vi.fn>, ensureUsableKey: ReturnType<typeof vi.fn>) => ({
+    listTokens: listTokens as unknown as () => Promise<{ group: string; id?: number; status?: number }[]>,
+    ensureUsableKey: ensureUsableKey as unknown as (group: string) => Promise<boolean>,
+    promptCreateAndEnsure: vi.fn(async () => false)
+  })
+
+  it('skips listTokens + ensure on the second call for the same group (cache hit)', async () => {
+    const listTokens = vi.fn(async () => [{ id: 1, group: 'vip', status: 1 }])
+    const ensureUsableKey = vi.fn(async () => true)
+    const deps = successDeps(listTokens, ensureUsableKey)
+    expect(await ensureGroupKeyForSelection('vip', deps)).toBe(true)
+    expect(await ensureGroupKeyForSelection('vip', deps)).toBe(true)
+    expect(listTokens).toHaveBeenCalledTimes(1)
+    expect(ensureUsableKey).toHaveBeenCalledTimes(1)
+  })
+
+  it('cache hit is case-insensitive on group name and logs the hit', async () => {
+    const listTokens = vi.fn(async () => [{ id: 1, group: 'Codex', status: 1 }])
+    const ensureUsableKey = vi.fn(async () => true)
+    const logs: string[] = []
+    await ensureGroupKeyForSelection('codex', { ...successDeps(listTokens, ensureUsableKey), log: (m) => logs.push(m) })
+    await ensureGroupKeyForSelection('Codex', { ...successDeps(listTokens, ensureUsableKey), log: (m) => logs.push(m) })
+    expect(listTokens).toHaveBeenCalledTimes(1)
+    expect(logs.some((m) => m.includes('命中已验证缓存'))).toBe(true)
+  })
+
+  it('re-checks after TTL expiry', async () => {
+    let clock = 1_000_000
+    const listTokens = vi.fn(async () => [{ id: 1, group: 'vip', status: 1 }])
+    const ensureUsableKey = vi.fn(async () => true)
+    const deps = { ...successDeps(listTokens, ensureUsableKey), now: () => clock }
+    await ensureGroupKeyForSelection('vip', deps)
+    clock += GROUP_KEY_CACHE_TTL_MS + 1
+    await ensureGroupKeyForSelection('vip', deps)
+    expect(listTokens).toHaveBeenCalledTimes(2)
+  })
+
+  it('re-checks after invalidateGroupKeyCache (create/delete key, account switch, group refresh)', async () => {
+    const listTokens = vi.fn(async () => [{ id: 1, group: 'vip', status: 1 }])
+    const ensureUsableKey = vi.fn(async () => true)
+    const deps = successDeps(listTokens, ensureUsableKey)
+    await ensureGroupKeyForSelection('vip', deps)
+    invalidateGroupKeyCache('vip')
+    await ensureGroupKeyForSelection('vip', deps)
+    expect(listTokens).toHaveBeenCalledTimes(2)
+  })
+
+  it('does NOT cache fail-open results (listTokens throwing keeps real-time checks)', async () => {
+    const listTokens = vi.fn(async () => {
+      throw new Error('network down')
+    })
+    const deps = {
+      listTokens: listTokens as unknown as () => Promise<{ group: string }[]>,
+      promptCreateAndEnsure: vi.fn(async () => false)
+    }
+    expect(await ensureGroupKeyForSelection('vip', deps)).toBe(true)
+    expect(await ensureGroupKeyForSelection('vip', deps)).toBe(true)
+    expect(listTokens).toHaveBeenCalledTimes(2)
+  })
+
+  it('does NOT cache when ensureUsableKey fails, and caches a confirmed prompt creation', async () => {
+    const listTokens = vi.fn(async () => [{ id: 1, group: 'vip', status: 1 }])
+    const ensureFail = vi.fn(async () => false)
+    const failDeps = successDeps(listTokens, ensureFail)
+    expect(await ensureGroupKeyForSelection('vip', failDeps)).toBe(false)
+    expect(await ensureGroupKeyForSelection('vip', failDeps)).toBe(false)
+    expect(listTokens).toHaveBeenCalledTimes(2)
+
+    // 弹窗建 Key 成功 → 缓存生效，下一次不再拉 keyList。
+    const emptyList = vi.fn(async () => [] as { group: string }[])
+    const prompt = vi.fn(async () => true)
+    const promptDeps = {
+      listTokens: emptyList as unknown as () => Promise<{ group: string }[]>,
+      promptCreateAndEnsure: prompt
+    }
+    expect(await ensureGroupKeyForSelection('fresh', promptDeps)).toBe(true)
+    expect(await ensureGroupKeyForSelection('fresh', promptDeps)).toBe(true)
+    expect(emptyList).toHaveBeenCalledTimes(1)
+    expect(prompt).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('两级缓存隔离（审查 Critical 2：listed 不满足 ensured 调用）', () => {
+  it('生图（无 ensureUsableKey）验证过的分组，Code（带 ensureUsableKey）调用不命中缓存并完整 ensure', async () => {
+    const listTokens = vi.fn(async () => [{ id: 1, group: 'vip', status: 1 }])
+    // 生图路径：只确认有 Key（listed 级）
+    await ensureGroupKeyForSelection('vip', {
+      listTokens: listTokens as unknown as () => Promise<{ group: string }[]>,
+      promptCreateAndEnsure: vi.fn(async () => false)
+    })
+    expect(listTokens).toHaveBeenCalledTimes(1)
+    // Code 路径：必须重新 listTokens + ensureUsableKey（apiKeyRef 回填不可跳过）
+    const ensureUsableKey = vi.fn(async () => true)
+    const ok = await ensureGroupKeyForSelection('vip', {
+      listTokens: listTokens as unknown as () => Promise<{ group: string }[]>,
+      ensureUsableKey,
+      promptCreateAndEnsure: vi.fn(async () => false)
+    })
+    expect(ok).toBe(true)
+    expect(listTokens).toHaveBeenCalledTimes(2)
+    expect(ensureUsableKey).toHaveBeenCalledTimes(1)
+    // ensure 过后（ensured 级）再来一次 Code 调用 → 命中缓存
+    await ensureGroupKeyForSelection('vip', {
+      listTokens: listTokens as unknown as () => Promise<{ group: string }[]>,
+      ensureUsableKey,
+      promptCreateAndEnsure: vi.fn(async () => false)
+    })
+    expect(listTokens).toHaveBeenCalledTimes(2)
+    expect(ensureUsableKey).toHaveBeenCalledTimes(1)
+  })
+
+  it('Code（ensured 级）验证过的分组，生图（listed 需求）调用命中缓存', async () => {
+    const listTokens = vi.fn(async () => [{ id: 1, group: 'vip', status: 1 }])
+    await ensureGroupKeyForSelection('vip', {
+      listTokens: listTokens as unknown as () => Promise<{ group: string }[]>,
+      ensureUsableKey: vi.fn(async () => true),
+      promptCreateAndEnsure: vi.fn(async () => false)
+    })
+    await ensureGroupKeyForSelection('vip', {
+      listTokens: listTokens as unknown as () => Promise<{ group: string }[]>,
+      promptCreateAndEnsure: vi.fn(async () => false)
+    })
+    expect(listTokens).toHaveBeenCalledTimes(1)
   })
 })

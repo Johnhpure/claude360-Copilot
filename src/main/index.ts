@@ -1112,7 +1112,17 @@ async function resolveManagedKunLaunchSettings(
 async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1> {
   const runtime = getKunRuntimeSettings(settings)
 
+  // [perf:runtime] 分阶段耗时：诊断首次对话慢（07-05）。健康探测→spawn→就绪逐段打点。
+  const perfStartedAt = Date.now()
+  let perfLastAt = perfStartedAt
+  const perfMark = (stage: string): void => {
+    const at = Date.now()
+    console.info(`[perf:runtime] ${stage} +${at - perfLastAt}ms (total ${at - perfStartedAt}ms)`)
+    perfLastAt = at
+  }
+
   const healthy = await waitForKunHealth(settings, 2_000)
+  perfMark(healthy ? 'health-probe:healthy' : 'health-probe:offline')
   if (healthy) {
     const threadApi = await probeThreadApi(settings)
     if (threadApi.ok) {
@@ -1171,7 +1181,9 @@ async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1>
     console.error('[kun-gui] failed to start kun:', e)
     throw e
   }
+  perfMark('spawn:done')
   const started = await waitForKunHealth(launchSettings, 20_000)
+  perfMark(started ? 'launch-health:ready' : 'launch-health:timeout')
   if (!started) {
     throw runtimeJsonError(
       'runtime_unhealthy',
@@ -1183,6 +1195,7 @@ async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1>
   if (!threadApi.ok) {
     throw runtimeJsonError(threadApi.error, threadApi.message)
   }
+  perfMark('thread-api:ready')
   noteRuntimeHealthy('ensure')
   return launchSettings
 }
@@ -1845,11 +1858,22 @@ app.whenReady().then(async () => {
     console.warn('[kun-gui] prune logs:', err)
   })
 
-  // 分组模式：无「全局默认 API Key」也预热运行时二进制，让首次调用更快。
+  // 分组模式：无「全局默认 API Key」也预热运行时，让首次调用更快。
+  // 先解析二进制路径，随后直接后台预启动 Kun 子进程（07-05 首次对话慢修复）：
+  // 否则子进程 spawn + 最多 20s 的就绪等待会全部落在用户第一条消息上。
+  // fire-and-forget：失败仅告警，首次真实请求仍会走 ensureRuntime 的正常报错路径。
   setTimeout(() => {
-    void kunRuntimeAdapter.resolveExecutable(initial).catch((err) => {
-      console.warn('[kun-gui] prewarm Kun binary:', err)
-    })
+    void kunRuntimeAdapter
+      .resolveExecutable(initial)
+      .then(() => {
+        console.info('[perf:runtime] prewarm:start')
+        return ensureRuntime(initial).then(() => {
+          console.info('[perf:runtime] prewarm:ready')
+        })
+      })
+      .catch((err) => {
+        console.warn('[kun-gui] prewarm Kun runtime:', err)
+      })
   }, 1500)
 
   app.on('second-instance', () => {

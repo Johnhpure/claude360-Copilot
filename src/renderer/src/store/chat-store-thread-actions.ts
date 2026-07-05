@@ -6,6 +6,7 @@ import { applyTheme, applyUiFontScale } from '../lib/apply-theme'
 import { formatWorkspacePickerError } from '../lib/format-workspace-picker-error'
 import { formatRuntimeError, getRuntimeErrorCode } from '../lib/format-runtime-error'
 import { ensureGroupKeyForSelection, groupNameFromProviderId } from '../lib/group-key-ensure'
+import { createPerfTrace } from '../lib/perf-trace'
 import { useGroupKeyPromptStore } from './group-key-prompt-store'
 import {
   deriveThreadTitleFromPrompt,
@@ -605,32 +606,9 @@ export function createThreadActions(
       set({ error: i18n.t('common:runtimeActionNeedsConnection') })
       return false
     }
-    // 执行时按所选分组确保有 Key：无则弹「需要创建分组 Key」模态，确认→自动创建 Key→
-    // 续跑本次发送；取消/失败→中止（调用方据返回 false 恢复草稿）。
-    // provider 解析必须与下方实际发送一致（queued 优先），否则 drain 队列时会检测错分组。
-    const sendProviderId =
-      overrides?.queued?.providerId ?? overrides?.providerId?.trim() ?? fallbackComposerProviderIdForSend(get())
-    const groupForKey = groupNameFromProviderId(sendProviderId)
-    if (groupForKey && typeof window.kunGui?.claude360TokensList === 'function') {
-      const keyReady = await ensureGroupKeyForSelection(
-        groupForKey,
-        {
-          listTokens: () => window.kunGui.claude360TokensList(),
-          ensureUsableKey: async (g) => {
-            await window.kunGui.claude360TokensEnsure({ group: g, purpose: 'text' })
-            rendererRuntimeClient.invalidateSettings()
-            return true
-          },
-          promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g)
-        },
-        {
-          feature: get().route === 'write' ? '写作' : 'Code',
-          model: overrides?.queued?.model ?? overrides?.model?.trim() ?? get().composerModel.trim(),
-          providerId: sendProviderId
-        }
-      )
-      if (!keyReady) return false
-    }
+    // [perf:chat] 分阶段耗时打点（07-05 首次对话慢排查）：enter→optimistic-ui→
+    // key-ensured→thread-ready→provider+checkpoint→request-sent→first-stream-event。
+    const perf = createPerfTrace('chat')
     const p = getProvider()
     if (get().route === 'write') {
       const writeThreadId = await get().ensureWriteThreadForWorkspace()
@@ -773,6 +751,54 @@ export function createThreadActions(
       turnStartedAtByUserId: { ...s.turnStartedAtByUserId, [userBlockId]: now },
       queuedMessages: queued ? s.queuedMessages.filter((message) => message.id !== queued.id) : s.queuedMessages
     }))
+    perf.mark('optimistic-ui')
+    // 执行时按所选分组确保有 Key：无则弹「需要创建分组 Key」模态，确认→自动创建 Key→
+    // 续跑本次发送；取消/失败→回滚乐观 UI 并中止（调用方据返回 false 恢复草稿）。
+    // 07-05 重排：检测从入口移到乐观 UI 之后——keyList/ensure 的网络往返不再挡住首帧
+    // 反馈；同分组短 TTL 缓存进一步跳过重复检测（见 group-key-ensure.ts）。
+    // provider 解析必须与实际发送一致（queued 优先），否则 drain 队列时会检测错分组。
+    const groupForKey = groupNameFromProviderId(composerProviderId)
+    if (groupForKey && typeof window.kunGui?.claude360TokensList === 'function') {
+      const keyReady = await ensureGroupKeyForSelection(
+        groupForKey,
+        {
+          listTokens: () => window.kunGui.claude360TokensList(),
+          ensureUsableKey: async (g) => {
+            await window.kunGui.claude360TokensEnsure({ group: g, purpose: 'text' })
+            rendererRuntimeClient.invalidateSettings()
+            return true
+          },
+          promptCreateAndEnsure: (g) => useGroupKeyPromptStore.getState().open(g)
+        },
+        {
+          feature: get().route === 'write' ? '写作' : 'Code',
+          model: composerModel,
+          providerId: composerProviderId
+        }
+      )
+      perf.mark('key-ensured')
+      if (!keyReady) {
+        // 用户取消/建 Key 失败：完整回滚乐观 UI；不置 error——主动取消不是错误。
+        // queuedMessages 用函数式恢复而非快照覆盖：检测的网络窗口内用户可能又排队了
+        // 新消息，快照覆盖会静默吞掉它们；这里只把本次 drain 的消息放回队首。
+        set((s) => ({
+          blocks: previousBlocks,
+          busy: false,
+          currentTurnId: previousCurrentTurnId,
+          currentTurnUserId: previousCurrentTurnUserId,
+          turnStartedAtByUserId: previousTurnStartedAtByUserId,
+          turnDurationByUserId: previousTurnDurationByUserId,
+          turnReasoningFirstAtByUserId: previousTurnReasoningFirstAtByUserId,
+          turnReasoningLastAtByUserId: previousTurnReasoningLastAtByUserId,
+          queuedMessages:
+            queued && !s.queuedMessages.some((message) => message.id === queued.id)
+              ? [queued, ...s.queuedMessages]
+              : s.queuedMessages
+        }))
+        perf.done('aborted:key-not-ready')
+        return false
+      }
+    }
     if (!activeThreadId) {
       try {
         const settings = await rendererRuntimeClient.getSettings()
@@ -867,54 +893,68 @@ export function createThreadActions(
     sseAbortRef.current = null
     clearBusyWatchdog()
     try {
+      perf.mark('thread-ready')
       const seqAtSend = get().lastSeq
       const channel = get().route === 'claw' ? activeClawChannel(get()) : null
       if (!channel && composerModel) {
         rememberThreadComposerSelection(activeThreadId, composerModel, composerProviderId)
       }
-      await ensureRuntimeProviderForSend({
-        providerId: channel ? undefined : composerProviderId,
-        model: composerModel,
-        set,
-        get
-      })
-      const settings = await rendererRuntimeClient.getSettings()
-      let workspaceCheckpointId: string | undefined
-      const checkpointThread = get().threads.find((thread) => thread.id === activeThreadId)
-      const checkpointWorkspaceRoot = normalizeWorkspaceRoot(checkpointThread?.workspace) || normalizeWorkspaceRoot(settings.workspaceRoot)
-      const checkpointWorkspaceKey = checkpointWorkspaceRoot.replaceAll('\\', '/').toLowerCase()
-      if (
-        checkpointWorkspaceRoot &&
-        !checkpointGitUnavailableWorkspaces.has(checkpointWorkspaceKey) &&
-        typeof window.kunGui.createGitCheckpoint === 'function'
-      ) {
-        const checkpoint = await window.kunGui.createGitCheckpoint({
-          workspaceRoot: checkpointWorkspaceRoot,
-          threadId: activeThreadId
-        }).catch((error) => ({
-          ok: false as const,
-          reason: 'error' as const,
-          message: error instanceof Error ? error.message : String(error)
-        }))
-        if (checkpoint.ok) {
-          workspaceCheckpointId = checkpoint.checkpointId
-        } else if (checkpoint.reason !== 'not_git_repo' && checkpoint.reason !== 'no_workspace') {
-          if (checkpoint.reason === 'git_unavailable') {
-            checkpointGitUnavailableWorkspaces.add(checkpointWorkspaceKey)
-          }
-          void window.kunGui.logError(
-            'git-checkpoint',
-            checkpoint.reason === 'git_unavailable'
-              ? 'Git checkpoint disabled for this workspace because Git was not found'
-              : 'Failed to create Git checkpoint',
-            {
-              message: checkpoint.message,
-              reason: checkpoint.reason,
-              workspaceRoot: checkpointWorkspaceRoot
+      // 07-05 并行化：provider 配置与 Git checkpoint 无数据依赖（checkpoint 是本地
+      // git 操作，只读 workspaceRoot；provider 切换即使触发 restartRuntime 也互不影响），
+      // 原先串行 await 白白叠加两段耗时。checkpoint 自取 settings（workspaceRoot 不受
+      // provider 切换影响）；prompt 用的 settings 在并行结束后重取——
+      // ensureRuntimeProviderForSend 可能 saveSettings+invalidate，语义与原串行一致。
+      const createCheckpointIfEligible = async (): Promise<string | undefined> => {
+        const checkpointSettings = await rendererRuntimeClient.getSettings()
+        let workspaceCheckpointId: string | undefined
+        const checkpointThread = get().threads.find((thread) => thread.id === activeThreadId)
+        const checkpointWorkspaceRoot = normalizeWorkspaceRoot(checkpointThread?.workspace) || normalizeWorkspaceRoot(checkpointSettings.workspaceRoot)
+        const checkpointWorkspaceKey = checkpointWorkspaceRoot.replaceAll('\\', '/').toLowerCase()
+        if (
+          checkpointWorkspaceRoot &&
+          !checkpointGitUnavailableWorkspaces.has(checkpointWorkspaceKey) &&
+          typeof window.kunGui.createGitCheckpoint === 'function'
+        ) {
+          const checkpoint = await window.kunGui.createGitCheckpoint({
+            workspaceRoot: checkpointWorkspaceRoot,
+            threadId: activeThreadId
+          }).catch((error) => ({
+            ok: false as const,
+            reason: 'error' as const,
+            message: error instanceof Error ? error.message : String(error)
+          }))
+          if (checkpoint.ok) {
+            workspaceCheckpointId = checkpoint.checkpointId
+          } else if (checkpoint.reason !== 'not_git_repo' && checkpoint.reason !== 'no_workspace') {
+            if (checkpoint.reason === 'git_unavailable') {
+              checkpointGitUnavailableWorkspaces.add(checkpointWorkspaceKey)
             }
-          ).catch(() => undefined)
+            void window.kunGui.logError(
+              'git-checkpoint',
+              checkpoint.reason === 'git_unavailable'
+                ? 'Git checkpoint disabled for this workspace because Git was not found'
+                : 'Failed to create Git checkpoint',
+              {
+                message: checkpoint.message,
+                reason: checkpoint.reason,
+                workspaceRoot: checkpointWorkspaceRoot
+              }
+            ).catch(() => undefined)
+          }
         }
+        return workspaceCheckpointId
       }
+      const [, workspaceCheckpointId] = await Promise.all([
+        ensureRuntimeProviderForSend({
+          providerId: channel ? undefined : composerProviderId,
+          model: composerModel,
+          set,
+          get
+        }),
+        createCheckpointIfEligible()
+      ])
+      const settings = await rendererRuntimeClient.getSettings()
+      perf.mark('provider-and-checkpoint-ready')
       let runtimeText: string
       if (channel) {
         runtimeText = buildClawRuntimePrompt(settings, trimmedText, { channel })
@@ -932,6 +972,7 @@ export function createThreadActions(
         ...(workspaceCheckpointId ? { workspaceCheckpointId } : {}),
         ...(fileReferences.length ? { fileReferences } : {})
       })
+      perf.mark('request-sent')
       // Mirror the composer model selection against the runtime's stable
       // user_message item id so the badge survives page refresh / thread
       // re-selection. The runtime itself doesn't persist per-turn metadata.
@@ -1012,7 +1053,23 @@ export function createThreadActions(
       const ac = new AbortController()
       sseAbortRef.current = ac
       const sink = buildThreadEventSink(set, get, { threadId: activeThreadId, signal: ac.signal, sinceSeq: seqAtSend })
-      subscribeThreadEventsWithRecovery(p, activeThreadId, seqAtSend, sink, ac.signal, get)
+      // [perf:chat] 首个流事件 / turn 完成打点：包装 sink，不侵入 helpers。
+      let firstStreamEventMarked = false
+      const perfSink: typeof sink = {
+        ...sink,
+        onDeltas: (deltas) => {
+          if (!firstStreamEventMarked) {
+            firstStreamEventMarked = true
+            perf.mark('first-stream-event')
+          }
+          sink.onDeltas(deltas)
+        },
+        onTurnComplete: () => {
+          perf.done('turn-complete')
+          sink.onTurnComplete()
+        }
+      }
+      subscribeThreadEventsWithRecovery(p, activeThreadId, seqAtSend, perfSink, ac.signal, get)
       armBusyWatchdog(set, get)
       if (shouldRenameThreadAfterSend) {
         // Provisional first-message title; the backend LLM titler upgrades it
