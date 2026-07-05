@@ -10,14 +10,17 @@ import {
   CANVAS_HISTORY_STORAGE_KEY,
   clampN,
   createCanvasStore,
+  diskRecordToArtwork,
   filterArtworks,
   loadPersistedArtworks,
+  mergeDiskRecords,
   migrateLegacyHistory,
   reduceFailPending,
   reduceResolvePending,
   sanitizeRehydratedArtworks,
   serializeArtworksForPersist,
-  type CanvasArtwork
+  type CanvasArtwork,
+  type DiskImageRecord
 } from './canvas-store'
 
 function image(id: string, overrides: Partial<Claude360CanvasImage> = {}): Claude360CanvasImage {
@@ -301,5 +304,72 @@ describe('持久化', () => {
     expect(raw).toBeTruthy()
     const parsed = JSON.parse(raw ?? '{}') as { artworks?: CanvasArtwork[] }
     expect(parsed.artworks?.map((a) => a.id)).toEqual(['persisted'])
+  })
+})
+
+// —— 07-05 磁盘持久化恢复 ——
+
+function diskRecord(id: string, overrides: Partial<DiskImageRecord> = {}): DiskImageRecord {
+  return {
+    id,
+    status: 'completed',
+    prompt: `p-${id}`,
+    model: 'gpt-image-1',
+    createdAt: '2026-07-03T00:00:00.000Z',
+    localPath: `assets/images/${id}.png`,
+    remoteUrl: `https://cdn.example/${id}.png`,
+    ...overrides
+  }
+}
+
+describe('磁盘持久化恢复（07-05）', () => {
+  it('diskRecordToArtwork：completed 记录转 success 作品并带 localPath', () => {
+    const artwork = diskRecordToArtwork(diskRecord('d1'))
+    expect(artwork?.status).toBe('success')
+    expect(artwork?.localPath).toBe('assets/images/d1.png')
+    expect(artwork?.image?.url).toBe('https://cdn.example/d1.png')
+  })
+
+  it('mergeDiskRecords：同 id 保留内存条目并补 localPath；新增磁盘条目按时间倒序并入', () => {
+    const memory = [successArtwork('a', { createdAt: '2026-07-04T00:00:00.000Z' })]
+    const merged = mergeDiskRecords(memory, [
+      diskRecord('a', { localPath: 'assets/images/a.png' }),
+      diskRecord('b', { createdAt: '2026-07-01T00:00:00.000Z' })
+    ])
+    expect(merged.map((x) => x.id)).toEqual(['a', 'b'])
+    expect(merged[0].localPath).toBe('assets/images/a.png')
+    expect(merged[0].prompt).toBe('p-a') // 内存条目字段保留
+  })
+
+  it('mergeDiskRecords：切换工作空间时移除其他空间的磁盘来源条目（带 localPath 且不在新记录中）', () => {
+    const fromOldWorkspace = successArtwork('old', { localPath: 'assets/images/old.png' })
+    const pureMemory = successArtwork('mem')
+    const merged = mergeDiskRecords([fromOldWorkspace, pureMemory], [diskRecord('new')])
+    expect(merged.map((x) => x.id).sort()).toEqual(['mem', 'new'])
+  })
+
+  it('mergeDiskRecords：fileMissing 标注透传，pending 磁盘记录不并入', () => {
+    const merged = mergeDiskRecords([], [
+      diskRecord('gone', { fileMissing: true }),
+      diskRecord('wip', { status: 'pending' })
+    ])
+    expect(merged.map((x) => x.id)).toEqual(['gone'])
+    expect(merged[0].fileMissing).toBe(true)
+  })
+
+  it('sanitizeRehydratedArtworks：无 image 但有 localPath 的条目保留（本地-only 作品）', () => {
+    const restored = sanitizeRehydratedArtworks([
+      { id: 'local-only', status: 'success', localPath: 'assets/images/x.png', prompt: '', model: '', size: '', quality: '', outputFormat: '', n: 1, createdAt: '' }
+    ])
+    expect(restored.map((x) => x.id)).toEqual(['local-only'])
+    expect(restored[0].localPath).toBe('assets/images/x.png')
+  })
+
+  it('hydrateFromDisk / attachLocalArtifact actions：合并与回写', () => {
+    const store = createCanvasStore({ initialArtworks: [successArtwork('run')] })
+    store.getState().hydrateFromDisk([diskRecord('disk1')])
+    expect(store.getState().artworks.map((x) => x.id).sort()).toEqual(['disk1', 'run'])
+    store.getState().attachLocalArtifact('run', 'assets/images/run.png')
+    expect(store.getState().artworks.find((x) => x.id === 'run')?.localPath).toBe('assets/images/run.png')
   })
 })

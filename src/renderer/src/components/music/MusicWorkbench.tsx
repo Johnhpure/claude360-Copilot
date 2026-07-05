@@ -26,9 +26,12 @@ import {
 import {
   debugProbeSongs,
   downloadSong,
+  hydrateMusicFromDisk,
+  persistCompletedSongs,
   playSongOnAudioElement,
   pollActiveTasksOnce,
   submitMusic,
+  type MusicPersistenceApi,
   type MusicWorkbenchApi
 } from '../../music/music-workbench-actions'
 import type { LyricsStreamApi } from '../../music/lyrics-ai'
@@ -146,6 +149,8 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
   const [textModels, setTextModels] = useState<string[]>([])
   // 当前 music 分组（选模型时用于确保该分组已有 Key）。
   const [musicGroup, setMusicGroup] = useState('')
+  // 当前工作空间根：资产落盘 / 恢复的定位（07-05）。
+  const [workspaceRoot, setWorkspaceRoot] = useState('')
 
   // 播放器状态（队列 / 进度 / 音量）——store 管状态，容器把状态桥接到 <audio>。
   const queue = useStore(useMusicPlayerStore, (s) => s.queue)
@@ -206,6 +211,61 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
     }
   }, [])
 
+  // 07-05 本地音频优先：已落盘歌曲播放时先读工作空间本地文件（objectURL 按
+  // localPath 缓存复用），本地不可用回退原远程 URL（含现有 blob 代取回退链）。
+  const localAudioObjectUrlsRef = useRef<Map<string, string>>(new Map())
+  useEffect(() => {
+    const urls = localAudioObjectUrlsRef.current
+    return () => {
+      for (const url of urls.values()) URL.revokeObjectURL(url)
+      urls.clear()
+    }
+  }, [])
+
+  const withLocalAudioFirst = useCallback(
+    async (song: Claude360Song): Promise<{ resolved: Claude360Song; localPath: string | null }> => {
+      const info = useMusicTaskStore.getState().songAssets[song.id]
+      const localPath = info?.localAudioPath
+      if (!localPath || info.audioMissing || !workspaceRoot) return { resolved: song, localPath: null }
+      const cached = localAudioObjectUrlsRef.current.get(localPath)
+      if (cached) return { resolved: { ...song, audioUrl: cached }, localPath }
+      const w = typeof window !== 'undefined' ? window.kunGui : undefined
+      if (!w?.mediaAssetsReadBlob) return { resolved: song, localPath: null }
+      try {
+        const result = await w.mediaAssetsReadBlob({ workspaceRoot, relativePath: localPath })
+        if (!result.ok) return { resolved: song, localPath: null }
+        const objectUrl = URL.createObjectURL(blobFromBase64(result.base64, result.mimeType))
+        localAudioObjectUrlsRef.current.set(localPath, objectUrl)
+        return { resolved: { ...song, audioUrl: objectUrl }, localPath }
+      } catch {
+        return { resolved: song, localPath: null }
+      }
+    },
+    [workspaceRoot]
+  )
+
+  /**
+   * 本地音频播放失败时的回退解析（审查 Important 4）：失效该 localPath 的
+   * objectURL 缓存，并用**原始远程 URL**（而非 blob: 地址）走 media-blob 代取，
+   * 保证「本地文件损坏 → 远程回退」链路可达。
+   */
+  const resolveFallbackForSong = useCallback(
+    (originalAudioUrl: string, localPath: string | null) =>
+      async (_failedUrl: string, error: unknown): Promise<string | null> => {
+        if (localPath) {
+          const stale = localAudioObjectUrlsRef.current.get(localPath)
+          if (stale) {
+            localAudioObjectUrlsRef.current.delete(localPath)
+            URL.revokeObjectURL(stale)
+          }
+        }
+        const remote = originalAudioUrl.trim()
+        if (!remote) return null
+        return resolvePlayableObjectUrl(remote, error)
+      },
+    [resolvePlayableObjectUrl]
+  )
+
   // 封面代理兜底产生的 objectURL 按 coverUrl 缓存复用（同一封面不重复代取、
   // 不重复 createObjectURL 累积内存），卸载时统一 revoke。
   const coverObjectUrlsRef = useRef<Map<string, string>>(new Map())
@@ -217,10 +277,26 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
     }
   }, [])
 
-  // 封面直连失败时经 main media-blob 代取（同源自动附 Key）转 objectURL。
+  // 封面直连失败时：先试本地落盘封面（07-05），再经 main media-blob 代取转 objectURL。
   const resolveCoverObjectUrl = useCallback(async (coverUrl: string): Promise<string | null> => {
     const cached = coverObjectUrlsRef.current.get(coverUrl)
     if (cached) return cached
+    const state = useMusicTaskStore.getState()
+    const song = state.tasks.flatMap((task) => task.songs).find((s) => s.imageUrl?.trim() === coverUrl)
+    const localCover = song ? state.songAssets[song.id]?.localCoverPath : undefined
+    const w = typeof window !== 'undefined' ? window.kunGui : undefined
+    if (localCover && workspaceRoot && w?.mediaAssetsReadBlob) {
+      try {
+        const local = await w.mediaAssetsReadBlob({ workspaceRoot, relativePath: localCover })
+        if (local.ok) {
+          const objectUrl = URL.createObjectURL(blobFromBase64(local.base64, local.mimeType))
+          coverObjectUrlsRef.current.set(coverUrl, objectUrl)
+          return objectUrl
+        }
+      } catch {
+        /* 本地读取失败 → 继续远程代理 */
+      }
+    }
     const k = api()
     if (!k?.claude360MusicMediaBlob) return null
     try {
@@ -236,7 +312,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
       console.error('[claude360-music] cover blob proxy threw', { coverUrl, error })
       return null
     }
-  }, [])
+  }, [workspaceRoot])
 
   // 调试探针：任务转 success 后对每首歌验证 coverUrl / audioUrl 可访问性与
   // content-type（结果打控制台，不影响业务）。每首歌只探测一次。
@@ -254,6 +330,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
   }, [tasks])
 
   // 拉取 text 分组的模型列表，供写词助手的文本模型下拉使用。
+  // 07-05：顺带记录 workspaceRoot 并从磁盘恢复本工作空间的音乐作品。
   useEffect(() => {
     let alive = true
     const w = typeof window !== 'undefined' ? window.kunGui : undefined
@@ -261,7 +338,18 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
     void w
       .getSettings()
       .then((s) => {
-        if (alive) setMusicGroup((s.claude360?.selectedMusicGroup ?? '').trim())
+        if (alive) {
+          setMusicGroup((s.claude360?.selectedMusicGroup ?? '').trim())
+          const root = (s.workspaceRoot ?? '').trim()
+          setWorkspaceRoot(root)
+          if (root && w.mediaAssetsList) {
+            void hydrateMusicFromDisk(
+              w as unknown as MusicPersistenceApi,
+              useMusicTaskStore.getState(),
+              root
+            )
+          }
+        }
         const group = (s.claude360?.selectedTextGroup || 'auto').trim() || 'auto'
         return w.claude360ModelsByGroup({ group })
       })
@@ -288,6 +376,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
   }
 
   // 轮询：有活跃任务才 tick；无活跃任务清除定时器（失败上限在 store 侧兜底）。
+  // 07-05：任务转 success 后把每首歌静默落盘到工作空间 assets/（fire-and-forget）。
   const activeKey = selectActiveTaskIds(tasks).join(',')
   useEffect(() => {
     if (activeKey === '') return
@@ -297,7 +386,29 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
     const tick = async (): Promise<void> => {
       const ids = selectActiveTaskIds(useMusicTaskStore.getState().tasks)
       if (ids.length === 0 || !alive) return
-      await pollActiveTasksOnce(k, { applyFetched }, ids)
+      await pollActiveTasksOnce(k, { applyFetched }, ids, (completed) => {
+        const w = typeof window !== 'undefined' ? window.kunGui : undefined
+        if (!workspaceRoot || !w?.mediaAssetsSaveMusic) return
+        void persistCompletedSongs(
+          w as unknown as MusicPersistenceApi,
+          useMusicTaskStore.getState(),
+          workspaceRoot,
+          completed,
+          {},
+          {
+            // 下载窗口内被删的歌：反删磁盘记录（连本地文件），防幽灵条目复活。
+            isRemoved: (songId) =>
+              !useMusicTaskStore
+                .getState()
+                .tasks.some((task) => task.songs.some((song) => song.id === songId)),
+            cleanupRemoved: (songId) => {
+              void w
+                .mediaAssetsDelete({ workspaceRoot, kind: 'music', ids: [songId], deleteFiles: true })
+                .catch(() => undefined)
+            }
+          }
+        )
+      })
     }
     void tick()
     const id = window.setInterval(() => void tick(), MUSIC_POLL_INTERVAL_MS)
@@ -305,7 +416,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
       alive = false
       window.clearInterval(id)
     }
-  }, [activeKey, applyFetched])
+  }, [activeKey, applyFetched, workspaceRoot])
 
   // 选模型仅更新表单，不再即时检测 Key；Key 改到「点开始生成」时按所选分组检测/创建。
   const patchForm = useCallback((patch: Partial<Claude360MusicCreateForm>): void => {
@@ -357,10 +468,13 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
         setPlaybackError(t('musicAudioPlayerUnavailable'))
         return
       }
-      void playSongOnAudioElement(el, song, volume, {
-        resolvePlayableUrl: resolvePlayableObjectUrl,
-        logError: (message, detail) => console.error(message, detail)
-      }).then((result) => {
+      // 07-05：已落盘歌曲优先播本地文件；本地不可用回退远程（含 blob 代取回退链）。
+      void withLocalAudioFirst(song).then(({ resolved, localPath }) =>
+        playSongOnAudioElement(el, resolved, volume, {
+          resolvePlayableUrl: resolveFallbackForSong(song.audioUrl, localPath),
+          logError: (message, detail) => console.error(message, detail)
+        })
+      ).then((result) => {
         if (!result.ok) {
           pauseAction()
           const message = result.reason === 'missing-url' ? t('musicAudioMissing') : t('musicAudioPlayFailed')
@@ -378,7 +492,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
         setQueue(q, start)
       })
     },
-    [pauseAction, rememberPlaybackSource, resolvePlayableObjectUrl, setQueue, t, volume]
+    [pauseAction, rememberPlaybackSource, resolveFallbackForSong, setQueue, t, volume, withLocalAudioFirst]
   )
 
   const togglePlayerPlayback = useCallback((): void => {
@@ -391,10 +505,12 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
       setPlaybackError(t('musicAudioPlayerUnavailable'))
       return
     }
-    void playSongOnAudioElement(el, current, volume, {
-      resolvePlayableUrl: resolvePlayableObjectUrl,
-      logError: (message, detail) => console.error(message, detail)
-    }).then((result) => {
+    void withLocalAudioFirst(current).then(({ resolved, localPath }) =>
+      playSongOnAudioElement(el, resolved, volume, {
+        resolvePlayableUrl: resolveFallbackForSong(current.audioUrl, localPath),
+        logError: (message, detail) => console.error(message, detail)
+      })
+    ).then((result) => {
       if (!result.ok) {
         pauseAction()
         const message = result.reason === 'missing-url' ? t('musicAudioMissing') : t('musicAudioPlayFailed')
@@ -411,7 +527,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
       setPlaybackError(null)
       playAction()
     })
-  }, [current, pauseAction, playAction, playing, rememberPlaybackSource, resolvePlayableObjectUrl, t, togglePlayAction, volume])
+  }, [current, pauseAction, playAction, playing, rememberPlaybackSource, resolveFallbackForSong, t, togglePlayAction, volume, withLocalAudioFirst])
 
   // 把播放器 store 状态桥接到 <audio>：切歌换 src、按 playing 播放/暂停。
   useEffect(() => {
@@ -439,10 +555,12 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
         })
         return
       }
-      void playSongOnAudioElement(el, current, volume, {
-        resolvePlayableUrl: resolvePlayableObjectUrl,
-        logError: (message, detail) => console.error(message, detail)
-      }).then((result) => {
+      void withLocalAudioFirst(current).then(({ resolved, localPath }) =>
+        playSongOnAudioElement(el, resolved, volume, {
+          resolvePlayableUrl: resolveFallbackForSong(current.audioUrl, localPath),
+          logError: (message, detail) => console.error(message, detail)
+        })
+      ).then((result) => {
         if (result.ok) {
           rememberPlaybackSource(current.id, result.sourceUrl, result.usedFallback)
           setPlaybackError(null)
@@ -460,7 +578,7 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
     } else {
       el.pause()
     }
-  }, [current, playing, pauseAction, rememberPlaybackSource, resolvePlayableObjectUrl, t, volume])
+  }, [current, playing, pauseAction, rememberPlaybackSource, resolveFallbackForSong, t, volume, withLocalAudioFirst])
 
   // 音量同步。
   useEffect(() => {
@@ -498,12 +616,56 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
       .catch(() => toast.error(t('musicPromptCopyFailed')))
   }, [t])
 
+  // 07-05：删除歌曲/任务/清空 = UI 移除 + 同步磁盘 metadata；已落盘的先确认是否
+  // 连本地文件一起删（默认仅移除记录，本地文件保留）。
+  const deleteSongAssets = useCallback(
+    (songIds: string[]): void => {
+      const w = typeof window !== 'undefined' ? window.kunGui : undefined
+      if (!workspaceRoot || !w?.mediaAssetsDelete || songIds.length === 0) return
+      const state = useMusicTaskStore.getState()
+      const persisted = songIds.filter((id) => state.songAssets[id]?.localAudioPath || state.songAssets[id]?.localCoverPath)
+      const finish = (deleteFiles: boolean): void => {
+        void w.mediaAssetsDelete({ workspaceRoot, kind: 'music', ids: songIds, deleteFiles }).catch(() => undefined)
+      }
+      if (persisted.length > 0) {
+        void confirmDialog(t('musicDeleteLocalFileConfirm')).then((deleteFiles) => finish(deleteFiles))
+        return
+      }
+      finish(false)
+    },
+    [workspaceRoot, t]
+  )
+
   const handleClearFinished = useCallback((): void => {
     if (tasks.length === 0) return
     void confirmDialog(t('musicClearConfirm')).then((ok) => {
-      if (ok) clearFinishedTasks()
+      if (!ok) return
+      // 清空与单删同语义：同步删除磁盘 metadata，否则下次 hydrate 会把已清任务
+      // 从磁盘补回（审查 Critical 1）。清空口径 = 非进行中任务（与 store 一致）。
+      const finished = useMusicTaskStore
+        .getState()
+        .tasks.filter((task) => task.status === 'success' || task.status === 'failure')
+      clearFinishedTasks()
+      deleteSongAssets(finished.flatMap((task) => task.songs.map((song) => song.id)))
     })
-  }, [clearFinishedTasks, tasks.length, t])
+  }, [clearFinishedTasks, deleteSongAssets, tasks.length, t])
+
+  const handleRemoveSong = useCallback(
+    (id: string): void => {
+      removeSong(id)
+      deleteSongAssets([id])
+    },
+    [removeSong, deleteSongAssets]
+  )
+
+  const handleRemoveTask = useCallback(
+    (id: string): void => {
+      const task = useMusicTaskStore.getState().tasks.find((item) => item.id === id)
+      removeTask(id)
+      if (task) deleteSongAssets(task.songs.map((song) => song.id))
+    },
+    [removeTask, deleteSongAssets]
+  )
 
   const handleRegenerate = useCallback((task: MusicGenTask): void => {
     const nextForm = formFromTask(task)
@@ -569,8 +731,8 @@ export function MusicWorkbench({ leftSidebarCollapsed, onToggleLeftSidebar }: Pr
               onPlay={(song, list) => playSong(song, list)}
               onPause={pauseAction}
               onDownload={handleDownload}
-              onRemoveTask={removeTask}
-              onRemoveSong={removeSong}
+              onRemoveTask={handleRemoveTask}
+              onRemoveSong={handleRemoveSong}
               onClear={handleClearFinished}
               onCopyPrompt={handleCopyPrompt}
               onRegenerate={handleRegenerate}

@@ -50,6 +50,18 @@ import type {
   Claude360ImageGeneratePayload,
   Claude360ImageResult
 } from './claude360-canvas'
+import type {
+  MediaAssetsDeletePayload,
+  MediaAssetsDeleteResult,
+  MediaAssetsListPayload,
+  MediaAssetsListResult,
+  MediaAssetsReadBlobPayload,
+  MediaAssetsReadBlobResult,
+  MediaAssetsSaveImagePayload,
+  MediaAssetsSaveImageResult,
+  MediaAssetsSaveMusicPayload,
+  MediaAssetsSaveMusicResult
+} from './media-assets'
 import type { GitBranchesResult, GitBranchWorktreesResult, GitWorktreeCheckoutResult } from './git-branches'
 import type { GitCheckpointCreateResult, GitCheckpointRestoreResult } from './git-checkpoint'
 import type {
@@ -428,6 +440,16 @@ export type KunGuiApi = {
   claude360CanvasGenerate: (payload: Claude360ImageGeneratePayload) => Promise<Claude360ImageResult>
   /** 单图编辑（main 用 image 分组 Key 走 multipart 调 /v1/images/edits；不下发 Key）。 */
   claude360CanvasEdit: (payload: Claude360ImageEditPayload) => Promise<Claude360ImageResult>
+  /** 生图作品落盘到工作空间 assets/（url 由 main 代下载 / base64 直写；07-05）。 */
+  mediaAssetsSaveImage: (payload: MediaAssetsSaveImagePayload) => Promise<MediaAssetsSaveImageResult>
+  /** 音乐作品落盘（音频 + 可选封面；07-05）。 */
+  mediaAssetsSaveMusic: (payload: MediaAssetsSaveMusicPayload) => Promise<MediaAssetsSaveMusicResult>
+  /** 列出当前工作空间已持久化资产（启动/切换工作空间恢复用；07-05）。 */
+  mediaAssetsList: (payload: MediaAssetsListPayload) => Promise<MediaAssetsListResult>
+  /** 读取本地资产内容为 base64（img src / audio 播放；路径限 assets/ 内；07-05）。 */
+  mediaAssetsReadBlob: (payload: MediaAssetsReadBlobPayload) => Promise<MediaAssetsReadBlobResult>
+  /** 删除资产记录（可选同时删本地文件；07-05）。 */
+  mediaAssetsDelete: (payload: MediaAssetsDeletePayload) => Promise<MediaAssetsDeleteResult>
   getKunConfigFile: () => Promise<DeepseekConfigFileResult>
   setKunConfigFile: (content: string) => Promise<DeepseekConfigSaveResult>
   openKunConfigDir: () => Promise<PathOpenResult>

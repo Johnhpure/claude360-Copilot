@@ -39,8 +39,38 @@ export interface MusicGenTask {
   pollMisses?: number
 }
 
+/** 07-05 本地持久化：单首歌的本地资产状态（与 Claude360Song 平行，按 song.id 关联）。 */
+export type SongAssetInfo = {
+  localAudioPath?: string
+  localCoverPath?: string
+  audioMissing?: boolean
+  coverMissing?: boolean
+}
+
+/** listAssets 返回的音乐记录最小结构（renderer 侧视角）。 */
+export type DiskMusicRecord = {
+  id: string
+  taskId?: string
+  status: 'pending' | 'completed' | 'failed'
+  title: string
+  lyrics?: string
+  prompt?: string
+  model?: string
+  duration?: number
+  tags?: string
+  createdAt: string
+  localAudioPath?: string
+  localCoverPath?: string
+  remoteAudioUrl?: string
+  remoteCoverUrl?: string
+  audioMissing?: boolean
+  coverMissing?: boolean
+}
+
 export interface MusicTasksState {
   tasks: MusicGenTask[]
+  /** 07-05：song.id → 本地资产信息（落盘回写 + 磁盘恢复时填充）。 */
+  songAssets: Record<string, SongAssetInfo>
   addSubmitting: (tempId: string, title: string, params: Claude360MusicSubmitPayload) => void
   markSubmitted: (tempId: string, taskId: string) => void
   markFailed: (id: string, message: string) => void
@@ -48,6 +78,10 @@ export interface MusicTasksState {
   removeTask: (id: string) => void
   removeSong: (id: string) => void
   clearFinishedTasks: () => void
+  /** 07-05：磁盘资产记录并入任务列表 + songAssets（启动 / 切工作空间时调用）。 */
+  hydrateFromDisk: (records: DiskMusicRecord[]) => void
+  /** 07-05：单曲落盘成功后回写本地路径。 */
+  attachSongAsset: (songId: string, info: SongAssetInfo) => void
 }
 
 /**
@@ -111,6 +145,76 @@ export function serializeTasksForPersist(tasks: MusicGenTask[]): MusicGenTask[] 
     .slice(0, MUSIC_TASK_HISTORY_LIMIT)
 }
 
+// —— 07-05 磁盘持久化恢复 ——
+
+/** 磁盘歌曲记录（按 taskId 分组）→ 恢复用 success 任务列表（纯函数，便于测试）。 */
+export function diskRecordsToTasks(records: DiskMusicRecord[]): MusicGenTask[] {
+  const byTask = new Map<string, DiskMusicRecord[]>()
+  for (const record of records) {
+    if (record.status === 'pending') continue
+    const key = record.taskId ?? `disk-${record.id}`
+    const group = byTask.get(key)
+    if (group) group.push(record)
+    else byTask.set(key, [record])
+  }
+  const tasks: MusicGenTask[] = []
+  for (const [key, group] of byTask) {
+    const first = group[0]
+    const createdAt = Date.parse(first.createdAt)
+    tasks.push({
+      id: `disk-${key}`,
+      taskId: first.taskId,
+      status: 'success',
+      createdAt: Number.isFinite(createdAt) ? createdAt : 0,
+      title: first.title || '未命名',
+      // 磁盘记录只存展示态；params 以最小快照重建（重新生成时以此回填）。
+      params: { prompt: first.lyrics ?? first.prompt ?? '', model: first.model ?? '' },
+      songs: group.map((record) => ({
+        id: record.id,
+        audioUrl: record.remoteAudioUrl ?? '',
+        ...(record.remoteCoverUrl ? { imageUrl: record.remoteCoverUrl } : {}),
+        title: record.title,
+        ...(record.lyrics ? { text: record.lyrics } : {}),
+        ...(record.duration !== undefined ? { duration: record.duration } : {}),
+        ...(record.tags ? { tags: record.tags } : {}),
+        ...(record.model ? { modelName: record.model } : {})
+      }))
+    })
+  }
+  return tasks
+}
+
+/** 磁盘记录 → songAssets 映射（含缺失标注）。 */
+export function diskRecordsToSongAssets(records: DiskMusicRecord[]): Record<string, SongAssetInfo> {
+  const assets: Record<string, SongAssetInfo> = {}
+  for (const record of records) {
+    if (!record.localAudioPath && !record.localCoverPath) continue
+    assets[record.id] = {
+      ...(record.localAudioPath ? { localAudioPath: record.localAudioPath } : {}),
+      ...(record.localCoverPath ? { localCoverPath: record.localCoverPath } : {}),
+      ...(record.audioMissing ? { audioMissing: true } : {}),
+      ...(record.coverMissing ? { coverMissing: true } : {})
+    }
+  }
+  return assets
+}
+
+/**
+ * 磁盘任务并入现有列表：内存任务优先（运行态较新）；磁盘补充「localStorage 上限
+ * 裁剪 / 清缓存后丢失」的任务。旧的磁盘来源任务（disk- 前缀）先移除再并入，
+ * 保证切换工作空间时只显示当前空间的资产。
+ */
+export function mergeDiskTasks(tasks: MusicGenTask[], diskTasks: MusicGenTask[]): MusicGenTask[] {
+  const memoryTasks = tasks.filter((task) => !task.id.startsWith('disk-'))
+  const existingTaskIds = new Set(memoryTasks.map((t) => t.taskId).filter(Boolean))
+  const existingSongIds = new Set(memoryTasks.flatMap((t) => t.songs.map((song) => song.id)))
+  const additions = diskTasks.filter((task) => {
+    if (task.taskId && existingTaskIds.has(task.taskId)) return false
+    return !task.songs.every((song) => existingSongIds.has(song.id))
+  })
+  return [...memoryTasks, ...additions].sort((a, b) => b.createdAt - a.createdAt)
+}
+
 /** 从本地存储读取任务；损坏/缺失时安全恢复空列表，并对僵尸任务做 sanitize。 */
 export function loadPersistedTasks(): MusicGenTask[] {
   const raw = readBrowserStorageItem(MUSIC_TASKS_STORAGE_KEY)
@@ -140,6 +244,7 @@ export function createMusicTaskStore(
   const shouldPersist = options.persist === true
   const store = create<MusicTasksState>((set) => ({
     tasks: options.initialTasks ?? [],
+    songAssets: {},
     addSubmitting: (tempId, title, params) =>
       set((s) => ({
         tasks: [
@@ -170,7 +275,20 @@ export function createMusicTaskStore(
           .filter((t) => t.status !== 'success' || t.songs.length > 0)
       })),
     clearFinishedTasks: () =>
-      set((s) => ({ tasks: s.tasks.filter((t) => IN_FLIGHT_STATUSES.includes(t.status)) }))
+      set((s) => ({ tasks: s.tasks.filter((t) => IN_FLIGHT_STATUSES.includes(t.status)) })),
+    hydrateFromDisk: (records) =>
+      set((s) => ({
+        tasks: mergeDiskTasks(s.tasks, diskRecordsToTasks(records)),
+        // songAssets 全量重建：切换工作空间后旧空间的本地映射不再有效。
+        songAssets: diskRecordsToSongAssets(records)
+      })),
+    attachSongAsset: (songId, info) =>
+      set((s) => ({
+        songAssets: {
+          ...s.songAssets,
+          [songId]: { ...s.songAssets[songId], ...info, audioMissing: undefined, coverMissing: undefined }
+        }
+      }))
   }))
 
   if (shouldPersist) {

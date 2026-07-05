@@ -84,6 +84,11 @@ import {
   claude360MusicMediaProbePayloadSchema,
   claude360CanvasGeneratePayloadSchema,
   claude360CanvasEditPayloadSchema,
+  mediaAssetsDeletePayloadSchema,
+  mediaAssetsListPayloadSchema,
+  mediaAssetsReadBlobPayloadSchema,
+  mediaAssetsSaveImagePayloadSchema,
+  mediaAssetsSaveMusicPayloadSchema,
   streamIdSchema,
   workflowRunNodePayloadSchema,
   workflowTestNodePayloadSchema,
@@ -118,6 +123,7 @@ import {
   resolveModelProviderProxyUrl
 } from '../../shared/app-settings'
 import { detectLegacySessions, importLegacySessions } from '../services/legacy-session-import-service'
+import { MediaAssetsService } from '../services/media-assets-service'
 import { claudeSubscriptionStatus, runClaudeSetupToken } from '../claude-subscription-auth'
 import { fetchSdkModels } from '../claude-subscription-models'
 import {
@@ -459,6 +465,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     getMainWindow()?.webContents.send('speech:local-whisper:progress', payload)
   })
   const workspaceFileWatchers = new Map<string, WorkspaceFileWatchRecord>()
+  // 资产持久化服务：无外部依赖（fs + fetch），handler 层直接实例化（07-05）。
+  const mediaAssetsService = new MediaAssetsService()
 
   const shouldRefreshClaude360ModelsForCode = (settings: AppSettingsV1): boolean => {
     if (!settings.claude360?.loggedIn) return false
@@ -866,6 +874,64 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         message: error instanceof Error ? error.message : String(error)
       })
       return { ok: false as const, message: '编辑失败，请稍后重试' }
+    }
+  })
+
+  // 生图/音乐资产本地持久化 IPC（07-05）。service 已把预期错误映射为 { ok:false }；
+  // handler 兜住意外异常，统一返回可展示错误结果。
+  ipcMain.handle('media:assets:save-image', async (_, payload: unknown) => {
+    const req = parseIpcPayload('media:assets:save-image', mediaAssetsSaveImagePayloadSchema, payload)
+    try {
+      return await mediaAssetsService.saveImageAsset(req)
+    } catch (error) {
+      logError('media-assets', 'saveImageAsset failed', {
+        message: error instanceof Error ? error.message : String(error)
+      })
+      return { ok: false as const, message: '图片保存失败' }
+    }
+  })
+  ipcMain.handle('media:assets:save-music', async (_, payload: unknown) => {
+    const req = parseIpcPayload('media:assets:save-music', mediaAssetsSaveMusicPayloadSchema, payload)
+    try {
+      return await mediaAssetsService.saveMusicAsset(req)
+    } catch (error) {
+      logError('media-assets', 'saveMusicAsset failed', {
+        message: error instanceof Error ? error.message : String(error)
+      })
+      return { ok: false as const, message: '音乐保存失败' }
+    }
+  })
+  ipcMain.handle('media:assets:list', async (_, payload: unknown) => {
+    const req = parseIpcPayload('media:assets:list', mediaAssetsListPayloadSchema, payload)
+    try {
+      return await mediaAssetsService.listAssets(req)
+    } catch (error) {
+      logError('media-assets', 'listAssets failed', {
+        message: error instanceof Error ? error.message : String(error)
+      })
+      return { ok: false as const, message: '资产列表读取失败' }
+    }
+  })
+  ipcMain.handle('media:assets:read-blob', async (_, payload: unknown) => {
+    const req = parseIpcPayload('media:assets:read-blob', mediaAssetsReadBlobPayloadSchema, payload)
+    try {
+      return await mediaAssetsService.readAssetBlob(req)
+    } catch (error) {
+      logError('media-assets', 'readAssetBlob failed', {
+        message: error instanceof Error ? error.message : String(error)
+      })
+      return { ok: false as const, message: '资产读取失败' }
+    }
+  })
+  ipcMain.handle('media:assets:delete', async (_, payload: unknown) => {
+    const req = parseIpcPayload('media:assets:delete', mediaAssetsDeletePayloadSchema, payload)
+    try {
+      return await mediaAssetsService.deleteAssets(req)
+    } catch (error) {
+      logError('media-assets', 'deleteAssets failed', {
+        message: error instanceof Error ? error.message : String(error)
+      })
+      return { ok: false as const, message: '资产删除失败' }
     }
   })
 

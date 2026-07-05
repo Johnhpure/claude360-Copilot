@@ -8,6 +8,7 @@ import {
   CLAUDE360_IMAGE_OUTPUT_FORMATS,
   CLAUDE360_IMAGE_QUALITIES,
   CLAUDE360_IMAGE_RESOLUTIONS,
+  type Claude360CanvasImage,
   type Claude360ImageOutputFormat,
   type Claude360ImageQuality,
   type Claude360ImageResolution
@@ -22,14 +23,18 @@ import {
 import {
   defaultImageModel,
   filterImageModels,
+  hydrateCanvasArtworksFromDisk,
+  persistGeneratedImages,
   submitGenerate,
   submitEdit,
   fileToDataUrl,
   copyImage,
   downloadImage,
+  type CanvasPersistenceApi,
   type CanvasWorkbenchApi
 } from '../../canvas/canvas-workbench-actions'
 import { imageDataUrl } from '../../canvas/image-result-utils'
+import { useLocalAssetSrc } from '../../lib/use-local-asset-src'
 import { confirmDialog } from '../../lib/confirm-dialog'
 import { PageHeader } from '../shell'
 import { toast } from '../ui'
@@ -114,6 +119,8 @@ export function CanvasWorkbench({
   const [imageModels, setImageModels] = useState<string[]>([])
   // 当前 image 分组（执行时用于确保该分组已有 Key）。
   const [imageGroup, setImageGroup] = useState('')
+  // 当前工作空间根：资产落盘 / 恢复的定位（07-05）。
+  const [workspaceRoot, setWorkspaceRoot] = useState('')
   // 大图查看（lightbox，基于 ui/Modal，Esc/遮罩关闭由基类接管）。
   const [viewing, setViewing] = useState<CanvasArtwork | null>(null)
 
@@ -142,6 +149,7 @@ export function CanvasWorkbench({
   )
 
   // 首屏加载：读取 image 模型缓存 + 低余额标记（分组模式不在初始化时做任何 Key 检测）。
+  // 07-05：顺带记录 workspaceRoot 并从磁盘恢复本工作空间的生图作品。
   useEffect(() => {
     let alive = true
     const kun = api()
@@ -152,6 +160,15 @@ export function CanvasWorkbench({
         if (!alive) return
         applyModelsFromCache(settings.claude360?.modelCache?.models ?? [])
         setImageGroup((settings.claude360?.selectedImageGroup ?? '').trim())
+        const root = (settings.workspaceRoot ?? '').trim()
+        setWorkspaceRoot(root)
+        if (root && w.mediaAssetsList) {
+          void hydrateCanvasArtworksFromDisk(
+            w as unknown as CanvasPersistenceApi,
+            useCanvasStore.getState(),
+            root
+          )
+        }
       }).catch(() => undefined)
     }
     if (w?.claude360BillingMe) {
@@ -199,8 +216,34 @@ export function CanvasWorkbench({
     // 提交（否则占位被覆盖，先回批次挂错参数、后回批次被静默丢弃）。ensure 弹窗 await
     // 期间状态可能变化，故在这里（而非进入函数时）读最新状态判定。
     if (s.generating || s.editing) return
+    // 07-05：生成/编辑成功后静默落盘到工作空间 assets/（fire-and-forget，不阻塞 UI）。
+    const persistAfterSuccess = (images: Claude360CanvasImage[] | undefined): void => {
+      if (!images?.length || !workspaceRoot || !window.kunGui?.mediaAssetsSaveImage) return
+      const latest = useCanvasStore.getState()
+      void persistGeneratedImages(
+        window.kunGui as unknown as CanvasPersistenceApi,
+        latest,
+        workspaceRoot,
+        images,
+        {
+          size: s.size,
+          quality: s.quality,
+          format: s.outputFormat,
+          ...(imageGroup ? { group: imageGroup } : {})
+        },
+        {
+          // 下载窗口内被删的作品：反删磁盘记录（连本地文件），防幽灵条目复活。
+          isRemoved: (id) => !useCanvasStore.getState().artworks.some((artwork) => artwork.id === id),
+          cleanupRemoved: (id) => {
+            void window.kunGui
+              ?.mediaAssetsDelete({ workspaceRoot, kind: 'image', ids: [id], deleteFiles: true })
+              .catch(() => undefined)
+          }
+        }
+      )
+    }
     if (s.referenceImage) {
-      await submitEdit(kun, { beginEdit, editSuccess, editFailure }, {
+      const edited = await submitEdit(kun, { beginEdit, editSuccess, editFailure }, {
         model: s.model,
         prompt: s.prompt,
         image: s.referenceImage,
@@ -208,9 +251,10 @@ export function CanvasWorkbench({
         quality: s.quality,
         output_format: s.outputFormat
       })
+      if (edited.ok) persistAfterSuccess(edited.images)
       return
     }
-    await submitGenerate(kun, { beginGenerate, generateSuccess, generateFailure }, {
+    const generated = await submitGenerate(kun, { beginGenerate, generateSuccess, generateFailure }, {
       model: s.model,
       prompt: s.prompt,
       size: s.size,
@@ -218,7 +262,8 @@ export function CanvasWorkbench({
       quality: s.quality,
       output_format: s.outputFormat
     })
-  }, [beginEdit, editFailure, editSuccess, beginGenerate, generateFailure, generateSuccess, imageGroup])
+    if (generated.ok) persistAfterSuccess(generated.images)
+  }, [beginEdit, editFailure, editSuccess, beginGenerate, generateFailure, generateSuccess, imageGroup, workspaceRoot])
 
   // 重新生成：把该作品的参数快照回填表单（所见即所发），随后按文本生图重新提交。
   const handleRegenerate = useCallback(
@@ -293,12 +338,51 @@ export function CanvasWorkbench({
     })
   }, [])
 
+  // 07-05：批量/清空与单删同语义——磁盘 metadata 必须同步删除，否则下次 hydrate
+  // 会把已删作品从磁盘补回（审查 Critical 1）。已落盘条目先确认是否连本地文件删。
+  const syncDiskDeletion = useCallback(
+    (targets: CanvasArtwork[]): void => {
+      const w = typeof window !== 'undefined' ? window.kunGui : undefined
+      const ids = targets.map((artwork) => artwork.id)
+      if (!workspaceRoot || !w?.mediaAssetsDelete || ids.length === 0) return
+      const finish = (deleteFiles: boolean): void => {
+        void w.mediaAssetsDelete({ workspaceRoot, kind: 'image', ids, deleteFiles }).catch(() => undefined)
+      }
+      if (targets.some((artwork) => artwork.localPath)) {
+        void confirmDialog(t('canvasDeleteLocalFileConfirm')).then((deleteFiles) => finish(deleteFiles))
+        return
+      }
+      finish(false)
+    },
+    [workspaceRoot, t]
+  )
+
+  const handleRemoveSelected = useCallback((): void => {
+    const s = useCanvasStore.getState()
+    // 与 store.removeSelected 相同口径：pending 占位豁免。
+    const targets = s.artworks.filter((artwork) => artwork.status !== 'pending' && s.selectedIds[artwork.id])
+    removeSelected()
+    syncDiskDeletion(targets)
+  }, [removeSelected, syncDiskDeletion])
+
   const handleClearArtworks = useCallback((): void => {
     if (artworks.length === 0) return
     void confirmDialog(t('canvasClearConfirm')).then((ok) => {
-      if (ok) clearArtworks()
+      if (!ok) return
+      const targets = useCanvasStore.getState().artworks.filter((artwork) => artwork.status !== 'pending')
+      clearArtworks()
+      syncDiskDeletion(targets)
     })
-  }, [artworks.length, clearArtworks, t])
+  }, [artworks.length, clearArtworks, syncDiskDeletion, t])
+
+  // 07-05：删除作品 = UI 列表移除 + 同步磁盘 metadata（含可选删本地文件确认）。
+  const handleRemoveArtwork = useCallback(
+    (artwork: CanvasArtwork): void => {
+      removeArtwork(artwork.id)
+      syncDiskDeletion([artwork])
+    },
+    [removeArtwork, syncDiskDeletion]
+  )
 
   const headerInset = useMemo(
     () => (leftSidebarCollapsed ? 'ds-window-controls-collapsed-titlebar-inset' : ''),
@@ -308,7 +392,9 @@ export function CanvasWorkbench({
   const filterLabel = (filter: CanvasArtworkFilter): string =>
     filter === 'all' ? t('canvasFilterAll') : t(`canvasStatus_${filter}`)
 
-  const viewingSrc = viewing?.image ? imageDataUrl(viewing.image) : null
+  // 大图查看：本地落盘文件优先，缺失回退远程/内存 src（07-05）。
+  const viewingFallbackSrc = viewing?.image ? imageDataUrl(viewing.image) : null
+  const viewingSrc = useLocalAssetSrc(workspaceRoot, viewing?.localPath, viewingFallbackSrc)
 
   return (
     <div className="ds-drag flex h-full min-h-0 flex-col bg-ds-main" data-testid="canvas-workbench">
@@ -407,7 +493,7 @@ export function CanvasWorkbench({
                     type="button"
                     data-testid="canvas-batch-delete-button"
                     disabled={selectedCount === 0}
-                    onClick={removeSelected}
+                    onClick={handleRemoveSelected}
                     className="rounded-full px-2.5 py-1 text-[12px] text-ds-danger transition-colors duration-[var(--motion-fast)] hover:bg-ds-danger-soft disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {t('canvasBatchDelete', { count: selectedCount })}
@@ -456,8 +542,9 @@ export function CanvasWorkbench({
               onCopyPrompt={handleCopyPrompt}
               onDownload={handleDownload}
               onRegenerate={handleRegenerate}
-              onRemove={(artwork) => removeArtwork(artwork.id)}
+              onRemove={handleRemoveArtwork}
               emptyKey={artworks.length > 0 ? 'canvasFilterEmpty' : 'canvasArtworksEmpty'}
+              workspaceRoot={workspaceRoot}
               t={t}
             />
           </div>
@@ -475,7 +562,7 @@ export function CanvasWorkbench({
           onCopyPrompt={() => handleCopyPrompt(viewing)}
           onDownload={() => handleDownload(viewing)}
           onDelete={() => {
-            removeArtwork(viewing.id)
+            handleRemoveArtwork(viewing)
             setViewing(null)
           }}
           t={t}

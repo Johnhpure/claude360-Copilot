@@ -109,6 +109,11 @@ const api = {
   claude360MusicMediaProbe: (url) => ipcRenderer.invoke('claude360:music:media-probe', { url }),
   claude360CanvasGenerate: (payload) => ipcRenderer.invoke('claude360:canvas:generate', payload),
   claude360CanvasEdit: (payload) => ipcRenderer.invoke('claude360:canvas:edit', payload),
+  mediaAssetsSaveImage: (payload) => ipcRenderer.invoke('media:assets:save-image', payload),
+  mediaAssetsSaveMusic: (payload) => ipcRenderer.invoke('media:assets:save-music', payload),
+  mediaAssetsList: (payload) => ipcRenderer.invoke('media:assets:list', payload),
+  mediaAssetsReadBlob: (payload) => ipcRenderer.invoke('media:assets:read-blob', payload),
+  mediaAssetsDelete: (payload) => ipcRenderer.invoke('media:assets:delete', payload),
   getKunConfigFile: () =>
     ipcRenderer.invoke('kun:config:read'),
   setKunConfigFile: (content) =>

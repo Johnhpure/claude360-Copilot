@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import { ClipboardType, Download, Images, Maximize2, RefreshCw, Trash2 } from 'lucide-react'
 import type { CanvasArtwork } from '../../canvas/canvas-store'
 import { imageDataUrl } from '../../canvas/image-result-utils'
+import { useLocalAssetSrc } from '../../lib/use-local-asset-src'
 import { Button, Card, EmptyState } from '../ui'
 import { TaskCard, type TaskCardStatus } from '../task'
 import { ImageCard } from './ImageCard'
@@ -22,6 +23,8 @@ type Props = {
   onRemove: (artwork: CanvasArtwork) => void
   /** 空态文案 key：真空态与「筛选无结果」可区分（默认真空态文案）。 */
   emptyKey?: string
+  /** 当前工作空间根（07-05 本地资产优先展示；缺省回退远程/内存 src）。 */
+  workspaceRoot?: string
   t: TFn
 }
 
@@ -107,6 +110,7 @@ export function ArtworkGrid({
   onRegenerate,
   onRemove,
   emptyKey = 'canvasArtworksEmpty',
+  workspaceRoot,
   t
 }: Props): ReactElement {
   if (artworks.length === 0) {
@@ -193,11 +197,69 @@ export function ArtworkGrid({
           )
         }
 
-        // success：ImageCard 焦点块
-        const src = artwork.image ? imageDataUrl(artwork.image) : null
+        // success：ImageCard 焦点块（本地资产优先，见 SuccessArtworkCard）
         return (
-          <ImageCard
+          <SuccessArtworkCard
             key={artwork.id}
+            artwork={artwork}
+            meta={meta}
+            selected={selected}
+            selectMode={selectMode}
+            busy={busy}
+            workspaceRoot={workspaceRoot}
+            onToggleSelected={onToggleSelected}
+            onView={onView}
+            onCopyPrompt={onCopyPrompt}
+            onDownload={onDownload}
+            onRegenerate={onRegenerate}
+            onRemove={onRemove}
+            t={t}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * success 作品卡（07-05 抽出为组件以使用 hook）：本地落盘文件优先展示，
+ * 本地缺失回退远程/内存 src；两者皆无（文件被手动删除且无远程回退）时
+ * ImageCard 走其自身的空 src 占位，不崩溃。
+ */
+function SuccessArtworkCard({
+  artwork,
+  meta,
+  selected,
+  selectMode,
+  busy,
+  workspaceRoot,
+  onToggleSelected,
+  onView,
+  onCopyPrompt,
+  onDownload,
+  onRegenerate,
+  onRemove,
+  t
+}: {
+  artwork: CanvasArtwork
+  meta: string[]
+  selected: boolean
+  selectMode: boolean
+  busy: boolean
+  workspaceRoot?: string
+  onToggleSelected: (id: string) => void
+  onView: (artwork: CanvasArtwork) => void
+  onCopyPrompt: (artwork: CanvasArtwork) => void
+  onDownload: (artwork: CanvasArtwork) => void
+  onRegenerate: (artwork: CanvasArtwork) => void
+  onRemove: (artwork: CanvasArtwork) => void
+  t: TFn
+}): ReactElement {
+  const fallbackSrc = artwork.image ? imageDataUrl(artwork.image) : null
+  const src = useLocalAssetSrc(workspaceRoot, artwork.localPath, fallbackSrc) || null
+  const missingLocal = Boolean(artwork.localPath) && !src
+  return (
+          <ImageCard
             data-testid="artwork-card"
             data-status={artwork.status}
             src={src}
@@ -220,7 +282,7 @@ export function ArtworkGrid({
                   data-testid="artwork-status-badge"
                   className="absolute left-1.5 top-1.5 rounded-[var(--radius-sm)] bg-ds-card px-1.5 py-0.5 text-[10.5px] font-medium text-ds-success"
                 >
-                  {t(`canvasStatus_${artwork.status}`)}
+                  {missingLocal ? t('canvasAssetMissing') : t(`canvasStatus_${artwork.status}`)}
                 </span>
                 {selectMode ? <SelectBox selected={selected} /> : null}
               </>
@@ -267,8 +329,5 @@ export function ArtworkGrid({
               </>
             }
           />
-        )
-      })}
-    </div>
   )
 }

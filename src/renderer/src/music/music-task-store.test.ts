@@ -14,6 +14,10 @@ import {
   MUSIC_POLL_INTERVAL_MS,
   MUSIC_POLL_FAILURE_LIMIT,
   MUSIC_TASKS_STORAGE_KEY,
+  diskRecordsToSongAssets,
+  diskRecordsToTasks,
+  mergeDiskTasks,
+  type DiskMusicRecord,
   type MusicGenTask
 } from './music-task-store'
 
@@ -233,5 +237,69 @@ describe('本地持久化', () => {
     store[MUSIC_TASKS_STORAGE_KEY] = JSON.stringify({ tasks })
     const restored = loadPersistedTasks()
     expect(restored[0].status).toBe('failure')
+  })
+})
+
+// —— 07-05 磁盘持久化恢复 ——
+
+function diskMusicRecord(id: string, overrides: Partial<DiskMusicRecord> = {}): DiskMusicRecord {
+  return {
+    id,
+    taskId: `task-${id}`,
+    status: 'completed',
+    title: `歌曲${id}`,
+    createdAt: '2026-07-03T00:00:00.000Z',
+    localAudioPath: `assets/music/${id}.mp3`,
+    localCoverPath: `assets/covers/${id}.jpg`,
+    remoteAudioUrl: `https://cdn/${id}.mp3`,
+    ...overrides
+  }
+}
+
+describe('磁盘持久化恢复（07-05）', () => {
+  it('diskRecordsToTasks：同 taskId 的歌聚成一个 success 任务；pending 记录不恢复', () => {
+    const tasks = diskRecordsToTasks([
+      diskMusicRecord('a1', { taskId: 'T1' }),
+      diskMusicRecord('a2', { taskId: 'T1' }),
+      diskMusicRecord('wip', { status: 'pending' })
+    ])
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0].taskId).toBe('T1')
+    expect(tasks[0].status).toBe('success')
+    expect(tasks[0].songs.map((s) => s.id)).toEqual(['a1', 'a2'])
+  })
+
+  it('diskRecordsToSongAssets：本地路径与缺失标注映射到 song.id', () => {
+    const assets = diskRecordsToSongAssets([
+      diskMusicRecord('a', { audioMissing: true }),
+      diskMusicRecord('b', { localAudioPath: undefined, localCoverPath: undefined })
+    ])
+    expect(assets['a']).toMatchObject({ localAudioPath: 'assets/music/a.mp3', audioMissing: true })
+    expect(assets['b']).toBeUndefined()
+  })
+
+  it('mergeDiskTasks：内存任务优先去重；旧 disk- 前缀任务先移除（切工作空间只留当前空间）', () => {
+    const memory: MusicGenTask = {
+      id: 'mem1', taskId: 'T1', status: 'success', createdAt: 2, title: 'mem',
+      params: payload(), songs: [song('a1')]
+    }
+    const oldDisk: MusicGenTask = {
+      id: 'disk-OLD', taskId: 'OLD', status: 'success', createdAt: 1, title: 'old',
+      params: payload(), songs: [song('z9')]
+    }
+    const merged = mergeDiskTasks([memory, oldDisk], diskRecordsToTasks([
+      diskMusicRecord('a1', { taskId: 'T1' }), // 与内存重复 → 不加
+      diskMusicRecord('b1', { taskId: 'T2' })
+    ]))
+    expect(merged.map((t) => t.id).sort()).toEqual(['disk-T2', 'mem1'])
+  })
+
+  it('hydrateFromDisk / attachSongAsset actions：任务并入 + songAssets 重建/回写', () => {
+    const store = createMusicTaskStore()
+    store.getState().hydrateFromDisk([diskMusicRecord('a1', { taskId: 'T1' })])
+    expect(store.getState().tasks.map((t) => t.id)).toEqual(['disk-T1'])
+    expect(store.getState().songAssets['a1']?.localAudioPath).toBe('assets/music/a1.mp3')
+    store.getState().attachSongAsset('fresh', { localAudioPath: 'assets/music/fresh.mp3' })
+    expect(store.getState().songAssets['fresh']?.localAudioPath).toBe('assets/music/fresh.mp3')
   })
 })

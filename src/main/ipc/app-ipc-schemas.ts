@@ -809,6 +809,91 @@ export const claude360CanvasEditPayloadSchema = z
   })
   .strict()
 
+// 生图/音乐资产本地持久化 IPC payload（07-05 media-assets-persistence）。
+// record 元数据字段宽松校验（展示态字符串），路径安全由 service 层强制
+// （assets/ 前缀 + 边界校验）；base64 体量沿用 canvas 编辑上限。
+const MAX_ASSET_PATH = 1_024
+const MAX_ASSET_TEXT = 8_000
+const mediaAssetIdSchema = z.string().trim().min(1).max(200)
+
+const mediaImageRecordSchema = z
+  .object({
+    id: mediaAssetIdSchema,
+    prompt: z.string().max(MAX_CANVAS_PROMPT),
+    model: z.string().trim().max(MAX_MODEL_ID_LENGTH),
+    group: z.string().trim().max(200).optional(),
+    size: z.string().trim().max(32).optional(),
+    quality: z.string().trim().max(32).optional(),
+    format: z.string().trim().max(16).optional(),
+    createdAt: z.string().trim().max(64),
+    mimeType: z.string().trim().max(128).optional(),
+    remoteUrl: z.string().trim().max(4096).optional()
+  })
+  .strict()
+
+const mediaMusicRecordSchema = z
+  .object({
+    id: mediaAssetIdSchema,
+    taskId: z.string().trim().max(256).optional(),
+    title: z.string().max(MAX_MUSIC_TITLE),
+    lyrics: z.string().max(MAX_ASSET_TEXT).optional(),
+    prompt: z.string().max(MAX_MUSIC_PROMPT).optional(),
+    model: z.string().trim().max(64).optional(),
+    duration: z.number().min(0).optional(),
+    tags: z.string().max(MAX_MUSIC_TAGS).optional(),
+    createdAt: z.string().trim().max(64),
+    remoteAudioUrl: z.string().trim().max(4096).optional(),
+    remoteCoverUrl: z.string().trim().max(4096).optional()
+  })
+  .strict()
+
+export const mediaAssetsSaveImagePayloadSchema = z
+  .object({
+    workspaceRoot: trimmedString(MAX_ASSET_PATH),
+    record: mediaImageRecordSchema,
+    source: z.union([
+      z.object({ url: trimmedString(4096) }).strict(),
+      z
+        .object({
+          b64: z.string().trim().min(1).max(MAX_CANVAS_IMAGE_CHARS),
+          mimeType: trimmedString(128)
+        })
+        .strict()
+    ])
+  })
+  .strict()
+
+export const mediaAssetsSaveMusicPayloadSchema = z
+  .object({
+    workspaceRoot: trimmedString(MAX_ASSET_PATH),
+    record: mediaMusicRecordSchema,
+    audioUrl: trimmedString(4096),
+    coverUrl: z.string().trim().min(1).max(4096).optional()
+  })
+  .strict()
+
+export const mediaAssetsListPayloadSchema = z
+  .object({
+    workspaceRoot: trimmedString(MAX_ASSET_PATH)
+  })
+  .strict()
+
+export const mediaAssetsReadBlobPayloadSchema = z
+  .object({
+    workspaceRoot: trimmedString(MAX_ASSET_PATH),
+    relativePath: trimmedString(MAX_ASSET_PATH)
+  })
+  .strict()
+
+export const mediaAssetsDeletePayloadSchema = z
+  .object({
+    workspaceRoot: trimmedString(MAX_ASSET_PATH),
+    kind: z.enum(['image', 'music']),
+    ids: z.array(mediaAssetIdSchema).min(1).max(500),
+    deleteFiles: z.boolean().optional()
+  })
+  .strict()
+
 // Claude360 通用文本流式 chat（AI 写词助手）：model 必填，system/user 由渲染侧 buildLyricsPrompt 组装。
 const MAX_CHAT_MESSAGE = 8_000
 export const claude360ChatStreamStartPayloadSchema = z

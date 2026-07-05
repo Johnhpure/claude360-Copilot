@@ -16,6 +16,11 @@ import type {
   Claude360Song
 } from '@shared/claude360-music'
 import type { Claude360TokenListItem } from '@shared/claude360'
+import type {
+  MediaAssetsListResult,
+  MediaAssetsSaveMusicPayload,
+  MediaAssetsSaveMusicResult
+} from '@shared/media-assets'
 import type { WorkspaceFileSaveAsPayload, WorkspaceFileSaveAsResult } from '@shared/workspace-file'
 import type { MusicTasksState } from './music-task-store'
 import { buildSubmitPayload, validateForm } from './suno-params'
@@ -28,6 +33,12 @@ export type MusicWorkbenchApi = {
   claude360MusicMediaProbe?: (url: string) => Promise<Claude360MusicMediaProbeResult>
   saveWorkspaceFileAs?: (payload: WorkspaceFileSaveAsPayload) => Promise<WorkspaceFileSaveAsResult>
   claude360TokensList: () => Promise<Claude360TokenListItem[]>
+}
+
+/** 07-05 资产持久化需要的 kunGui 子集。 */
+export type MusicPersistenceApi = {
+  mediaAssetsSaveMusic: (payload: MediaAssetsSaveMusicPayload) => Promise<MediaAssetsSaveMusicResult>
+  mediaAssetsList: (payload: { workspaceRoot: string }) => Promise<MediaAssetsListResult>
 }
 
 let seq = 0
@@ -78,7 +89,9 @@ export async function submitMusic(
 export async function pollActiveTasksOnce(
   api: Pick<MusicWorkbenchApi, 'claude360MusicFetch'>,
   store: Pick<MusicTasksState, 'applyFetched'>,
-  activeTaskIds: string[]
+  activeTaskIds: string[],
+  /** 07-05：本轮解析出的 success 任务回调（组件层用于触发本地落盘）。 */
+  onCompleted?: (completed: { taskId: string; songs: Claude360Song[] }[]) => void
 ): Promise<void> {
   if (activeTaskIds.length === 0) return
   const settled = await Promise.all(
@@ -94,7 +107,90 @@ export async function pollActiveTasksOnce(
   const resolved = settled.filter((t): t is NonNullable<typeof t> => t !== null)
   // 即使本轮全部为网络错误也调用 applyFetched：store 只对“有 taskId 却未在结果里”的
   // 任务累加 miss。但网络错误不应累加 miss —— 故仅在拿到 >=1 条结果时才归约。
-  if (resolved.length > 0) store.applyFetched(resolved)
+  if (resolved.length > 0) {
+    store.applyFetched(resolved)
+    const completed = resolved
+      .filter((task) => task.status === 'success' && task.songs.length > 0)
+      .map((task) => ({ taskId: task.taskId, songs: task.songs }))
+    if (completed.length > 0) onCompleted?.(completed)
+  }
+}
+
+// —— 07-05 本地持久化编排 ——
+
+/**
+ * 任务成功后把每首歌静默落盘（音频 + 封面）到工作空间 assets/：
+ * main 代下载；成功回写 songAssets。单曲失败只记 console，不打断其余歌曲。
+ * 音频下载窗口可达数十秒，期间用户可能已删歌：落盘完成后经 opts.isRemoved 复查，
+ * 已删则调 opts.cleanupRemoved 反删磁盘记录（审查 Important 3）。
+ */
+export async function persistCompletedSongs(
+  api: Pick<MusicPersistenceApi, 'mediaAssetsSaveMusic'>,
+  store: Pick<MusicTasksState, 'attachSongAsset'>,
+  workspaceRoot: string,
+  completed: { taskId: string; songs: Claude360Song[] }[],
+  meta: { model?: string; prompt?: string } = {},
+  opts: {
+    isRemoved?: (songId: string) => boolean
+    cleanupRemoved?: (songId: string) => void
+  } = {}
+): Promise<void> {
+  const root = workspaceRoot.trim()
+  if (!root) return
+  await Promise.all(
+    completed.flatMap(({ taskId, songs }) =>
+      songs.map(async (song) => {
+        const audioUrl = song.audioUrl?.trim()
+        if (!audioUrl) return
+        try {
+          const result = await api.mediaAssetsSaveMusic({
+            workspaceRoot: root,
+            record: {
+              id: song.id,
+              taskId,
+              title: song.title || '未命名',
+              createdAt: new Date().toISOString(),
+              ...(song.text ? { lyrics: song.text } : {}),
+              ...(meta.prompt ? { prompt: meta.prompt } : {}),
+              ...(song.modelName || meta.model ? { model: song.modelName || meta.model } : {}),
+              ...(song.duration !== undefined ? { duration: song.duration } : {}),
+              ...(song.tags ? { tags: song.tags } : {})
+            },
+            audioUrl,
+            ...(song.imageUrl?.trim() ? { coverUrl: song.imageUrl.trim() } : {})
+          })
+          if (opts.isRemoved?.(song.id)) {
+            opts.cleanupRemoved?.(song.id)
+            return
+          }
+          if (result.ok && (result.record.localAudioPath || result.record.localCoverPath)) {
+            store.attachSongAsset(song.id, {
+              ...(result.record.localAudioPath ? { localAudioPath: result.record.localAudioPath } : {}),
+              ...(result.record.localCoverPath ? { localCoverPath: result.record.localCoverPath } : {})
+            })
+          }
+        } catch (error) {
+          console.warn('[media-assets] 歌曲落盘失败（不影响播放）:', error)
+        }
+      })
+    )
+  )
+}
+
+/** 启动 / 切换工作空间时从磁盘恢复音乐任务列表与本地资产映射（失败静默）。 */
+export async function hydrateMusicFromDisk(
+  api: Pick<MusicPersistenceApi, 'mediaAssetsList'>,
+  store: Pick<MusicTasksState, 'hydrateFromDisk'>,
+  workspaceRoot: string
+): Promise<void> {
+  const root = workspaceRoot.trim()
+  if (!root) return
+  try {
+    const result = await api.mediaAssetsList({ workspaceRoot: root })
+    if (result.ok) store.hydrateFromDisk(result.music)
+  } catch (error) {
+    console.warn('[media-assets] 音乐资产恢复失败:', error)
+  }
 }
 
 // —— 下载（主进程链路：media-blob 代取鉴权音频 → file:save-as 保存对话框）——

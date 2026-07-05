@@ -69,6 +69,12 @@ export type CanvasArtwork = {
   /** status='failed' 时的错误信息。 */
   error?: string
   createdAt: string
+  /** 07-05 持久化：相对 workspace 的本地文件路径（assets/images/...）。 */
+  localPath?: string
+  /** 本地文件缺失（listAssets 扫描标注；UI 显示缺失态并回退远程 url）。 */
+  fileMissing?: boolean
+  /** 来自磁盘 metadata 恢复的条目（切换工作空间时按此清理，含仅剩远程回退的记录）。 */
+  diskOrigin?: boolean
 }
 
 export interface CanvasState {
@@ -118,6 +124,11 @@ export interface CanvasState {
   toggleSelectMode: () => void
   toggleSelected: (id: string) => void
   clearError: () => void
+  // actions —— 07-05 本地持久化
+  /** 磁盘资产记录并入作品列表（启动 / 切工作空间时调用）。 */
+  hydrateFromDisk: (records: DiskImageRecord[]) => void
+  /** 落盘成功后回写本地路径（清除缺失标记）。 */
+  attachLocalArtifact: (id: string, localPath: string) => void
 }
 
 let artworkSeq = 0
@@ -205,7 +216,7 @@ function isUsableImage(image: unknown): image is Claude360CanvasImage {
   return Boolean(img.url) || Boolean(img.b64Json)
 }
 
-/** 从持久化恢复时过滤坏条目：仅保留带可用图片的 success 作品。 */
+/** 从持久化恢复时过滤坏条目：保留带可用图片、或有本地文件路径的 success 作品。 */
 export function sanitizeRehydratedArtworks(artworks: unknown): CanvasArtwork[] {
   if (!Array.isArray(artworks)) return []
   const usable: CanvasArtwork[] = []
@@ -213,18 +224,20 @@ export function sanitizeRehydratedArtworks(artworks: unknown): CanvasArtwork[] {
     if (!item || typeof item !== 'object') continue
     const artwork = item as Partial<CanvasArtwork>
     if (typeof artwork.id !== 'string' || artwork.status !== 'success') continue
-    if (!isUsableImage(artwork.image)) continue
+    const hasLocalPath = typeof artwork.localPath === 'string' && artwork.localPath.length > 0
+    if (!isUsableImage(artwork.image) && !hasLocalPath) continue
     usable.push({
       id: artwork.id,
       status: 'success',
-      image: artwork.image,
+      ...(artwork.image && typeof artwork.image === 'object' ? { image: artwork.image as Claude360CanvasImage } : {}),
       prompt: typeof artwork.prompt === 'string' ? artwork.prompt : '',
       model: typeof artwork.model === 'string' ? artwork.model : '',
       size: typeof artwork.size === 'string' ? artwork.size : '',
       quality: typeof artwork.quality === 'string' ? artwork.quality : '',
       outputFormat: typeof artwork.outputFormat === 'string' ? artwork.outputFormat : '',
       n: 1,
-      createdAt: typeof artwork.createdAt === 'string' ? artwork.createdAt : ''
+      createdAt: typeof artwork.createdAt === 'string' ? artwork.createdAt : '',
+      ...(hasLocalPath ? { localPath: artwork.localPath } : {})
     })
   }
   return usable.slice(0, CANVAS_HISTORY_LIMIT)
@@ -251,6 +264,91 @@ export function serializeArtworksForPersist(artworks: CanvasArtwork[]): CanvasAr
       }
       return artwork
     })
+}
+
+// —— 07-05 磁盘持久化恢复：workspace assets 记录 ↔ 作品条目 ——
+
+/** listAssets 返回的图片记录最小结构（避免 renderer 依赖 main 侧类型细节）。 */
+export type DiskImageRecord = {
+  id: string
+  status: 'pending' | 'completed' | 'failed'
+  prompt: string
+  model: string
+  size?: string
+  quality?: string
+  format?: string
+  createdAt: string
+  localPath?: string
+  mimeType?: string
+  remoteUrl?: string
+  fileMissing?: boolean
+}
+
+/** 磁盘记录 → success 作品条目（completed / 有远程回退的 failed 均可展示）。 */
+export function diskRecordToArtwork(record: DiskImageRecord): CanvasArtwork | null {
+  const hasLocal = Boolean(record.localPath) && !record.fileMissing
+  const hasRemote = Boolean(record.remoteUrl)
+  if (!hasLocal && !hasRemote && !record.localPath) return null
+  return {
+    id: record.id,
+    status: 'success',
+    image: {
+      id: record.id,
+      source: 'url',
+      ...(record.remoteUrl ? { url: record.remoteUrl } : {}),
+      mimeType: record.mimeType ?? 'image/png',
+      prompt: record.prompt,
+      model: record.model,
+      createdAt: record.createdAt
+    },
+    prompt: record.prompt,
+    model: record.model,
+    size: record.size ?? '',
+    quality: record.quality ?? '',
+    outputFormat: record.format ?? '',
+    n: 1,
+    createdAt: record.createdAt,
+    diskOrigin: true,
+    ...(record.localPath ? { localPath: record.localPath } : {}),
+    ...(record.fileMissing ? { fileMissing: true } : {})
+  }
+}
+
+/**
+ * 磁盘记录并入现有作品列表：id 重合时保留内存条目（运行态较新）并补 localPath /
+ * fileMissing；新增条目按 createdAt 倒序插入。pending 占位不受影响。
+ * 磁盘来源条目（localPath / diskOrigin）若不在本次记录集中，即属于其他工作空间 →
+ * 移除（切换工作空间时只显示当前空间资产）。
+ */
+export function mergeDiskRecords(artworks: CanvasArtwork[], records: DiskImageRecord[]): CanvasArtwork[] {
+  const byId = new Map(records.map((record) => [record.id, record]))
+  const merged: CanvasArtwork[] = []
+  for (const artwork of artworks) {
+    const record = byId.get(artwork.id)
+    if (!record) {
+      // 其他工作空间落盘/恢复的条目：切换后不再展示；纯内存/localStorage 条目保留。
+      if (artwork.localPath || artwork.diskOrigin) continue
+      merged.push(artwork)
+      continue
+    }
+    byId.delete(artwork.id)
+    merged.push({
+      ...artwork,
+      ...(record.localPath ? { localPath: record.localPath } : {}),
+      ...(record.fileMissing ? { fileMissing: true } : { fileMissing: undefined })
+    })
+  }
+  const additions: CanvasArtwork[] = []
+  for (const record of byId.values()) {
+    if (record.status === 'pending') continue
+    const artwork = diskRecordToArtwork(record)
+    if (artwork) additions.push(artwork)
+  }
+  const existingKeys = new Set(merged.map((artwork) => artwork.id))
+  const fresh = additions.filter((artwork) => !existingKeys.has(artwork.id))
+  return [...merged, ...fresh]
+    .sort((a, b) => (a.status === 'pending' ? -1 : b.status === 'pending' ? 1 : b.createdAt.localeCompare(a.createdAt)))
+    .slice(0, CANVAS_HISTORY_LIMIT)
 }
 
 /** 旧版纯图片历史（Claude360CanvasImage[]）→ success 作品条目（一次性迁移读取）。 */
@@ -425,7 +523,14 @@ export function createCanvasStore(
         }
         return { selectedIds: { ...s.selectedIds, [id]: true } }
       }),
-    clearError: () => set({ error: null })
+    clearError: () => set({ error: null }),
+    hydrateFromDisk: (records) => set((s) => ({ artworks: mergeDiskRecords(s.artworks, records) })),
+    attachLocalArtifact: (id, localPath) =>
+      set((s) => ({
+        artworks: s.artworks.map((artwork) =>
+          artwork.id === id ? { ...artwork, localPath, fileMissing: undefined } : artwork
+        )
+      }))
   }))
 
   if (shouldPersist) {
