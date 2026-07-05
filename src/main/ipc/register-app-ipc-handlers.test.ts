@@ -649,6 +649,47 @@ describe('claude360 token/model/billing IPC handlers', () => {
     expect(restartRuntime).toHaveBeenCalledTimes(1)
   })
 
+  it('authoritatives lossy group names via profile-id reconstruction (GLM5.2-style groups)', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const current = settings()
+    // 分组名含空格：normalizeModelProviderId 把空格替换为 '-'，renderer 反解出的
+    // "glm-5.2" 与 profile.name "GLM 5.2" 大小写不敏感比较也不同 → 必须走 id 重构兜底。
+    current.provider.providers = [
+      {
+        id: 'claude360-glm-5.2',
+        name: 'GLM 5.2',
+        kind: 'http',
+        apiKey: '',
+        baseUrl: 'https://claude360.xyz/v1',
+        endpointFormat: 'chat_completions',
+        models: ['glm-5.2'],
+        modelProfiles: {}
+      }
+    ]
+    const store = { load: vi.fn(async () => current) }
+    const ensureGroupToken = vi.fn(async () => ({
+      tokenId: 7,
+      name: 'Claude360 Copilot / text',
+      group: 'GLM 5.2',
+      secretUpdated: true,
+      tokenCreated: true
+    }))
+
+    registerAppIpcHandlers(
+      registerOptions({
+        store: store as never,
+        restartRuntime: vi.fn(async () => undefined),
+        claude360TokenService: { listTokens: vi.fn(), ensureGroupToken, createToken: vi.fn(), revealToken: vi.fn() } as never
+      })
+    )
+
+    const handler = handlers.get('claude360:tokens:ensure')
+    await handler?.({}, { group: 'glm-5.2', purpose: 'text' })
+
+    // 必须以 profile.name（服务端原始分组名）调 ensure，否则后端「分组不可用」拒绝。
+    expect(ensureGroupToken).toHaveBeenCalledWith('GLM 5.2', 'text')
+  })
+
   it('models:refresh persists provider profiles and model cache', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const applySettingsPatch = vi.fn(async (_patch: unknown) => settings())

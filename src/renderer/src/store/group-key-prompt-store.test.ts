@@ -12,6 +12,7 @@ function resetStore(): void {
     purpose: 'text',
     submitting: false,
     succeeded: false,
+    error: null,
     resolve: null
   })
 }
@@ -53,7 +54,34 @@ describe('useGroupKeyPromptStore', () => {
     expect(s.resolve).toBeNull()
   })
 
-  it('confirm 失败（ensure 抛错）：resolve(false) 且不进成功态', async () => {
+  it('confirm 失败（ensure 抛错）：模态保持打开并展示真实原因，promise 不结算；取消后才 resolve(false)', async () => {
+    const ensure = vi.fn(
+      async (_p: EnsurePayload): Promise<{ tokenId: number; name: string; group: string }> => {
+        throw new Error('分组不可用')
+      }
+    )
+    vi.stubGlobal('window', { kunGui: { claude360TokensEnsure: ensure } })
+
+    const pending = useGroupKeyPromptStore.getState().open('vip')
+    await useGroupKeyPromptStore.getState().confirm()
+
+    // 失败不得静默关闭弹窗（否则「点创建→无提示→再弹创建」死循环）。
+    const s = useGroupKeyPromptStore.getState()
+    expect(s.group).toBe('vip')
+    expect(s.succeeded).toBe(false)
+    expect(s.submitting).toBe(false)
+    expect(s.error).toBeTruthy()
+    expect(s.resolve).not.toBeNull()
+
+    // 重试：再次 confirm 前清空 error；本次成功则续跑。
+    ensure.mockImplementationOnce(async () => ({ tokenId: 9, name: 'k', group: 'vip' }))
+    await useGroupKeyPromptStore.getState().confirm()
+    await expect(pending).resolves.toBe(true)
+    expect(useGroupKeyPromptStore.getState().error).toBeNull()
+    expect(useGroupKeyPromptStore.getState().succeeded).toBe(true)
+  })
+
+  it('confirm 失败后取消：resolve(false) 且状态全清', async () => {
     const ensure = vi.fn(async () => {
       throw new Error('network')
     })
@@ -61,11 +89,12 @@ describe('useGroupKeyPromptStore', () => {
 
     const pending = useGroupKeyPromptStore.getState().open('vip')
     await useGroupKeyPromptStore.getState().confirm()
+    useGroupKeyPromptStore.getState().cancel()
 
     await expect(pending).resolves.toBe(false)
     const s = useGroupKeyPromptStore.getState()
     expect(s.group).toBeNull()
-    expect(s.succeeded).toBe(false)
+    expect(s.error).toBeNull()
   })
 
   it('preload 缺 ensure API：confirm 直接 resolve(false)', async () => {

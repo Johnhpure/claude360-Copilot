@@ -130,6 +130,7 @@ import type { JsonSettingsStore } from '../settings-store'
 import {
   isClaude360ProviderId,
   mergeClaude360ProviderProfiles,
+  normalizeModelProviderId,
   resolveClaude360SelectedGroup
 } from '../../shared/app-settings-provider'
 import type { ModelProviderProfileV1 } from '../../shared/app-settings-types'
@@ -680,16 +681,31 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     // 或建成后回填不中导致弹窗反复出现。
     const loaded = await store.load()
     const preProviders = (loaded.provider?.providers as ModelProviderProfileV1[] | undefined) ?? []
-    const authoritativeGroup =
-      preProviders.find((p) => isClaude360ProviderId(p.id) && sameClaude360Group(p.name, req.group))
-        ?.name ?? req.group
+    // ① name 大小写不敏感匹配（常规路径）。
+    const byName = preProviders.find(
+      (p) => isClaude360ProviderId(p.id) && sameClaude360Group(p.name, req.group)
+    )
+    // ② id 重构归一化精确匹配（lossless 兜底）：req.group 反解自归一化 profile id，
+    // 分组名含空格/中文等被 normalizeModelProviderId 替换的字符时 ① 必然失配
+    // （如 "GLM 5.2"→id "claude360-glm-5.2"→反解 "glm-5.2"≠"glm 5.2"）；此时用
+    // req.group 重构 id 与存盘 id 比对可无损定位 profile，再取其 name（服务端原始
+    // 分组名）创建/查重，否则拿错误形态调后端会被「分组不可用」拒绝并陷入弹窗循环。
+    const byId = byName
+      ? undefined
+      : preProviders.find(
+          (p) =>
+            isClaude360ProviderId(p.id) &&
+            normalizeModelProviderId(p.id) === normalizeModelProviderId(`claude360:${req.group}`)
+        )
+    const authoritativeGroup = byName?.name ?? byId?.name ?? req.group
     if (authoritativeGroup === req.group && preProviders.length === 0) {
       console.warn(
         `[kun-gui] tokens:ensure: providers 为空，无法权威化分组名，按 renderer 原样使用 "${req.group}"`
       )
     }
     console.info(
-      `[kun-gui] tokens:ensure group="${req.group}" → authoritative="${authoritativeGroup}" purpose=${req.purpose}`
+      `[kun-gui] tokens:ensure group="${req.group}" → authoritative="${authoritativeGroup}"` +
+        `(via ${byName ? 'name' : byId ? 'id' : 'fallback'}) purpose=${req.purpose}`
     )
     const ref = await claude360TokenService.ensureGroupToken(authoritativeGroup, req.purpose)
     // 回填对应 claude360:<group> profile 的 apiKeyRef，令运行时（kun-process）能据

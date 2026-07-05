@@ -16,6 +16,7 @@ export function GroupKeyPromptModal(): ReactElement | null {
   const group = useGroupKeyPromptStore((s) => s.group)
   const submitting = useGroupKeyPromptStore((s) => s.submitting)
   const succeeded = useGroupKeyPromptStore((s) => s.succeeded)
+  const error = useGroupKeyPromptStore((s) => s.error)
   const confirm = useGroupKeyPromptStore((s) => s.confirm)
   const cancel = useGroupKeyPromptStore((s) => s.cancel)
   const reset = useGroupKeyPromptStore((s) => s.reset)
@@ -59,6 +60,11 @@ export function GroupKeyPromptModal(): ReactElement | null {
         <h2 className="text-[15px] font-semibold text-ds-ink">{t('groupKeyPromptTitle')}</h2>
       </div>
       <p className="mt-3 text-sm leading-relaxed text-ds-muted">{t('groupKeyPromptBody')}</p>
+      {error ? (
+        <p className="mt-3 text-sm leading-relaxed text-ds-danger" role="alert" data-testid="group-key-error">
+          {t('groupKeyPromptError', { message: error })}
+        </p>
+      ) : null}
       <div className="mt-5 flex justify-end gap-2.5">
         <Button variant="secondary" size="md" disabled={submitting} onClick={cancel}>
           {t('groupKeyPromptCancel')}
