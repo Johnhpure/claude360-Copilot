@@ -1,5 +1,6 @@
 import type { FormEvent, MouseEvent as ReactMouseEvent, ReactElement } from 'react'
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Archive,
@@ -26,6 +27,7 @@ import type { NormalizedThread } from '../../agent/types'
 import { rendererRuntimeClient } from '../../agent/runtime-client'
 import { useChatStore } from '../../store/chat-store'
 import { formatRelativeTime } from '../../lib/format-relative-time'
+import { formatRuntimeError } from '../../lib/format-runtime-error'
 import { workspaceLabelFromPath } from '../../lib/workspace-label'
 import { deleteSddDraft } from '../../sdd/sdd-draft-actions'
 import { listSddDraftHistory, type SddDraftHistoryItem } from '../../sdd/sdd-draft-history'
@@ -111,6 +113,8 @@ type SidebarActionDialogState = {
   confirmLabel: string
   danger?: boolean
   submitting: boolean
+  /** 确认操作失败时的错误文案（保持弹窗打开展示，而非静默关闭）。 */
+  error?: string
   onConfirm: () => Promise<void>
 }
 
@@ -122,6 +126,16 @@ export type RenameThreadDialogState = {
 
 const SDD_DRAFT_HISTORY_PAGE_SIZE = 3
 const SDD_DRAFT_HISTORY_LOAD_LIMIT = 40
+
+/**
+ * 全屏浮层 portal 到 body：侧栏 .ds-sidebar-shell 的 isolation:isolate 会产生独立
+ * 堆叠上下文，浮层留在侧栏子树内会被 DOM 后续的 main 整体盖住（只见蒙层不见卡片）。
+ * node 测试环境（renderToStaticMarkup 无 DOM）下退回原地渲染，保持可测。
+ */
+function portalToBody(node: ReactElement): ReactElement {
+  if (typeof document === 'undefined') return node
+  return createPortal(node, document.body) as unknown as ReactElement
+}
 
 export function resolveThreadPreviewPosition(
   anchor: ThreadPreviewAnchorRect,
@@ -621,12 +635,15 @@ export function SidebarProjectsSection({
   const submitActionDialog = async (): Promise<void> => {
     const dialog = actionDialog
     if (!dialog || dialog.submitting) return
-    setActionDialog((current) => current ? { ...current, submitting: true } : current)
+    setActionDialog((current) => current ? { ...current, submitting: true, error: undefined } : current)
     try {
       await dialog.onConfirm()
       setActionDialog(null)
-    } catch {
-      setActionDialog((current) => current ? { ...current, submitting: false } : current)
+    } catch (error) {
+      // 失败保持弹窗打开并展示真实原因，而非静默复位（用户否则无从得知删除失败）。
+      setActionDialog((current) =>
+        current ? { ...current, submitting: false, error: formatRuntimeError(error) } : current
+      )
     }
   }
 
@@ -1450,7 +1467,8 @@ export function ThreadRenameDialog({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [onClose, state.submitting])
 
-  return (
+  // Portal 到 body（原因见 portalToBody 注释）。
+  return portalToBody(
     <div
       role="dialog"
       aria-modal="true"
@@ -1654,7 +1672,8 @@ function SidebarActionDialog({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [onClose, state.submitting])
 
-  return (
+  // Portal 到 body（原因见 portalToBody 注释）。
+  return portalToBody(
     <div
       role="dialog"
       aria-modal="true"
@@ -1689,6 +1708,11 @@ function SidebarActionDialog({
         <p className="mt-4 rounded-2xl border border-ds-border-muted bg-ds-main px-3.5 py-3 text-[13px] leading-6 text-ds-muted">
           {state.detail}
         </p>
+        {state.error ? (
+          <p className="mt-3 text-[13px] leading-6 text-ds-danger" role="alert">
+            {t('sidebarActionDialogError', { message: state.error })}
+          </p>
+        ) : null}
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
