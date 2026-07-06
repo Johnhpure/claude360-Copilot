@@ -98,21 +98,13 @@ describe('audit-bundle 包归集与黑名单', () => {
     })
   })
 
-  it('nodeModulesDepth 区分顶层安装（==1）与嵌套安装（>=2）', () => {
-    expect(audit.nodeModulesDepth('node_modules/jimp')).toBe(1)
-    expect(audit.nodeModulesDepth('node_modules/@jimp/core')).toBe(1)
-    expect(audit.nodeModulesDepth('node_modules/@computer-use/nut-js/node_modules/jimp')).toBe(2)
-    expect(audit.nodeModulesDepth('kun/node_modules/foo/node_modules/@jimp/core')).toBe(2)
-  })
-
-  it('命中：超过 1MB 的黑名单实体（agent-sdk 三平台 / canvas 变体 / 顶层 jimp / 构建工具 / @rolldown binding）', () => {
+  it('命中：超过 1MB 的黑名单实体（agent-sdk 三平台 / canvas 变体 / 构建工具 / @rolldown binding）', () => {
     const packages = audit.aggregatePackages([
       { path: 'kun/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/cli', size: 200 * MB },
       { path: 'kun/node_modules/@anthropic-ai/claude-agent-sdk-win32-x64/cli.exe', size: 200 * MB },
       { path: 'kun/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/cli', size: 200 * MB },
       { path: 'node_modules/@napi-rs/canvas-linux-x64-gnu/canvas.node', size: 32 * MB },
       { path: 'node_modules/@napi-rs/canvas-linux-x64-musl/canvas.node', size: 28 * MB },
-      { path: 'node_modules/jimp/dist/index.js', size: 6 * MB },
       { path: 'node_modules/typescript/lib/typescript.js', size: 8 * MB },
       { path: 'node_modules/vite/dist/node/index.js', size: 2 * MB },
       { path: 'node_modules/vitest/dist/index.js', size: 2 * MB },
@@ -128,13 +120,12 @@ describe('audit-bundle 包归集与黑名单', () => {
       'build-tool-vite',
       'build-tool-vitest',
       'napi-rs-canvas',
-      'napi-rs-canvas',
-      'top-level-jimp-v1'
+      'napi-rs-canvas'
     ])
     expect(violations[0]).toMatchObject({ side: 'unpacked', bytes: 200 * MB })
   })
 
-  it('未命中：1MB 以下空壳、canvas 元包桩、嵌套 jimp@0.22 与正常依赖不报', () => {
+  it('未命中：1MB 以下空壳、canvas 元包桩、jimp 系（@computer-use/kun 合法依赖）与正常依赖不报', () => {
     const packages = audit.aggregatePackages([
       // files 排除规则掏空后的 typescript 空壳（design.md §1 实测 asar 内为 0-64K）
       { path: 'kun/node_modules/typescript/package.json', size: 3000 },
@@ -144,9 +135,13 @@ describe('audit-bundle 包归集与黑名单', () => {
       { path: 'node_modules/react/cjs/react.production.js', size: 5 * MB },
       // agent-sdk 的纯 JS 小包（非平台二进制）应保留
       { path: 'kun/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs', size: 3 * MB },
-      // @computer-use 链条的嵌套 jimp@0.22（node_modules 深度 >=2）是截图必需，不得误伤
+      // jimp 系是 @computer-use（截图）与 kun 的合法依赖：npm 可能把 @computer-use 的
+      // jimp@0.22 提升到顶层（CI #29 实测），产物层面无法与「直接依赖」区分，故不黑名单。
+      // 下面两条正是 CI #29 曾误报的场景，须验证不再命中。源头守护改由
+      // package.json「dependencies 不含 jimp」断言承担（见 packaging-config.test.ts）。
+      { path: 'node_modules/jimp/dist/index.js', size: 6 * MB },
       { path: 'node_modules/@computer-use/nut-js/node_modules/jimp/dist/index.js', size: 6 * MB },
-      { path: 'node_modules/@computer-use/shared/node_modules/@jimp/core/index.js', size: 2 * MB }
+      { path: 'kun/node_modules/@jimp/custom/index.js', size: 2 * MB }
     ])
     expect(audit.evaluateBlacklist(packages, 'asar')).toEqual([])
   })

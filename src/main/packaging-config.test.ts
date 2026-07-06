@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url)
 const builderConfig = require('../../electron-builder.config.cjs')
 const afterPack = require('../../scripts/after-pack.cjs')
 const macNotarize = require('../../scripts/mac-notarize.cjs')
+const rootPackageJson = require('../../package.json')
 
 const tempRoots: string[] = []
 
@@ -114,6 +115,13 @@ describe('electron-builder Claude360 Copilot packaging', () => {
     // 只保留简中/繁中/英文,裁掉其余 ~50 种 locale pak(~38M)。
     // 三平台通用:linux/win 过滤 locales/*.pak,mac 过滤 *.lproj。
     expect(builderConfig.electronLanguages).toEqual(['zh-CN', 'zh-TW', 'en-US', 'en-GB'])
+  })
+
+  it('保持 jimp 不在应用直接依赖中（Step 3 源头守护）', () => {
+    // jimp 会经 @computer-use/nut-js（0.22 截图，npm 可能提升到顶层）与 kun（1.6 自有
+    // 依赖）合法留在产物树，无法在产物层黑名单（会误报，见 CI #29）。改守护源头：应用
+    // 自身 dependencies 不得重新声明 Step 3 已移除的直接 jimp@1.6.1。
+    expect(rootPackageJson.dependencies).not.toHaveProperty('jimp')
   })
 
   it('points every platform icon at the Claude360 assets', () => {

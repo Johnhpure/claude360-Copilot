@@ -40,14 +40,8 @@ export const SIZE_FLOOR_BYTES = 1024 * 1024
 /** 总体积相对基线允许的最大膨胀比例（+10%）。 */
 export const BASELINE_DRIFT_RATIO = 0.1
 
-/** 包根路径的 node_modules 段计数：==1 为顶层安装，>=2 为嵌套安装。 */
-export function nodeModulesDepth(root) {
-  return root.split('/').filter((segment) => segment === 'node_modules').length
-}
-
 /**
- * 黑名单规则：match 接收 (name, root)。name 为 node_modules 下的一级实体
- * （scoped 含 scope 前缀）；root 为包根相对路径，用于区分顶层 vs 嵌套安装。
+ * 黑名单规则：match 接收包名（node_modules 下的一级实体，scoped 含 scope 前缀）。
  * Step 4 依赖重分类落地后，renderer-only 包名单会追加到这里。
  */
 export const BLACKLIST_RULES = [
@@ -62,16 +56,6 @@ export const BLACKLIST_RULES = [
     reason:
       'pdfjs-dist 的 canvas 渲染 optionalDependency；主进程只做 PDF 文本提取（getTextContent，' +
       '见 write-pdf-text-service.ts）不需要 canvas，已在 electron-builder.config.cjs 整体排除'
-  },
-  {
-    // 顶层 jimp@1.x 是历史残留（src 无引用），已从 dependencies 移除。此规则仅防其
-    // 经顶层安装回归：@computer-use 链条的嵌套 jimp@0.22（node_modules 深度 >=2）
-    // 是自动化截图必需，绝不能误伤，故用 node_modules 深度区分顶层 vs 嵌套。
-    id: 'top-level-jimp-v1',
-    match: (name, root) =>
-      (name === 'jimp' || name === '@jimp/core' || name === '@jimp/custom') &&
-      nodeModulesDepth(root) === 1,
-    reason: '顶层 jimp（v1 全源码）src 无引用，为历史残留，不得随包分发；@computer-use 嵌套 jimp@0.22 不受影响'
   },
   {
     id: 'build-tool-typescript',
