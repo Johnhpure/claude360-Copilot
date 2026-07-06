@@ -150,6 +150,42 @@ describe('audit-bundle 包归集与黑名单', () => {
     ])
     expect(audit.evaluateBlacklist(packages, 'asar')).toEqual([])
   })
+
+  it('命中：renderer-only 大库误入产物（Step 4 重分类回归守护）', () => {
+    const packages = audit.aggregatePackages([
+      { path: 'node_modules/lucide-react/dist/index.js', size: 40 * MB },
+      { path: 'node_modules/@xyflow/react/dist/index.js', size: 5 * MB },
+      { path: 'node_modules/shiki/dist/index.js', size: 3.5 * MB },
+      { path: 'node_modules/streamdown/dist/index.js', size: 2 * MB },
+      { path: 'node_modules/zustand/index.js', size: 2 * MB },
+      { path: 'node_modules/@codemirror/view/dist/index.js', size: 2 * MB },
+      { path: 'node_modules/@tiptap/core/dist/index.js', size: 2 * MB },
+      { path: 'node_modules/@xterm/xterm/lib/xterm.js', size: 2 * MB }
+    ])
+    const violations = audit.evaluateBlacklist(packages, 'asar')
+    expect(violations.every((v: { ruleId: string }) => v.ruleId === 'renderer-only-dependency')).toBe(
+      true
+    )
+    expect(violations.map((v: { path: string }) => v.path).sort()).toEqual([
+      'node_modules/@codemirror/view',
+      'node_modules/@tiptap/core',
+      'node_modules/@xterm/xterm',
+      'node_modules/@xyflow/react',
+      'node_modules/lucide-react',
+      'node_modules/shiki',
+      'node_modules/streamdown',
+      'node_modules/zustand'
+    ])
+  })
+
+  it('未命中：mermaid/katex/es-toolkit（streamdown 传递依赖）不进 renderer-only 名单，避免保留依赖传递引入时误报', () => {
+    const packages = audit.aggregatePackages([
+      { path: 'node_modules/mermaid/dist/mermaid.js', size: 20 * MB },
+      { path: 'node_modules/katex/dist/katex.js', size: 4 * MB },
+      { path: 'node_modules/es-toolkit/dist/index.js', size: 8 * MB }
+    ])
+    expect(audit.evaluateBlacklist(packages, 'asar')).toEqual([])
+  })
 })
 
 describe('audit-bundle 产物布局与基线', () => {

@@ -92,6 +92,34 @@ export const BLACKLIST_RULES = [
     id: 'build-tool-rolldown',
     match: (name) => name === 'rolldown' || name.startsWith('@rolldown/'),
     reason: '构建工具（含平台 binding）不应进入产物'
+  },
+  {
+    // renderer-only 大头库（Step 4 依赖重分类落地）：这些包只被 renderer 直接 import，
+    // electron-vite 已把它们 bundle 进 out/renderer，node_modules 副本纯冗余。移到
+    // devDependencies 后 electron-builder 不再收集其进 asar。此规则守护回归——防其
+    // 因误移回 dependencies 或被新增 prod 依赖传递引入而重新膨胀产物。
+    //
+    // 只列「确认不被任何保留 main/preload 生产依赖传递引用」的包（npm ls --omit=dev
+    // 均查无，见 design.md §3.2）。mermaid/katex/es-toolkit 是 streamdown 的传递依赖，
+    // streamdown 已一并 devDep，故它们在生产树也消失；但它们不进本名单——一旦未来某
+    // 保留 prod 依赖传递引入 katex（如 react-markdown 数学插件链），黑名单会误报，
+    // 宁可漏守也不误伤。这里只锁 renderer 直接依赖的顶层大库。
+    id: 'renderer-only-dependency',
+    match: (name) =>
+      name === '@xyflow/react' ||
+      name === 'lucide-react' ||
+      name === 'shiki' ||
+      name === 'streamdown' ||
+      name === 'qrcode.react' ||
+      name === 'react-i18next' ||
+      name === 'i18next' ||
+      name === 'zustand' ||
+      name.startsWith('@codemirror/') ||
+      name.startsWith('@tiptap/') ||
+      name.startsWith('@xterm/'),
+    reason:
+      'renderer-only 依赖（Step 4 重分类为 devDependencies）；electron-vite 已 bundle 进 ' +
+      'out/renderer，node_modules 副本不应随包分发'
   }
 ]
 
