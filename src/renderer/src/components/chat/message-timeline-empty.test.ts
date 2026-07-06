@@ -65,22 +65,21 @@ describe('MessageTimelineEmptyHero — runtime offline hero (issue #78)', () => 
     expect(html).toContain('Open Settings')
   })
 
-  it('plays the waking loading effects only while genuinely reconnecting', () => {
-    // Still probing: stage carries the is-waking modifier with the Zzz /
-    // sonar / caret decorations.
+  it('renders the animated text brand instead of a Logo image stage while offline/waking', () => {
+    // 需求二：启动/未就绪画面以动态文字品牌「Claude360 Copilot」(BrandHero) 取代原
+    // KunHeroStage 图片舞台。断言文字品牌出现、且旧图片舞台的唤醒动效不再渲染。
     const waking = renderOfflineHero(null)
-    expect(waking).toContain('is-waking')
-    expect(waking).toContain('ds-runtime-wake-zzz')
-    expect(waking).toContain('ds-runtime-wake-sonar')
-    expect(waking).toContain('ds-runtime-wake-caret')
+    expect(waking).toContain('brand-hero')
+    expect(waking).toContain('Copilot')
+    // 旧图片舞台（KunHeroStage）的唤醒动效 class 不应再出现
+    expect(waking).not.toContain('ds-runtime-wake-zzz')
+    expect(waking).not.toContain('ds-runtime-wake-sonar')
+    expect(waking).not.toContain('ds-runtime-wake-caret')
 
-    // Runtime error: same #78 principle as the title swap — an error state
-    // must not look like it is still loading, so the effects are dropped.
+    // 报错态：仍是文字品牌 + 明确错误标题（连接状态逻辑保留，不受影响）
     const errored = renderOfflineHero(i18n.t('common:runtimePortConflict'))
-    expect(errored).not.toContain('is-waking')
+    expect(errored).toContain('brand-hero')
     expect(errored).not.toContain('ds-runtime-wake-zzz')
-    expect(errored).not.toContain('ds-runtime-wake-sonar')
-    expect(errored).not.toContain('ds-runtime-wake-caret')
   })
 })
 

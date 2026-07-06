@@ -1,4 +1,4 @@
-import type { ChangeEvent, ReactElement } from 'react'
+import { useState, type ChangeEvent, type ReactElement } from 'react'
 import { Sparkles, RefreshCw, ImagePlus, X } from 'lucide-react'
 import {
   CLAUDE360_ASPECT_PRESETS,
@@ -122,8 +122,23 @@ export function ImagePromptPanel({
   t
 }: Props): ReactElement {
   const hasModels = imageModels.length > 0
-  const handlePrompt = (e: ChangeEvent<HTMLTextAreaElement>): void => onChangePrompt(e.target.value)
-  const promptMissing = hasModels && !prompt.trim()
+  // 校验时机：默认不判错，仅当用户点击「生成图片」提交后（attempted）才对空 prompt 判红；
+  // 用户开始输入有效内容即清除错误态。避免打开面板就显示红框。
+  const [attempted, setAttempted] = useState(false)
+  const promptEmpty = hasModels && !prompt.trim()
+  const promptMissing = attempted && promptEmpty
+  const handlePrompt = (e: ChangeEvent<HTMLTextAreaElement>): void => {
+    const value = e.target.value
+    if (attempted && value.trim()) setAttempted(false)
+    onChangePrompt(value)
+  }
+  const handleSubmit = (): void => {
+    if (promptEmpty) {
+      setAttempted(true)
+      return
+    }
+    onSubmit()
+  }
   const handleReferenceInput = (e: ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0]
     if (file) onPickReference(file)
@@ -332,7 +347,7 @@ export function ImagePromptPanel({
         variant="primary"
         size="lg"
         data-testid="image-generate-button"
-        onClick={onSubmit}
+        onClick={handleSubmit}
         disabled={!hasModels}
         loading={generating}
         className="w-full"
