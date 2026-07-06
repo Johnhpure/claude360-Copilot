@@ -96,6 +96,10 @@ module.exports = {
   appId: 'xyz.claude360.copilot',
   productName: 'Claude360 Copilot',
   asar: true,
+  // Electron 默认打包 54 种语言的 locale pak(~38M)。本应用 UI 以中文为主
+  // + i18next,只需简中/繁中/英文;裁掉其余 locale。此字段对三平台通用:
+  // linux/win 过滤 locales/*.pak,mac 过滤 *.lproj。
+  electronLanguages: ['zh-CN', 'zh-TW', 'en-US', 'en-GB'],
   asarUnpack: [
     '**/kun/dist/**/*',
     '**/kun/package*.json',

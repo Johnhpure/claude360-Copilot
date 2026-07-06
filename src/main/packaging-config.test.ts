@@ -110,6 +110,12 @@ describe('electron-builder Claude360 Copilot packaging', () => {
     expect(micUsage).toMatch(/Claude360 Copilot/)
   })
 
+  it('trims Electron locales to the shipped UI languages', () => {
+    // 只保留简中/繁中/英文,裁掉其余 ~50 种 locale pak(~38M)。
+    // 三平台通用:linux/win 过滤 locales/*.pak,mac 过滤 *.lproj。
+    expect(builderConfig.electronLanguages).toEqual(['zh-CN', 'zh-TW', 'en-US', 'en-GB'])
+  })
+
   it('points every platform icon at the Claude360 assets', () => {
     // 图标引用改指向 claude360 命名资源(当前为占位副本,待后续替换真实设计)。
     expect(builderConfig.win.icon).toBe('./build/icon-claude360.ico')
