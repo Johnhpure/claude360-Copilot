@@ -11,6 +11,7 @@
     "build:kun": "node ./scripts/ensure-kun-install.cjs && npm --prefix kun run build",
     "lint": "eslint . && npm run lint:tokens",
     "lint:tokens": "node ./scripts/check-design-tokens.mjs",
+    "audit:bundle": "node ./scripts/audit-bundle.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "dist": "npm run build && npx --yes electron-builder@26.8.1 --config electron-builder.config.cjs --publish never",

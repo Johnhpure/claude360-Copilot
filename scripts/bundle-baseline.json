@@ -1,0 +1,26 @@
+{
+  "$comment": "打包产物体积基线（apparent bytes = 常规文件 st_size 之和，不含符号链接，与 scripts/audit-bundle.mjs 遍历口径一致）。来源：dist/Claude360-Copilot-0.1.0-linux-x86_64.AppImage 经 unsquashfs 提取实测（dist/linux-unpacked 为中断残留、缺 resources/，不可用）。本文件为优化前基线，07-06-optimize-bundle-size 各 Step 落地后由人工刷新；audit-bundle.mjs 在 platform 匹配时以 totalUnpackedBytes +10% 为回归阈值。",
+  "generatedAt": "2026-07-07T00:00:00+08:00",
+  "platform": "linux",
+  "arch": "x64",
+  "appVersion": "0.1.0",
+  "appImageBytes": 291387949,
+  "asarBytes": 203738554,
+  "asarUnpackedBytes": 406143005,
+  "totalUnpackedBytes": 888444358,
+  "topEntries": [
+    { "side": "resources", "path": "app.asar.unpacked", "bytes": 406143005 },
+    { "side": "unpacked", "path": "kun/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64", "bytes": 240557445 },
+    { "side": "resources", "path": "app.asar", "bytes": 203738554 },
+    { "side": "unpacked", "path": "node_modules/@napi-rs/canvas-linux-x64-gnu", "bytes": 33393671 },
+    { "side": "unpacked", "path": "node_modules/@napi-rs/canvas-linux-x64-musl", "bytes": 29754785 },
+    { "side": "asar", "path": "node_modules/mermaid", "bytes": 23228383 },
+    { "side": "asar", "path": "node_modules/pdfjs-dist", "bytes": 16841022 },
+    { "side": "unpacked", "path": "node_modules/better-sqlite3", "bytes": 12281325 },
+    { "side": "asar", "path": "node_modules/@larksuiteoapi/node-sdk", "bytes": 9959105 },
+    { "side": "asar", "path": "node_modules/cytoscape-fcose", "bytes": 9302011 },
+    { "side": "asar", "path": "node_modules/@shikijs/langs", "bytes": 8041605 },
+    { "side": "asar", "path": "node_modules/react-dom", "bytes": 7318213 },
+    { "side": "resources", "path": "whisper", "bytes": 2926970 }
+  ]
+}
