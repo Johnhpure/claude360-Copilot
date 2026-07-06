@@ -131,6 +131,21 @@ jobs:
         if: ${{ !inputs.mac_sign }}
         run: npm run dist:mac:${{ matrix.arch }}
 
+      # 产物体积防回归守护：断言黑名单包（agent-sdk 平台二进制、@napi-rs/canvas、
+      # renderer-only 依赖等）未混入产物。审计不过则不出包（阻止 upload）。
+      # baseline 为 linux 口径，platform 不匹配时自动跳过体积对比，仅做黑名单断言。
+      - name: Audit bundle (size & blacklist guard)
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "=== dist tree ==="; ls -la dist || true
+          app_dir="$(find dist -maxdepth 2 -name '*.app' -type d | head -1)"
+          if [[ -z "$app_dir" ]]; then
+            echo "::error::未找到 .app 产物，无法审计"; exit 1
+          fi
+          echo "审计目标: $app_dir"
+          node scripts/audit-bundle.mjs "$app_dir"
+
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -173,6 +188,15 @@ jobs:
 
       - name: Build Windows installer (x64)
         run: npm run dist:win
+
+      # 产物体积防回归守护（同 macOS job 说明）。Windows 侧重点验证
+      # agent-sdk-win32-x64 平台二进制混入已被 afterPack 清除。
+      - name: Audit bundle (size & blacklist guard)
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "=== dist tree ==="; ls -la dist || true
+          node scripts/audit-bundle.mjs dist/win-unpacked
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
