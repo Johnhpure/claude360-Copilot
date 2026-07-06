@@ -174,6 +174,34 @@ describe('electron-builder Claude360 Copilot packaging', () => {
     })
   })
 
+  it('strips agent-sdk platform binaries that npm prune reinstalls into the unpacked kun', () => {
+    // `npm prune` reifies the kun lockfile, re-installing the platform-matched
+    // @anthropic-ai/claude-agent-sdk-* optional binary (~230MB) that the
+    // builder `files` exclusion already kept out. afterPack must strip every
+    // platform flavor again while keeping the pure-JS SDK packages.
+    const root = tempRoot()
+    const kunDir = join(root, 'kun')
+    const scopeDir = join(kunDir, 'node_modules/@anthropic-ai')
+    for (const packageName of [
+      'claude-agent-sdk',
+      'claude-agent-sdk-linux-x64',
+      'claude-agent-sdk-linux-x64-musl',
+      'claude-agent-sdk-win32-x64',
+      'claude-agent-sdk-darwin-arm64',
+      'sdk'
+    ]) {
+      touch(join(scopeDir, packageName, 'package.json'))
+    }
+
+    afterPack._internals.removeOnDemandAgentSdkBinaries(kunDir)
+
+    expect(readdirSync(scopeDir).sort()).toEqual(['claude-agent-sdk', 'sdk'])
+    // Missing @anthropic-ai scope must stay a no-op instead of throwing.
+    expect(() =>
+      afterPack._internals.removeOnDemandAgentSdkBinaries(join(root, 'missing-kun'))
+    ).not.toThrow()
+  })
+
   it('uses the rounded Claude360 icon for Windows installers and shortcuts', () => {
     // Windows ships a multi-size .ico (16/24/32/48/64/72/96/128/256) generated
     // from the rounded claude360_mac.png so Explorer/desktop render crisp small

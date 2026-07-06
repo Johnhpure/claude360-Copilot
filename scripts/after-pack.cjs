@@ -46,6 +46,27 @@ function npmCommand(args, platform = process.platform) {
   return { command: 'npm', args }
 }
 
+// `npm prune` (npm 7+) reifies node_modules to the lockfile's ideal tree, so it
+// RE-INSTALLS the platform-matched @anthropic-ai/claude-agent-sdk-* optional
+// binary (~230MB) that the electron-builder `files` exclusion already kept out
+// of the copied app (see electron-builder.config.cjs). Claude Code binaries are
+// downloaded on demand into the user-data dir (src/main/agent-sdk-installer.ts),
+// so strip them again right after pruning. Keep this name filter in sync with
+// the agent-sdk-platform-binary rule in scripts/audit-bundle.mjs.
+const AGENT_SDK_PLATFORM_BINARY_PATTERN = /^claude-agent-sdk-(linux|win32|darwin)-/
+
+function removeOnDemandAgentSdkBinaries(kunDir) {
+  const scopeDir = join(kunDir, 'node_modules', '@anthropic-ai')
+  if (!existsSync(scopeDir)) return
+  for (const entry of readdirSync(scopeDir)) {
+    if (!AGENT_SDK_PLATFORM_BINARY_PATTERN.test(entry)) continue
+    rmSync(join(scopeDir, entry), { recursive: true, force: true })
+    console.log(
+      `[after-pack] Removed Claude Code platform binary reinstalled by npm prune: @anthropic-ai/${entry}`
+    )
+  }
+}
+
 function prunePackedKunDependencies(context) {
   const root = unpackedAppRoot(context)
   const kunDir = join(root, 'kun')
@@ -64,6 +85,8 @@ function prunePackedKunDependencies(context) {
     },
     stdio: 'inherit'
   })
+
+  removeOnDemandAgentSdkBinaries(kunDir)
 
   // Keep native SQLite on the app root dependency so electron-builder's
   // native-module rebuild owns the target arch and Electron ABI.
@@ -144,6 +167,7 @@ exports._internals = {
   packedResourcesDir,
   unpackedAppRoot,
   npmCommand,
+  removeOnDemandAgentSdkBinaries,
   prunePackedKunDependencies,
   validateBundledKunRuntime,
   ensureNodePtyHelpersExecutable

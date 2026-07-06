@@ -120,9 +120,15 @@ module.exports = {
     'kun/package.json',
     'kun/package-lock.json',
     'kun/node_modules/**/*',
-    // The Agent SDK ships a ~222MB per-platform Claude Code binary as an optional
+    // The Agent SDK ships a ~230MB per-platform Claude Code binary as an optional
     // dep; do NOT bundle it into the installer. It's downloaded on demand into the
     // user-data dir (see src/main/agent-sdk-installer.ts). The small SDK JS stays.
+    // NOTE: this exclusion filters the single file set electron-builder feeds to
+    // BOTH app.asar and app.asar.unpacked, so the copy phase is clean on both
+    // sides. The binary sneaks back in later: afterPack's `npm prune` reifies the
+    // kun lockfile and re-installs the platform-matched optional binary into
+    // app.asar.unpacked; scripts/after-pack.cjs strips it again right after
+    // pruning (removeOnDemandAgentSdkBinaries).
     '!kun/node_modules/@anthropic-ai/claude-agent-sdk-*/**',
     '!**/*.map',
     '!**/*.d.ts',
