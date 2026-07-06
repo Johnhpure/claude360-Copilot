@@ -195,7 +195,7 @@ npm install --registry=https://registry.npmmirror.com
 - 打 `win-v*` 标签（如 `win-v0.1.3`）：**仅打 Windows x64** 便携包，用于快速出测试包。
 - 也可在 GitHub → Actions → Build Installers → Run workflow 手动触发（可勾选 `only_windows`）。
 
-构建产物在对应 run 页面底部 **Artifacts** 下载（`Claude360-Copilot-Windows-x64` / `Claude360-Copilot-macOS`，保留 14 天）。完整说明见 [打包指引](doc/BUILD-打包环境与安装包.md)。
+构建产物在对应 run 页面底部 **Artifacts** 下载（`Claude360-Copilot-Windows-x64` / `Claude360-Copilot-macOS-Intel-x64` / `Claude360-Copilot-macOS-Apple-Silicon-arm64`，保留 14 天）。完整说明见 [打包指引](doc/BUILD-打包环境与安装包.md)。
 
 ## 配置与数据
 

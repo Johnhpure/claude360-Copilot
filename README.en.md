@@ -195,7 +195,7 @@ Native modules (e.g. `node-pty`) cannot be cross-compiled, so **Windows and macO
 - Tag `win-v*` (e.g. `win-v0.1.3`): build **Windows x64 only** (a portable zip) for quick test builds.
 - Or trigger manually via GitHub → Actions → Build Installers → Run workflow (with an optional `only_windows` toggle).
 
-Download build artifacts from the **Artifacts** section at the bottom of the run page (`Claude360-Copilot-Windows-x64` / `Claude360-Copilot-macOS`, retained for 14 days). See the [packaging guide](doc/BUILD-打包环境与安装包.md) for full details.
+Download build artifacts from the **Artifacts** section at the bottom of the run page (`Claude360-Copilot-Windows-x64` / `Claude360-Copilot-macOS-Intel-x64` / `Claude360-Copilot-macOS-Apple-Silicon-arm64`, retained for 14 days). See the [packaging guide](doc/BUILD-打包环境与安装包.md) for full details.
 
 ## Configuration and Data
 

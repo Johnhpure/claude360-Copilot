@@ -1,4 +1,4 @@
-# 按需打包安装包（Mac arm64+x64 / Windows x64）
+# 按需打包安装包（Mac Apple Silicon arm64 / Intel x64 / Windows x64）
 #
 # 与既有 release.yml（PR 合并触发、签名 + R2 + GitHub Release 的重型发布流水线）
 # 不同：本工作流是「手动触发、只产出安装包 artifact」的轻量构建，用于在 Linux
@@ -47,12 +47,24 @@ env:
   NODE_VERSION: '22'
 
 jobs:
-  # ── macOS：一次产出 arm64 + x64 的 dmg/zip ─────────────────────────────
+  # ── macOS：Apple Silicon 与 Intel 分开在原生架构 runner 上打 dmg/zip ─────
   build-macos:
-    name: Build macOS (arm64 + x64)
+    name: Build macOS (${{ matrix.chip_name }})
     # 仅 win 场景跳过 macOS：win-v* tag 或手动勾选 only_windows。
     if: ${{ !startsWith(github.ref, 'refs/tags/win-v') && github.event.inputs.only_windows != 'true' }}
-    runs-on: macos-latest
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - chip_name: Intel x64
+            arch: x64
+            runner: macos-15-intel
+            artifact_name: Claude360-Copilot-macOS-Intel-x64
+          - chip_name: Apple Silicon arm64
+            arch: arm64
+            runner: macos-15
+            artifact_name: Claude360-Copilot-macOS-Apple-Silicon-arm64
     env:
       # 无签名构建：关闭 electron-builder 的钥匙串签名身份自动发现，避免误签/告警。
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -111,25 +123,23 @@ jobs:
             echo "MAC_SIGN=1"
           } >> "${GITHUB_ENV}"
 
-      - name: Build macOS packages (signed)
+      - name: Build macOS package (signed)
         if: ${{ inputs.mac_sign }}
-        run: npm run dist:mac:signed
+        run: MAC_SIGN=1 npm run dist:mac:${{ matrix.arch }}
 
-      - name: Build macOS packages (unsigned)
+      - name: Build macOS package (unsigned)
         if: ${{ !inputs.mac_sign }}
-        run: npm run dist:mac
+        run: npm run dist:mac:${{ matrix.arch }}
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Claude360-Copilot-macOS
+          name: ${{ matrix.artifact_name }}
           if-no-files-found: error
           retention-days: 14
           path: |
-            dist/Claude360-Copilot-*-mac-arm64.dmg
-            dist/Claude360-Copilot-*-mac-x64.dmg
-            dist/Claude360-Copilot-*-mac-arm64.zip
-            dist/Claude360-Copilot-*-mac-x64.zip
+            dist/Claude360-Copilot-*-mac-${{ matrix.arch }}.dmg
+            dist/Claude360-Copilot-*-mac-${{ matrix.arch }}.zip
 
   # ── Windows x64：NSIS 安装包 ───────────────────────────────────────────
   build-windows:

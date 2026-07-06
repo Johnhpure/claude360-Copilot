@@ -8,13 +8,13 @@
 | macOS arm64 / x64 | ❌ **不能** | `.app`/`.dmg` 生成依赖 macOS 独有工具链（hdiutil / codesign），electron-builder 无法在 Linux 产出。 |
 | Linux x64 (AppImage) | ✅ 能 | `npm run dist:linux`（本机原生编译 node-pty），如需可本地打。 |
 
-> 结论：**Win + 两个 Mac 目标都必须在对应平台/ CI 上打**。项目自身的 `release.yml` 也是把 Windows 放 `windows-latest`、Mac 放 `macos-latest`，印证此约束。
+> 结论：**Win + 两个 Mac 目标都必须在对应平台/ CI 上打**。项目自身的发布流水线也把 Windows 与 macOS 放到对应 runner 上，印证此约束。
 
 ## 推荐路径：GitHub Actions 云端打包（已配好）
 
-已新增工作流：**`.github/workflows/build-installers.yml`**（手动或 tag 触发、只产出安装包、不涉及签名/R2/发布）。
-- `build-macos`（`macos-latest`）：一次产出 **Mac arm64 + x64** 的 `dmg` 与 `zip`。
-- `build-windows`（`windows-latest`）：产出 **Win x64** 的 **zip** 便携包（免安装，解压即用；不打 nsis 安装包）。
+已新增工作流：**`.github/workflows/build-installers.yml`**（手动或 tag 触发、只产出安装包、不涉及 R2）。
+- `build-macos`（矩阵任务）：`macos-15` 产出 **Mac Apple Silicon arm64** 的 `dmg` 与 `zip`，`macos-15-intel` 产出 **Mac Intel x64** 的 `dmg` 与 `zip`。
+- `build-windows`（`windows-latest`）：产出 **Win x64** 的 NSIS 安装包与 `zip` 便携包。
 - 原生模块（node-pty / better-sqlite3 / nut-js）在各自平台 runner 原生编译，无跨平台问题。
 
 ### 触发方式（二选一）
@@ -31,15 +31,16 @@
 ### 使用步骤
 1. 把改动推到 GitHub（仓库 `github.com/Johnhpure/claude360-Copilot`）：
    ```bash
-   git add .github/workflows/build-installers.yml electron-builder.config.cjs package.json doc/BUILD-打包环境与安装包.md
-   git commit -m "ci: on-demand + tag installers (mac arm64/x64 + win x64 zip)"
+   git add .github/workflows/build-installers.yml README.md README.en.md doc/BUILD-打包环境与安装包.md
+   git commit -m "ci: split macos installer builds by architecture"
    git push
    ```
    > 注：本会话按约束**未执行任何 git 操作**，需你自行提交推送。
 2. 手动 **Actions → Build Installers → Run workflow**，或直接推 `v*` 标签自动触发。
 3. 构建完成后在该 run 页面底部 **Artifacts** 下载：
-   - `Claude360-Copilot-macOS`（含 arm64+x64 的 dmg/zip）
-   - `Claude360-Copilot-Windows-x64`（**Win x64 zip 便携包**）
+   - `Claude360-Copilot-macOS-Apple-Silicon-arm64`（Mac M 系列 `dmg`/`zip`）
+   - `Claude360-Copilot-macOS-Intel-x64`（Mac Intel `dmg`/`zip`）
+   - `Claude360-Copilot-Windows-x64`（Win x64 NSIS 安装包与 `zip` 便携包）
    - 产物保留 14 天。
 
 ### macOS 签名说明
