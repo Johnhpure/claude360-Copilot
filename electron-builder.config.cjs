@@ -130,6 +130,13 @@ module.exports = {
     // app.asar.unpacked; scripts/after-pack.cjs strips it again right after
     // pruning (removeOnDemandAgentSdkBinaries).
     '!kun/node_modules/@anthropic-ai/claude-agent-sdk-*/**',
+    // @napi-rs/canvas is pdfjs-dist's optionalDependency for Node-side bitmap
+    // rendering (~61MB across gnu+musl variants). The main process only does PDF
+    // *text extraction* (getTextContent, see src/main/services/write-pdf-text-service.ts),
+    // which does not touch canvas — verified by running that service's tests with
+    // @napi-rs removed. Exclude the whole scope; the electron-builder auto-unpack
+    // for .node files would otherwise copy both libc variants into app.asar.unpacked.
+    '!node_modules/@napi-rs/**',
     '!**/*.map',
     '!**/*.d.ts',
     '!**/*.ts',

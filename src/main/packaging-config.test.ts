@@ -142,6 +142,13 @@ describe('electron-builder Claude360 Copilot packaging', () => {
     expect(builderConfig.files).not.toEqual(expect.arrayContaining([
       '!**/node_modules/openclaw/**/*'
     ]))
+    // @napi-rs/canvas (pdfjs-dist's optional Node-side renderer) is excluded
+    // wholesale: the main process only does PDF text extraction, which does not
+    // touch canvas. Unlike kun-side packages, main app node_modules are not
+    // reinstalled by afterPack's npm prune, so the files exclusion is sufficient.
+    expect(builderConfig.files).toEqual(expect.arrayContaining([
+      '!node_modules/@napi-rs/**'
+    ]))
   })
 
   it('validates the unpacked Kun runtime before release artifacts are created', () => {
