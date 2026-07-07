@@ -11,9 +11,9 @@ import type {
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { Button } from '../ui'
 import { MyAccountOverview } from './MyAccountOverview'
-import { MyBillingPanel, type BillingPollPhase } from './MyBillingPanel'
+import { MyTopupModal } from './MyTopupModal'
 import { MyUsagePanel } from './MyUsagePanel'
-import { pollTopupOrderUntilComplete } from './my-page-actions'
+import { pollTopupOrderUntilComplete, type BillingPollPhase } from './my-page-actions'
 
 type Props = {
   leftSidebarCollapsed: boolean
@@ -23,11 +23,12 @@ type Props = {
   onLogout: () => void
 }
 
-// 「我的」页容器:账号 / 余额 / 今日用量概览 + 充值 + 退出登录。
+// 「我的」页容器:账号 / 余额 / 今日用量概览 + 充值弹窗 + 退出登录。
 // API Key 的分组管理已归口到「设置 → 分组及 Key」，本页不再展示 Key 分组表。
 // 所有 window.kunGui 调用都做存在性守卫。
-// Calm Blue 三层卡片结构（父任务 07-03-oneui-redesign design §4.7）:
-// 账户卡 → 用量卡（唯一强色区域）→ 账单/充值卡；卡间距 16px(gap-4)。
+// 布局（07-07-my-page-redesign-topup-modal design §1）:
+// 账户卡（常驻充值主按钮）→ 用量卡（总览行 + 紧凑表格,唯一强色区域）;
+// 充值全流程收进 MyTopupModal,页面底部不再有充值卡片。
 export function MyPage({
   leftSidebarCollapsed,
   onToggleLeftSidebar,
@@ -39,11 +40,14 @@ export function MyPage({
   const [usageStats, setUsageStats] = useState<Claude360TokenStat[]>([])
 
   const [topupOptions, setTopupOptions] = useState<Claude360TopupOptions | null>(null)
+  const [topupOpen, setTopupOpen] = useState(false)
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null)
   const [order, setOrder] = useState<Claude360TopupOrder | null>(null)
   const [pollPhase, setPollPhase] = useState<BillingPollPhase>('idle')
   const [submittingTopup, setSubmittingTopup] = useState(false)
+  // 全页 error 只承载加载类错误;充值过程错误走 topupError 在弹窗内展示,互不渗漏。
   const [error, setError] = useState<string | null>(null)
+  const [topupError, setTopupError] = useState<string | null>(null)
 
   // 组件卸载后中断订单轮询,避免对已卸载组件 setState。
   const abortedRef = useRef(false)
@@ -53,6 +57,11 @@ export function MyPage({
       abortedRef.current = true
     }
   }, [])
+
+  // per-order 中止标记(会话语义,与卸载语义的 abortedRef 分离):
+  // 关闭弹窗 / 重新生成时自增,使 in-flight 轮询的 shouldAbort 变真,
+  // 且不会误伤之后新订单的轮询(新订单持有更新的 seq)。
+  const orderSeqRef = useRef(0)
 
   const refreshMe = useCallback(async () => {
     if (typeof window.kunGui === 'undefined') return
@@ -85,43 +94,72 @@ export function MyPage({
 
   const handleCreateWechatTopup = useCallback(async () => {
     if (typeof window.kunGui === 'undefined' || submittingTopup || selectedAmount == null) return
+    const seq = orderSeqRef.current + 1
+    orderSeqRef.current = seq
+    const isStale = (): boolean => abortedRef.current || orderSeqRef.current !== seq
     setSubmittingTopup(true)
+    setTopupError(null)
+    let created: Claude360TopupOrder
     try {
-      const created = await window.kunGui.claude360BillingTopupWechat({ amount: selectedAmount })
+      created = await window.kunGui.claude360BillingTopupWechat({ amount: selectedAmount })
       // 排障锚点:控制台可直接核对订单接口返回与解析出的二维码数据(orderId/codeUrl/moneyDisplay)。
       console.info('[topup] order created', created)
-      if (abortedRef.current) return
-      setOrder(created)
-      setPollPhase('pending')
-      const result = await pollTopupOrderUntilComplete(window.kunGui, created.orderId, {
-        shouldAbort: () => abortedRef.current
-      })
-      if (abortedRef.current) return
-      if (result.ok && result.completed) {
-        setPollPhase('completed')
-        // 订单完成后刷新余额,让「我的」页余额即时反映充值结果。
-        await refreshMe()
-      } else if (result.ok && !result.completed) {
-        // 轮询跑满上限仍未完成:复位为可重试态并提示超时,避免二维码永久停在「等待支付」。
-        setPollPhase('idle')
-        setError(t('myTopupTimeout'))
-      } else if (!result.ok) {
-        setError(result.message)
-        setPollPhase('idle')
-      }
     } catch (e) {
       if (!abortedRef.current) {
-        setError(e instanceof Error ? e.message : String(e))
+        setTopupError(e instanceof Error ? e.message : String(e))
         setPollPhase('idle')
+        setSubmittingTopup(false)
       }
-    } finally {
-      if (!abortedRef.current) setSubmittingTopup(false)
+      return
     }
-  }, [selectedAmount, submittingTopup, refreshMe, t])
+    if (abortedRef.current) return
+    // 订单已创建,提交态立即复位:等待支付期间弹窗保持可关闭(dismissable)。
+    setSubmittingTopup(false)
+    if (orderSeqRef.current !== seq) return
+    setOrder(created)
+    setPollPhase('pending')
+    const result = await pollTopupOrderUntilComplete(window.kunGui, created.orderId, {
+      shouldAbort: isStale
+    })
+    if (isStale()) return
+    if (result.ok && result.completed) {
+      setPollPhase('completed')
+      // 订单完成后刷新余额,让「我的」页余额即时反映充值结果。
+      await refreshMe()
+    } else if (result.ok) {
+      // reason → pollPhase 映射(design §2.3):超时与过期同展示「已超时」;aborted 静默(弹窗已关)。
+      if (result.reason === 'failed') {
+        setPollPhase('failed')
+      } else if (result.reason === 'expired' || result.reason === 'timeout') {
+        setPollPhase('expired')
+      }
+    } else {
+      // 轮询请求本身失败(网络/登录态):回金额选择视图并在弹窗内报错。
+      setTopupError(result.message)
+      setOrder(null)
+      setPollPhase('idle')
+    }
+  }, [selectedAmount, submittingTopup, refreshMe])
 
-  const scrollToBilling = useCallback(() => {
-    if (typeof document === 'undefined') return
-    document.getElementById('my-billing-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const handleOpenTopup = useCallback(() => {
+    setTopupOpen(true)
+  }, [])
+
+  // 关闭弹窗 = 放弃当前支付会话:中止在途轮询并整体复位,下次打开回金额选择视图。
+  const handleCloseTopup = useCallback(() => {
+    orderSeqRef.current += 1
+    setTopupOpen(false)
+    setOrder(null)
+    setPollPhase('idle')
+    setTopupError(null)
+  }, [])
+
+  // 失败/超时后重新生成:仅复位订单态回金额选择视图(金额保留),由用户再点「微信充值」。
+  const handleRegenerateTopup = useCallback(() => {
+    orderSeqRef.current += 1
+    setOrder(null)
+    setPollPhase('idle')
+    setTopupError(null)
   }, [])
 
   const headerInset = useMemo(
@@ -173,24 +211,26 @@ export function MyPage({
             </p>
           ) : null}
 
-          <MyAccountOverview me={me} onTopup={scrollToBilling} t={t} />
+          <MyAccountOverview me={me} onTopup={handleOpenTopup} t={t} />
 
           <MyUsagePanel stats={usageStats} t={t} />
-
-          <div id="my-billing-panel">
-            <MyBillingPanel
-              options={topupOptions}
-              selectedAmount={selectedAmount}
-              order={order}
-              pollPhase={pollPhase}
-              submitting={submittingTopup}
-              onSelectAmount={setSelectedAmount}
-              onCreateWechatTopup={() => void handleCreateWechatTopup()}
-              t={t}
-            />
-          </div>
         </div>
       </main>
+
+      <MyTopupModal
+        open={topupOpen}
+        options={topupOptions}
+        selectedAmount={selectedAmount}
+        order={order}
+        pollPhase={pollPhase}
+        submitting={submittingTopup}
+        error={topupError}
+        onSelectAmount={setSelectedAmount}
+        onCreateWechatTopup={() => void handleCreateWechatTopup()}
+        onRegenerate={handleRegenerateTopup}
+        onClose={handleCloseTopup}
+        t={t}
+      />
     </div>
   )
 }

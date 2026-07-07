@@ -177,7 +177,12 @@ export type Claude360TopupOrder = {
 
 export type Claude360TopupOrderStatus = {
   orderId: string
-  status: number
+  /**
+   * 后端订单状态为**字符串**枚举 `pending / success / failed / expired`
+   * （newapi common/constants.go:244）。主进程透传原值；完成判断以 completeTime
+   * 为准（isTopupOrderComplete），failed/expired 用于提前终止轮询。
+   */
+  status: string
   moneyDisplay: string
   completeTime: number
 }
@@ -223,7 +228,8 @@ export type Claude360TopupOrderRawResponse = {
 
 export type Claude360TopupOrderStatusRawResponse = {
   order_id: string
-  status: number
+  /** 字符串枚举 pending/success/failed/expired（见 Claude360TopupOrderStatus.status）。 */
+  status: string
   money_display?: string
   complete_time?: number
 }

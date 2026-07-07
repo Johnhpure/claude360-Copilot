@@ -20,6 +20,12 @@ export type MyPageApi = {
   claude360BillingTokenStats: (payload: { startTimestamp?: number; endTimestamp?: number }) => Promise<Claude360TokenStat[]>
 }
 
+/**
+ * 充值订单轮询阶段(充值弹窗据此推导视图)。
+ * failed/expired 映射后端字符串枚举的终态;轮询跑满上限(timeout)也归入 expired 展示。
+ */
+export type BillingPollPhase = 'idle' | 'pending' | 'completed' | 'failed' | 'expired'
+
 /** 订单是否已完成:newapi 完成后会回填 completeTime(秒)。 */
 export function isTopupOrderComplete(order: Claude360TopupOrderStatus): boolean {
   return order.completeTime > 0
@@ -40,7 +46,7 @@ export type PollTopupOptions = {
 
 export type PollTopupResult =
   | { ok: true; completed: true; status: Claude360TopupOrderStatus }
-  | { ok: true; completed: false }
+  | { ok: true; completed: false; reason: 'timeout' | 'aborted' | 'failed' | 'expired' }
   | { ok: false; message: string }
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
@@ -48,6 +54,8 @@ const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => set
 /**
  * 轮询微信充值订单直至完成或超时。完成后不直接刷新余额,
  * 交由调用方在 completed=true 时调用 refreshMe(),保持职责单一。
+ * 后端 status 为字符串枚举 pending/success/failed/expired:
+ * 遇 failed/expired 终态提前终止(旧实现会傻等到轮询上限),reason 区分未完成原因。
  */
 export async function pollTopupOrderUntilComplete(
   api: Pick<MyPageApi, 'claude360BillingTopupOrder'>,
@@ -59,16 +67,103 @@ export async function pollTopupOrderUntilComplete(
   const sleep = options.sleep ?? defaultSleep
   try {
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      if (options.shouldAbort?.()) return { ok: true, completed: false }
+      if (options.shouldAbort?.()) return { ok: true, completed: false, reason: 'aborted' }
       const status = await api.claude360BillingTopupOrder({ orderId })
       options.onStatus?.(status)
       if (isTopupOrderComplete(status)) {
         return { ok: true, completed: true, status }
       }
+      if (status.status === 'failed' || status.status === 'expired') {
+        return { ok: true, completed: false, reason: status.status }
+      }
       await sleep(intervalMs)
     }
-    return { ok: true, completed: false }
+    return { ok: true, completed: false, reason: 'timeout' }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }
+}
+
+// ── 二维码 payload 分类(R4) ──
+
+export type QrPayload =
+  | { kind: 'encode'; value: string } // weixin:// 等支付链接 → QRCodeSVG 前端编码
+  | { kind: 'image'; src: string } // dataURL / http(s) URL / 补前缀后的裸 base64 → <img>
+  | { kind: 'empty' }
+
+/** 裸 base64(无 data: 前缀)判定:纯 base64 字符且足够长(排除短支付码/口令)。 */
+const BARE_BASE64_RE = /^[A-Za-z0-9+/=]+$/
+
+/**
+ * 按内容分类 codeUrl 的渲染方式。判定顺序按可判定性从强到弱:
+ * 空 → dataURL → http(s) → 裸 base64(补 png 前缀) → 其余一律当支付链接前端编码。
+ * weixin:// 等非 http 协议不能当 img src(浏览器无法加载,恒空白),必须走 encode。
+ */
+export function classifyQrPayload(codeUrl: string): QrPayload {
+  const value = codeUrl.trim()
+  if (!value) return { kind: 'empty' }
+  if (value.startsWith('data:image/')) return { kind: 'image', src: value }
+  if (/^https?:\/\//i.test(value)) return { kind: 'image', src: value }
+  if (value.length > 100 && BARE_BASE64_RE.test(value)) {
+    return { kind: 'image', src: `data:image/png;base64,${value}` }
+  }
+  return { kind: 'encode', value }
+}
+
+// ── Token 用量视图(R2) ──
+
+export type UsageSortKey = 'tokens' | 'requests'
+
+export type UsageView = {
+  /** 全量合计(不受搜索过滤影响,总览始终反映全局)。 */
+  totals: { requests: number; tokens: number }
+  /** 主要消耗分组 Top 3(按 tokens 降序,占全局总量比)。 */
+  top3: Array<{ tokenName: string; sharePct: number }>
+  /** 过滤 → 排序 → limit 截断后的表格行。 */
+  rows: Array<Claude360TokenStat & { sharePct: number }>
+  /** rows 截断后剩余条数(0 = 无需「展开更多」)。 */
+  hiddenCount: number
+}
+
+const sortValue = (row: Claude360TokenStat, key: UsageSortKey): number =>
+  key === 'tokens' ? row.totalTokens : row.requestCount
+
+/**
+ * 把 token 用量统计整形为「总览行 + 紧凑表格」视图数据。
+ * 纯函数:搜索(大小写不敏感包含)、双键排序、Top N 截断都在此处,组件零业务逻辑。
+ */
+export function buildUsageView(
+  stats: Claude360TokenStat[],
+  opts: { query: string; sortKey: UsageSortKey; sortDesc: boolean; limit: number | null }
+): UsageView {
+  const totals = stats.reduce(
+    (acc, row) => {
+      acc.requests += row.requestCount
+      acc.tokens += row.totalTokens
+      return acc
+    },
+    { requests: 0, tokens: 0 }
+  )
+  const shareOf = (row: Claude360TokenStat): number =>
+    totals.tokens > 0 ? Math.round((row.totalTokens / totals.tokens) * 100) : 0
+
+  const top3 = [...stats]
+    .sort((a, b) => b.totalTokens - a.totalTokens)
+    .slice(0, 3)
+    .map((row) => ({ tokenName: row.tokenName, sharePct: shareOf(row) }))
+
+  const query = opts.query.trim().toLowerCase()
+  const filtered = query
+    ? stats.filter((row) => row.tokenName.toLowerCase().includes(query))
+    : stats
+  const sorted = [...filtered].sort((a, b) => {
+    const diff = sortValue(a, opts.sortKey) - sortValue(b, opts.sortKey)
+    return opts.sortDesc ? -diff : diff
+  })
+  const rows = (opts.limit == null ? sorted : sorted.slice(0, opts.limit)).map((row) => ({
+    ...row,
+    sharePct: shareOf(row)
+  }))
+
+  return { totals, top3, rows, hiddenCount: sorted.length - rows.length }
 }

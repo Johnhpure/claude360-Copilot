@@ -5,10 +5,11 @@ import { Button, Card } from '../ui'
 
 type Translate = (key: string, params?: Record<string, unknown>) => string
 
-// 账号 / 余额 / 今日用量概览。低余额时展示充值入口(onTopup)。
+// 账号 / 余额 / 今日用量概览。充值入口常驻(onTopup 打开充值弹窗),
+// 低余额时额外展示警示条(其按钮同样触发 onTopup)。
 // Calm Blue 换肤（父任务 07-03-oneui-redesign design §4.7）：账户卡 = focus block
 // （ui/Card：16px 圆角、不透明 surface、无投影），头像/套餐胶囊 chip 保持单色克制,
-// 强色（accent 图表）只出现在用量卡。
+// 强色（accent 图表）只出现在用量卡;充值主按钮为 ui/Button primary(accent 蓝)。
 export function MyAccountOverview({
   me,
   onTopup,
@@ -54,6 +55,10 @@ export function MyAccountOverview({
           <span className="text-[12px] text-ds-faint">
             {t('myUsedTotal')}: {me.usedDisplay || '—'}
           </span>
+          {/* 常驻充值入口(R1):不再依赖 lowBalance 条件,首屏顶部即可见。 */}
+          <Button size="sm" className="mt-1.5" data-testid="my-topup-open" onClick={onTopup}>
+            {t('myTopupNow')}
+          </Button>
         </div>
       </div>
 
