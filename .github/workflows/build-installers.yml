@@ -5,9 +5,12 @@
 # 本机无法产出 macOS 包时，借 GitHub 的 macOS/Windows runner 云端打包。
 #
 # - 触发：Actions 页面手动 Run workflow（workflow_dispatch），或推 v* / win-v* tag。
+#   push 到 ci/build-installers 分支也会自动打包（仅 artifact，不发 Release），
+#   版本号 0.1.0-ci.<run_number>。
 # - 产物：作为 workflow artifacts 上传，构建完在 run 页面下载，保留 14 天。
-#   tag 触发时 Windows 产物还会发布为 GitHub Release（tag 统一为 v<version>），
-#   供应用内更新（electron-updater GitHub provider）拉取 latest.yml。
+#   tag 触发时由独立 publish-release job 汇总 Windows + macOS 产物发布为
+#   GitHub Release（tag 统一为 v<version>），供应用内更新（electron-updater
+#   GitHub provider）拉取 latest.yml / latest-mac.yml。
 # - macOS 默认「无签名」（ad-hoc）：可安装，但首次打开需在「系统设置 → 隐私与
 #   安全性」放行（或右键→打开）。若已配置 Apple 签名 secret，设 mac_sign=true 走签名。
 # - 各平台原生模块（node-pty / better-sqlite3 / @computer-use/nut-js）在对应
@@ -29,7 +32,11 @@ on:
         default: false
   # tag 触发：推 v* 三平台；推 win-v*（如 win-v0.1.3-test.1）只打 Windows x64。
   # 产物版本号取自标签（去掉 win-/v 前缀），须为合法 semver。
+  # 分支触发：push 到 ci/build-installers → 三平台自动打包（仅 artifact，不发
+  # Release，不进更新通道）；连续 commit 由 concurrency cancel-in-progress 去重。
   push:
+    branches:
+      - ci/build-installers
     tags:
       - 'v*'
       - 'win-v*'
@@ -88,6 +95,13 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         run: echo "CLAUDE360_APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      # 分支 push 的 CI 构建：版本号 0.1.0-ci.N（合法 semver prerelease）。
+      # CI 构建不进 Release/更新通道，版本仅用于产物命名与追踪。
+      - name: Resolve CI version for branch build
+        if: github.ref == 'refs/heads/ci/build-installers'
+        shell: bash
+        run: echo "CLAUDE360_APP_VERSION=0.1.0-ci.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
       # 可选签名：仅当手动勾选 mac_sign 且仓库配好 Apple secret 时启用。
       - name: Decode Apple signing credentials
@@ -186,6 +200,13 @@ jobs:
           ver="${ver#v}"
           echo "CLAUDE360_APP_VERSION=${ver}" >> "$GITHUB_ENV"
 
+      # 分支 push 的 CI 构建：版本号 0.1.0-ci.N（合法 semver prerelease）。
+      # CI 构建不进 Release/更新通道，版本仅用于产物命名与追踪。
+      - name: Resolve CI version for branch build
+        if: github.ref == 'refs/heads/ci/build-installers'
+        shell: bash
+        run: echo "CLAUDE360_APP_VERSION=0.1.0-ci.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+
       - name: Build Windows installer (x64)
         run: npm run dist:win
 
@@ -204,17 +225,56 @@ jobs:
           name: Claude360-Copilot-Windows-x64
           if-no-files-found: error
           retention-days: 14
+          # latest.yml 必须随 artifact 上传：publish-release job 靠它发布
+          # electron-updater 的 Windows 更新 feed。
           path: |
             dist/Claude360-Copilot-*-win-x64.exe
             dist/Claude360-Copilot-*-win-x64.exe.blockmap
             dist/Claude360-Copilot-*-win-x64.zip
+            dist/latest.yml
 
-      # tag 触发时把安装包发布为 GitHub Release，应用内更新（electron-updater
-      # GitHub provider）从这里拉取 latest.yml。Release tag 必须是 v<semver>：
-      # provider 解析不了 win-v 前缀，因此 win-v* 触发也统一发布到 v<version>。
-      # 版本号含 "-"（如 0.1.3-test.12）标记为 prerelease，对应 frontier 通道。
+  # ── 发布：tag 触发时汇总三平台产物发 GitHub Release ─────────────────────
+  # mac 的 latest-mac.yml 必须在此合并生成：单架构 job 内各自生成会互相覆盖，
+  # electron-updater 需要一份同时含 arm64+x64 zip 的 files 列表。
+  # win-v* 时 build-macos 被 skip，用 always()+needs.result 显式判断保证仍可
+  # 发布仅 Windows 的 Release；任一必需 job 失败则不发布。
+  # Release tag 必须是 v<semver>：electron-updater GitHub provider 解析不了
+  # win-v 前缀，因此 win-v* 触发也统一发布到 v<version>。
+  # 版本号含 "-"（如 0.1.3-test.12）标记为 prerelease，对应 frontier 通道。
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-macos, build-windows]
+    if: >-
+      always() &&
+      (startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/win-v')) &&
+      needs.build-windows.result == 'success' &&
+      (needs.build-macos.result == 'success' || needs.build-macos.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      # 需要仓库内容：generate-mac-latest.cjs 脚本 + annotated tag message 作 release notes。
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate latest-mac.yml (merged arm64 + x64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -la release-assets
+          if compgen -G "release-assets/Claude360-Copilot-*-mac-*.zip" > /dev/null; then
+            node scripts/generate-mac-latest.cjs release-assets
+          else
+            echo "No macOS artifacts (win-v* build) — skip latest-mac.yml"
+          fi
+
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/win-v')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -225,11 +285,14 @@ jobs:
           tag="v${ver}"
 
           assets=()
-          for f in dist/*.exe dist/*.exe.blockmap dist/*-win-*.zip dist/latest.yml; do
+          for f in release-assets/*.exe release-assets/*.exe.blockmap \
+                   release-assets/*-win-*.zip release-assets/latest.yml \
+                   release-assets/*-mac-*.dmg release-assets/*-mac-*.zip \
+                   release-assets/latest-mac.yml; do
             [[ -e "$f" ]] && assets+=("$f")
           done
           if [[ "${#assets[@]}" -eq 0 ]]; then
-            echo "::error::dist/ 中没有可发布的产物"
+            echo "::error::release-assets/ 中没有可发布的产物"
             exit 1
           fi
 
