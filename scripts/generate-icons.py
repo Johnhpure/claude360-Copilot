@@ -8,12 +8,14 @@
 
 输出（覆盖式、幂等）:
     src/asset/img/claude360.png       1024x1024      主图标 / Linux AppImage / 渲染进程
-    src/asset/img/claude360_mac.png   1024x1024      macOS（electron-builder 自动转 icns，需 RGBA 透明圆角）
+    src/asset/img/claude360_mac.png   1024x1024      macOS（主体 824px 居中 + 透明安全边距，electron-builder 自动转 icns）
     src/asset/img/claude360_tray.png  256x256        系统托盘
     build/icon-claude360.ico          16~256 多尺寸   Windows Explorer / 任务栏 / 快捷方式
 
 设计取舍: 仅依赖 Python Pillow（系统已装），零 Node 依赖，不改 package.json，
 与体积优化任务零冲突。ICO 由 Pillow 原生多尺寸输出。
+mac 图标遵循 Apple HIG 网格：1024 画布上主体（圆角方块）约 824px、四周留透明安全边距，
+铺满画布会导致 Dock 中比其他 App 显大一圈；其余目标铺满（占比 1.0）保持原行为。
 """
 import argparse
 import os
@@ -30,11 +32,12 @@ ROOT = os.path.dirname(HERE)  # claude360-Copilot/
 DEFAULT_SOURCE = os.path.join(ROOT, "build", "brand", "claude360-copilot-logo.png")
 ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
 
-# 目标 PNG: 相对路径 -> 边长
+# 目标 PNG: 相对路径 -> (边长, 主体内容占比)
+# 占比 1.0 = 主体铺满画布（原行为）；mac = 824/1024（Apple HIG 网格安全边距）。
 PNG_TARGETS = {
-    os.path.join("src", "asset", "img", "claude360.png"): 1024,
-    os.path.join("src", "asset", "img", "claude360_mac.png"): 1024,
-    os.path.join("src", "asset", "img", "claude360_tray.png"): 256,
+    os.path.join("src", "asset", "img", "claude360.png"): (1024, 1.0),
+    os.path.join("src", "asset", "img", "claude360_mac.png"): (1024, 824 / 1024),
+    os.path.join("src", "asset", "img", "claude360_tray.png"): (256, 1.0),
 }
 
 
@@ -55,6 +58,15 @@ def resized(img: Image.Image, size: int) -> Image.Image:
     return img.resize((size, size), Image.LANCZOS)
 
 
+def fit_with_margin(img: Image.Image, canvas_size: int, content_size: int) -> Image.Image:
+    """全透明画布上居中放置缩放后的主体，四周留安全边距（mac Dock 视觉尺寸对齐）。"""
+    canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+    body = resized(img, content_size)
+    offset = (canvas_size - content_size) // 2
+    canvas.paste(body, (offset, offset), body)  # 以主体 alpha 作 mask，保留圆角透明
+    return canvas
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="生成 Claude360 Copilot 多尺寸图标")
     parser.add_argument("--source", default=DEFAULT_SOURCE, help="品牌源 Logo PNG 路径")
@@ -66,11 +78,16 @@ def main() -> None:
     src = load_source(args.source)
     print(f"源图: {args.source}  {src.size[0]}x{src.size[1]}")
 
-    for rel, size in PNG_TARGETS.items():
+    for rel, (size, content_ratio) in PNG_TARGETS.items():
         dst = os.path.join(ROOT, rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        resized(src, size).save(dst, "PNG")
-        print(f"[png] {rel}  {size}x{size}")
+        content_size = round(size * content_ratio)
+        if content_size >= size:
+            out = resized(src, size)  # 占比 1.0: 铺满，与历史产物字节级一致
+        else:
+            out = fit_with_margin(src, size, content_size)
+        out.save(dst, "PNG")
+        print(f"[png] {rel}  {size}x{size}  主体 {content_size}px")
 
     ico_path = os.path.join(ROOT, "build", "icon-claude360.ico")
     os.makedirs(os.path.dirname(ico_path), exist_ok=True)
