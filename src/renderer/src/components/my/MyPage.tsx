@@ -88,6 +88,8 @@ export function MyPage({
     setSubmittingTopup(true)
     try {
       const created = await window.kunGui.claude360BillingTopupWechat({ amount: selectedAmount })
+      // 排障锚点:控制台可直接核对订单接口返回与解析出的二维码数据(orderId/codeUrl/moneyDisplay)。
+      console.info('[topup] order created', created)
       if (abortedRef.current) return
       setOrder(created)
       setPollPhase('pending')

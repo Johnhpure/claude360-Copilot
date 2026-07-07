@@ -36,6 +36,7 @@ const labels: Record<string, string> = {
   myWechatDisabled: 'WeChat unavailable.',
   myScanToPay: 'Scan to pay',
   myWechatQr: 'WeChat QR',
+  myQrError: 'QR code unavailable.',
   myWaitingPayment: 'Waiting for payment…',
   myPaymentComplete: 'Payment received.'
 }
@@ -148,7 +149,8 @@ describe('MyPage presentational panels', () => {
     expect(withoutOrder).toContain('¥10')
     expect(withoutOrder).toContain('¥30')
     expect(withoutOrder).toContain('¥50')
-    expect(withoutOrder).not.toContain('weixin://wxpay/qr')
+    // 无订单时不渲染二维码(crispEdges 是 qrcode.react 生成 QR path 的标志,lucide 图标 svg 无此属性)
+    expect(withoutOrder).not.toContain('shape-rendering="crispEdges"')
 
     const order: Claude360TopupOrder = { orderId: 'o1', codeUrl: 'weixin://wxpay/qr', moneyDisplay: '¥10' }
     const withOrder = renderToStaticMarkup(
@@ -163,9 +165,37 @@ describe('MyPage presentational panels', () => {
         t
       })
     )
-    // 微信充值成功展示二维码
-    expect(withOrder).toContain('weixin://wxpay/qr')
+    // 微信充值成功后由 qrcode.react 把 codeUrl 编码为 QR svg;
+    // weixin:// 支付链接不能再作为 img src 出现(浏览器无法把它当图片加载,恒空白)。
+    expect(withOrder).toContain('shape-rendering="crispEdges"')
+    expect(withOrder).toContain('aria-label="WeChat QR"')
+    expect(withOrder).not.toContain('src="weixin://wxpay/qr"')
     expect(withOrder).toContain('Waiting for payment…')
+  })
+
+  it('shows an explicit error instead of a blank QR when codeUrl is empty', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      const order: Claude360TopupOrder = { orderId: 'o1', codeUrl: '', moneyDisplay: '¥10' }
+      const html = renderToStaticMarkup(
+        createElement(MyBillingPanel, {
+          options: topupOptionsFixture(),
+          selectedAmount: 10,
+          order,
+          pollPhase: 'pending' as const,
+          submitting: false,
+          onSelectAmount: () => undefined,
+          onCreateWechatTopup: () => undefined,
+          t
+        })
+      )
+      // codeUrl 为空:显式错误文案,不渲染空白二维码;控制台有 error 日志。
+      expect(html).toContain('QR code unavailable.')
+      expect(html).not.toContain('shape-rendering="crispEdges"')
+      expect(errorSpy).toHaveBeenCalledWith('[topup] empty codeUrl', order)
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 })
 

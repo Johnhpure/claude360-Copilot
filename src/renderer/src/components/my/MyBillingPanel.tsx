@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { CreditCard, QrCode, Loader2, CheckCircle2 } from 'lucide-react'
 import type { Claude360TopupOptions, Claude360TopupOrder } from '@shared/claude360'
 import { Button, Card } from '../ui'
@@ -31,6 +32,11 @@ export function MyBillingPanel({
   onCreateWechatTopup: () => void
   t: Translate
 }): ReactElement {
+  // codeUrl 防御:后端返回的是 weixin:// 支付链接,正常由下方 QRCodeSVG 编码成二维码;
+  // 若 order 存在但 codeUrl 为空(接口异常),显式报错并打日志,禁止渲染空白占位。
+  if (order && !order.codeUrl) {
+    console.error('[topup] empty codeUrl', order)
+  }
   return (
     <Card>
       <h2 className="flex items-center gap-2 text-[14px] font-semibold text-ds-ink">
@@ -85,12 +91,21 @@ export function MyBillingPanel({
               <span className="text-[12.5px] font-medium text-ds-ink">
                 {t('myScanToPay')} · {order.moneyDisplay}
               </span>
-              {/* 二维码必须白底才可靠扫码:bg-white 为内容约束色,不随主题反转。 */}
-              <img
-                src={order.codeUrl}
-                alt={t('myWechatQr')}
-                className="h-40 w-40 rounded-[var(--radius-sm)] border border-ds-border bg-white object-contain"
-              />
+              {order.codeUrl ? (
+                /* codeUrl 是 weixin:// 支付链接,不能当 img src;用 QRCodeSVG 编码成二维码。
+                   白底才可靠扫码:bg-white 为内容约束色,不随主题反转;p-3 白边即 quiet zone;
+                   svg 自带 180×180 尺寸,容器不设宽高,避免 CSS 压缩变形。 */
+                <div className="shrink-0 rounded-[var(--radius-sm)] border border-ds-border bg-white p-3">
+                  <QRCodeSVG
+                    value={order.codeUrl}
+                    size={180}
+                    role="img"
+                    aria-label={t('myWechatQr')}
+                  />
+                </div>
+              ) : (
+                <span className="text-[12.5px] text-ds-danger">{t('myQrError')}</span>
+              )}
               {pollPhase === 'pending' ? (
                 <span className="flex items-center gap-1.5 text-[12px] text-ds-faint">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} aria-hidden />

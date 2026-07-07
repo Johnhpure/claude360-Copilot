@@ -1395,6 +1395,7 @@
   "myWechatDisabled": "WeChat top-up is currently unavailable.",
   "myScanToPay": "Scan to pay",
   "myWechatQr": "WeChat top-up QR code",
+  "myQrError": "QR code unavailable: the order did not include a payment link. Please try again.",
   "myWaitingPayment": "Waiting for payment…",
   "myTopupTimeout": "Order timed out. Please retry or refresh your balance.",
   "myPaymentComplete": "Payment received — balance updated.",

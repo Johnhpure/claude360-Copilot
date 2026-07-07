@@ -1395,6 +1395,7 @@
   "myWechatDisabled": "微信充值当前不可用。",
   "myScanToPay": "扫码支付",
   "myWechatQr": "微信充值二维码",
+  "myQrError": "二维码生成失败：订单未返回支付链接，请重试或联系客服。",
   "myWaitingPayment": "等待支付到账…",
   "myTopupTimeout": "订单等待超时，请重试或刷新余额确认。",
   "myPaymentComplete": "充值到账，余额已更新。",
