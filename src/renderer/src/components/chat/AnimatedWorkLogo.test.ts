@@ -164,8 +164,6 @@ describe('AnimatedWorkLogo', () => {
     expect(baseShellCss).toContain('@keyframes ds-kun-sit-sway')
     expect(baseShellCss).toContain('.ds-work-logo:hover')
     expect(baseShellCss).toContain('.ds-kun-state:hover')
-    expect(baseShellCss).toContain("[data-focus-mode='on'] .ds-work-logo")
-    expect(baseShellCss).toContain('display: none !important;')
 
     // 形象工坊 CSS 痕迹必须清零
     expect(baseShellCss).not.toContain("data-ikun-mode")

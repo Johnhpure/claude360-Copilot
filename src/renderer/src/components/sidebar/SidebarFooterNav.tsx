@@ -7,7 +7,6 @@ type SidebarFooterNavProps = {
   onOpenMy: () => void
   onOpenSettings: () => void
   myActive?: boolean
-  before?: ReactNode
   settingsAccessory?: ReactNode
 }
 
@@ -15,13 +14,11 @@ export function SidebarFooterNav({
   onOpenMy,
   onOpenSettings,
   myActive = false,
-  before,
   settingsAccessory
 }: SidebarFooterNavProps): ReactElement {
   const { t } = useTranslation('common')
   return (
     <div className="space-y-1">
-      {before}
       <SidebarCommandRow
         icon={<User className="h-4 w-4" strokeWidth={1.75} />}
         label={t('myPage')}

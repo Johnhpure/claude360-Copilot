@@ -104,7 +104,7 @@ export function MyUsagePanel({
             <table className="mt-4 w-full border-collapse text-[12.5px]">
               <thead>
                 <tr className="border-b border-ds-border text-[11.5px] uppercase tracking-wide text-ds-faint">
-                  <th scope="col" className="py-2 pr-3 text-left font-medium">
+                  <th scope="col" className="min-w-[220px] py-2 pr-3 text-left font-medium">
                     {t('myUsageGroupName')}
                   </th>
                   <SortableHeader
@@ -112,14 +112,16 @@ export function MyUsagePanel({
                     active={sortKey === 'requests'}
                     desc={sortDesc}
                     onClick={() => handleSort('requests')}
+                    className="w-[100px]"
                   />
                   <SortableHeader
                     label={t('myUsageTokens')}
                     active={sortKey === 'tokens'}
                     desc={sortDesc}
                     onClick={() => handleSort('tokens')}
+                    className="w-[160px]"
                   />
-                  <th scope="col" className="w-28 py-2 pl-3 text-right font-medium">
+                  <th scope="col" className="w-[120px] py-2 pl-6 text-right font-medium">
                     {t('myUsageShare')}
                   </th>
                 </tr>
@@ -130,15 +132,18 @@ export function MyUsagePanel({
                     <td className="w-full max-w-0 truncate py-1.5 pr-3 font-medium text-ds-ink">
                       {row.tokenName}
                     </td>
-                    <td className="whitespace-nowrap py-1.5 pl-3 text-right tabular-nums text-ds-muted">
+                    <td className="whitespace-nowrap py-1.5 pl-6 text-right tabular-nums text-ds-muted">
                       {row.requestCount.toLocaleString()}
                     </td>
-                    <td className="whitespace-nowrap py-1.5 pl-3 text-right tabular-nums text-ds-muted">
+                    <td
+                      className="whitespace-nowrap py-1.5 pl-6 text-right tabular-nums text-ds-muted"
+                      title={row.totalTokens.toLocaleString()}
+                    >
                       {row.totalTokens.toLocaleString()}
                     </td>
-                    <td className="py-1.5 pl-3">
+                    <td className="py-1.5 pl-6">
                       <div className="flex items-center justify-end gap-2">
-                        <div className="h-1.5 w-14 shrink-0 overflow-hidden rounded-[var(--radius-pill)] bg-ds-subtle">
+                        <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-[var(--radius-pill)] bg-ds-subtle">
                           <div
                             className="h-full rounded-[var(--radius-pill)] bg-accent"
                             style={{ width: `${row.sharePct}%` }}
@@ -194,23 +199,26 @@ function UsageStatTile({
   )
 }
 
-/** 可排序表头:点击切换排序,aria-sort 标注当前方向(design §5.2)。 */
+/** 可排序表头:点击切换排序,aria-sort 标注当前方向(design §5.2)。
+ *  className 仅用于列宽(07-08 布局优化:表头与数据列同套宽度/对齐/内边距)。 */
 function SortableHeader({
   label,
   active,
   desc,
-  onClick
+  onClick,
+  className = ''
 }: {
   label: string
   active: boolean
   desc: boolean
   onClick: () => void
+  className?: string
 }): ReactElement {
   return (
     <th
       scope="col"
       aria-sort={active ? (desc ? 'descending' : 'ascending') : undefined}
-      className="py-2 pl-3 text-right font-medium"
+      className={`py-2 pl-6 text-right font-medium ${className}`}
     >
       <button
         type="button"

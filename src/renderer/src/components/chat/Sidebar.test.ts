@@ -84,8 +84,6 @@ function renderSidebar(overrides?: Partial<Parameters<typeof Sidebar>[0]>): stri
       canvasActive: false,
       musicActive: false,
       onToggleTheme: vi.fn(),
-      focusModeEnabled: false,
-      onFocusModeChange: vi.fn(),
       onToggleConnectPhone: vi.fn(),
       onCodeOpen: vi.fn(),
       onWriteOpen: vi.fn(),

@@ -204,7 +204,7 @@ export function MyPage({
       </div>
 
       <main className="ds-no-drag min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-6">
-        <div className="mx-auto flex w-full max-w-[880px] flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-[960px] flex-col gap-4">
           {error ? (
             <p className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft px-4 py-3 text-[13px] text-ds-danger">
               {error}

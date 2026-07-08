@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import {
   Clock3,
   FileQuestion,
-  Focus,
   LayoutGrid,
   Moon,
   Plus,
@@ -63,8 +62,6 @@ type Props = {
   canvasActive: boolean
   musicActive: boolean
   onToggleTheme: () => void
-  focusModeEnabled: boolean
-  onFocusModeChange: (enabled: boolean) => void
   onToggleConnectPhone: () => void
   onCodeOpen: () => void
   onWriteOpen: () => void
@@ -102,8 +99,6 @@ export function Sidebar({
   canvasActive,
   musicActive,
   onToggleTheme,
-  focusModeEnabled,
-  onFocusModeChange,
   onToggleConnectPhone,
   onCodeOpen,
   onWriteOpen,
@@ -154,18 +149,6 @@ export function Sidebar({
           onOpenMy={onOpenMy}
           myActive={myActive}
           onOpenSettings={() => onOpenSettings('general')}
-          before={
-            <div className="flex min-h-[42px] items-center justify-center gap-2.5 pb-1">
-            <FocusModeToggle
-              enabled={focusModeEnabled}
-              onToggle={() => onFocusModeChange(!focusModeEnabled)}
-              label={t('focusMode')}
-              status={focusModeEnabled ? t('switchOn') : t('switchOff')}
-              title={t('focusModeToggleTitle')}
-              ariaLabel={t('focusModeToggleLabel')}
-            />
-            </div>
-          }
           settingsAccessory={
             <SidebarIconButton
               title={isDarkMode ? t('switchToLight') : t('switchToDark')}
@@ -374,57 +357,5 @@ export function Sidebar({
       />
     ) : null}
     </>
-  )
-}
-
-function FocusModeToggle({
-  enabled,
-  onToggle,
-  label,
-  status,
-  title,
-  ariaLabel
-}: {
-  enabled: boolean
-  onToggle: () => void
-  label: string
-  status: string
-  title: string
-  ariaLabel: string
-}): ReactElement {
-  return (
-    <button
-      type="button"
-      data-cursor-spotlight-target
-      role="switch"
-      aria-checked={enabled}
-      aria-label={ariaLabel}
-      title={`${title} · ${status}`}
-      onClick={onToggle}
-      className={`group inline-flex h-8 w-[112px] shrink-0 items-center justify-between overflow-hidden rounded-[10px] border px-2.5 text-[12px] font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] ${
-        enabled
-          ? 'border-[color-mix(in_srgb,var(--ds-accent)_35%,transparent)] bg-[var(--ds-sidebar-row-active)] text-ds-ink shadow-[inset_0_0_0_1px_var(--ds-sidebar-row-ring),var(--ds-shadow-chip)] dark:text-white'
-          : 'border-[var(--ds-sidebar-divider)] bg-[var(--ds-sidebar-field-bg)] text-ds-muted shadow-[var(--ds-shadow-chip)] hover:bg-[var(--ds-sidebar-row-hover)] hover:text-ds-ink dark:text-white/62 dark:shadow-none dark:hover:text-white'
-      }`}
-    >
-      <span className="flex min-w-0 items-center gap-1.5">
-        <Focus className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-        <span className="min-w-0 truncate">{label}</span>
-      </span>
-      <span
-        className={`relative h-4 w-7 shrink-0 rounded-full transition ${
-          enabled
-            ? 'bg-accent shadow-[inset_0_0_0_1px_var(--ds-border-muted)]'
-            : 'bg-[color-mix(in_srgb,var(--ds-text-faint)_38%,transparent)] shadow-[inset_0_0_0_1px_var(--ds-border-muted)]'
-        }`}
-        aria-hidden="true"
-      >
-        <span
-          className={`absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-white shadow-[var(--c360-shadow-sm)] transition-transform ${
-            enabled ? 'translate-x-3' : 'translate-x-0'
-          }`}
-        />
-      </span>
-    </button>
   )
 }

@@ -742,11 +742,7 @@ function UsagePanelCard({ children }: { children: ReactElement }): ReactElement 
   )
 }
 
-export function InitialSessionUsageHeatmap({
-  hideHero = false
-}: {
-  hideHero?: boolean
-} = {}): ReactElement {
+export function InitialSessionUsageHeatmap(): ReactElement {
   const [refreshKey, setRefreshKey] = useState(0)
   const [rangeKey, setRangeKey] = useState<UsageRangeKey>('all')
   const state = useDailyUsageState(true, refreshKey, USAGE_RANGE_DAYS.all)
@@ -757,8 +753,7 @@ export function InitialSessionUsageHeatmap({
       state={state}
       modelState={modelState}
       rangeKey={rangeKey}
-      hideHero={hideHero}
-      initialCollapsed={!hideHero}
+      initialCollapsed
       onRangeChange={setRangeKey}
       onRefresh={() => setRefreshKey((value) => value + 1)}
     />
@@ -772,7 +767,6 @@ export function InitialSessionUsageHeatmapView({
   initialCollapsed = false,
   initialActiveTab = 'overview',
   initialModelHoverIndex = null,
-  hideHero = false,
   onRangeChange,
   onRefresh
 }: {
@@ -782,7 +776,6 @@ export function InitialSessionUsageHeatmapView({
   initialCollapsed?: boolean
   initialActiveTab?: UsageTabKey
   initialModelHoverIndex?: number | null
-  hideHero?: boolean
   onRangeChange?: (rangeKey: UsageRangeKey) => void
   onRefresh?: () => void
 }): ReactElement {
@@ -845,13 +838,11 @@ export function InitialSessionUsageHeatmapView({
   return (
     <div className="ds-initial-usage-heatmap ds-no-drag mx-auto flex min-h-[min(620px,calc(100dvh-220px))] w-full items-center justify-center px-3 py-6 text-left sm:px-5 sm:py-8">
       <div className="ds-chat-content-max-width flex w-full min-w-0 flex-col gap-5">
-        {!hideHero ? (
-          <UsageHeroSection
-            title={heroTitle}
-            sub={heroSub}
-            showText={mode !== 'populated'}
-          />
-        ) : null}
+        <UsageHeroSection
+          title={heroTitle}
+          sub={heroSub}
+          showText={mode !== 'populated'}
+        />
         {collapsed ? (
           <CollapsedCalendarCard onExpand={() => setCollapsed(false)} />
         ) : (

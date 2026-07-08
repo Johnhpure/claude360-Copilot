@@ -94,7 +94,6 @@ import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useKeyboardShortcutSettings } from '../lib/keyboard-shortcut-settings'
 import { collectComposerChangeSummary } from '../lib/composer-change-summary'
 import { formatWorkspacePickerError } from '../lib/format-workspace-picker-error'
-import { readFocusModePreference, writeFocusModePreference } from '../lib/focus-mode'
 import { invalidateGroupKeyCache } from '../lib/group-key-ensure'
 import {
   buildComposerFileContextPrompt,
@@ -543,7 +542,6 @@ export function Workbench(): ReactElement {
   const [connectPhoneSidebarOpen, setConnectPhoneSidebarOpen] = useState(false)
   const [fileTreeSidePanelOpen, setFileTreeSidePanelOpen] = useState(false)
   const [openFilePreviewTargets, setOpenFilePreviewTargets] = useState<WorkspaceFileTarget[]>([])
-  const [focusModeEnabled, setFocusModeEnabled] = useState(readFocusModePreference)
   const [runtimeLogPath, setRuntimeLogPath] = useState('')
   const [planPanelOverlayPreferred, setPlanPanelOverlayPreferred] = useState(false)
   const writeAssistantOpen = useWriteWorkspaceStore((s) => s.assistantOpen)
@@ -838,16 +836,6 @@ export function Workbench(): ReactElement {
       cancelled = true
     }
   }, [])
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return
-    document.documentElement.setAttribute('data-focus-mode', focusModeEnabled ? 'on' : 'off')
-  }, [focusModeEnabled])
-
-  const updateFocusMode = (enabled: boolean): void => {
-    writeFocusModePreference(enabled)
-    setFocusModeEnabled(enabled)
-  }
 
   const toggleTheme = useCallback((): void => {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
@@ -2640,8 +2628,6 @@ export function Workbench(): ReactElement {
               canvasActive={route === 'canvas'}
               musicActive={route === 'music'}
               onToggleTheme={toggleTheme}
-              focusModeEnabled={focusModeEnabled}
-              onFocusModeChange={updateFocusMode}
               onToggleConnectPhone={toggleConnectPhone}
               onCodeOpen={openCodeMode}
               onWriteOpen={openWriteMode}
@@ -2815,7 +2801,6 @@ export function Workbench(): ReactElement {
                   onRetryConnection={() => void probeRuntime('user', { restart: true })}
                   onOpenSettings={() => openSettings('agents')}
                   onSelectSuggestion={(text) => setInput(text)}
-                  focusModeEnabled={focusModeEnabled}
                   planActionsBusy={busy}
                   onBuildPlan={() => void buildGuiPlan()}
                   onOpenPlan={openGuiPlanPanel}

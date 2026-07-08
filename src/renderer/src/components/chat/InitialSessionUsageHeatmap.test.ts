@@ -115,20 +115,6 @@ describe('InitialSessionUsageHeatmap', () => {
     expect(html).not.toContain('Explain this project&#x27;s structure')
   })
 
-  it('renders the usage panel without the animated hero in focus mode', () => {
-    const html = render(state({ usage: usage(), loaded: true }), { hideHero: true })
-
-    expect(html).toContain('Daily agent usage calendar')
-    expect(html).toContain('aria-label="2026-05-02')
-    expect(html).toContain('Overview')
-    expect(html).toContain('Models')
-    expect(html).toContain('Sessions')
-    expect(html).toContain('Messages')
-    expect(html).toContain('Collapse calendar')
-    expect(html).toContain('You&#x27;ve used 11.2k tokens across 2 active days.')
-    expect(html).not.toContain('ds-runtime-wake-stage')
-  })
-
   it('renders stacked model usage bars with a hover breakdown tooltip', () => {
     const detailedDay = {
       date: '2026-06-04',

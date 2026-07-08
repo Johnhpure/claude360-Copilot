@@ -40,7 +40,6 @@ type Props = {
   onRetryConnection: () => void
   onOpenSettings: () => void
   onSelectSuggestion?: (prompt: string) => void
-  focusModeEnabled?: boolean
   devPreviewCard?: ReactElement | null
   /** Disables the inline Review Plan card's Build action while a turn runs. */
   planActionsBusy?: boolean
@@ -152,7 +151,6 @@ export function MessageTimeline({
   onRetryConnection,
   onOpenSettings,
   onSelectSuggestion,
-  focusModeEnabled = false,
   devPreviewCard,
   planActionsBusy,
   onBuildPlan,
@@ -294,7 +292,6 @@ export function MessageTimeline({
             onRetry={onRetryConnection}
             onOpenSettings={onOpenSettings}
             onSelectSuggestion={onSelectSuggestion}
-            focusModeEnabled={focusModeEnabled}
           />
         ) : null}
 

@@ -4005,15 +4005,6 @@ pre {
   }
 }
 
-/* Focus mode removes decorative work figures without hiding essential loading indicators. */
-
-[data-focus-mode='on'] .ds-kun-state,
-[data-focus-mode='on'] .ds-runtime-wake-zzz,
-[data-focus-mode='on'] .ds-work-logo,
-[data-focus-mode='on'] .ds-work-logo-slot:has(.ds-work-logo){
-  display: none !important;
-}
-
 /* ============================================================
    07-05 首页品牌欢迎区（BrandHero）：动态文字 Claude360 Copilot。
    动效原则（Celestial Horizon）：色彩混合/透明度优先、低不透明度扩散
