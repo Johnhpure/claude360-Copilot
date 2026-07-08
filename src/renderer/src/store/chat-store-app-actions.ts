@@ -235,10 +235,10 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
       set({ route: 'workflow' })
     },
 
-    openInitialSetup: (mode: InitialSetupMode = 'required') =>
-      set({ initialSetupOpen: true, initialSetupMode: mode }),
+    openInitialSetup: (mode: InitialSetupMode = 'required', message: string | null = null) =>
+      set({ initialSetupOpen: true, initialSetupMode: mode, initialSetupMessage: message }),
 
-    closeInitialSetup: () => set({ initialSetupOpen: false, initialSetupMode: 'required' }),
+    closeInitialSetup: () => set({ initialSetupOpen: false, initialSetupMode: 'required', initialSetupMessage: null }),
 
     selectInspectorItem: (id) => set({ inspectorSelectedId: id }),
 

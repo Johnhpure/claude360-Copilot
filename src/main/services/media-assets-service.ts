@@ -211,7 +211,11 @@ export class MediaAssetsService {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS)
     try {
+      this.log(`[media-assets] 资产下载开始 url=${url}`)
       const res = await this.fetchImpl(url, { signal: controller.signal })
+      this.log(
+        `[media-assets] 资产下载响应 url=${url} status=${res.status} headers=${JSON.stringify(Object.fromEntries(res.headers.entries()))}`
+      )
       if (!res.ok) throw new Error(`download failed with HTTP ${res.status}`)
       // 上限前置（审查 I5）：Content-Length 声明超限直接拒绝，不进内存。
       const declared = Number(res.headers.get('content-length') ?? '')
@@ -280,6 +284,9 @@ export class MediaAssetsService {
       const fileName = `${Date.now().toString(36)}-${safeFileToken(record.id)}.${ext}`
       const localPath = posix.join(MEDIA_ASSET_DIRS.images, fileName)
       await writeFile(join(workspace, localPath), buffer)
+      this.log(
+        `[media-assets] 图片写入完成 id=${record.id} path=${localPath} bytes=${buffer.byteLength} mimeType=${mimeType}`
+      )
       const completed: ImageAssetRecord = { ...record, status: 'completed', localPath, mimeType }
       await this.upsertRecord(workspace, 'images', completed)
       return { ok: true, record: completed }

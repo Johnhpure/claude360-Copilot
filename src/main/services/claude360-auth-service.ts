@@ -25,6 +25,8 @@ import { CLAUDE360_CLI_TOKEN_REF, type Claude360SecretStore } from './claude360-
  * - 返回 renderer 的 result 不含任何明文凭据。
  */
 
+export const CLAUDE360_LOCAL_STORE_RELOGIN_MESSAGE = '由于安全存储方式已更新，请重新登录 Claude360'
+
 export type Claude360ApiClientPort = {
   get<T>(path: string, token?: string): Promise<T>
   post<T>(path: string, body?: unknown, token?: string): Promise<T>
@@ -53,13 +55,17 @@ export class Claude360AuthService {
     this.now = deps.now ?? (() => new Date().toISOString())
   }
 
-  private async sessionFromSettings(loggedInOverride?: boolean): Promise<Claude360SessionResult> {
+  private async sessionFromSettings(
+    loggedInOverride?: boolean,
+    message?: string
+  ): Promise<Claude360SessionResult> {
     const s = await this.deps.readClaude360()
     return {
       loggedIn: loggedInOverride ?? s.loggedIn,
       username: s.username,
       displayName: s.displayName,
-      baseUrl: s.baseUrl
+      baseUrl: s.baseUrl,
+      ...(message ? { message } : {})
     }
   }
 
@@ -81,6 +87,14 @@ export class Claude360AuthService {
     const s = await this.deps.readClaude360()
     const token = await this.deps.secretStore.loadSecret(s.cliTokenRef || CLAUDE360_CLI_TOKEN_REF)
     // 凭据缺失视为未登录，避免展示态与密钥态不一致。
+    if (s.loggedIn && !token) {
+      await this.deps.writeClaude360({
+        loggedIn: false,
+        cliTokenRef: '',
+        tokenRefs: {}
+      })
+      return await this.sessionFromSettings(false, CLAUDE360_LOCAL_STORE_RELOGIN_MESSAGE)
+    }
     return await this.sessionFromSettings(s.loggedIn && Boolean(token))
   }
 

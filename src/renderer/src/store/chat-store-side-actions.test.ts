@@ -107,6 +107,7 @@ function buildHarness(overrides: Partial<ChatState> = {}): Harness {
     settingsSection: 'general',
     initialSetupOpen: false,
     initialSetupMode: 'required',
+    initialSetupMessage: null,
     workspaceRoot: '/tmp',
     workspaceLabel: '/tmp',
     runtimeConnection: 'ready',

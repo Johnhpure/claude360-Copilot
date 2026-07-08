@@ -139,6 +139,7 @@ export type ChatState = {
   settingsSection: SettingsRouteSection
   initialSetupOpen: boolean
   initialSetupMode: InitialSetupMode
+  initialSetupMessage: string | null
   workspaceRoot: string
   workspaceLabel: string
   /** 对话会话的工作目录根(默认 ~/Documents/Claude360 Copilot),供侧边栏对话区块和项目保护使用。 */
@@ -235,7 +236,7 @@ export type ChatState = {
   deleteClawChannel: (channelId: string) => Promise<void>
   resetClawChannelSession: (channelId: string) => Promise<void>
   setClawChannelModel: (channelId: string, model: string) => Promise<void>
-  openInitialSetup: (mode?: InitialSetupMode) => void
+  openInitialSetup: (mode?: InitialSetupMode, message?: string | null) => void
   closeInitialSetup: () => void
   boot: () => Promise<void>
   probeRuntime: (mode?: 'user' | 'background', options?: { restart?: boolean }) => Promise<void>

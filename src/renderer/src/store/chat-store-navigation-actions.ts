@@ -356,7 +356,8 @@ export function createNavigationActions(
             runtimeConnection: 'offline',
             runtimeErrorDetail: 'Preload bridge missing (window.kunGui). Restart the app or check BrowserWindow preload path.',
             initialSetupOpen: false,
-            initialSetupMode: 'required'
+            initialSetupMode: 'required',
+            initialSetupMessage: null
           })
           return
         }
@@ -374,7 +375,14 @@ export function createNavigationActions(
           preservedWorkspaceRoots: [workspaceRoot]
         })
         saveCodeWorkspaceRoots(codeWorkspaceRoots)
-        const needsInitialSetup = !settings.claude360?.loggedIn
+        let isClaude360LoggedIn = settings.claude360?.loggedIn === true
+        let initialSetupMessage: string | null = null
+        if (isClaude360LoggedIn && typeof window.kunGui.claude360Session === 'function') {
+          const session = await window.kunGui.claude360Session()
+          isClaude360LoggedIn = session.loggedIn
+          initialSetupMessage = session.loggedIn ? null : session.message?.trim() || null
+        }
+        const needsInitialSetup = !isClaude360LoggedIn
         applyTheme(settings.theme)
         applyUiFontScale(settings.uiFontScale)
         applyChatContentMaxWidth(settings.chatContentMaxWidthPx)
@@ -451,6 +459,7 @@ export function createNavigationActions(
           route: 'chat',
           initialSetupOpen: needsInitialSetup,
           initialSetupMode: 'required',
+          initialSetupMessage: needsInitialSetup ? initialSetupMessage : null,
           workspaceRoot,
           codeWorkspaceRoots,
           workspaceLabel: workspaceLabelFromPath(workspaceRoot),
@@ -476,6 +485,7 @@ export function createNavigationActions(
           runtimeConnection: 'offline',
           initialSetupOpen: false,
           initialSetupMode: 'required',
+          initialSetupMessage: null,
           ...(shouldOpenSettingsForError(e)
             ? { route: 'settings' as const, settingsSection: 'agents' as const }
             : {})

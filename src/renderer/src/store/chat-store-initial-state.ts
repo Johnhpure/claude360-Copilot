@@ -12,6 +12,7 @@ export function createInitialChatStoreState(workingDirectoryLabel: string) {
     settingsSection: 'general' as const,
     initialSetupOpen: false,
     initialSetupMode: 'required' as const,
+    initialSetupMessage: null,
     workspaceRoot: '',
     conversationWorkspaceRoot: defaultConversationWorkspaceRoot(),
     workspaceLabel: workingDirectoryLabel,

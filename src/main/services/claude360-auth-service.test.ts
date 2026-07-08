@@ -163,6 +163,32 @@ describe('Claude360AuthService', () => {
     expect(await secretStore.loadSecret('claude360:cli-token')).toBeNull()
   })
 
+  it('marks stale logged-in settings as signed out when the local secret is missing', async () => {
+    const port = settingsPort()
+    port.writeClaude360({
+      loggedIn: true,
+      username: 'demo',
+      displayName: 'Demo',
+      cliTokenRef: 'claude360:cli-token'
+    })
+    const service = new Claude360AuthService({
+      apiClient: fakeApi({}),
+      secretStore: fakeSecretStore(),
+      readClaude360: port.readClaude360,
+      writeClaude360: port.writeClaude360
+    })
+
+    await expect(service.getSession()).resolves.toEqual({
+      loggedIn: false,
+      username: 'demo',
+      displayName: 'Demo',
+      baseUrl: port.current().baseUrl,
+      message: '由于安全存储方式已更新，请重新登录 Claude360'
+    })
+    expect(port.current().loggedIn).toBe(false)
+    expect(port.current().cliTokenRef).toBe('')
+  })
+
   it('returns a typed failure when the API rejects login', async () => {
     const port = settingsPort()
     const service = new Claude360AuthService({

@@ -20,6 +20,7 @@ export type Claude360SessionResult = {
   username: string
   displayName: string
   baseUrl: string
+  message?: string
 }
 
 export type Claude360DeviceAuthStartResult =
@@ -240,5 +241,4 @@ export type Claude360TokenStatRawResponse = {
   total_tokens?: number
   quota?: number
 }
-
 

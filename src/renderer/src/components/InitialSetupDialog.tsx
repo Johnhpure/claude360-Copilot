@@ -73,6 +73,7 @@ type DeviceStatus = 'idle' | 'pending' | 'expired' | 'denied'
 export function InitialSetupDialog(): ReactElement {
   const { t } = useTranslation('settings')
   const initialSetupMode = useChatStore((s) => s.initialSetupMode)
+  const initialSetupMessage = useChatStore((s) => s.initialSetupMessage)
   const closeInitialSetup = useChatStore((s) => s.closeInitialSetup)
   const reloadUiSettings = useChatStore((s) => s.reloadUiSettings)
   const probeRuntime = useChatStore((s) => s.probeRuntime)
@@ -90,6 +91,10 @@ export function InitialSetupDialog(): ReactElement {
   const pollTimer = useRef<number | null>(null)
 
   const closeAllowed = canCloseInitialSetup(initialSetupMode)
+
+  useEffect(() => {
+    setError(initialSetupMessage)
+  }, [initialSetupMessage])
 
   const stopPolling = useCallback((): void => {
     if (pollTimer.current !== null) {

@@ -280,6 +280,54 @@ describe('onClawChannelActivity routes through subscribeThreadEventsLive (not se
     expect(subscribeThreadEventsLive).toHaveBeenCalledWith('thr_bot')
     expect(selectThread).not.toHaveBeenCalled()
   })
+
+  it('requires initial setup when the local Claude360 secret is missing despite stale logged-in settings', async () => {
+    const onRuntimeStatus = vi.fn(() => () => {})
+    const onTrayAction = vi.fn(() => () => {})
+    const onClawChannelActivity = vi.fn(() => () => {})
+    const claude360Session = vi.fn(async () => ({
+      loggedIn: false,
+      username: 'demo',
+      displayName: 'Demo',
+      baseUrl: 'https://claude360.xyz',
+      message: '由于安全存储方式已更新，请重新登录 Claude360'
+    }))
+    const getSettings = vi.fn(async () => ({
+      workspaceRoot: '~/.kun/default_workspace',
+      write: {
+        defaultWorkspaceRoot: '~/.kun/default_workspace',
+        activeWorkspaceRoot: '~/.kun/default_workspace',
+        workspaces: []
+      },
+      claw: { channels: [] },
+      theme: 'dark',
+      uiFontScale: 1,
+      chatContentMaxWidthPx: 896,
+      locale: 'en',
+      agents: { kun: { apiKey: 'test-key', model: 'deepseek-v4-pro', baseUrl: '' } },
+      claude360: { loggedIn: true },
+      disabledSkillIds: []
+    }))
+    vi.stubGlobal('window', {
+      kunGui: {
+        getSettings,
+        claude360Session,
+        onClawChannelActivity,
+        onTrayAction,
+        onRuntimeStatus
+      }
+    })
+
+    const probeRuntime = vi.fn(async () => undefined)
+    const harness = buildHarness({ probeRuntime })
+    await harness.actions.boot()
+
+    expect(claude360Session).toHaveBeenCalledTimes(1)
+    expect(harness.state.initialSetupOpen).toBe(true)
+    expect(harness.state.initialSetupMessage).toBe('由于安全存储方式已更新，请重新登录 Claude360')
+    expect(harness.state.runtimeConnection).toBe('idle')
+    expect(probeRuntime).not.toHaveBeenCalled()
+  })
 })
 
 // 「我的」页路由:setRoute('my') 合法,且从「我的」页打开设置再返回时

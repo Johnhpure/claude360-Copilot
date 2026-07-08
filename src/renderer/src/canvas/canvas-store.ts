@@ -114,11 +114,11 @@ export interface CanvasState {
   setN: (n: number) => void
   // actions —— 生成（签名与 canvas-workbench-actions 注入约定保持不变）
   beginGenerate: () => void
-  generateSuccess: (images: Claude360CanvasImage[]) => void
+  generateSuccess: (images: Claude360CanvasImage[], localArtifacts?: Record<string, string>) => void
   generateFailure: (message: string) => void
   // actions —— 编辑
   beginEdit: () => void
-  editSuccess: (images: Claude360CanvasImage[]) => void
+  editSuccess: (images: Claude360CanvasImage[], localArtifacts?: Record<string, string>) => void
   editFailure: (message: string) => void
   // actions —— 作品管理
   removeArtwork: (id: string) => void
@@ -190,7 +190,8 @@ export function pendingArtworkFromForm(
 export function reduceResolvePending(
   artworks: CanvasArtwork[],
   pendingId: string | null,
-  images: Claude360CanvasImage[]
+  images: Claude360CanvasImage[],
+  localArtifacts: Record<string, string> = {}
 ): CanvasArtwork[] {
   const resolved: CanvasArtwork[] = []
   for (const artwork of artworks) {
@@ -207,7 +208,8 @@ export function reduceResolvePending(
         prompt: image.prompt || artwork.prompt,
         model: image.model || artwork.model,
         n: 1,
-        createdAt: image.createdAt || artwork.createdAt
+        createdAt: image.createdAt || artwork.createdAt,
+        ...(localArtifacts[image.id] ? { localPath: localArtifacts[image.id] } : {})
       })
     }
   }
@@ -482,12 +484,12 @@ export function createCanvasStore(
           artworks: [pending, ...s.artworks].slice(0, CANVAS_HISTORY_LIMIT)
         }
       }),
-    generateSuccess: (images) =>
+    generateSuccess: (images, localArtifacts) =>
       set((s) => ({
         generating: false,
         error: null,
         pendingArtworkId: null,
-        artworks: reduceResolvePending(s.artworks, s.pendingArtworkId, images)
+        artworks: reduceResolvePending(s.artworks, s.pendingArtworkId, images, localArtifacts)
       })),
     generateFailure: (message) =>
       set((s) => ({
@@ -506,12 +508,12 @@ export function createCanvasStore(
           artworks: [pending, ...s.artworks].slice(0, CANVAS_HISTORY_LIMIT)
         }
       }),
-    editSuccess: (images) =>
+    editSuccess: (images, localArtifacts) =>
       set((s) => ({
         editing: false,
         error: null,
         pendingArtworkId: null,
-        artworks: reduceResolvePending(s.artworks, s.pendingArtworkId, images)
+        artworks: reduceResolvePending(s.artworks, s.pendingArtworkId, images, localArtifacts)
       })),
     editFailure: (message) =>
       set((s) => ({

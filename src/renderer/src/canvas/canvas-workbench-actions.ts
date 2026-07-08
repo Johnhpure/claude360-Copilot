@@ -47,6 +47,21 @@ export function defaultImageModel(models: string[]): string {
 }
 
 export type SubmitResult = { ok: boolean; message?: string; images?: Claude360CanvasImage[] }
+export type SubmitOptions = {
+  beforeSuccess?: (images: Claude360CanvasImage[]) => Promise<Record<string, string>>
+}
+
+function nonEmptyArtifacts(localArtifacts: Record<string, string>): Record<string, string> | undefined {
+  return Object.keys(localArtifacts).length > 0 ? localArtifacts : undefined
+}
+
+function canvasDebugLog(event: string, details: Record<string, unknown>): void {
+  const runtime = globalThis as typeof globalThis & {
+    process?: { env?: { NODE_ENV?: string } }
+  }
+  if (runtime.process?.env?.NODE_ENV === 'test') return
+  console.info(`[claude360-canvas-ui] ${event}`, JSON.stringify(details))
+}
 
 /**
  * 提交一次文本生图：校验 → beginGenerate → 调 main 生成 →
@@ -56,11 +71,21 @@ export type SubmitResult = { ok: boolean; message?: string; images?: Claude360Ca
 export async function submitGenerate(
   api: Pick<CanvasWorkbenchApi, 'claude360CanvasGenerate'>,
   store: Pick<CanvasState, 'beginGenerate' | 'generateSuccess' | 'generateFailure'>,
-  payload: Claude360ImageGeneratePayload
+  payload: Claude360ImageGeneratePayload,
+  options: SubmitOptions = {}
 ): Promise<SubmitResult> {
   if (!payload.prompt.trim()) return { ok: false, message: 'emptyPrompt' }
   if (!payload.model.trim()) return { ok: false, message: 'emptyModel' }
+  canvasDebugLog('generate request', {
+    model: payload.model,
+    promptLength: payload.prompt.length,
+    size: payload.size ?? null,
+    n: payload.n ?? 1,
+    quality: payload.quality ?? null,
+    output_format: payload.output_format ?? null
+  })
   store.beginGenerate()
+  canvasDebugLog('status transition', { operation: 'generate', from: 'idle', to: 'pending' })
   try {
     const result = await api.claude360CanvasGenerate({
       model: payload.model,
@@ -71,14 +96,46 @@ export async function submitGenerate(
       ...(payload.output_format ? { output_format: payload.output_format } : {})
     })
     if (result.ok) {
-      store.generateSuccess(result.images)
+      let localArtifacts: Record<string, string> = {}
+      try {
+        localArtifacts = await (options.beforeSuccess?.(result.images) ?? Promise.resolve({}))
+      } catch (error) {
+        canvasDebugLog('asset persist failed', {
+          operation: 'generate',
+          reason: error instanceof Error ? error.message : String(error)
+        })
+      }
+      const artifacts = nonEmptyArtifacts(localArtifacts)
+      if (artifacts) {
+        store.generateSuccess(result.images, artifacts)
+      } else {
+        store.generateSuccess(result.images)
+      }
+      canvasDebugLog('status transition', {
+        operation: 'generate',
+        from: 'pending',
+        to: 'success',
+        imageCount: result.images.length
+      })
       return { ok: true, images: result.images }
     }
     store.generateFailure(result.message)
+    canvasDebugLog('status transition', {
+      operation: 'generate',
+      from: 'pending',
+      to: 'failed',
+      reason: result.message
+    })
     return { ok: false, message: result.message }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     store.generateFailure(message)
+    canvasDebugLog('status transition', {
+      operation: 'generate',
+      from: 'pending',
+      to: 'failed',
+      reason: message
+    })
     return { ok: false, message }
   }
 }
@@ -90,12 +147,23 @@ export async function submitGenerate(
 export async function submitEdit(
   api: Pick<CanvasWorkbenchApi, 'claude360CanvasEdit'>,
   store: Pick<CanvasState, 'beginEdit' | 'editSuccess' | 'editFailure'>,
-  payload: Claude360ImageEditPayload
+  payload: Claude360ImageEditPayload,
+  options: SubmitOptions = {}
 ): Promise<SubmitResult> {
   if (!payload.image) return { ok: false, message: 'emptyImage' }
   if (!payload.prompt.trim()) return { ok: false, message: 'emptyPrompt' }
   if (!payload.model.trim()) return { ok: false, message: 'emptyModel' }
+  canvasDebugLog('edit request', {
+    model: payload.model,
+    promptLength: payload.prompt.length,
+    hasImage: Boolean(payload.image),
+    hasMask: Boolean(payload.mask),
+    size: payload.size ?? null,
+    quality: payload.quality ?? null,
+    output_format: payload.output_format ?? null
+  })
   store.beginEdit()
+  canvasDebugLog('status transition', { operation: 'edit', from: 'idle', to: 'pending' })
   try {
     const result = await api.claude360CanvasEdit({
       model: payload.model,
@@ -107,14 +175,46 @@ export async function submitEdit(
       ...(payload.output_format ? { output_format: payload.output_format } : {})
     })
     if (result.ok) {
-      store.editSuccess(result.images)
+      let localArtifacts: Record<string, string> = {}
+      try {
+        localArtifacts = await (options.beforeSuccess?.(result.images) ?? Promise.resolve({}))
+      } catch (error) {
+        canvasDebugLog('asset persist failed', {
+          operation: 'edit',
+          reason: error instanceof Error ? error.message : String(error)
+        })
+      }
+      const artifacts = nonEmptyArtifacts(localArtifacts)
+      if (artifacts) {
+        store.editSuccess(result.images, artifacts)
+      } else {
+        store.editSuccess(result.images)
+      }
+      canvasDebugLog('status transition', {
+        operation: 'edit',
+        from: 'pending',
+        to: 'success',
+        imageCount: result.images.length
+      })
       return { ok: true, images: result.images }
     }
     store.editFailure(result.message)
+    canvasDebugLog('status transition', {
+      operation: 'edit',
+      from: 'pending',
+      to: 'failed',
+      reason: result.message
+    })
     return { ok: false, message: result.message }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     store.editFailure(message)
+    canvasDebugLog('status transition', {
+      operation: 'edit',
+      from: 'pending',
+      to: 'failed',
+      reason: message
+    })
     return { ok: false, message }
   }
 }
@@ -201,7 +301,7 @@ export type PersistImageMeta = {
  */
 export async function persistGeneratedImages(
   api: Pick<CanvasPersistenceApi, 'mediaAssetsSaveImage'>,
-  store: Pick<CanvasState, 'attachLocalArtifact'>,
+  store: Pick<CanvasState, 'attachLocalArtifact'> | null,
   workspaceRoot: string,
   images: Claude360CanvasImage[],
   meta: PersistImageMeta = {},
@@ -211,9 +311,10 @@ export async function persistGeneratedImages(
     /** 反删磁盘记录（含本地文件）。 */
     cleanupRemoved?: (id: string) => void
   } = {}
-): Promise<void> {
+): Promise<Record<string, string>> {
   const root = workspaceRoot.trim()
-  if (!root) return
+  if (!root) return {}
+  const localArtifacts: Record<string, string> = {}
   await Promise.all(
     images.map(async (image) => {
       const source = image.source === 'base64' && image.b64Json
@@ -223,6 +324,12 @@ export async function persistGeneratedImages(
           : null
       if (!source) return
       try {
+        canvasDebugLog('asset persist start', {
+          imageId: image.id,
+          source: 'url' in source ? 'url' : 'base64',
+          workspaceRoot,
+          url: 'url' in source ? source.url : null
+        })
         const result = await api.mediaAssetsSaveImage({
           workspaceRoot: root,
           record: {
@@ -244,15 +351,34 @@ export async function persistGeneratedImages(
           return
         }
         if (result.ok && result.record.localPath) {
-          store.attachLocalArtifact(image.id, result.record.localPath)
+          canvasDebugLog('asset persist success', {
+            imageId: image.id,
+            localPath: result.record.localPath,
+            status: result.record.status
+          })
+          localArtifacts[image.id] = result.record.localPath
+          store?.attachLocalArtifact(image.id, result.record.localPath)
+        } else if (result.ok && result.record.status === 'failed') {
+          canvasDebugLog('asset persist failed', {
+            imageId: image.id,
+            status: result.record.status,
+            reason: '生成成功，但图片下载失败'
+          })
+          console.warn('[media-assets] 生成成功，但图片下载失败（不影响展示）')
         } else if (!result.ok) {
+          canvasDebugLog('asset persist failed', { imageId: image.id, reason: result.message })
           console.warn('[media-assets] 图片本地保存失败（不影响展示）:', result.message)
         }
       } catch (error) {
+        canvasDebugLog('asset persist failed', {
+          imageId: image.id,
+          reason: error instanceof Error ? error.message : String(error)
+        })
         console.warn('[media-assets] 图片本地保存失败（不影响展示）:', error)
       }
     })
   )
+  return localArtifacts
 }
 
 /** 启动 / 切换工作空间时从磁盘恢复生图作品列表（失败静默，保留内存态）。 */

@@ -59,13 +59,24 @@ export type Claude360CanvasServiceDeps = {
 // 或裸 base64 串。这里做统一提取：**只要任一路径能解出可用图片就算成功**，
 // 不因 body 里同时带 message/warning 文案而误判失败。
 
-type ExtractedImage = { url?: string; b64?: string; mimeType?: string }
+export type NormalizedImage = { url?: string; b64?: string; mimeType?: string }
+
+export type NormalizedImageResponse = {
+  success: boolean
+  images: NormalizedImage[]
+  error?: {
+    code?: string
+    message?: string
+    type?: string
+  }
+  warnings?: string[]
+}
 
 const DATA_URL_IMAGE = /^data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/i
 const IMAGE_CONTAINER_KEYS = ['data', 'images', 'output', 'result', 'content'] as const
 
 /** 字符串 → 图片：data URL / http(s) URL / 长裸 base64（字符集+长度双重把关）。 */
-function extractFromString(value: string): ExtractedImage | null {
+function extractFromString(value: string): NormalizedImage | null {
   const raw = value.trim()
   if (!raw) return null
   const dataUrl = DATA_URL_IMAGE.exec(raw)
@@ -76,7 +87,7 @@ function extractFromString(value: string): ExtractedImage | null {
 }
 
 /** 单条目 → 图片：string 直取；object 依次试 url/image_url(含嵌套 {url})/b64 系字段。 */
-function extractFromEntry(entry: unknown): ExtractedImage | null {
+function extractFromEntry(entry: unknown): NormalizedImage | null {
   if (typeof entry === 'string') return extractFromString(entry)
   if (!entry || typeof entry !== 'object') return null
   const item = entry as Record<string, unknown>
@@ -107,8 +118,8 @@ function extractFromEntry(entry: unknown): ExtractedImage | null {
  * NewAPI 有时会再套一层 `{ success, data: { data: [...] } }`，因此容器键递归
  * 扫描；但不扫描任意字符串字段，避免把普通 message 里的 URL 当成图片。
  */
-function collectImages(env: Claude360ImagesRawEnvelope): ExtractedImage[] {
-  const found: ExtractedImage[] = []
+function collectImages(env: Claude360ImagesRawEnvelope): NormalizedImage[] {
+  const found: NormalizedImage[] = []
   const walk = (entry: unknown, depth = 0): void => {
     if (depth > 8 || entry === undefined || entry === null) return
     if (Array.isArray(entry)) {
@@ -128,9 +139,9 @@ function collectImages(env: Claude360ImagesRawEnvelope): ExtractedImage[] {
 }
 
 /** 去重：同一 url / 同一 base64（前缀足够区分）只保留一张，避免 data+images 并存时重复。 */
-function dedupeImages(images: ExtractedImage[]): ExtractedImage[] {
+function dedupeImages(images: NormalizedImage[]): NormalizedImage[] {
   const seen = new Set<string>()
-  const unique: ExtractedImage[] = []
+  const unique: NormalizedImage[] = []
   for (const image of images) {
     const key = image.url ?? `b64:${image.b64?.slice(0, 128)}:${image.b64?.length}`
     if (seen.has(key)) continue
@@ -179,7 +190,73 @@ function collectFieldsByName(value: unknown, matcher: RegExp, depth = 0): unknow
   return out
 }
 
-function logImagesShape(path: string, env: Claude360ImagesRawEnvelope, extracted: ExtractedImage[]): void {
+function stringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key]
+  return typeof value === 'string' && value.trim() ? sanitizeClaude360Message(value.trim()) : undefined
+}
+
+function envelopeErrorDetails(
+  env: Claude360ImagesRawEnvelope
+): NormalizedImageResponse['error'] | undefined {
+  const record = env as Record<string, unknown>
+  const err = record.error
+  if (typeof err === 'string' && err.trim()) {
+    return { message: sanitizeClaude360Message(err.trim()) }
+  }
+  if (err && typeof err === 'object') {
+    const errorRecord = err as Record<string, unknown>
+    const message = stringField(errorRecord, 'message')
+    return {
+      ...(stringField(errorRecord, 'code') ? { code: stringField(errorRecord, 'code') } : {}),
+      ...(message ? { message } : {}),
+      ...(stringField(errorRecord, 'type') ? { type: stringField(errorRecord, 'type') } : {})
+    }
+  }
+  const message = stringField(record, 'message') ?? stringField(record, 'msg')
+  return message ? { message } : undefined
+}
+
+function normalizeWarningValue(value: unknown): string[] {
+  if (typeof value === 'string' && value.trim()) return [sanitizeClaude360Message(value.trim())]
+  if (Array.isArray(value)) return value.flatMap((item) => normalizeWarningValue(item))
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return ['message', 'msg', 'warning', 'warnings']
+      .flatMap((key) => normalizeWarningValue(record[key]))
+  }
+  return []
+}
+
+function collectWarnings(env: Claude360ImagesRawEnvelope): string[] {
+  const record = env as Record<string, unknown>
+  const values: string[] = [
+    ...normalizeWarningValue(record.warning),
+    ...normalizeWarningValue(record.warnings)
+  ]
+  const message = stringField(record, 'message') ?? stringField(record, 'msg')
+  if (message) values.push(message)
+  return [...new Set(values)]
+}
+
+export function normalizeImageResponse(env: Claude360ImagesRawEnvelope): NormalizedImageResponse {
+  const images = collectImages(env)
+  if (images.length > 0) {
+    const warnings = collectWarnings(env)
+    return {
+      success: true,
+      images,
+      ...(warnings.length > 0 ? { warnings } : {})
+    }
+  }
+  const error = envelopeErrorDetails(env)
+  return {
+    success: false,
+    images: [],
+    ...(error && error.message ? { error } : {})
+  }
+}
+
+function logImagesShape(path: string, env: Claude360ImagesRawEnvelope, extracted: NormalizedImage[]): void {
   if (process.env.NODE_ENV === 'test') return
   const record = env as Record<string, unknown>
   // 按任务书要求打印完整真实响应（原始 body 结构 / 提取到的图片字段），不猜字段名。
@@ -213,6 +290,16 @@ function logImagesShape(path: string, env: Claude360ImagesRawEnvelope, extracted
   )
 }
 
+function logImageRequest(path: string, payload: Record<string, unknown>): void {
+  if (process.env.NODE_ENV === 'test') return
+  console.info(`[claude360-canvas] ${path} request`, JSON.stringify(summarizeForLog(payload)))
+}
+
+function logNormalizeResult(path: string, normalized: NormalizedImageResponse): void {
+  if (process.env.NODE_ENV === 'test') return
+  console.info(`[claude360-canvas] ${path} normalize result`, JSON.stringify(summarizeForLog(normalized)))
+}
+
 function logFinalDecision(
   path: string,
   decision: {
@@ -228,14 +315,7 @@ function logFinalDecision(
 
 /** 解出上游可展示错误信息（error.message / message / msg），已脱敏。 */
 function envelopeError(env: Claude360ImagesRawEnvelope): string | null {
-  const err = env.error
-  const raw =
-    (typeof err === 'string' && err.trim()) ||
-    (err && typeof err === 'object' && typeof err.message === 'string' && err.message.trim()) ||
-    (typeof env.message === 'string' && env.message.trim()) ||
-    (typeof env.msg === 'string' && env.msg.trim()) ||
-    ''
-  return raw ? sanitizeClaude360Message(raw) : null
+  return envelopeErrorDetails(env)?.message ?? null
 }
 
 function isSafetyRefusal(message: string): boolean {
@@ -248,7 +328,7 @@ function upstreamFailureMessage(message: string): string {
 
 /** 归一化单张图片：url 优先，base64 带真实 mimeType；两者皆无返回 null。 */
 function mapImage(
-  item: ExtractedImage,
+  item: NormalizedImage,
   meta: { prompt: string; model: string; createdAt: string }
 ): Claude360CanvasImage | null {
   if (item.url) {
@@ -342,6 +422,7 @@ export class Claude360CanvasService {
     if (input.size) body.size = input.size
     if (input.quality) body.quality = input.quality
     if (input.output_format) body.output_format = input.output_format
+    logImageRequest('/v1/images/generations', body)
 
     let env: Claude360ImagesRawEnvelope
     try {
@@ -376,6 +457,7 @@ export class Claude360CanvasService {
     form.append('model', input.model)
     form.append('prompt', input.prompt)
     form.append('image', new Blob([decoded.buffer], { type: decoded.mimeType }), 'image.png')
+    let maskByteLength: number | undefined
     if (input.mask) {
       const mask = decodeImageInput(input.mask)
       if (!mask) {
@@ -384,12 +466,22 @@ export class Claude360CanvasService {
       if (mask.byteLength > MAX_IMAGE_BYTES) {
         return { ok: false, message: '蒙版图片过大，请压缩到 25MB 以内后重试' }
       }
+      maskByteLength = mask.byteLength
       form.append('mask', new Blob([mask.buffer], { type: mask.mimeType }), 'mask.png')
     }
     if (input.size) form.append('size', input.size)
     // 参考图(图生图)一并透传质量与输出格式；newapi edits 走 multipart 全字段转发上游。
     if (input.quality) form.append('quality', input.quality)
     if (input.output_format) form.append('output_format', input.output_format)
+    logImageRequest('/v1/images/edits', {
+      model: input.model,
+      prompt: input.prompt,
+      size: input.size ?? null,
+      quality: input.quality ?? null,
+      output_format: input.output_format ?? null,
+      imageBytes: decoded.byteLength,
+      maskBytes: maskByteLength ?? null
+    })
 
     let env: Claude360ImagesRawEnvelope
     try {
@@ -412,10 +504,11 @@ export class Claude360CanvasService {
     env: Claude360ImagesRawEnvelope,
     meta: { prompt: string; model: string }
   ): Claude360ImageResult {
-    const extracted = collectImages(env)
-    logImagesShape(path, env, extracted)
+    const normalized = normalizeImageResponse(env)
+    logImagesShape(path, env, normalized.images)
+    logNormalizeResult(path, normalized)
     const createdAt = new Date().toISOString()
-    const images = extracted
+    const images = normalized.images
       .map((row) => mapImage(row, { ...meta, createdAt }))
       .filter((img): img is Claude360CanvasImage => img !== null)
     if (images.length > 0) {

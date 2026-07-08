@@ -65,6 +65,33 @@ describe('submitGenerate · 生成编排', () => {
     expect(store.generateSuccess).toHaveBeenCalledWith([image('a')])
     expect(store.generateFailure).not.toHaveBeenCalled()
   })
+  it('成功结果先执行本地保存钩子，再更新 success 卡片', async () => {
+    const ok: Claude360ImageResult = { ok: true, images: [image('a')] }
+    const order: string[] = []
+    const api = { claude360CanvasGenerate: vi.fn(async () => ok) }
+    const store = {
+      beginGenerate: vi.fn(),
+      generateSuccess: vi.fn(() => order.push('success')),
+      generateFailure: vi.fn()
+    }
+    const beforeSuccess = vi.fn(async () => {
+      order.push('persist')
+      return { a: 'assets/images/a.png' }
+    })
+
+    const result = await submitGenerate(
+      api,
+      store,
+      { prompt: '猫', model: 'flux-pro', size: '1024x1024', n: 1 },
+      { beforeSuccess }
+    )
+
+    expect(result.ok).toBe(true)
+    expect(order).toEqual(['persist', 'success'])
+    expect(beforeSuccess).toHaveBeenCalledWith([image('a')])
+    expect(store.generateSuccess).toHaveBeenCalledWith([image('a')], { a: 'assets/images/a.png' })
+    expect(store.generateFailure).not.toHaveBeenCalled()
+  })
   it('后端 ok:false → generateFailure(message)', async () => {
     const fail: Claude360ImageResult = { ok: false, message: '余额不足' }
     const api = { claude360CanvasGenerate: vi.fn(async () => fail) }

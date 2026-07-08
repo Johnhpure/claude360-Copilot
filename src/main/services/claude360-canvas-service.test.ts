@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   Claude360CanvasService,
+  normalizeImageResponse,
   type Claude360CanvasApiClientPort,
   type Claude360CanvasServiceDeps
 } from './claude360-canvas-service'
@@ -352,6 +353,38 @@ describe('Claude360CanvasService.generateImages', () => {
     )
     const result = await service.generateImages(generatePayload)
     expect(result).toMatchObject({ ok: false, retryable: true })
+  })
+})
+
+describe('normalizeImageResponse', () => {
+  it('只要存在图片结果就判定成功，并把 unsafe message 降为 warning', () => {
+    const normalized = normalizeImageResponse({
+      success: true,
+      message: 'The generated images appear to be unsafe...',
+      data: { data: [{ url: 'https://cdn/ok.png' }] }
+    } as never)
+
+    expect(normalized).toEqual({
+      success: true,
+      images: [{ url: 'https://cdn/ok.png' }],
+      warnings: ['The generated images appear to be unsafe...']
+    })
+  })
+
+  it('没有任何图片且有错误文案时才判定失败', () => {
+    const normalized = normalizeImageResponse({
+      error: { code: 'content_policy_violation', message: 'The generated images appear to be unsafe...', type: 'invalid_request_error' }
+    } as never)
+
+    expect(normalized).toEqual({
+      success: false,
+      images: [],
+      error: {
+        code: 'content_policy_violation',
+        message: 'The generated images appear to be unsafe...',
+        type: 'invalid_request_error'
+      }
+    })
   })
 })
 

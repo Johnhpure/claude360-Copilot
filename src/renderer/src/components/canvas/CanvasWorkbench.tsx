@@ -216,13 +216,12 @@ export function CanvasWorkbench({
     // 提交（否则占位被覆盖，先回批次挂错参数、后回批次被静默丢弃）。ensure 弹窗 await
     // 期间状态可能变化，故在这里（而非进入函数时）读最新状态判定。
     if (s.generating || s.editing) return
-    // 07-05：生成/编辑成功后静默落盘到工作空间 assets/（fire-and-forget，不阻塞 UI）。
-    const persistAfterSuccess = (images: Claude360CanvasImage[] | undefined): void => {
-      if (!images?.length || !workspaceRoot || !window.kunGui?.mediaAssetsSaveImage) return
-      const latest = useCanvasStore.getState()
-      void persistGeneratedImages(
+    // 服务端成功后先尝试落盘，再把 pending 卡片更新为 success；落盘失败不改变生成成功状态。
+    const persistBeforeSuccess = async (images: Claude360CanvasImage[]): Promise<Record<string, string>> => {
+      if (!images.length || !workspaceRoot || !window.kunGui?.mediaAssetsSaveImage) return {}
+      return await persistGeneratedImages(
         window.kunGui as unknown as CanvasPersistenceApi,
-        latest,
+        null,
         workspaceRoot,
         images,
         {
@@ -230,39 +229,38 @@ export function CanvasWorkbench({
           quality: s.quality,
           format: s.outputFormat,
           ...(imageGroup ? { group: imageGroup } : {})
-        },
-        {
-          // 下载窗口内被删的作品：反删磁盘记录（连本地文件），防幽灵条目复活。
-          isRemoved: (id) => !useCanvasStore.getState().artworks.some((artwork) => artwork.id === id),
-          cleanupRemoved: (id) => {
-            void window.kunGui
-              ?.mediaAssetsDelete({ workspaceRoot, kind: 'image', ids: [id], deleteFiles: true })
-              .catch(() => undefined)
-          }
         }
       )
     }
     if (s.referenceImage) {
-      const edited = await submitEdit(kun, { beginEdit, editSuccess, editFailure }, {
-        model: s.model,
-        prompt: s.prompt,
-        image: s.referenceImage,
-        size: s.size,
-        quality: s.quality,
-        output_format: s.outputFormat
-      })
-      if (edited.ok) persistAfterSuccess(edited.images)
+      await submitEdit(
+        kun,
+        { beginEdit, editSuccess, editFailure },
+        {
+          model: s.model,
+          prompt: s.prompt,
+          image: s.referenceImage,
+          size: s.size,
+          quality: s.quality,
+          output_format: s.outputFormat
+        },
+        { beforeSuccess: persistBeforeSuccess }
+      )
       return
     }
-    const generated = await submitGenerate(kun, { beginGenerate, generateSuccess, generateFailure }, {
-      model: s.model,
-      prompt: s.prompt,
-      size: s.size,
-      n: s.n,
-      quality: s.quality,
-      output_format: s.outputFormat
-    })
-    if (generated.ok) persistAfterSuccess(generated.images)
+    await submitGenerate(
+      kun,
+      { beginGenerate, generateSuccess, generateFailure },
+      {
+        model: s.model,
+        prompt: s.prompt,
+        size: s.size,
+        n: s.n,
+        quality: s.quality,
+        output_format: s.outputFormat
+      },
+      { beforeSuccess: persistBeforeSuccess }
+    )
   }, [beginEdit, editFailure, editSuccess, beginGenerate, generateFailure, generateSuccess, imageGroup, workspaceRoot])
 
   // 重新生成：把该作品的参数快照回填表单（所见即所发），随后按文本生图重新提交。

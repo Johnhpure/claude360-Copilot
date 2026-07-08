@@ -5,7 +5,6 @@ import {
   ipcMain,
   Menu,
   nativeImage,
-  safeStorage,
   Notification,
   powerSaveBlocker,
   Tray,
@@ -1735,8 +1734,7 @@ app.whenReady().then(async () => {
   // baseUrl 默认指向 claude360.xyz；第一阶段无修改入口（供应商配置隐藏）。
   const claude360ApiClient = new Claude360ApiClient({ baseUrl: DEFAULT_CLAUDE360_BASE_URL })
   const claude360SecretStore = createClaude360SecretStore({
-    filePath: join(app.getPath('userData'), 'claude360-secrets.json'),
-    safeStorage
+    filePath: join(app.getPath('userData'), 'secure-store.json')
   })
   // 让 kun 运行时（子进程，拿不到 secretStore）能在 spawn/写子进程 config 前，
   // 把 provider.apiKeyRef 解出真 Key 注入运行时。明文只在 main 侧解析，绝不落 settings。
