@@ -223,7 +223,7 @@ describe('Claude360CanvasService.generateImages', () => {
       })
     )
     const result = await service.generateImages(generatePayload)
-    expect(result).toMatchObject({ ok: false, message: '余额不足，请充值' })
+    expect(result).toMatchObject({ ok: false, message: '上游接口错误：余额不足，请充值' })
   })
 
   it('后端返回非预期结构（无 data 数组）返回可展示错误', async () => {
@@ -232,6 +232,7 @@ describe('Claude360CanvasService.generateImages', () => {
     )
     const result = await service.generateImages(generatePayload)
     expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toBe('图片字段缺失：接口响应中未找到可用图片字段')
   })
 
   it('body 同时带非空 message 与有效 data 图片时仍判成功（不按文案误判失败）', async () => {
@@ -247,6 +248,39 @@ describe('Claude360CanvasService.generateImages', () => {
     const result = await service.generateImages(generatePayload)
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.images[0]).toMatchObject({ source: 'url', url: 'https://cdn/ok.png' })
+  })
+
+  it('兼容 NewAPI 成功信封嵌套 data.data 图片且忽略 unsafe message 文案', async () => {
+    const service = new Claude360CanvasService(
+      makeDeps({
+        apiClient: fakeApi({
+          generate: () =>
+            ({
+              success: true,
+              message: 'The generated images appear to be unsafe...',
+              data: { data: [{ url: 'https://cdn/wrapped.png' }] }
+            }) as never
+        })
+      })
+    )
+    const result = await service.generateImages(generatePayload)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.images[0]).toMatchObject({ source: 'url', url: 'https://cdn/wrapped.png' })
+  })
+
+  it('没有图片结果且 unsafe message 时标记为模型拒绝', async () => {
+    const service = new Claude360CanvasService(
+      makeDeps({
+        apiClient: fakeApi({
+          generate: () => ({ message: 'The generated images appear to be unsafe...' }) as never
+        })
+      })
+    )
+    const result = await service.generateImages(generatePayload)
+    expect(result).toMatchObject({
+      ok: false,
+      message: '模型拒绝：The generated images appear to be unsafe...'
+    })
   })
 
   it('兼容 images[] 容器与 b64 字段名', async () => {

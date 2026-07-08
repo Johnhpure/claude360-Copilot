@@ -62,6 +62,7 @@ export type Claude360CanvasServiceDeps = {
 type ExtractedImage = { url?: string; b64?: string; mimeType?: string }
 
 const DATA_URL_IMAGE = /^data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/i
+const IMAGE_CONTAINER_KEYS = ['data', 'images', 'output', 'result', 'content'] as const
 
 /** 字符串 → 图片：data URL / http(s) URL / 长裸 base64（字符集+长度双重把关）。 */
 function extractFromString(value: string): ExtractedImage | null {
@@ -101,36 +102,28 @@ function extractFromEntry(entry: unknown): ExtractedImage | null {
   return null
 }
 
-/** 遍历所有已知容器路径收集图片：data[]/images[]/output[](含 content[])/result/顶层。 */
+/**
+ * 遍历所有已知容器路径收集图片：data[]/images[]/output[](含 content[])/result/顶层。
+ * NewAPI 有时会再套一层 `{ success, data: { data: [...] } }`，因此容器键递归
+ * 扫描；但不扫描任意字符串字段，避免把普通 message 里的 URL 当成图片。
+ */
 function collectImages(env: Claude360ImagesRawEnvelope): ExtractedImage[] {
-  const record = env as Record<string, unknown>
   const found: ExtractedImage[] = []
-  const pushEntry = (entry: unknown): void => {
-    const image = extractFromEntry(entry)
-    if (image) found.push(image)
-  }
-  const pushArrayEntry = (entry: unknown): void => {
-    const direct = extractFromEntry(entry)
-    if (direct) {
-      found.push(direct)
+  const walk = (entry: unknown, depth = 0): void => {
+    if (depth > 8 || entry === undefined || entry === null) return
+    if (Array.isArray(entry)) {
+      for (const item of entry) walk(item, depth + 1)
       return
     }
-    // Responses API 风格：output[].content[] 内才是图片分片。
-    const content = entry && typeof entry === 'object' ? (entry as Record<string, unknown>).content : undefined
-    if (Array.isArray(content)) {
-      for (const part of content) pushEntry(part)
+    const direct = extractFromEntry(entry)
+    if (direct) found.push(direct)
+    if (!entry || typeof entry !== 'object') return
+    const record = entry as Record<string, unknown>
+    for (const key of IMAGE_CONTAINER_KEYS) {
+      if (key in record) walk(record[key], depth + 1)
     }
   }
-  for (const key of ['data', 'images', 'output', 'result']) {
-    const value = record[key]
-    if (Array.isArray(value)) {
-      for (const entry of value) pushArrayEntry(entry)
-    } else if (value !== undefined && value !== null) {
-      pushEntry(value)
-    }
-  }
-  // 容器路径全空时最后尝试顶层字段（{url} / {image_url} / {b64_json}）。
-  if (found.length === 0) pushEntry(record)
+  walk(env)
   return dedupeImages(found)
 }
 
@@ -156,7 +149,7 @@ function summarizeForLog(value: unknown, depth = 0): unknown {
     if (value.length > 512 && /^(data:image\/[a-z0-9.+-]+;base64,)?[A-Za-z0-9+/=\s]+$/i.test(value)) {
       return `<base64 length=${value.length}>`
     }
-    return value
+    return sanitizeClaude360Message(value)
   }
   if (Array.isArray(value)) {
     return depth > 6 ? '<max-depth>' : value.map((item) => summarizeForLog(item, depth + 1))
@@ -172,11 +165,41 @@ function summarizeForLog(value: unknown, depth = 0): unknown {
   return value
 }
 
+function collectFieldsByName(value: unknown, matcher: RegExp, depth = 0): unknown[] {
+  if (depth > 8 || value === undefined || value === null) return []
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectFieldsByName(item, matcher, depth + 1))
+  }
+  if (typeof value !== 'object') return []
+  const out: unknown[] = []
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (matcher.test(key)) out.push(summarizeForLog(item))
+    out.push(...collectFieldsByName(item, matcher, depth + 1))
+  }
+  return out
+}
+
 function logImagesShape(path: string, env: Claude360ImagesRawEnvelope, extracted: ExtractedImage[]): void {
   if (process.env.NODE_ENV === 'test') return
+  const record = env as Record<string, unknown>
   // 按任务书要求打印完整真实响应（原始 body 结构 / 提取到的图片字段），不猜字段名。
   // 仅 main 进程控制台，不入 renderer。
   console.info(`[claude360-canvas] ${path} raw response`, JSON.stringify(summarizeForLog(env)))
+  console.info(
+    `[claude360-canvas] ${path} response fields`,
+    JSON.stringify({
+      data: summarizeForLog(record.data ?? null),
+      error: summarizeForLog(record.error ?? null),
+      message: typeof record.message === 'string' ? sanitizeClaude360Message(record.message) : null,
+      msg: typeof record.msg === 'string' ? sanitizeClaude360Message(record.msg) : null,
+      imageUrls: extracted.map((image) => image.url).filter((url): url is string => Boolean(url)),
+      base64Images: extracted
+        .filter((image) => Boolean(image.b64))
+        .map((image) => ({ b64Length: image.b64?.length ?? 0, mimeType: image.mimeType ?? null })),
+      finishReasons: collectFieldsByName(env, /^finish[_-]?reason$/i),
+      safety: collectFieldsByName(env, /safety|safe|blocked|policy|moderation/i)
+    })
+  )
   console.info(
     `[claude360-canvas] ${path} extracted images`,
     JSON.stringify(
@@ -190,6 +213,19 @@ function logImagesShape(path: string, env: Claude360ImagesRawEnvelope, extracted
   )
 }
 
+function logFinalDecision(
+  path: string,
+  decision: {
+    ok: boolean
+    reason: string
+    imageCount: number
+    message?: string
+  }
+): void {
+  if (process.env.NODE_ENV === 'test') return
+  console.info(`[claude360-canvas] ${path} final decision`, JSON.stringify(decision))
+}
+
 /** 解出上游可展示错误信息（error.message / message / msg），已脱敏。 */
 function envelopeError(env: Claude360ImagesRawEnvelope): string | null {
   const err = env.error
@@ -200,6 +236,14 @@ function envelopeError(env: Claude360ImagesRawEnvelope): string | null {
     (typeof env.msg === 'string' && env.msg.trim()) ||
     ''
   return raw ? sanitizeClaude360Message(raw) : null
+}
+
+function isSafetyRefusal(message: string): boolean {
+  return /unsafe|safety|policy|blocked|moderation|refus/i.test(message)
+}
+
+function upstreamFailureMessage(message: string): string {
+  return `${isSafetyRefusal(message) ? '模型拒绝' : '上游接口错误'}：${message}`
 }
 
 /** 归一化单张图片：url 优先，base64 带真实 mimeType；两者皆无返回 null。 */
@@ -304,7 +348,7 @@ export class Claude360CanvasService {
       env = await this.deps.apiClient.postImagesRaw('/v1/images/generations', body, apiKey)
     } catch (error) {
       // 网络/传输错误：可重试。
-      return { ok: false, message: errorMessage(error), retryable: true }
+      return { ok: false, message: `接口请求失败：${errorMessage(error)}`, retryable: true }
     }
 
     return this.normalize('/v1/images/generations', env, { prompt: input.prompt, model: input.model })
@@ -351,7 +395,7 @@ export class Claude360CanvasService {
     try {
       env = await this.deps.apiClient.postImagesMultipart('/v1/images/edits', form, apiKey)
     } catch (error) {
-      return { ok: false, message: errorMessage(error), retryable: true }
+      return { ok: false, message: `接口请求失败：${errorMessage(error)}`, retryable: true }
     }
 
     return this.normalize('/v1/images/edits', env, { prompt: input.prompt, model: input.model })
@@ -375,13 +419,18 @@ export class Claude360CanvasService {
       .map((row) => mapImage(row, { ...meta, createdAt }))
       .filter((img): img is Claude360CanvasImage => img !== null)
     if (images.length > 0) {
+      logFinalDecision(path, { ok: true, reason: 'image_result_present', imageCount: images.length })
       return { ok: true, images }
     }
     const upstreamError = envelopeError(env)
     if (upstreamError) {
-      return { ok: false, message: upstreamError }
+      const message = upstreamFailureMessage(upstreamError)
+      logFinalDecision(path, { ok: false, reason: 'upstream_error_without_image', imageCount: 0, message })
+      return { ok: false, message }
     }
-    return { ok: false, message: '生成失败，未返回图片，请稍后重试' }
+    const message = '图片字段缺失：接口响应中未找到可用图片字段'
+    logFinalDecision(path, { ok: false, reason: 'missing_image_fields', imageCount: 0, message })
+    return { ok: false, message }
   }
 }
 

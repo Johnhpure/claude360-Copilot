@@ -271,7 +271,7 @@ function SuccessArtworkCard({
             onOpen={() => (selectMode ? onToggleSelected(artwork.id) : onView(artwork))}
             onImageError={() => {
               // 打印加载失败的真实 URL（截断 data URL），排查鉴权/CSP/字段映射问题。
-              console.error('[claude360-canvas] artwork image load failed', {
+              console.error('[claude360-canvas] 前端图片渲染失败（不影响生成任务状态）', {
                 artworkId: artwork.id,
                 src: src && src.startsWith('data:') ? `${src.slice(0, 64)}...` : src
               })

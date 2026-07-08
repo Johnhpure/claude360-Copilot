@@ -245,9 +245,11 @@ export async function persistGeneratedImages(
         }
         if (result.ok && result.record.localPath) {
           store.attachLocalArtifact(image.id, result.record.localPath)
+        } else if (!result.ok) {
+          console.warn('[media-assets] 图片本地保存失败（不影响展示）:', result.message)
         }
       } catch (error) {
-        console.warn('[media-assets] 图片落盘失败（不影响展示）:', error)
+        console.warn('[media-assets] 图片本地保存失败（不影响展示）:', error)
       }
     })
   )
