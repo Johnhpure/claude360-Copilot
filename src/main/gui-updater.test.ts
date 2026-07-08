@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -17,10 +18,13 @@ type MockUpdater = EventEmitter & {
 let updater: MockUpdater
 let nativeUpdater: EventEmitter
 let originalEnv: NodeJS.ProcessEnv
+let originalPlatform: NodeJS.Platform
 let appVersion: string
 let mockedFiles: Map<string, string>
 let showMessageBox: ReturnType<typeof vi.fn>
 let openExternal: ReturnType<typeof vi.fn>
+
+const TEST_APP_PATH = '/tmp/deepseek-gui-updater-test-app'
 
 function createUpdater(): MockUpdater {
   return Object.assign(new EventEmitter(), {
@@ -38,12 +42,14 @@ function createUpdater(): MockUpdater {
 
 beforeEach(() => {
   originalEnv = { ...process.env }
+  originalPlatform = process.platform
   vi.useFakeTimers()
   vi.resetModules()
   updater = createUpdater()
   nativeUpdater = new EventEmitter()
   appVersion = '0.1.0'
   mockedFiles = new Map()
+  rmSync(TEST_APP_PATH, { recursive: true, force: true })
   showMessageBox = vi.fn().mockResolvedValue({ response: 1 })
   openExternal = vi.fn().mockResolvedValue(undefined)
   vi.doMock('node:fs/promises', () => ({
@@ -60,7 +66,7 @@ beforeEach(() => {
   vi.doMock('electron', () => ({
     app: {
       isPackaged: true,
-      getAppPath: () => '/tmp/deepseek-gui-updater-test-app',
+      getAppPath: () => TEST_APP_PATH,
       getPath: () => '/tmp/deepseek-gui-updater-test-user-data',
       getVersion: () => appVersion,
       getLocale: () => 'en-US'
@@ -78,6 +84,8 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env = originalEnv
+  Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+  rmSync(TEST_APP_PATH, { recursive: true, force: true })
   vi.clearAllTimers()
   vi.useRealTimers()
   vi.unstubAllGlobals()
@@ -91,6 +99,15 @@ function platformManifestName(): string {
   if (process.platform === 'darwin') return 'latest-mac.yml'
   if (process.platform === 'linux') return 'latest-linux.yml'
   return 'latest.yml'
+}
+
+function setProcessPlatform(platform: NodeJS.Platform): void {
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+}
+
+function writePackagedPackageJson(value: Record<string, unknown>): void {
+  mkdirSync(TEST_APP_PATH, { recursive: true })
+  writeFileSync(join(TEST_APP_PATH, 'package.json'), JSON.stringify(value), 'utf8')
 }
 
 describe('checkGuiUpdate feed configuration', () => {
@@ -164,6 +181,152 @@ describe('checkGuiUpdate feed configuration', () => {
     expect(updater.setFeedURL).toHaveBeenLastCalledWith({
       provider: 'generic',
       url: 'https://updates.example.com/stable/'
+    })
+  })
+
+  it('prefers the CLAUDE360_UPDATE_URL escape hatch over legacy update URLs', async () => {
+    process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES = '1'
+    process.env.CLAUDE360_UPDATE_URL = 'https://updates.claude360.example.com/{channel}'
+    process.env.KUN_UPDATE_URL = 'https://updates.legacy.example.com/{channel}'
+    updater.checkForUpdates.mockResolvedValue({
+      updateInfo: { version: '0.2.0', releaseDate: '2026-06-06T00:00:00.000Z' },
+      isUpdateAvailable: true
+    })
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
+      ok: true,
+      latestVersion: '0.2.0',
+      hasUpdate: true
+    })
+    expect(updater.setFeedURL).toHaveBeenLastCalledWith({
+      provider: 'generic',
+      url: 'https://updates.claude360.example.com/stable/'
+    })
+  })
+})
+
+describe('checkGuiUpdate mac auto-update gate', () => {
+  it('uses electron-updater on signed and notarized macOS builds', async () => {
+    setProcessPlatform('darwin')
+    writePackagedPackageJson({
+      buildHints: {
+        macSigningEnabled: true,
+        notarizationEnabled: true
+      }
+    })
+    updater.checkForUpdates.mockResolvedValue({
+      updateInfo: { version: '0.2.0', releaseDate: '2026-06-06T00:00:00.000Z' },
+      isUpdateAvailable: true
+    })
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
+      ok: true,
+      latestVersion: '0.2.0',
+      hasUpdate: true,
+      manualOnly: false
+    })
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps unsigned macOS builds on the explicit manual-only fallback path', async () => {
+    setProcessPlatform('darwin')
+    writePackagedPackageJson({
+      buildHints: {
+        macSigningEnabled: false,
+        notarizationEnabled: false
+      }
+    })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          tag_name: 'v0.2.0',
+          prerelease: false,
+          draft: false,
+          published_at: '2026-07-01T00:00:00.000Z',
+          html_url: 'https://github.com/Johnhpure/claude360-Copilot/releases/tag/v0.2.0'
+        }
+      ]
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
+      ok: true,
+      latestVersion: '0.2.0',
+      hasUpdate: true,
+      manualOnly: true
+    })
+    await expect(module.downloadGuiUpdate('stable')).resolves.toMatchObject({
+      ok: false,
+      code: 'unsupported',
+      message: expect.stringMatching(/signed and notarized/)
+    })
+    expect(updater.checkForUpdates).not.toHaveBeenCalled()
+    expect(updater.downloadUpdate).not.toHaveBeenCalled()
+  })
+
+  it('allows the CLAUDE360 unsigned-update escape hatch to use electron-updater on macOS', async () => {
+    setProcessPlatform('darwin')
+    process.env.CLAUDE360_ALLOW_UNSIGNED_UPDATES = '1'
+    writePackagedPackageJson({
+      buildHints: {
+        macSigningEnabled: false,
+        notarizationEnabled: false
+      }
+    })
+    updater.checkForUpdates.mockResolvedValue({
+      updateInfo: { version: '0.2.0', releaseDate: '2026-06-06T00:00:00.000Z' },
+      isUpdateAvailable: true
+    })
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
+      ok: true,
+      latestVersion: '0.2.0',
+      hasUpdate: true,
+      manualOnly: false
+    })
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('checkGuiUpdate error normalization', () => {
+  it('classifies missing update metadata separately from unknown updater failures', async () => {
+    process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES = '1'
+    updater.checkForUpdates.mockRejectedValue(new Error('Object not found. latest-mac.yml'))
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
+      ok: false,
+      code: 'metadata_missing',
+      message: expect.stringMatching(/metadata/i)
+    })
+  })
+
+  it('classifies signature and checksum failures as update package verification errors', async () => {
+    process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES = '1'
+    updater.checkForUpdates.mockRejectedValue(new Error('sha512 checksum mismatch for downloaded update'))
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
+      ok: false,
+      code: 'signature_invalid',
+      message: expect.stringMatching(/signature|package|verified/i)
     })
   })
 })
