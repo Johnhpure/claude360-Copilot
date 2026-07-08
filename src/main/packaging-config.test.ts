@@ -231,15 +231,6 @@ describe('electron-builder Claude360 Copilot packaging', () => {
     expect(builderConfig.win.icon).toBe('./build/icon-claude360.ico')
   })
 
-  it('requires signed and notarized macOS builds for v* release tags', () => {
-    const workflow = readFileSync(join(process.cwd(), '.github/workflows/build-installers.yml'), 'utf8')
-
-    expect(workflow).toContain("startsWith(github.ref, 'refs/tags/v')")
-    expect(workflow).toContain("if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.mac_sign }}")
-    expect(workflow).toContain("if: ${{ !startsWith(github.ref, 'refs/tags/v') && !inputs.mac_sign }}")
-    expect(workflow).toContain('macOS 正式 tag Release 必须 Developer ID 签名+公证')
-  })
-
   it('uses a process-tree shutdown guard for Windows overwrite installs', () => {
     const installerScript = readFileSync(join(process.cwd(), 'build/installer.nsh'), 'utf8')
 

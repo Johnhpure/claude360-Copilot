@@ -77,7 +77,6 @@ export function GuiUpdateControl({
     title = info.manualOnly
       ? t('guiUpdateAvailableManual', { current: info.currentVersion, latest: info.latestVersion })
       : t('guiUpdateAvailable', { current: info.currentVersion, latest: info.latestVersion })
-    detail = info.releaseNotes?.trim() || null
     tone = 'warn'
   } else if (info?.ok) {
     title = t('guiUpdateCurrent', { version: info.currentVersion })
@@ -141,7 +140,7 @@ export function GuiUpdateControl({
             ) : (
               <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
             )}
-            {t('guiUpdateDownloadInstall')}
+            {t('guiUpdateDownload')}
           </button>
         ) : null}
         {canInstall || installing ? (
@@ -163,7 +162,7 @@ export function GuiUpdateControl({
           <button
             type="button"
             onClick={() => void window.kunGui.openExternal(releaseUrl).catch(() => undefined)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[13px] font-medium text-ds-muted shadow-sm transition hover:bg-ds-hover hover:text-ds-ink"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-ds-userbubble px-3 py-2 text-[13px] font-medium text-ds-userbubbleFg shadow-sm transition hover:opacity-90"
           >
             {t('guiUpdateOpenRelease')}
           </button>

@@ -162,14 +162,6 @@ export function guiUpdateFailureMessage(
       return t('guiUpdateErrNotConfigured')
     case 'unsupported':
       return t('guiUpdateErrUnsupported')
-    case 'metadata_missing':
-      return t('guiUpdateErrMetadataMissing')
-    case 'metadata_invalid':
-      return t('guiUpdateErrMetadataInvalid')
-    case 'network':
-      return t('guiUpdateErrNetwork')
-    case 'signature_invalid':
-      return t('guiUpdateErrSignatureInvalid')
     case 'download_failed':
       return t('guiUpdateErrDownloadFailed', { message: info.message.trim() })
     case 'install_failed':

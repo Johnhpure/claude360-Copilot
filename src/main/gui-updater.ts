@@ -16,18 +16,14 @@ import { nextGuiUpdateCheckDelay } from '../shared/gui-update-schedule'
 import { DEFAULT_GUI_UPDATE_CHANNEL, normalizeGuiUpdateChannel } from '../shared/gui-update'
 
 // 应用内更新走 GitHub Releases(公开仓库,electron-updater 原生 github provider)。
-// CLAUDE360_UPDATE_URL* env 可覆盖为 generic 源,旧 KUN/DEEPSEEK 前缀保留兼容。
+// KUN_UPDATE_URL* env 仍可覆盖为 generic 源,作为内部逃生舱保留。
 const GITHUB_UPDATE_OWNER = 'Johnhpure'
 const GITHUB_UPDATE_REPO = 'claude360-Copilot'
 const GITHUB_RELEASES_URL = `https://github.com/${GITHUB_UPDATE_OWNER}/${GITHUB_UPDATE_REPO}/releases`
 const { autoUpdater } = electronUpdater
 
-function envFirst(...names: string[]): string {
-  for (const name of names) {
-    const value = process.env[name]?.trim()
-    if (value) return value
-  }
-  return ''
+function envWithLegacyFallback(kunName: string, legacyName: string): string {
+  return process.env[kunName]?.trim() || process.env[legacyName]?.trim() || ''
 }
 
 let initialized = false
@@ -37,7 +33,7 @@ let lastState: GuiUpdateState = { status: 'idle' }
 let downloaded = false
 let downloadPromise: Promise<string[]> | null = null
 let configuredChannel: GuiUpdateChannel = normalizeGuiUpdateChannel(
-  envFirst('CLAUDE360_UPDATE_CHANNEL', 'KUN_UPDATE_CHANNEL', 'DEEPSEEK_GUI_UPDATE_CHANNEL') || undefined
+  envWithLegacyFallback('KUN_UPDATE_CHANNEL', 'DEEPSEEK_GUI_UPDATE_CHANNEL') || undefined
 )
 let configuredFeedUrl = ''
 let getSelectedChannel: (() => GuiUpdateChannel | Promise<GuiUpdateChannel>) | null = null
@@ -52,11 +48,6 @@ const GUI_UPDATE_SCHEDULE_FILE = 'gui-update-schedule.json'
 const GUI_VERSION_STATE_FILE = 'gui-version-state.json'
 const DEFAULT_CHANGELOG_URL = GITHUB_RELEASES_URL
 
-type SanitizedUpdaterError = {
-  message: string
-  code: GuiUpdateFailureCode
-}
-
 type GuiVersionState = {
   lastSeenVersion?: string
   dismissedUpdateVersion?: string
@@ -67,12 +58,11 @@ type GuiVersionState = {
 }
 
 function envUpdateUrl(channel: GuiUpdateChannel): string {
-  const channelSpecific = envFirst(
-    `CLAUDE360_UPDATE_URL_${channel.toUpperCase()}`,
+  const channelSpecific = envWithLegacyFallback(
     `KUN_UPDATE_URL_${channel.toUpperCase()}`,
     `DEEPSEEK_GUI_UPDATE_URL_${channel.toUpperCase()}`
   )
-  const direct = channelSpecific || envFirst('CLAUDE360_UPDATE_URL', 'KUN_UPDATE_URL', 'DEEPSEEK_GUI_UPDATE_URL')
+  const direct = channelSpecific || envWithLegacyFallback('KUN_UPDATE_URL', 'DEEPSEEK_GUI_UPDATE_URL')
   return direct ? direct.replace(/\{channel\}/g, channel).replace(/\/?$/, '/') : ''
 }
 
@@ -105,7 +95,7 @@ async function writeGuiVersionState(state: GuiVersionState): Promise<void> {
 }
 
 function changelogUrl(): string {
-  return envFirst('CLAUDE360_CHANGELOG_URL', 'KUN_CHANGELOG_URL', 'DEEPSEEK_GUI_CHANGELOG_URL') || DEFAULT_CHANGELOG_URL
+  return envWithLegacyFallback('KUN_CHANGELOG_URL', 'DEEPSEEK_GUI_CHANGELOG_URL') || DEFAULT_CHANGELOG_URL
 }
 
 function normalizeReleaseNotes(value: unknown): string | undefined {
@@ -191,9 +181,7 @@ function readPackageJson(): Record<string, unknown> | null {
 }
 
 function resolveGithubReleaseUrl(): string | null {
-  const envRepo = normalizeGithubOwnerRepo(
-    envFirst('CLAUDE360_GITHUB_REPO', 'KUN_GITHUB_REPO', 'DEEPSEEK_GUI_GITHUB_REPO')
-  )
+  const envRepo = normalizeGithubOwnerRepo(process.env.DEEPSEEK_GUI_GITHUB_REPO?.trim() ?? '')
   if (envRepo) return `https://github.com/${envRepo}/releases`
 
   const pkg = readPackageJson()
@@ -209,7 +197,7 @@ function resolveGithubReleaseUrl(): string | null {
 }
 
 function downloadPageUrl(): string {
-  const direct = envFirst('CLAUDE360_DOWNLOAD_URL', 'KUN_DOWNLOAD_URL', 'DEEPSEEK_GUI_DOWNLOAD_URL')
+  const direct = envWithLegacyFallback('KUN_DOWNLOAD_URL', 'DEEPSEEK_GUI_DOWNLOAD_URL')
   if (direct) return direct
 
   const pkg = readPackageJson()
@@ -220,8 +208,8 @@ function downloadPageUrl(): string {
 }
 
 function releaseUrlForVersion(version: string): string {
-  // 下载页 env 覆盖仍然优先(内部逃生舱),CLAUDE360_* 先于旧前缀。
-  const direct = envFirst('CLAUDE360_DOWNLOAD_URL', 'KUN_DOWNLOAD_URL', 'DEEPSEEK_GUI_DOWNLOAD_URL')
+  // KUN_DOWNLOAD_URL env 覆盖仍然优先(内部逃生舱)。
+  const direct = envWithLegacyFallback('KUN_DOWNLOAD_URL', 'DEEPSEEK_GUI_DOWNLOAD_URL')
   if (direct) return direct
 
   // 更新源是 GitHub Releases,版本链接直接指向对应 Release tag 页,
@@ -290,9 +278,7 @@ function parseYamlScalar(source: string, key: string): string {
 
 function macAutoUpdateAllowed(): boolean {
   if (process.platform !== 'darwin') return true
-  if (envFirst('CLAUDE360_ALLOW_UNSIGNED_UPDATES', 'KUN_ALLOW_UNSIGNED_UPDATES', 'DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES') === '1') {
-    return true
-  }
+  if (process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES === '1') return true
 
   const pkg = readPackageJson()
   const hints = pkg?.buildHints
@@ -315,73 +301,35 @@ function extractHttpStatus(raw: string): number | null {
   return Number.isFinite(status) ? status : null
 }
 
-function sanitizeUpdaterError(raw: string, channel: GuiUpdateChannel): SanitizedUpdaterError {
+function sanitizeUpdaterError(raw: string, channel: GuiUpdateChannel): string {
   const message = raw.trim()
   if (!message) {
-    return {
-      code: 'metadata_missing',
-      message: `Could not read GUI update metadata for the ${channel} channel. Open the download page instead.`
-    }
-  }
-
-  if (/sha512|checksum|signature|code\s*sign|codesign|not signed|package verification|could not be verified/i.test(message)) {
-    return {
-      code: 'signature_invalid',
-      message: `The ${channel} update package could not be verified. Please retry, or use the download page if the problem continues.`
-    }
+    return `Could not read GUI update metadata for the ${channel} channel. Open the download page instead.`
   }
 
   if (/Invalid release object path\./i.test(message)) {
-    return {
-      code: 'metadata_invalid',
-      message: `The ${channel} update feed is not published correctly yet. Open the download page instead.`
-    }
+    return `The ${channel} update feed is not published correctly yet. Open the download page instead.`
   }
 
   if (/Object not found\./i.test(message)) {
-    return {
-      code: 'metadata_missing',
-      message: `The ${channel} update feed is missing release metadata right now. Open the download page instead.`
-    }
+    return `The ${channel} update feed is missing release metadata right now. Open the download page instead.`
   }
 
   const status = extractHttpStatus(message)
   if (status === 400 || status === 404) {
-    return {
-      code: 'metadata_missing',
-      message: `The ${channel} update feed is not available right now. Open the download page instead.`
-    }
+    return `The ${channel} update feed is not available right now. Open the download page instead.`
   }
   if (status === 403) {
-    return {
-      code: 'github_forbidden',
-      message: `The ${channel} update feed denied this request. Open the download page instead.`
-    }
+    return `The ${channel} update feed denied this request. Open the download page instead.`
   }
   if (status === 429) {
-    return {
-      code: 'github_rate_limited',
-      message: `The ${channel} update feed is rate limited right now. Please try again later.`
-    }
+    return `The ${channel} update feed is rate limited right now. Please try again later.`
   }
   if (status && status >= 500) {
-    return {
-      code: 'network',
-      message: `The ${channel} update feed is temporarily unavailable. Please try again later.`
-    }
+    return `The ${channel} update feed is temporarily unavailable. Please try again later.`
   }
 
-  if (/ENOTFOUND|ECONNRESET|ETIMEDOUT|EAI_AGAIN|network|fetch failed|socket hang up/i.test(message)) {
-    return {
-      code: 'network',
-      message: message.split(/\n(?:Headers:|Data:)/, 1)[0].trim() || message
-    }
-  }
-
-  return {
-    code: 'unknown',
-    message: message.split(/\n(?:Headers:|Data:)/, 1)[0].trim() || message
-  }
+  return message.split(/\n(?:Headers:|Data:)/, 1)[0].trim() || message
 }
 
 function toGuiInfo(updateInfo: UpdateInfo, hasUpdate: boolean, manualOnly = false): Extract<GuiUpdateInfo, { ok: true }> {
@@ -471,7 +419,7 @@ async function resolveUpdateChannel(requested?: GuiUpdateChannel): Promise<GuiUp
   return DEFAULT_GUI_UPDATE_CHANNEL
 }
 
-// env 逃生舱优先(保留旧 UPDATE_URL* 语义):设了就走 generic 源;
+// env 逃生舱优先(保留 KUN_UPDATE_URL* 语义):设了就走 generic 源;
 // 否则一律 GitHub provider,通道差异只体现在 allowPrerelease 上
 // (stable 只看正式 Release,frontier 连 0.1.3-test.N 这类 prerelease 一起看)。
 function configureUpdaterChannel(channel: GuiUpdateChannel): void {
@@ -668,13 +616,8 @@ export function initializeGuiUpdater(
   })
 
   autoUpdater.on('error', (error) => {
-    const sanitized = sanitizeUpdaterError(error instanceof Error ? error.message : String(error), configuredChannel)
-    emitGuiUpdateState({
-      status: 'error',
-      info: lastInfo ?? undefined,
-      message: sanitized.message,
-      code: sanitized.code
-    })
+    const message = error instanceof Error ? error.message : String(error)
+    emitGuiUpdateState({ status: 'error', info: lastInfo ?? undefined, message, code: 'unknown' })
   })
 
   nativeAutoUpdater?.on?.('before-quit-for-update', () => {
@@ -760,16 +703,16 @@ export async function checkGuiUpdate(channel?: GuiUpdateChannel): Promise<GuiUpd
     emitGuiUpdateState(info.hasUpdate ? { status: 'available', info } : { status: 'not_available', info })
     return info
   } catch (e) {
-    const sanitized = sanitizeUpdaterError(e instanceof Error ? e.message : String(e), selectedChannel)
+    const message = sanitizeUpdaterError(e instanceof Error ? e.message : String(e), selectedChannel)
     const info: GuiUpdateInfo = {
       ok: false,
       currentVersion: app.getVersion(),
-      message: sanitized.message,
-      code: sanitized.code,
+      message,
+      code: 'unknown',
       releaseUrl: downloadPageUrl(),
       channel: selectedChannel
     }
-    emitGuiUpdateState({ status: 'error', info, message: sanitized.message, code: sanitized.code })
+    emitGuiUpdateState({ status: 'error', info, message, code: 'unknown' })
     return info
   }
 }

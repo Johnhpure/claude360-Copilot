@@ -11,9 +11,8 @@
 #   tag 触发时由独立 publish-release job 汇总 Windows + macOS 产物发布为
 #   GitHub Release（tag 统一为 v<version>），供应用内更新（electron-updater
 #   GitHub provider）拉取 latest.yml / latest-mac.yml。
-# - macOS 手动 artifact 构建默认「无签名」（ad-hoc）：可安装，但首次打开需在
-#   「系统设置 → 隐私与安全性」放行（或右键→打开）。正式 v* tag Release 必须
-#   Developer ID 签名+公证，否则不发布 macOS 自动更新包。
+# - macOS 默认「无签名」（ad-hoc）：可安装，但首次打开需在「系统设置 → 隐私与
+#   安全性」放行（或右键→打开）。若已配置 Apple 签名 secret，设 mac_sign=true 走签名。
 # - 各平台原生模块（node-pty / better-sqlite3 / @computer-use/nut-js）在对应
 #   runner 上原生编译，无跨平台交叉编译问题。
 
@@ -104,11 +103,9 @@ jobs:
         shell: bash
         run: echo "CLAUDE360_APP_VERSION=0.1.0-ci.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
-      # macOS 正式 tag Release 必须 Developer ID 签名+公证；手动 artifact 构建
-      # 仍可用 mac_sign=true 选择签名。缺少 secret 时本步骤失败，阻止发布
-      # 只能手动安装的 mac 自动更新包。
+      # 可选签名：仅当手动勾选 mac_sign 且仓库配好 Apple secret 时启用。
       - name: Decode Apple signing credentials
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.mac_sign }}
+        if: ${{ inputs.mac_sign }}
         env:
           MAC_CODESIGN_P12_BASE64: ${{ secrets.MAC_CODESIGN_P12_BASE64 }}
           APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
@@ -141,11 +138,11 @@ jobs:
           } >> "${GITHUB_ENV}"
 
       - name: Build macOS package (signed)
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.mac_sign }}
+        if: ${{ inputs.mac_sign }}
         run: MAC_SIGN=1 npm run dist:mac:${{ matrix.arch }}
 
       - name: Build macOS package (unsigned)
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') && !inputs.mac_sign }}
+        if: ${{ !inputs.mac_sign }}
         run: npm run dist:mac:${{ matrix.arch }}
 
       # 产物体积防回归守护：断言黑名单包（agent-sdk 平台二进制、@napi-rs/canvas、
