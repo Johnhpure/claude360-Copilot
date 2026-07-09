@@ -112,7 +112,7 @@ export function classifyQrPayload(codeUrl: string): QrPayload {
 
 // ── Token 用量视图(R2) ──
 
-export type UsageSortKey = 'tokens' | 'requests'
+export type UsageSortKey = 'tokens' | 'requests' | 'cost'
 
 export type UsageView = {
   /** 全量合计(不受搜索过滤影响,总览始终反映全局)。 */
@@ -125,8 +125,26 @@ export type UsageView = {
   hiddenCount: number
 }
 
-const sortValue = (row: Claude360TokenStat, key: UsageSortKey): number =>
-  key === 'tokens' ? row.totalTokens : row.requestCount
+function compareUsageRows(a: Claude360TokenStat, b: Claude360TokenStat, key: UsageSortKey, desc: boolean): number {
+  if (key === 'cost') {
+    const aCost = finiteCost(a.costCny)
+    const bCost = finiteCost(b.costCny)
+    if (aCost == null && bCost == null) return 0
+    if (aCost == null) return 1
+    if (bCost == null) return -1
+    const diff = aCost - bCost
+    return desc ? -diff : diff
+  }
+
+  const aValue = key === 'tokens' ? a.totalTokens : a.requestCount
+  const bValue = key === 'tokens' ? b.totalTokens : b.requestCount
+  const diff = aValue - bValue
+  return desc ? -diff : diff
+}
+
+function finiteCost(value: number | null): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
 
 /**
  * 把 token 用量统计整形为「总览行 + 紧凑表格」视图数据。
@@ -156,10 +174,7 @@ export function buildUsageView(
   const filtered = query
     ? stats.filter((row) => row.tokenName.toLowerCase().includes(query))
     : stats
-  const sorted = [...filtered].sort((a, b) => {
-    const diff = sortValue(a, opts.sortKey) - sortValue(b, opts.sortKey)
-    return opts.sortDesc ? -diff : diff
-  })
+  const sorted = [...filtered].sort((a, b) => compareUsageRows(a, b, opts.sortKey, opts.sortDesc))
   const rows = (opts.limit == null ? sorted : sorted.slice(0, opts.limit)).map((row) => ({
     ...row,
     sharePct: shareOf(row)

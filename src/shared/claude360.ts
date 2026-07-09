@@ -193,6 +193,7 @@ export type Claude360TokenStat = {
   requestCount: number
   totalTokens: number
   quota: number
+  costCny: number | null
 }
 
 export type Claude360TokenStatsQuery = {
@@ -240,5 +241,19 @@ export type Claude360TokenStatRawResponse = {
   request_count?: number
   total_tokens?: number
   quota?: number
+  cost_cny?: unknown
+  amount_cny?: unknown
+  fee_cny?: unknown
+  price_cny?: unknown
+  expense_cny?: unknown
+  cost?: unknown
+  amount?: unknown
+  fee?: unknown
+  price?: unknown
+  expense?: unknown
 }
 
+export type Claude360StatusRawResponse = {
+  quota_per_unit?: unknown
+  price?: unknown
+}

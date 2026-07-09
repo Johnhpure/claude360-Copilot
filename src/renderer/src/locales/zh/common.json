@@ -1403,6 +1403,7 @@
   "myUsageGroupName": "分组名称",
   "myUsageRequests": "请求数",
   "myUsageTokens": "tokens",
+  "myUsageCost": "费用",
   "myUsageTotalRequests": "总请求数",
   "myUsageTotalTokens": "总 Tokens",
   "myUsageTop3": "主要消耗分组",

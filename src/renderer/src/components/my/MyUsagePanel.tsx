@@ -9,6 +9,10 @@ type Translate = (key: string, params?: Record<string, unknown>) => string
 
 /** 默认展示行数(R2.5):超出走「展开更多」,不做分页,分组再多页面也不无限拉长。 */
 const USAGE_ROW_LIMIT = 10
+const CNY_FORMATTER = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+})
 
 // Token 用量统计(claude360BillingTokenStats):总览行 + 紧凑表格
 // (07-07-my-page-redesign-topup-modal design §5)。
@@ -101,63 +105,78 @@ export function MyUsagePanel({
           {view.rows.length === 0 ? (
             <p className="mt-4 text-[13px] text-ds-faint">{t('myNoUsage')}</p>
           ) : (
-            <table className="mt-4 w-full border-collapse text-[12.5px]">
-              <thead>
-                <tr className="border-b border-ds-border text-[11.5px] uppercase tracking-wide text-ds-faint">
-                  <th scope="col" className="min-w-[220px] py-2 pr-3 text-left font-medium">
-                    {t('myUsageGroupName')}
-                  </th>
-                  <SortableHeader
-                    label={t('myUsageRequests')}
-                    active={sortKey === 'requests'}
-                    desc={sortDesc}
-                    onClick={() => handleSort('requests')}
-                    className="w-[100px]"
-                  />
-                  <SortableHeader
-                    label={t('myUsageTokens')}
-                    active={sortKey === 'tokens'}
-                    desc={sortDesc}
-                    onClick={() => handleSort('tokens')}
-                    className="w-[160px]"
-                  />
-                  <th scope="col" className="w-[120px] py-2 pl-6 text-right font-medium">
-                    {t('myUsageShare')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {view.rows.map((row) => (
-                  <tr key={row.tokenName} className="border-b border-ds-border-muted last:border-0">
-                    <td className="w-full max-w-0 truncate py-1.5 pr-3 font-medium text-ds-ink">
-                      {row.tokenName}
-                    </td>
-                    <td className="whitespace-nowrap py-1.5 pl-6 text-right tabular-nums text-ds-muted">
-                      {row.requestCount.toLocaleString()}
-                    </td>
-                    <td
-                      className="whitespace-nowrap py-1.5 pl-6 text-right tabular-nums text-ds-muted"
-                      title={row.totalTokens.toLocaleString()}
-                    >
-                      {row.totalTokens.toLocaleString()}
-                    </td>
-                    <td className="py-1.5 pl-6">
-                      <div className="flex items-center justify-end gap-2">
-                        <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-[var(--radius-pill)] bg-ds-subtle">
-                          <div
-                            className="h-full rounded-[var(--radius-pill)] bg-accent"
-                            style={{ width: `${row.sharePct}%` }}
-                          />
-                        </div>
-                        <span className="w-9 shrink-0 text-right text-[11.5px] font-medium tabular-nums text-accent">
-                          {row.sharePct}%
-                        </span>
-                      </div>
-                    </td>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[760px] border-collapse text-[12.5px]">
+                <thead>
+                  <tr className="border-b border-ds-border text-[11.5px] uppercase tracking-wide text-ds-faint">
+                    <th scope="col" className="min-w-[220px] py-2 pr-4 text-left font-medium">
+                      {t('myUsageGroupName')}
+                    </th>
+                    <SortableHeader
+                      label={t('myUsageRequests')}
+                      active={sortKey === 'requests'}
+                      desc={sortDesc}
+                      onClick={() => handleSort('requests')}
+                      className="w-[100px]"
+                    />
+                    <SortableHeader
+                      label={t('myUsageTokens')}
+                      active={sortKey === 'tokens'}
+                      desc={sortDesc}
+                      onClick={() => handleSort('tokens')}
+                      className="w-[160px]"
+                    />
+                    <SortableHeader
+                      label={t('myUsageCost')}
+                      active={sortKey === 'cost'}
+                      desc={sortDesc}
+                      onClick={() => handleSort('cost')}
+                      className="w-[110px]"
+                    />
+                    <th scope="col" className="w-[140px] py-2 pl-6 text-right font-medium">
+                      {t('myUsageShare')}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {view.rows.map((row) => {
+                    const cost = formatUsageCost(row.costCny)
+                    return (
+                      <tr key={row.tokenName} className="border-b border-ds-border-muted last:border-0">
+                        <td className="w-full max-w-0 truncate py-1.5 pr-4 font-medium text-ds-ink">
+                          {row.tokenName}
+                        </td>
+                        <td className="whitespace-nowrap py-1.5 pl-6 text-right tabular-nums text-ds-muted">
+                          {row.requestCount.toLocaleString()}
+                        </td>
+                        <td
+                          className="whitespace-nowrap py-1.5 pl-6 text-right tabular-nums text-ds-muted"
+                          title={row.totalTokens.toLocaleString()}
+                        >
+                          {row.totalTokens.toLocaleString()}
+                        </td>
+                        <td className="whitespace-nowrap py-1.5 pl-6 text-right tabular-nums text-ds-muted">
+                          {cost}
+                        </td>
+                        <td className="py-1.5 pl-6 text-right tabular-nums">
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-[var(--radius-pill)] bg-ds-subtle">
+                              <div
+                                className="h-full rounded-[var(--radius-pill)] bg-accent"
+                                style={{ width: `${row.sharePct}%` }}
+                              />
+                            </div>
+                            <span className="w-9 shrink-0 text-right text-[11.5px] font-medium tabular-nums text-accent">
+                              {row.sharePct}%
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {view.hiddenCount > 0 ? (
@@ -178,6 +197,11 @@ export function MyUsagePanel({
       )}
     </Card>
   )
+}
+
+function formatUsageCost(costCny: number | null): string {
+  if (typeof costCny !== 'number' || !Number.isFinite(costCny)) return '-'
+  return `¥${CNY_FORMATTER.format(costCny)}`
 }
 
 function UsageStatTile({

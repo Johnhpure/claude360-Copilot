@@ -1403,6 +1403,7 @@
   "myUsageGroupName": "Group",
   "myUsageRequests": "Requests",
   "myUsageTokens": "Tokens",
+  "myUsageCost": "Cost",
   "myUsageTotalRequests": "Total requests",
   "myUsageTotalTokens": "Total tokens",
   "myUsageTop3": "Top groups",

@@ -53,6 +53,7 @@ const labels: Record<string, string> = {
   myUsageGroupName: 'Group',
   myUsageRequests: 'Requests',
   myUsageTokens: 'Tokens',
+  myUsageCost: 'Cost',
   myUsageTotalRequests: 'Total requests',
   myUsageTotalTokens: 'Total tokens',
   myUsageTop3: 'Top groups',
@@ -90,7 +91,7 @@ function tokenListFixture(): Claude360TokenListItem[] {
 }
 
 function tokenStatsFixture(): Claude360TokenStat[] {
-  return [{ tokenName: 'text-key', requestCount: 42, totalTokens: 12345, quota: 1000 }]
+  return [{ tokenName: 'text-key', requestCount: 42, totalTokens: 12345, quota: 1000, costCny: 0.01 }]
 }
 
 /** 构造 count 个分组:key-01..key-NN,tokens/requests 随序号递增,便于断言排序/截断。 */
@@ -99,7 +100,8 @@ function usageStatsFixture(count: number): Claude360TokenStat[] {
     tokenName: `key-${String(i + 1).padStart(2, '0')}`,
     requestCount: (i + 1) * 2,
     totalTokens: (i + 1) * 100,
-    quota: 0
+    quota: 0,
+    costCny: 0
   }))
 }
 
@@ -200,6 +202,19 @@ describe('MyPage presentational panels', () => {
     expect(html).not.toContain('key-02')
     expect(html).toContain('Show more')
     expect(html).toContain('data-testid="my-usage-show-more"')
+  })
+
+  it('renders usage costs as CNY and keeps missing costs explicit', () => {
+    const stats: Claude360TokenStat[] = [
+      { tokenName: 'paid-key', requestCount: 7, totalTokens: 4567890, quota: 860000, costCny: 12.556 },
+      { tokenName: 'unknown-key', requestCount: 1, totalTokens: 10, quota: 0, costCny: null }
+    ]
+    const html = renderToStaticMarkup(createElement(MyUsagePanel, { stats, t }))
+
+    expect(html).toContain('Cost')
+    expect(html).toContain('¥12.56')
+    expect(html).toContain('4,567,890')
+    expect(html).toMatch(/<td[^>]*>\s*-\s*<\/td>/)
   })
 })
 
@@ -355,6 +370,20 @@ describe('my-page-actions pure helpers', () => {
     const expandedView = buildUsageView(stats, { query: '', sortKey: 'tokens', sortDesc: true, limit: null })
     expect(expandedView.rows).toHaveLength(12)
     expect(expandedView.hiddenCount).toBe(0)
+  })
+
+  it('sorts usage rows by known cost while keeping missing costs last', () => {
+    const stats: Claude360TokenStat[] = [
+      { tokenName: 'unknown', requestCount: 99, totalTokens: 999, quota: 0, costCny: null },
+      { tokenName: 'small', requestCount: 1, totalTokens: 10, quota: 1000, costCny: 0.04 },
+      { tokenName: 'large', requestCount: 2, totalTokens: 20, quota: 100000, costCny: 12.34 }
+    ]
+
+    const desc = buildUsageView(stats, { query: '', sortKey: 'cost', sortDesc: true, limit: null })
+    expect(desc.rows.map((row) => row.tokenName)).toEqual(['large', 'small', 'unknown'])
+
+    const asc = buildUsageView(stats, { query: '', sortKey: 'cost', sortDesc: false, limit: null })
+    expect(asc.rows.map((row) => row.tokenName)).toEqual(['small', 'large', 'unknown'])
   })
 })
 

@@ -1,6 +1,7 @@
 import type {
   Claude360Me,
   Claude360MeRawResponse,
+  Claude360StatusRawResponse,
   Claude360TokenStat,
   Claude360TokenStatRawResponse,
   Claude360TokenStatsQuery,
@@ -33,6 +34,11 @@ export type Claude360BillingServiceDeps = {
 export type Claude360WechatTopupInput = {
   amount: number
   discountCode?: string
+}
+
+type TokenCostPricing = {
+  quotaPerUnit: number
+  price: number
 }
 
 export class Claude360BillingService {
@@ -110,15 +116,76 @@ export class Claude360BillingService {
       params.set('end_timestamp', String(query.endTimestamp))
     }
     const suffix = params.toString() ? `?${params.toString()}` : ''
-    const rows = await this.deps.apiClient.get<Claude360TokenStatRawResponse[]>(
-      `/api/cli/token_stats${suffix}`,
-      token
-    )
+    const [pricing, rows] = await Promise.all([
+      this.loadTokenCostPricing(),
+      this.deps.apiClient.get<Claude360TokenStatRawResponse[]>(`/api/cli/token_stats${suffix}`, token)
+    ])
     return (rows ?? []).map((row) => ({
       tokenName: row.token_name,
       requestCount: row.request_count ?? 0,
       totalTokens: row.total_tokens ?? 0,
-      quota: row.quota ?? 0
+      quota: row.quota ?? 0,
+      costCny: tokenStatCostCny(row, pricing)
     }))
   }
+
+  private async loadTokenCostPricing(): Promise<TokenCostPricing | null> {
+    try {
+      const status = await this.deps.apiClient.get<Claude360StatusRawResponse>('/api/status')
+      const quotaPerUnit = finitePositiveNumber(status.quota_per_unit)
+      const price = finitePositiveNumber(status.price)
+      if (quotaPerUnit == null || price == null) return null
+      return { quotaPerUnit, price }
+    } catch {
+      return null
+    }
+  }
+}
+
+function tokenStatCostCny(row: Claude360TokenStatRawResponse, pricing: TokenCostPricing | null): number | null {
+  const directCost = firstFiniteNonNegativeNumber(
+    row.cost_cny,
+    row.amount_cny,
+    row.fee_cny,
+    row.price_cny,
+    row.expense_cny,
+    row.cost,
+    row.amount,
+    row.fee,
+    row.price,
+    row.expense
+  )
+  if (directCost != null) return directCost
+
+  if (pricing == null) return null
+  const quota = finiteNonNegativeNumber(row.quota)
+  if (quota == null) return null
+  return (quota / pricing.quotaPerUnit) * pricing.price
+}
+
+function firstFiniteNonNegativeNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    const parsed = finiteNonNegativeNumber(value)
+    if (parsed != null) return parsed
+  }
+  return null
+}
+
+function finitePositiveNumber(value: unknown): number | null {
+  const parsed = finiteNumber(value)
+  return parsed != null && parsed > 0 ? parsed : null
+}
+
+function finiteNonNegativeNumber(value: unknown): number | null {
+  const parsed = finiteNumber(value)
+  return parsed != null && parsed >= 0 ? parsed : null
+}
+
+function finiteNumber(value: unknown): number | null {
+  const numberValue = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim()
+      ? Number(value)
+      : Number.NaN
+  return Number.isFinite(numberValue) ? numberValue : null
 }

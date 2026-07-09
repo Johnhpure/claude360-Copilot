@@ -91,16 +91,36 @@ describe('Claude360BillingService', () => {
     expect(calls[0]).toContain('order_id=ord_1')
   })
 
-  it('forwards token stats timestamps and maps rows', async () => {
+  it('forwards token stats timestamps and maps rows with dynamic CNY cost', async () => {
     const calls: string[] = []
     const service = new Claude360BillingService({
-      apiClient: fakeApi({ '/api/cli/token_stats': () => [{ token_name: 'text', request_count: 3, total_tokens: 100, quota: 10 }] }, calls),
+      apiClient: fakeApi(
+        {
+          '/api/status': () => ({ quota_per_unit: 500_000, price: 7.3 }),
+          '/api/cli/token_stats': () => [{ token_name: 'text', request_count: 3, total_tokens: 100, quota: 1000 }]
+        },
+        calls
+      ),
       secretStore: fakeSecretStore()
     })
     const stats = await service.getTokenStats({ startTimestamp: 1000, endTimestamp: 2000 })
-    expect(stats).toEqual([{ tokenName: 'text', requestCount: 3, totalTokens: 100, quota: 10 }])
-    expect(calls[0]).toContain('start_timestamp=1000')
-    expect(calls[0]).toContain('end_timestamp=2000')
+    expect(stats).toEqual([{ tokenName: 'text', requestCount: 3, totalTokens: 100, quota: 1000, costCny: 0.0146 }])
+    expect(calls).toContain('/api/status')
+    expect(calls[1]).toContain('start_timestamp=1000')
+    expect(calls[1]).toContain('end_timestamp=2000')
+  })
+
+  it('keeps token stats cost unknown when status pricing is unavailable', async () => {
+    const service = new Claude360BillingService({
+      apiClient: fakeApi({
+        '/api/status': () => ({ quota_per_unit: 500_000 }),
+        '/api/cli/token_stats': () => [{ token_name: 'text', request_count: 3, total_tokens: 100, quota: 1000 }]
+      }),
+      secretStore: fakeSecretStore()
+    })
+
+    const stats = await service.getTokenStats()
+    expect(stats[0]).toMatchObject({ tokenName: 'text', quota: 1000, costCny: null })
   })
 
   it('throws when not logged in', async () => {
