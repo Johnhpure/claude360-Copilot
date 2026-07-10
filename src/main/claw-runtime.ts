@@ -1467,7 +1467,7 @@ export class ClawRuntime {
         { method: 'GET' }
       )
       if (!detailRes.ok) {
-        this.deps.logError('claw-feishu', 'Failed to read recent generated files from Kun thread', {
+        this.deps.logError('claw-feishu', 'Failed to read recent generated files from Claude360 Copilot runtime thread', {
           ...context,
           threadId: targetThreadId,
           message: runtimeErrorMessage(detailRes, 'Failed to read thread result.')
@@ -1479,7 +1479,7 @@ export class ClawRuntime {
         maxFiles: 3
       })
     } catch (error) {
-      this.deps.logError('claw-feishu', 'Failed to inspect Kun thread for recent generated files', {
+      this.deps.logError('claw-feishu', 'Failed to inspect Claude360 Copilot runtime thread for recent generated files', {
         ...context,
         threadId: targetThreadId,
         message: errorMessage(error)
@@ -2361,7 +2361,7 @@ export class ClawRuntime {
           ok: false,
           code: 'gui_plan_create_retired',
           message:
-            'The /claw/internal/gui-plan/create endpoint is no longer active. Use the Kun create_plan tool.'
+            'The /claw/internal/gui-plan/create endpoint is no longer active. Use the Claude360 Copilot create_plan tool.'
         })
         return
       }

@@ -143,7 +143,7 @@ function printUsage(): void {
   console.log('  npm --prefix kun run benchmark:replay -- --suite <file> [options]')
   console.log('')
   console.log('Options:')
-  console.log(`  --base-url <url>          Kun runtime URL (or KUN_RUNTIME_URL, default ${DEFAULT_RUNTIME_URL})`)
+  console.log(`  --base-url <url>          Claude360 Copilot runtime URL (or KUN_RUNTIME_URL, default ${DEFAULT_RUNTIME_URL})`)
   console.log('  --workspace <path>        Workspace for replay tasks')
   console.log('  --tag <tag>               Run only tasks with this tag')
   console.log('  --repeat <n>              Repeat each selected task (default 1)')

@@ -13,7 +13,7 @@ export function normalizeLocalKunHost(host: string): string {
   if (normalized === 'localhost') return 'localhost'
   if (normalized === '127.0.0.1') return '127.0.0.1'
   if (normalized === '::1' || normalized === '[::1]') return '::1'
-  throw new Error(`Kun local host must be localhost, 127.0.0.1, or ::1; got "${host}".`)
+  throw new Error(`Claude360 Copilot runtime local host must be localhost, 127.0.0.1, or ::1; got "${host}".`)
 }
 
 function formatHostForUrl(host: string): string {

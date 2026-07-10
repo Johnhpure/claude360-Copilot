@@ -50,6 +50,20 @@ describe('plan-prompts', () => {
     expect(isGuiPlanDraftOrRefinePrompt('Build plan: .deepseekgui/plan/add-auth.md')).toBe(false)
   })
 
+  it('keeps recognizing legacy-brand plan prompts from persisted history', () => {
+    const legacyKunDraft =
+      'Kun is asking you to draft a GUI-owned implementation plan.\nUser request:\nAdd auth'
+    const legacyKunRefine =
+      'Kun is asking you to revise an existing GUI-owned implementation plan.\nUser feedback:\nSmaller\nCurrent plan:\n# Old'
+    expect(getGuiPlanPromptKind(legacyKunDraft)).toBe('draft')
+    expect(getGuiPlanPromptKind(legacyKunRefine)).toBe('refine')
+    expect(formatGuiPlanPromptForDisplay(legacyKunDraft)).toBe('Create plan: Add auth')
+    expect(formatGuiPlanPromptForDisplay(legacyKunRefine)).toBe('Revise plan: Smaller')
+    expect(
+      getGuiPlanPromptKind('DeepSeek GUI is asking you to draft a GUI-owned implementation plan.')
+    ).toBe('draft')
+  })
+
   it('builds refine prompts with the existing plan and feedback', () => {
     const prompt = buildRefinePlanPrompt({
       feedback: 'Make it smaller',

@@ -159,7 +159,7 @@ export function buildCanUseTool(decide: ToolApprovalDecider): SdkCanUseTool {
       // The deny variant requires a non-empty `message`.
       return {
         behavior: 'deny',
-        message: decision.message ?? 'Denied by kun permission policy',
+        message: decision.message ?? 'Denied by Claude360 Copilot permission policy',
         ...(decision.interrupt ? { interrupt: true } : {})
       }
     } catch (err) {

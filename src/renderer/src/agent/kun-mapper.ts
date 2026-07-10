@@ -1269,7 +1269,7 @@ export async function dispatchKunRuntimeEvent(
       sink.onTurnComplete()
       return
     case 'turn_failed': {
-      const payload = runtimeErrorFromEvent(event, 'Kun turn failed')
+      const payload = runtimeErrorFromEvent(event, 'Claude360 Copilot turn failed')
       sink.onRuntimeError?.(payload)
       sink.onError(errorForRuntimeEvent(payload), { terminal: true })
       return

@@ -382,7 +382,7 @@ async function startKunChildOnce(
   const resolution = resolveKunExecutable(root, runtime.binaryPath)
   if (resolution.command === process.execPath && !existsSync(resolution.args[0])) {
     throw new Error(
-      `Kun runtime build is missing at ${resolution.args[0]}. Run \`npm run build:kun\` before starting the GUI.`
+      `Claude360 Copilot runtime build is missing at ${resolution.args[0]}. Run \`npm run build:kun\` before starting the GUI.`
     )
   }
   const dataDir = resolveKunDataDir(runtime)
@@ -649,7 +649,7 @@ export async function syncGuiManagedKunConfig(
   const parsedNext = KunConfigSchema.safeParse(next)
   if (!parsedNext.success) {
     throw new Error(
-      `Refusing to write invalid GUI-managed Kun config at ${configPath}: ${JSON.stringify(parsedNext.error.issues, null, 2)}`
+      `Refusing to write invalid GUI-managed Claude360 Copilot runtime config at ${configPath}: ${JSON.stringify(parsedNext.error.issues, null, 2)}`
     )
   }
   const nextText = `${JSON.stringify(next, null, 2)}\n`
@@ -1645,7 +1645,7 @@ function allocateTcpPort(host: string): Promise<number> {
         cleanup()
         if (error) reject(error)
         else if (port > 0) resolve(port)
-        else reject(new Error('failed to allocate an available Kun port'))
+        else reject(new Error('failed to allocate an available Claude360 Copilot runtime port'))
       })
     })
   })
@@ -1755,17 +1755,17 @@ function describeKunExit(
   stderrTail = ''
 ): string {
   const suffix = stderrTail.trim() ? `\n${stderrTail.trim()}` : ''
-  if (signal) return `Kun exited during startup with signal ${signal}${suffix}`
-  if (typeof code === 'number') return `Kun exited during startup with code ${code}${suffix}`
-  return `Kun exited during startup${suffix}`
+  if (signal) return `Claude360 Copilot runtime exited during startup with signal ${signal}${suffix}`
+  if (typeof code === 'number') return `Claude360 Copilot runtime exited during startup with code ${code}${suffix}`
+  return `Claude360 Copilot runtime exited during startup${suffix}`
 }
 
 function describeKunStartupTimeout(stderrTail: string, sawReadyMarker = false): string {
   const suffix = stderrTail.trim() ? `\n${stderrTail.trim()}` : ''
   if (sawReadyMarker) {
-    return `Kun reported ready but did not pass health checks within ${KUN_STARTUP_TIMEOUT_MS}ms${suffix}`
+    return `Claude360 Copilot runtime reported ready but did not pass health checks within ${KUN_STARTUP_TIMEOUT_MS}ms${suffix}`
   }
-  return `Kun did not report ready within ${KUN_STARTUP_TIMEOUT_MS}ms${suffix}`
+  return `Claude360 Copilot runtime did not report ready within ${KUN_STARTUP_TIMEOUT_MS}ms${suffix}`
 }
 
 async function probeKunHealth(port: number): Promise<boolean> {

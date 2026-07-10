@@ -2,12 +2,15 @@ const GUI_PLAN_OPEN = '<gui_plan>'
 const GUI_PLAN_CLOSE = '</gui_plan>'
 /**
  * @deprecated Kept for legacy prompt compatibility only. New turns use
- * the native Kun `create_plan` tool; the renderer still emits a
+ * the native runtime `create_plan` tool; the renderer still emits a
  * brief tag-based fallback section for legacy providers.
  */
 export const GUI_PLAN_CREATE_TOOL_NAME = 'create_plan'
-const DRAFT_PLAN_INTRO = 'Kun is asking you to draft a GUI-owned implementation plan.'
-const REFINE_PLAN_INTRO = 'Kun is asking you to revise an existing GUI-owned implementation plan.'
+const DRAFT_PLAN_INTRO = 'Claude360 Copilot is asking you to draft a GUI-owned implementation plan.'
+const REFINE_PLAN_INTRO = 'Claude360 Copilot is asking you to revise an existing GUI-owned implementation plan.'
+// Legacy intros kept ONLY so old persisted turns keep folding in the chat UI.
+const LEGACY_KUN_DRAFT_PLAN_INTRO = 'Kun is asking you to draft a GUI-owned implementation plan.'
+const LEGACY_KUN_REFINE_PLAN_INTRO = 'Kun is asking you to revise an existing GUI-owned implementation plan.'
 const LEGACY_DRAFT_PLAN_INTRO = 'DeepSeek GUI is asking you to draft a GUI-owned implementation plan.'
 const LEGACY_REFINE_PLAN_INTRO = 'DeepSeek GUI is asking you to revise an existing GUI-owned implementation plan.'
 const BUILD_PLAN_INTRO = 'Please read and execute the GUI plan file at'
@@ -105,6 +108,7 @@ export function getGuiPlanPromptKind(text: string): GuiPlanPromptKind | null {
   const normalized = text.trim()
   if (
     normalized.includes(DRAFT_PLAN_INTRO) ||
+    normalized.includes(LEGACY_KUN_DRAFT_PLAN_INTRO) ||
     normalized.includes(LEGACY_DRAFT_PLAN_INTRO) ||
     normalized.startsWith(DRAFT_PLAN_DISPLAY_PREFIX) ||
     normalized === 'Create GUI plan'
@@ -113,6 +117,7 @@ export function getGuiPlanPromptKind(text: string): GuiPlanPromptKind | null {
   }
   if (
     normalized.includes(REFINE_PLAN_INTRO) ||
+    normalized.includes(LEGACY_KUN_REFINE_PLAN_INTRO) ||
     normalized.includes(LEGACY_REFINE_PLAN_INTRO) ||
     normalized.startsWith(REFINE_PLAN_DISPLAY_PREFIX) ||
     normalized === 'Revise GUI plan'
@@ -131,11 +136,19 @@ export function getGuiPlanPromptKind(text: string): GuiPlanPromptKind | null {
 
 export function formatGuiPlanPromptForDisplay(text: string): string | null {
   const normalized = text.trim()
-  if (normalized.includes(DRAFT_PLAN_INTRO) || normalized.includes(LEGACY_DRAFT_PLAN_INTRO)) {
+  if (
+    normalized.includes(DRAFT_PLAN_INTRO) ||
+    normalized.includes(LEGACY_KUN_DRAFT_PLAN_INTRO) ||
+    normalized.includes(LEGACY_DRAFT_PLAN_INTRO)
+  ) {
     const request = readSectionAfter(normalized, 'User request:')
     return request ? `Create plan: ${request}` : 'Create GUI plan'
   }
-  if (normalized.includes(REFINE_PLAN_INTRO) || normalized.includes(LEGACY_REFINE_PLAN_INTRO)) {
+  if (
+    normalized.includes(REFINE_PLAN_INTRO) ||
+    normalized.includes(LEGACY_KUN_REFINE_PLAN_INTRO) ||
+    normalized.includes(LEGACY_REFINE_PLAN_INTRO)
+  ) {
     const feedback = readSectionBetween(normalized, 'User feedback:', 'Current plan:')
     return feedback ? `Revise plan: ${feedback}` : 'Revise GUI plan'
   }

@@ -10,7 +10,7 @@ export function composeSddAssistantPrompt(options: {
 }): string {
   const frameworkGuidance = composeFrameworkGuidance(options.frameworkIds ?? [])
   return [
-    'You are helping clarify and improve an SDD requirement draft inside Kun.',
+    'You are helping clarify and improve an SDD requirement draft inside Claude360 Copilot.',
     `Workspace: ${options.workspaceRoot}`,
     `Draft file: ${options.draftRelativePath}`,
     '',

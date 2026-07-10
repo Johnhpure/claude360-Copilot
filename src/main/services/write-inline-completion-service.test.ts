@@ -155,7 +155,7 @@ describe('requestWriteInlineCompletion', () => {
       suffix: ' a test.',
       max_tokens: 64
     })
-    expect(body.prompt).toContain('Kun inline completion')
+    expect(body.prompt).toContain('Claude360 Copilot inline completion')
     expect(body.prompt).toContain('Return only the text to insert at the cursor')
     expect(body.prompt).not.toContain('<<<SHORT')
     expect(body.prompt).toContain('<<<PREFIX')
@@ -239,7 +239,7 @@ describe('requestWriteInlineCompletion', () => {
       suffix: ' a test.',
       responseChars: 0
     })
-    expect(debugEntries[0].prompt).toContain('Kun inline completion')
+    expect(debugEntries[0].prompt).toContain('Claude360 Copilot inline completion')
     expect(debugEntries[0].prompt.endsWith('# Draft\n\nThis is')).toBe(true)
   })
 
@@ -681,7 +681,7 @@ describe('requestWriteInlineCompletion', () => {
     const request = createRequest()
 
     const prompt = buildWriteInlineCompletionPrompt(request, null)
-    expect(prompt).toContain('Kun inline completion')
+    expect(prompt).toContain('Claude360 Copilot inline completion')
     expect(prompt).toContain('<<<PREFIX')
     expect(prompt).toContain('<<<SUFFIX')
     expect(prompt).not.toContain('<<<SHORT')

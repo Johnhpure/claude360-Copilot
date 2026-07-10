@@ -37,7 +37,7 @@ export const kunRuntimeAdapter = {
       const scriptPath = resolution.args[0] ?? ''
       return runtime.binaryPath.trim()
         ? `Node.js script (${scriptPath})`
-        : `Bundled Kun (${scriptPath})`
+        : `Bundled Claude360 Copilot runtime (${scriptPath})`
     }
     return resolution.command
   },

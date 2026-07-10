@@ -117,7 +117,7 @@ describe('AgentLoop', () => {
       kind: 'turn_failed',
       message: expect.stringContaining('model stream exploded')
     })
-    expect(failed?.kind === 'turn_failed' ? failed.message : '').toContain('[Kun turn failed]')
+    expect(failed?.kind === 'turn_failed' ? failed.message : '').toContain('[Claude360 Copilot turn failed]')
   })
 
   it('fails the turn when the model stream yields an error chunk', async () => {
@@ -663,7 +663,7 @@ describe('AgentLoop', () => {
 	    expect(items.find((item) => item.kind === 'error' && item.code === 'tool_catalog_changed'))
 	      .toMatchObject({
 	        kind: 'error',
-	        message: expect.stringContaining('Kun stopped this turn')
+	        message: expect.stringContaining('Claude360 Copilot stopped this turn')
 	      })
 	  })
 

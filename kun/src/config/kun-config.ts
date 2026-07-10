@@ -332,12 +332,12 @@ export function readKunConfigFile(path: string): LoadedKunConfig {
     json = JSON.parse(text)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to parse Kun config JSON at ${resolvedPath}: ${message}`)
+    throw new Error(`Failed to parse Claude360 Copilot runtime config JSON at ${resolvedPath}: ${message}`)
   }
   const parsed = KunConfigSchema.safeParse(json)
   if (!parsed.success) {
     throw new Error(
-      `Invalid Kun config at ${resolvedPath}: ${JSON.stringify(parsed.error.issues, null, 2)}`
+      `Invalid Claude360 Copilot runtime config at ${resolvedPath}: ${JSON.stringify(parsed.error.issues, null, 2)}`
     )
   }
   return { path: resolvedPath, config: parsed.data }

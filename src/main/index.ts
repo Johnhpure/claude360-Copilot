@@ -847,7 +847,7 @@ async function superviseKunCrash(info: KunUnexpectedExitInfo): Promise<void> {
   publishRuntimeStatus({
     state: 'crashed',
     source: 'supervisor',
-    message: `Kun exited unexpectedly (${exitLabel}).`,
+    message: `Claude360 Copilot runtime exited unexpectedly (${exitLabel}).`,
     stderrTail: info.stderrTail
   })
   if (supervisedRestartInFlight) return
@@ -859,7 +859,7 @@ async function superviseKunCrash(info: KunUnexpectedExitInfo): Promise<void> {
       publishRuntimeStatus({
         state: 'stopped',
         source: 'supervisor',
-        message: 'Kun exited and automatic restart is unavailable (auto-start disabled).'
+        message: 'Claude360 Copilot runtime exited and automatic restart is unavailable (auto-start disabled).'
       })
       return
     }
@@ -872,8 +872,8 @@ async function superviseKunCrash(info: KunUnexpectedExitInfo): Promise<void> {
           state: 'failed',
           source: 'supervisor',
           message: lastError
-            ? `Kun keeps crashing; automatic restarts are paused. Last error: ${lastError}`
-            : 'Kun keeps crashing; automatic restarts are paused. Check the runtime logs, then retry.',
+            ? `Claude360 Copilot runtime keeps crashing; automatic restarts are paused. Last error: ${lastError}`
+            : 'Claude360 Copilot runtime keeps crashing; automatic restarts are paused. Check the runtime logs, then retry.',
           stderrTail: info.stderrTail
         })
         return
@@ -883,7 +883,7 @@ async function superviseKunCrash(info: KunUnexpectedExitInfo): Promise<void> {
         source: 'supervisor',
         attempt: verdict.attempt,
         maxAttempts: 3,
-        message: `Restarting Kun automatically (attempt ${verdict.attempt}/3).`
+        message: `Restarting Claude360 Copilot runtime automatically (attempt ${verdict.attempt}/3).`
       })
       await new Promise((resolve) => setTimeout(resolve, verdict.delayMs))
       try {
@@ -956,7 +956,7 @@ async function runtimeWatchdogTick(): Promise<void> {
     publishRuntimeStatus({
       state: 'restarting',
       source: 'watchdog',
-      message: 'Kun stopped responding to health checks; restarting it.'
+      message: 'Claude360 Copilot runtime stopped responding to health checks; restarting it.'
     })
     try {
       await restartRuntime(settings)
@@ -965,7 +965,7 @@ async function runtimeWatchdogTick(): Promise<void> {
       publishRuntimeStatus({
         state: 'failed',
         source: 'watchdog',
-        message: `Kun is unresponsive and the automatic restart failed: ${
+        message: `Claude360 Copilot runtime is unresponsive and the automatic restart failed: ${
           error instanceof Error ? error.message : String(error)
         }`
       })
@@ -992,7 +992,7 @@ function queueRuntimeSettingsApply(prev: AppSettingsV1, next: AppSettingsV1): vo
       await restartManagedRuntimeForSettingsChange(anchor, current)
     })
     .catch((error: unknown) => {
-      logWarn('settings-apply', 'Failed to apply Kun runtime settings in background', {
+      logWarn('settings-apply', 'Failed to apply Claude360 Copilot runtime settings in background', {
         message: error instanceof Error ? error.message : String(error)
       })
     })
@@ -1016,7 +1016,7 @@ function queueRuntimeMcpConfigApply(settings: AppSettingsV1): void {
       await restartManagedRuntimeForMcpConfigChange(current)
     })
     .catch((error: unknown) => {
-      logWarn('mcp-config', 'Failed to apply Kun MCP config change in background', {
+      logWarn('mcp-config', 'Failed to apply Claude360 Copilot MCP config change in background', {
         message: error instanceof Error ? error.message : String(error)
       })
     })
@@ -1100,7 +1100,7 @@ async function resolveManagedKunLaunchSettings(
 
   const next = await store.patch({ agents: { kun: { port: resolved.port } } })
   lastAppliedSettings = next
-  logWarn(source, `Kun port ${runtime.port} is unavailable; using ${resolved.port} for the managed runtime`, {
+  logWarn(source, `Claude360 Copilot runtime port ${runtime.port} is unavailable; using ${resolved.port} for the managed runtime`, {
     previousPort: runtime.port,
     port: resolved.port,
     message: resolved.message
@@ -1136,7 +1136,7 @@ async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1>
   if (!runtime.autoStart) {
     throw runtimeJsonError(
       'runtime_offline',
-      'Kun is offline. Enable automatic startup in Settings, or start `kun serve` manually.'
+      'Claude360 Copilot runtime is offline. Enable automatic startup in Settings, or start `kun serve` manually.'
     )
   }
 
@@ -1166,7 +1166,7 @@ async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1>
       }
       logWarn(
         'runtime-start',
-        `managed Kun child stopped responding on port ${runtime.port}; restarting it in place`
+        `managed Claude360 Copilot runtime child stopped responding on port ${runtime.port}; restarting it in place`
       )
       await kunRuntimeAdapter.stopAndWait()
     }
@@ -1186,7 +1186,7 @@ async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1>
   if (!started) {
     throw runtimeJsonError(
       'runtime_unhealthy',
-      'Kun did not become healthy after launch.'
+      'Claude360 Copilot runtime did not become healthy after launch.'
     )
   }
 
@@ -1225,7 +1225,7 @@ async function restartRuntimeOnce(settings: AppSettingsV1): Promise<void> {
   if (!runtime.autoStart) {
     throw runtimeJsonError(
       'runtime_offline',
-      'Kun is offline. Enable automatic startup in Settings, or start `kun serve` manually.'
+      'Claude360 Copilot runtime is offline. Enable automatic startup in Settings, or start `kun serve` manually.'
     )
   }
 
@@ -1244,7 +1244,7 @@ async function restartRuntimeOnce(settings: AppSettingsV1): Promise<void> {
   if (!healthy) {
     throw runtimeJsonError(
       'runtime_unhealthy',
-      'Kun did not become healthy after restart.'
+      'Claude360 Copilot runtime did not become healthy after restart.'
     )
   }
 
@@ -1374,7 +1374,7 @@ function runtimeStartupConfigChanged(prev: AppSettingsV1, next: AppSettingsV1): 
 function validateRuntimeSettingsForApply(next: AppSettingsV1): string | null {
   const runtime = resolveKunRuntimeSettings(next)
   if (!Number.isInteger(runtime.port) || runtime.port < MIN_KUN_LOCAL_PORT || runtime.port > 65_535) {
-    return `Kun port must be an integer between ${MIN_KUN_LOCAL_PORT} and 65535 (got ${String(runtime.port)})`
+    return `Claude360 Copilot runtime port must be an integer between ${MIN_KUN_LOCAL_PORT} and 65535 (got ${String(runtime.port)})`
   }
   const baseUrl = (runtime.baseUrl ?? '').trim()
   if (baseUrl) {
@@ -1421,7 +1421,7 @@ async function restartManagedRuntimeForSettingsChange(
   if (!nextHasApiKey && settingsHaveResolvableApiKey(prev)) {
     logWarn(
       'settings-apply',
-      'Skipping Kun restart: the new settings resolve to no API key but the running runtime had one — leaving the healthy runtime in place.'
+      'Skipping Claude360 Copilot runtime restart: the new settings resolve to no API key but the running runtime had one — leaving the healthy runtime in place.'
     )
     return
   }
@@ -1432,7 +1432,7 @@ async function restartManagedRuntimeForSettingsChange(
     publishRuntimeStatus({
       state: 'stopped',
       source: 'settings-apply',
-      message: 'Kun was stopped: auto-start is disabled.'
+      message: 'Claude360 Copilot runtime was stopped: auto-start is disabled.'
     })
     return
   }
@@ -1443,13 +1443,13 @@ async function restartManagedRuntimeForSettingsChange(
     await adapter.ensureRunning(launchSettings)
     const healthy = await waitForKunHealth(launchSettings, 20_000)
     if (!healthy) {
-      throw new Error('Kun did not become healthy after the settings change')
+      throw new Error('Claude360 Copilot runtime did not become healthy after the settings change')
     }
     noteRuntimeHealthy('settings-apply')
     publishRuntimeStatus({ state: 'running', source: 'settings-apply' })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    logWarn('settings-apply', `Kun restart failed after settings change: ${message}`)
+    logWarn('settings-apply', `Claude360 Copilot runtime restart failed after settings change: ${message}`)
     await rollbackRuntimeSettingsAfterFailedApply(prev, message)
   }
 }
@@ -1498,7 +1498,7 @@ async function rollbackRuntimeSettingsAfterFailedApply(
       state: 'running',
       source: 'settings-apply',
       rolledBack: true,
-      message: `The new settings failed to apply (${failureMessage}); Kun is running on the previous settings again.`
+      message: `The new settings failed to apply (${failureMessage}); Claude360 Copilot runtime is running on the previous settings again.`
     })
   } catch (error) {
     publishRuntimeStatus({
@@ -1532,17 +1532,17 @@ async function restartManagedRuntimeForMcpConfigChange(settings: AppSettingsV1):
     await adapter.ensureRunning(launchSettings)
     const healthy = await waitForKunHealth(launchSettings, 20_000)
     if (!healthy) {
-      throw new Error('Kun did not become healthy after the MCP config change')
+      throw new Error('Claude360 Copilot runtime did not become healthy after the MCP config change')
     }
     noteRuntimeHealthy('mcp-config')
     publishRuntimeStatus({ state: 'running', source: 'mcp-config' })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    logWarn('mcp-config', `Kun restart failed after MCP config change: ${message}`)
+    logWarn('mcp-config', `Claude360 Copilot runtime restart failed after MCP config change: ${message}`)
     publishRuntimeStatus({
       state: 'failed',
       source: 'mcp-config',
-      message: `Kun failed to restart after the MCP config change: ${message}. Check the MCP config file, then retry.`
+      message: `Claude360 Copilot runtime failed to restart after the MCP config change: ${message}. Check the MCP config file, then retry.`
     })
   }
 }
@@ -1553,14 +1553,14 @@ async function waitForManagedRuntimeReadyBeforeStop(
 ): Promise<void> {
   const healthy = await waitForKunHealth(settings, 20_000)
   if (!healthy) {
-    logWarn(source, 'Kun did not become healthy before a managed restart; stopping it anyway')
+    logWarn(source, 'Claude360 Copilot runtime did not become healthy before a managed restart; stopping it anyway')
     return
   }
   const idle = await waitForRuntimeTurnsIdle({ settings })
   if (idle === 'timeout') {
-    logWarn(source, 'Kun still has running turns after waiting; stopping it anyway')
+    logWarn(source, 'Claude360 Copilot runtime still has running turns after waiting; stopping it anyway')
   } else if (idle === 'unavailable') {
-    logWarn(source, 'Could not verify Kun turn idleness before a managed restart; stopping it anyway')
+    logWarn(source, 'Could not verify Claude360 Copilot runtime turn idleness before a managed restart; stopping it anyway')
   }
 }
 
@@ -1870,7 +1870,7 @@ app.whenReady().then(async () => {
         })
       })
       .catch((err) => {
-        console.warn('[kun-gui] prewarm Kun runtime:', err)
+        console.warn('[kun-gui] prewarm Claude360 Copilot runtime:', err)
       })
   }, 1500)
 
@@ -1892,7 +1892,7 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   void stopManagedRuntimes().catch((error) => {
-    console.warn('[kun-gui] failed to stop Kun runtime:', error)
+    console.warn('[kun-gui] failed to stop Claude360 Copilot runtime:', error)
   })
   if (process.platform !== 'darwin') {
     app.quit()
@@ -1907,7 +1907,7 @@ app.on('before-quit', (event) => {
   event.preventDefault()
   void stopManagedRuntimesForQuit()
     .catch((error) => {
-      console.warn('[kun-gui] failed to stop Kun runtime:', error)
+      console.warn('[kun-gui] failed to stop Claude360 Copilot runtime:', error)
       managedRuntimesStoppedForQuit = true
     })
     .finally(() => {

@@ -29,7 +29,7 @@ describe('serializeSddChatTranscript', () => {
       {
         kind: 'user',
         id: 'u1',
-        text: 'Kun is asking… full draft markdown inlined …',
+        text: 'Claude360 Copilot is asking… full draft markdown inlined …',
         meta: { displayText: '帮我澄清需求' }
       },
       { kind: 'reasoning', id: 'r1', text: '思考过程不应出现' },

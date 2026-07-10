@@ -58,7 +58,7 @@ export function buildSddDraftToPlanPrompt(options: {
         : 'No local SDD images were referenced in the draft.'
 
   return [
-    'Kun is asking you to upgrade an SDD requirement draft into a concrete implementation plan.',
+    'Claude360 Copilot is asking you to upgrade an SDD requirement draft into a concrete implementation plan.',
     `Workspace: ${options.workspaceRoot}`,
     `Draft file: ${options.draftRelativePath}`,
     `Reserved plan file: ${options.planRelativePath}`,

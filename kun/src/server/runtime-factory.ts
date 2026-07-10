@@ -164,7 +164,7 @@ export async function createKunServeRuntime(
     pinnedConstraints: [
       'system: preserve user intent across compaction',
       'system: keep the HTTP/SSE contract stable for the GUI',
-      'system: keep the stable Kun prefix byte-stable for prompt-cache reuse'
+      'system: keep the stable Claude360 Copilot prefix byte-stable for prompt-cache reuse'
     ]
   })
   const threadService = new ThreadService({ threadStore, sessionStore, events, ids, nowIso })
