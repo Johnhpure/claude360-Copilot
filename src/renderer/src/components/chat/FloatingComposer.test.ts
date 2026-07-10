@@ -524,13 +524,15 @@ describe('FloatingComposer model controls', () => {
     expect(html).not.toContain('disabled=""')
   })
 
-  it('does not treat default fallback models as configured providers', () => {
+  it('shows the group setup prompt instead of a blank menu when the pick list is empty', () => {
+    // 07-10: hardcode 默认模型清理后,未登录/上游失败时 pick 列表为空,
+    // picker 必须显示分组配置/登录引导而非空白或 hardcode 模型。
     const html = renderToStaticMarkup(
       createElement(FloatingComposerModelPicker, {
         compact: false,
         mode: 'select',
-        composerModel: 'deepseek-v4-pro',
-        composerPickList: ['deepseek-v4-pro', 'deepseek-v4-flash'],
+        composerModel: '',
+        composerPickList: [],
         composerModelGroups: [],
         canChangeModel: true,
         onComposerModelChange: () => undefined,

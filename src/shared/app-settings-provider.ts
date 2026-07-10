@@ -54,7 +54,6 @@ import { DEFAULT_CLAUDE360_BASE_URL } from './app-settings-claude360'
 import { getKunRuntimeSettings } from './app-settings-kun'
 import { normalizeDeepseekBaseUrl } from './app-settings-normalizers'
 import { sameClaude360Group } from './claude360'
-import { DEFAULT_COMPOSER_MODEL_IDS } from './default-composer-models'
 import {
   TOKEN_PLAN_PROVIDER_ID_SUFFIX,
   getModelProviderPreset,
@@ -874,7 +873,9 @@ function defaultModelProviderProfile(apiKey: string, baseUrl: string): ModelProv
     apiKey: apiKey.trim(),
     baseUrl: normalizeModelProviderBaseUrl(baseUrl),
     endpointFormat: DEFAULT_MODEL_ENDPOINT_FORMAT,
-    models: [...DEFAULT_COMPOSER_MODEL_IDS],
+    // DeepSeek 默认 provider 的预设模型（与下方 modelProfiles 键一致）。
+    // 仅作 provider profile 兜底,不再作为选择器的 hardcode 回退（07-10）。
+    models: ['deepseek-v4-pro', 'deepseek-v4-flash'],
     modelProfiles: {
       'deepseek-v4-pro': deepseekTextModelProfile(),
       'deepseek-v4-flash': {

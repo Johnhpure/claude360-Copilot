@@ -11,7 +11,6 @@ import {
   DEFAULT_WRITE_INLINE_LONG_COMPLETION_MAX_TOKENS,
   DEFAULT_KUN_DATA_DIR,
   MIN_KUN_LOCAL_PORT,
-  WRITE_INLINE_COMPLETION_MODEL_IDS,
   defaultModelProviderSettings,
   isClaude360ProviderId,
   isKunRuntimeInsecure,

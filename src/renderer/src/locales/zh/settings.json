@@ -1103,6 +1103,7 @@
   "writeInlineCompletionApiKeyOverride": "当前使用写作专用 API Key。",
   "writeInlineCompletionModel": "写作建议模型",
   "writeInlineCompletionModelDesc": "留空则沿用 AI 助手的默认模型；只有写作建议需要单独模型时才填写。",
+  "writeInlineCompletionModelEmpty": "暂无可选模型：请先登录 Claude360，或到「分组及 Key」页点刷新同步分组模型。",
   "writeInlineCompletionModelPlaceholder": "留空则沿用助手模型",
   "writeInlineCompletionModelInherited": "当前沿用助手模型：{{value}}",
   "writeInlineCompletionModelOverride": "当前使用写作专用模型：{{value}}",

@@ -79,6 +79,7 @@ type Props = {
   composerReasoningEffort: ComposerReasoningEffort
   setComposerModel: (modelId: string, providerId?: string) => void
   setComposerReasoningEffort: (effort: ComposerReasoningEffort) => void
+  onModelPickerOpen?: () => void
   queuedMessages: QueuedUserMessage[]
   removeQueuedMessage: (id: string) => void
   attachments?: AttachmentReference[]
@@ -118,6 +119,7 @@ export function SddAssistantPanel({
   composerReasoningEffort,
   setComposerModel,
   setComposerReasoningEffort,
+  onModelPickerOpen,
   queuedMessages,
   removeQueuedMessage,
   attachments = [],
@@ -270,6 +272,7 @@ export function SddAssistantPanel({
           composerReasoningEffort={composerReasoningEffort}
           onComposerModelChange={setComposerModel}
           onComposerReasoningEffortChange={setComposerReasoningEffort}
+          onModelPickerOpen={onModelPickerOpen}
           modelPickerMode="combobox"
           queuedMessages={queuedMessages}
           onRemoveQueuedMessage={removeQueuedMessage}

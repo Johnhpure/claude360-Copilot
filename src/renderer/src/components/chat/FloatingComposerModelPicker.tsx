@@ -26,7 +26,6 @@ import {
   type ModelReasoningEffort,
   type ModelProviderModelProfileV1
 } from '@shared/app-settings'
-import { DEFAULT_COMPOSER_MODEL_IDS } from '@shared/default-composer-models'
 import type { ModelProviderModelGroup } from '@shared/kun-gui-api'
 
 export type ComposerReasoningEffort = ModelReasoningEffort
@@ -45,6 +44,8 @@ type Props = {
   onComposerModelChange: (modelId: string, providerId?: string) => void
   onComposerReasoningEffortChange?: (effort: ComposerReasoningEffort) => void
   onConfigureProviders?: () => void
+  /** 菜单从关闭到打开时触发一次：装配点用来懒刷新模型列表（TTL 防抖在 main 侧）。 */
+  onMenuOpen?: () => void
 }
 
 const REASONING_OPTIONS: Array<{ id: ComposerReasoningEffort; labelKey: string }> = [
@@ -92,9 +93,6 @@ const FLOATING_SUBMENU_WIDTH = 232
 const FLOATING_SUBMENU_MIN_HEIGHT = 80
 const FLOATING_SUBMENU_MAX_HEIGHT = 320
 const UNGROUPED_MODEL_PROVIDER_ID = '__composer_models__'
-const DEFAULT_COMPOSER_MODEL_KEYS = new Set(
-  DEFAULT_COMPOSER_MODEL_IDS.map((id) => normalizeModelCapabilityKey(id))
-)
 
 export function FloatingComposerModelPicker({
   compact,
@@ -109,7 +107,8 @@ export function FloatingComposerModelPicker({
   lockVisionToTextModelSwitch = false,
   onComposerModelChange,
   onComposerReasoningEffortChange,
-  onConfigureProviders
+  onConfigureProviders,
+  onMenuOpen
 }: Props): ReactElement {
   const { t } = useTranslation('common')
   const pickerRef = useRef<HTMLElement | null>(null)
@@ -181,6 +180,16 @@ export function FloatingComposerModelPicker({
       onComposerReasoningEffortChange?.(currentReasoning)
     }
   }, [composerReasoningEffort, currentReasoning, onComposerReasoningEffortChange, reasoningEnabled])
+
+  // onMenuOpen 用 ref 承接：回调引用不稳定（装配点内联箭头函数）不应重跑 effect，
+  // 只在 menuOpen false→true 的那一次触发。
+  const onMenuOpenRef = useRef(onMenuOpen)
+  useEffect(() => {
+    onMenuOpenRef.current = onMenuOpen
+  })
+  useEffect(() => {
+    if (menuOpen) onMenuOpenRef.current?.()
+  }, [menuOpen])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -613,6 +622,9 @@ export function filterComposerModelIds(
   return modelIds.filter((id) => id.toLowerCase().includes(normalizedQuery))
 }
 
+// 没有任何配置分组、也没有任何残留的未分组模型（如当前选中模型）时，
+// 显示「配置供应商 / 登录」引导而非空白菜单。hardcode 默认模型清理后
+// （07-10），未登录/上游失败的 pick 列表为空，正好落到这个引导态。
 function shouldShowProviderSetupPrompt(groups: readonly ComposerModelMenuGroup[]): boolean {
   const hasConfiguredProviderModels = groups.some((group) =>
     group.providerId !== UNGROUPED_MODEL_PROVIDER_ID
@@ -621,9 +633,7 @@ function shouldShowProviderSetupPrompt(groups: readonly ComposerModelMenuGroup[]
   const ungroupedModels = groups.flatMap((group) =>
     group.providerId === UNGROUPED_MODEL_PROVIDER_ID ? group.modelIds : []
   )
-  return ungroupedModels.every((id) =>
-    DEFAULT_COMPOSER_MODEL_KEYS.has(normalizeModelCapabilityKey(id))
-  )
+  return ungroupedModels.length === 0
 }
 
 export function normalizeComposerReasoningEffort(

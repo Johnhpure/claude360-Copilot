@@ -11,7 +11,6 @@ import {
   WRITE_EDITOR_LINE_HEIGHT_MIN,
   WRITE_FONT_PRESETS,
   WRITE_AGENT_PRESET_MAX_COUNT,
-  WRITE_INLINE_COMPLETION_MODEL_IDS,
   WRITE_QUICK_ACTION_MAX_COUNT,
   defaultModelProviderSettings,
   defaultWriteAgentPresets,
@@ -51,13 +50,13 @@ const WRITE_FONT_PRESET_LABEL_KEYS: Record<WriteFontPreset, string> = {
   custom: 'writeFontCustom'
 }
 
+// 内联补全模型选项只来自当前生效 provider（Claude360 模型缓存优先）；
+// 为空时返回空列表并由 UI 引导登录/刷新，不回退 hardcode 默认模型（07-10）。
 export function writeInlineCompletionModelOptions(providerModels: readonly string[]): string[] {
   const scopedModels = providerModels
     .map((model) => model.trim())
     .filter(Boolean)
-  return scopedModels.length > 0
-    ? [...new Set(scopedModels)]
-    : [...WRITE_INLINE_COMPLETION_MODEL_IDS]
+  return [...new Set(scopedModels)]
 }
 
 export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): ReactElement {
@@ -289,6 +288,11 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                           })
                         }}
                       />
+                      {writeInlineModelOptions.length === 0 ? (
+                        <p className="mt-2 text-[12.5px] leading-5 text-ds-faint">
+                          {t('writeInlineCompletionModelEmpty')}
+                        </p>
+                      ) : null}
                     </div>
                   }
                 />

@@ -120,7 +120,6 @@ export const DEFAULT_KUN_DATA_DIR = DEFAULT_RUNTIME_DATA_DIR
 export const DEFAULT_KUN_MODEL = 'deepseek-v4-pro'
 export const DEFAULT_WRITE_INLINE_COMPLETION_BASE_URL = 'https://api.deepseek.com/beta'
 export const DEFAULT_WRITE_INLINE_COMPLETION_MODEL = 'deepseek-v4-flash'
-export const WRITE_INLINE_COMPLETION_MODEL_IDS = ['deepseek-v4-pro', 'deepseek-v4-flash'] as const
 export const DEFAULT_WRITE_INLINE_COMPLETION_DEBOUNCE_MS = 650
 export const DEFAULT_WRITE_INLINE_COMPLETION_MIN_ACCEPT_SCORE = 0.52
 export const DEFAULT_WRITE_INLINE_COMPLETION_MAX_TOKENS = 96

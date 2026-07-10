@@ -12,7 +12,6 @@ import {
   DEFAULT_KUN_DATA_DIR,
   UI_FONT_SCALE_MAX,
   UI_FONT_SCALE_MIN,
-  WRITE_INLINE_COMPLETION_MODEL_IDS,
   isKunRuntimeInsecure,
   normalizeChatContentMaxWidth,
   normalizeUiFontScale

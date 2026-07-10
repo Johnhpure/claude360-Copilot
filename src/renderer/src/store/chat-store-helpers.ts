@@ -1,5 +1,4 @@
 import type { ChatBlock, NormalizedThread } from '../agent/types'
-import { DEFAULT_COMPOSER_MODEL_IDS } from '@shared/default-composer-models'
 import type { ModelProviderModelGroup } from '@shared/kun-gui-api'
 import {
   CLAW_MANAGED_INSTRUCTIONS_HEADING,
@@ -405,16 +404,14 @@ export function forgetCodeWorkspaceRoot(
   return next
 }
 
+// 选择器列表只来自 Claude360 分组模型（plan-03 收口）：上游失败/未登录返回空列表，
+// 不得回退任何 hardcode 默认模型（07-10）。
 export function mergeComposerPickList(upstreamOk: boolean, upstreamIds: string[]): string[] {
+  if (!upstreamOk) return []
   const ordered = new Set<string>()
-  for (const id of DEFAULT_COMPOSER_MODEL_IDS) {
-    ordered.add(id)
-  }
-  if (upstreamOk) {
-    for (const id of upstreamIds) {
-      const trimmed = id.trim()
-      if (trimmed && trimmed !== 'auto') ordered.add(trimmed)
-    }
+  for (const id of upstreamIds) {
+    const trimmed = id.trim()
+    if (trimmed && trimmed !== 'auto') ordered.add(trimmed)
   }
   return [...ordered].sort((a, b) => a.localeCompare(b))
 }
@@ -423,7 +420,7 @@ export function fallbackComposerModel(pickList: readonly string[], runtimeDefaul
   const allowed = new Set(pickList)
   const preferred = runtimeDefault.trim()
   if (preferred && preferred.toLowerCase() !== 'auto' && allowed.has(preferred)) return preferred
-  return DEFAULT_COMPOSER_MODEL_IDS.find((id) => allowed.has(id)) ?? pickList[0] ?? ''
+  return pickList[0] ?? ''
 }
 
 export function newClawChannel(

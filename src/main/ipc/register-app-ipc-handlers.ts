@@ -477,6 +477,13 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     return !hasClaude360Provider || !hasCachedGroups || !hasCachedModels
   }
 
+  // 落盘模型缓存（provider profiles + claude360.modelCache）的 TTL 自动同步门控。
+  // 时间戳是进程内存态、不持久化：重启进程即视为过期，天然覆盖「软件启动首次加载」；
+  // 60s 内多个触发点（打开选择器 / sync-account / upstream:models）只落一次网络请求。
+  const CLAUDE360_MODEL_SYNC_TTL_MS = 60_000
+  let lastClaude360ModelSyncAt = 0
+  let claude360ModelSyncInFlight: Promise<void> | null = null
+
   const syncClaude360ModelSettings = async (reason: string) => {
     console.info(`[kun-gui] Claude360 model sync start reason=${reason}`)
     const result = await claude360ModelService.refreshGroupsAndModels()
@@ -513,7 +520,44 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       `[kun-gui] Claude360 model sync done reason=${reason} ` +
         `groups=[${result.modelCache.groups.join(', ')}] models=[${result.modelCache.models.join(', ')}]`
     )
+    // 成功才刷新 TTL 时间戳（含 manual-refresh 路径：手动刷新后 60s 内视为新鲜）。
+    lastClaude360ModelSyncAt = Date.now()
     return result
+  }
+
+  // TTL 门控入口：已登录 && (缓存为空/provider 缺失 || TTL 过期) 才真正同步；
+  // 进行中的同步被后续调用者 await 复用（并发去重）；失败吞掉异常 + logError，
+  // 保留旧缓存让调用方继续用旧数据，不得清空或把错误抛断 UI。
+  const maybeSyncClaude360Models = async (reason: string): Promise<void> => {
+    const loaded = await store.load()
+    if (!loaded.claude360?.loggedIn) return
+    // 空缓存/provider 缺失视为 TTL 必过期（吸收原 code-picker-empty-cache 判断）。
+    const cacheIncomplete = shouldRefreshClaude360ModelsForCode(loaded)
+    const ageMs = Date.now() - lastClaude360ModelSyncAt
+    if (!cacheIncomplete && ageMs < CLAUDE360_MODEL_SYNC_TTL_MS) {
+      console.info(`[kun-gui] Claude360 model sync skip reason=ttl-fresh trigger=${reason} ageMs=${ageMs}`)
+      return
+    }
+    if (claude360ModelSyncInFlight) return claude360ModelSyncInFlight
+    console.info(
+      `[kun-gui] Claude360 model sync trigger reason=${reason} ` +
+        `cacheIncomplete=${cacheIncomplete} ageMs=${ageMs} ` +
+        `cachedGroups=[${(loaded.claude360.modelCache?.groups ?? []).join(', ')}] ` +
+        `cachedModels=[${(loaded.claude360.modelCache?.models ?? []).join(', ')}]`
+    )
+    const task = (async () => {
+      try {
+        await syncClaude360ModelSettings(reason)
+      } catch (error) {
+        logError('claude360-models', `Claude360 model sync failed reason=${reason} keep-stale-cache`, {
+          message: error instanceof Error ? error.message : String(error)
+        })
+      } finally {
+        claude360ModelSyncInFlight = null
+      }
+    })()
+    claude360ModelSyncInFlight = task
+    return task
   }
 
   const disposeWorkspaceFileWatch = (watchId: string): boolean => {
@@ -676,7 +720,13 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     return claude360AuthService.passwordLogin2FA(request)
   })
   ipcMain.handle('claude360:auth:logout', async () => claude360AuthService.logout())
-  ipcMain.handle('claude360:sync-account', async () => claude360AuthService.syncAccount())
+  ipcMain.handle('claude360:sync-account', async () => {
+    const result = await claude360AuthService.syncAccount()
+    // 登录成功（finishLogin）必经此 IPC：账号同步成功后 fire-and-forget 刷新模型缓存。
+    // 「我的」页刷新复用同一 IPC 时被 TTL 防抖，不产生额外请求风暴。
+    if (result.ok) void maybeSyncClaude360Models('sync-account')
+    return result
+  })
 
   // Claude360 token / 模型 / 账单 IPC（plan-03 Task 4）
   ipcMain.handle('claude360:tokens:list', async () => claude360TokenService.listTokens())
@@ -943,21 +993,10 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('runtime:restart', async () => restartRuntime())
 
   ipcMain.handle('upstream:models', async () => {
-    const loaded = await store.load()
-    if (shouldRefreshClaude360ModelsForCode(loaded)) {
-      console.info(
-        `[kun-gui] Code model picker auto-refresh Claude360 groups ` +
-          `cachedGroups=[${loaded.claude360.modelCache.groups.join(', ')}] ` +
-          `cachedModels=[${loaded.claude360.modelCache.models.join(', ')}]`
-      )
-      try {
-        await syncClaude360ModelSettings('code-picker-empty-cache')
-      } catch (error) {
-        logError('claude360-models', 'Failed to refresh Claude360 models for Code picker', {
-          message: error instanceof Error ? error.message : String(error)
-        })
-      }
-    }
+    // Code/写作选择器读落盘 provider profiles；进入前先走 TTL 门控同步，
+    // 保证后台上架的新模型（如 Codex 分组 gpt-5.6-*）无需手动刷新即可见。
+    // 同步失败在门控内部吞掉并保留旧缓存，此处继续返回旧落盘数据。
+    await maybeSyncClaude360Models('code-picker')
     return fetchUpstreamModels()
   })
 

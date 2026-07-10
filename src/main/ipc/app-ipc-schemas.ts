@@ -45,8 +45,7 @@ import {
   SCHEDULE_REASONING_EFFORT_IDS,
   SPEECH_TO_TEXT_PROTOCOLS,
   TEXT_TO_SPEECH_PROTOCOLS,
-  VIDEO_GENERATION_PROTOCOLS,
-  WRITE_INLINE_COMPLETION_MODEL_IDS
+  VIDEO_GENERATION_PROTOCOLS
 } from '../../shared/app-settings'
 import { DESKTOP_COMMANDS } from '../../shared/kun-gui-api'
 import { GUI_UPDATE_CHANNELS } from '../../shared/gui-update'
@@ -224,10 +223,9 @@ const clawTaskStatusSchema = z.enum(['idle', 'queued', 'running', 'success', 'er
 const scheduleReasoningEffortSchema = z.enum(SCHEDULE_REASONING_EFFORT_IDS)
 const modelIdSchema = z.string().trim().min(1).max(MAX_MODEL_ID_LENGTH)
 const optionalModelIdSchema = z.string().trim().max(MAX_MODEL_ID_LENGTH).optional()
-const writeInlineCompletionModelSchema = z.union([
-  z.enum(WRITE_INLINE_COMPLETION_MODEL_IDS),
-  modelIdSchema
-])
+// 写作补全模型来自 Claude360 分组模型缓存（07-10 去 hardcode 白名单）:
+// 任意非空模型 id 即合法,与 modelIdSchema 同构。
+const writeInlineCompletionModelSchema = modelIdSchema
 const modelEndpointFormatSchema = z.enum(MODEL_ENDPOINT_FORMATS)
 const imageGenerationProtocolSchema = z.enum(IMAGE_GENERATION_PROTOCOLS)
 const speechToTextProtocolSchema = z.enum(SPEECH_TO_TEXT_PROTOCOLS)

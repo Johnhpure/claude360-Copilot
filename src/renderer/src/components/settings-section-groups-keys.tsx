@@ -22,6 +22,9 @@ import {
 } from 'lucide-react'
 import type { Claude360TokenListItem, Claude360TokenPurpose } from '@shared/claude360'
 import { invalidateGroupKeyCache } from '../lib/group-key-ensure'
+import { rendererRuntimeClient } from '../agent/runtime-client'
+import { emitRendererSettingsChanged } from '../lib/keyboard-shortcut-settings'
+import { useChatStore } from '../store/chat-store'
 import { Button } from './ui'
 
 // 「设置 → 分组及 Key」页(Master-Detail)。
@@ -606,6 +609,15 @@ export function GroupsKeysSection({ t }: { t: Translate }): ReactElement {
       setGroupsByPurpose(groupsResult)
       setTokens(tokensResult)
       clearAllRevealed()
+      // 联动 Code/写作选择器:models:refresh 已把新模型落盘(manual-refresh 绕过
+      // TTL 并刷新时间戳),让 chat-store 立即重读落盘数据,无需重启应用。
+      console.info('[kun-gui] settings refresh -> reload composer models')
+      void useChatStore.getState().loadComposerModels()
+      // 「写作」节内联补全列表读 SettingsView 的 form.claude360.modelCache;
+      // 落盘发生在 main,form 不会自动回填 → 主动拉最新 settings 并广播,
+      // 复用 SETTINGS_CHANGED_EVENT 既有回填机制。
+      const nextSettings = await rendererRuntimeClient.getSettings({ forceRefresh: true })
+      if (!abortedRef.current) emitRendererSettingsChanged(nextSettings)
     } catch (e) {
       if (!abortedRef.current) setError(e instanceof Error ? e.message : String(e))
     } finally {

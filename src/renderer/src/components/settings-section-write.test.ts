@@ -21,11 +21,9 @@ describe('write inline completion model options', () => {
     expect(options).not.toContain('deepseek-v4-flash')
   })
 
-  it('uses built-in defaults only when the provider has no models', () => {
-    expect(writeInlineCompletionModelOptions([])).toEqual([
-      'deepseek-v4-pro',
-      'deepseek-v4-flash'
-    ])
+  it('returns an empty list instead of hardcoded defaults when the provider has no models', () => {
+    // 07-10: modelCache 为空时不回退 deepseek hardcode,由 UI 引导登录/刷新。
+    expect(writeInlineCompletionModelOptions([])).toEqual([])
   })
 })
 

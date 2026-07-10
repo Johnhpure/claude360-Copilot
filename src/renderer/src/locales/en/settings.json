@@ -1103,6 +1103,7 @@
   "writeInlineCompletionApiKeyOverride": "Currently using a writing-only API key.",
   "writeInlineCompletionModel": "Writing suggestion model",
   "writeInlineCompletionModelDesc": "Leave this empty to use the assistant's default model. Fill it only if writing suggestions need their own model.",
+  "writeInlineCompletionModelEmpty": "No models available yet. Sign in to Claude360, or refresh groups on the Groups & Keys page.",
   "writeInlineCompletionModelPlaceholder": "Leave empty to use assistant model",
   "writeInlineCompletionModelInherited": "Currently using assistant model: {{value}}",
   "writeInlineCompletionModelOverride": "Currently using a writing-only model: {{value}}",

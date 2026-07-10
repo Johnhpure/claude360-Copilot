@@ -250,8 +250,8 @@ describe('chat-store app actions composer model loading', () => {
     )
     const { actions, state } = buildHarness({
       ok: true,
-      modelIds: ['Kwai-Kolors/Kolors'],
-      defaultModelId: 'deepseek-v4-pro',
+      modelIds: ['Kwai-Kolors/Kolors', 'text-fallback-model'],
+      defaultModelId: 'text-fallback-model',
       modelGroups: [{
         providerId: 'minimax',
         label: 'MiniMax',
@@ -271,7 +271,7 @@ describe('chat-store app actions composer model loading', () => {
       id: 'thread-a',
       title: 'Thread A',
       workspace: '/tmp/project',
-      model: 'deepseek-v4-pro',
+      model: 'text-fallback-model',
       status: 'idle',
       mode: 'agent',
       updatedAt: '2026-06-01T00:00:00.000Z'
@@ -279,7 +279,7 @@ describe('chat-store app actions composer model loading', () => {
 
     await actions.loadComposerModels()
 
-    expect(state.composerModel).toBe('deepseek-v4-pro')
+    expect(state.composerModel).toBe('text-fallback-model')
     expect(state.composerProviderId).toBe('')
   })
 
@@ -499,7 +499,7 @@ describe('chat-store app actions composer model loading', () => {
     expect(localStorage.getItem(COMPOSER_MODEL_STORAGE_KEY)).toBe('vision-model')
   })
 
-  it('does not overwrite a stored custom model when only fallback models are available', async () => {
+  it('keeps the stored custom model and shows no hardcoded fallback when upstream fails', async () => {
     localStorage.setItem(COMPOSER_MODEL_STORAGE_KEY, 'MiniMax-M2')
     const { actions, state } = buildHarness({
       ok: false,
@@ -508,7 +508,10 @@ describe('chat-store app actions composer model loading', () => {
 
     await actions.loadComposerModels()
 
-    expect(state.composerModel).toBe('deepseek-v4-pro')
+    // 07-10: 上游失败时 pick 列表为空,不得回退 deepseek hardcode;
+    // 已存储的自定义模型保留在 localStorage,待上游恢复后再还原。
+    expect(state.composerPickList).toEqual([])
+    expect(state.composerModel).toBe('')
     expect(localStorage.getItem(COMPOSER_MODEL_STORAGE_KEY)).toBe('MiniMax-M2')
   })
 })

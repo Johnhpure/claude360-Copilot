@@ -151,6 +151,8 @@ type Props = {
   onComposerModelChange: (modelId: string, providerId?: string) => void
   onComposerReasoningEffortChange?: (effort: ComposerReasoningEffort) => void
   onConfigureProviders?: () => void
+  /** 模型选择菜单打开时触发：装配点用来懒刷新模型列表（透传给 picker 的 onMenuOpen）。 */
+  onModelPickerOpen?: () => void
   hideModelPicker?: boolean
   modelPickerMode?: 'select' | 'combobox'
   queuedMessages: QueuedComposerMessage[]
@@ -479,6 +481,7 @@ export function FloatingComposer({
   onComposerModelChange,
   onComposerReasoningEffortChange,
   onConfigureProviders,
+  onModelPickerOpen,
   hideModelPicker = false,
   modelPickerMode = 'select',
   queuedMessages,
@@ -2344,6 +2347,7 @@ export function FloatingComposer({
                   onComposerModelChange={onComposerModelChange}
                   onComposerReasoningEffortChange={onComposerReasoningEffortChange}
                   onConfigureProviders={onConfigureProviders}
+                  onMenuOpen={onModelPickerOpen}
                 />
               )}
               {hideModelPicker ? null : (

@@ -838,6 +838,198 @@ describe('claude360 token/model/billing IPC handlers', () => {
     })
   })
 
+  // TTL 同步门控测试的公共夹具：已登录 + 非空缓存 + 已有 claude360 provider，
+  // 即 stale-cache bug 的现场（旧逻辑下缓存非空则永不自动同步）。
+  function loggedInSettingsWithCodexCache(): AppSettingsV1 {
+    const current = settings()
+    return {
+      ...current,
+      provider: {
+        ...current.provider,
+        providers: [
+          {
+            id: 'claude360-codex',
+            name: 'Codex',
+            kind: 'http',
+            apiKey: '',
+            baseUrl: 'https://claude360.xyz/v1',
+            endpointFormat: 'chat_completions',
+            models: ['gpt-5.5'],
+            modelProfiles: {}
+          }
+        ]
+      },
+      claude360: {
+        ...defaultClaude360Settings(),
+        loggedIn: true,
+        cliTokenRef: 'claude360:cli-token',
+        modelCache: { groups: ['Codex'], models: ['gpt-5.5'] }
+      }
+    } as AppSettingsV1
+  }
+
+  function codexRefreshResult() {
+    return {
+      modelCache: { groups: ['Codex'], models: ['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra'] },
+      providerProfiles: [
+        {
+          id: 'claude360:Codex',
+          name: 'Codex',
+          apiKey: '',
+          baseUrl: 'https://claude360.xyz/v1',
+          endpointFormat: 'chat_completions',
+          models: ['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra'],
+          modelProfiles: {}
+        }
+      ],
+      groupsByPurpose: { text: [{ name: 'Codex', recommended: true }], image: [], music: [] }
+    }
+  }
+
+  it('upstream:models syncs a non-empty cache when the process TTL has expired (stale-cache bug)', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const store = { load: vi.fn(async () => loggedInSettingsWithCodexCache()) }
+    const refreshGroupsAndModels = vi.fn(async () => codexRefreshResult())
+    const fetchUpstreamModels = vi.fn(async () => ({ ok: true as const, modelIds: ['gpt-5.5'] }))
+
+    registerAppIpcHandlers(
+      registerOptions({
+        store: store as never,
+        fetchUpstreamModels,
+        claude360ModelService: { refreshGroupsAndModels } as never
+      })
+    )
+
+    // 缓存非空 + provider 齐备,旧逻辑（仅空缓存才同步）不会刷新;
+    // 新逻辑进程启动后首次调用视为 TTL 过期,必须同步。
+    await handlers.get('upstream:models')?.({})
+
+    expect(refreshGroupsAndModels).toHaveBeenCalledTimes(1)
+    expect(fetchUpstreamModels).toHaveBeenCalledTimes(1)
+  })
+
+  it('upstream:models skips sync within the TTL window and syncs again after expiry', async () => {
+    vi.useFakeTimers()
+    try {
+      const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+      const store = { load: vi.fn(async () => loggedInSettingsWithCodexCache()) }
+      const refreshGroupsAndModels = vi.fn(async () => codexRefreshResult())
+      const fetchUpstreamModels = vi.fn(async () => ({ ok: true as const, modelIds: ['gpt-5.5'] }))
+
+      registerAppIpcHandlers(
+        registerOptions({
+          store: store as never,
+          fetchUpstreamModels,
+          claude360ModelService: { refreshGroupsAndModels } as never
+        })
+      )
+
+      const handler = handlers.get('upstream:models')
+      await handler?.({})
+      expect(refreshGroupsAndModels).toHaveBeenCalledTimes(1)
+
+      // TTL 内二次调用 → 跳过同步,直接返回落盘数据。
+      await handler?.({})
+      expect(refreshGroupsAndModels).toHaveBeenCalledTimes(1)
+
+      // TTL 过期后再调用 → 再次同步。
+      vi.advanceTimersByTime(61_000)
+      await handler?.({})
+      expect(refreshGroupsAndModels).toHaveBeenCalledTimes(2)
+      expect(fetchUpstreamModels).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('upstream:models keeps returning stale cached models when the sync fails', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const store = { load: vi.fn(async () => loggedInSettingsWithCodexCache()) }
+    const refreshGroupsAndModels = vi.fn(async () => {
+      throw new Error('network down')
+    })
+    const fetchUpstreamModels = vi.fn(async () => ({ ok: true as const, modelIds: ['gpt-5.5'] }))
+    const logError = vi.fn()
+
+    registerAppIpcHandlers(
+      registerOptions({
+        store: store as never,
+        fetchUpstreamModels,
+        logError,
+        claude360ModelService: { refreshGroupsAndModels } as never
+      })
+    )
+
+    // 同步失败必须吞掉异常、保留旧缓存:handler 正常返回旧模型,只打告警日志。
+    await expect(handlers.get('upstream:models')?.({})).resolves.toMatchObject({
+      ok: true,
+      modelIds: ['gpt-5.5']
+    })
+    expect(refreshGroupsAndModels).toHaveBeenCalledTimes(1)
+    expect(logError).toHaveBeenCalledWith(
+      'claude360-models',
+      expect.stringContaining('keep-stale-cache'),
+      expect.objectContaining({ message: 'network down' })
+    )
+  })
+
+  it('claude360:sync-account triggers a model sync after a successful account sync', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const store = { load: vi.fn(async () => loggedInSettingsWithCodexCache()) }
+    const refreshGroupsAndModels = vi.fn(async () => codexRefreshResult())
+    const syncAccount = vi.fn(async () => ({
+      ok: true as const,
+      session: { loggedIn: true, username: 'demo', displayName: 'Demo', baseUrl: 'https://claude360.xyz' }
+    }))
+
+    registerAppIpcHandlers(
+      registerOptions({
+        store: store as never,
+        claude360AuthService: {
+          getSession: vi.fn(),
+          startDeviceAuth: vi.fn(),
+          pollDeviceAuth: vi.fn(),
+          passwordLogin: vi.fn(),
+          passwordLogin2FA: vi.fn(),
+          logout: vi.fn(),
+          syncAccount
+        } as never,
+        claude360ModelService: { refreshGroupsAndModels } as never
+      })
+    )
+
+    await expect(handlers.get('claude360:sync-account')?.({})).resolves.toMatchObject({ ok: true })
+    // fire-and-forget:等微任务队列排空后应触发一次模型同步。
+    await vi.waitFor(() => expect(refreshGroupsAndModels).toHaveBeenCalledTimes(1))
+  })
+
+  it('claude360:sync-account does not trigger a model sync when the account sync fails', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const store = { load: vi.fn(async () => loggedInSettingsWithCodexCache()) }
+    const refreshGroupsAndModels = vi.fn(async () => codexRefreshResult())
+    const syncAccount = vi.fn(async () => ({ ok: false as const, message: '未登录' }))
+
+    registerAppIpcHandlers(
+      registerOptions({
+        store: store as never,
+        claude360AuthService: {
+          getSession: vi.fn(),
+          startDeviceAuth: vi.fn(),
+          pollDeviceAuth: vi.fn(),
+          passwordLogin: vi.fn(),
+          passwordLogin2FA: vi.fn(),
+          logout: vi.fn(),
+          syncAccount
+        } as never,
+        claude360ModelService: { refreshGroupsAndModels } as never
+      })
+    )
+
+    await expect(handlers.get('claude360:sync-account')?.({})).resolves.toMatchObject({ ok: false })
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(refreshGroupsAndModels).not.toHaveBeenCalled()
+  })
+
   it('forwards token stats payload to the billing service', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const getTokenStats = vi.fn(async () => [])

@@ -9,7 +9,6 @@ import {
   type SandboxMode
 } from '@shared/app-settings'
 import { parseClawCommand } from '@shared/claw-commands'
-import { DEFAULT_COMPOSER_MODEL_IDS } from '@shared/default-composer-models'
 import { buildGuiPlanId, buildPlanRelativePath } from '@shared/gui-plan'
 import { sddDraftTraceRelativePath } from '@shared/sdd'
 import { buildSddTraceSnapshot } from '@shared/sdd-trace'
@@ -552,12 +551,10 @@ export function Workbench(): ReactElement {
   const activeSddDraft = useSddDraftStore((s) => s.activeDraft)
   const sddDraftContent = useSddDraftStore((s) => s.content)
   const sddDraftOperationStatus = useSddDraftStore((s) => s.operationStatus)
+  // 写作助手 pick 列表与 Code 共用 composerPickList（同一落盘缓存），仅追加当前
+  // 选中模型防止残留选择消失；不并入任何 hardcode 默认模型（07-10）。
   const writeAssistantPickList = useMemo(() => {
     const ordered = new Set<string>()
-    for (const id of DEFAULT_COMPOSER_MODEL_IDS) {
-      const normalized = id.trim()
-      if (normalized && normalized.toLowerCase() !== 'auto') ordered.add(normalized)
-    }
     for (const id of composerPickList) {
       const normalized = id.trim()
       if (normalized && normalized.toLowerCase() !== 'auto') ordered.add(normalized)
@@ -578,6 +575,13 @@ export function Workbench(): ReactElement {
     }
     return providerIdForComposerModel(composerModelGroups, writeAssistantModel)
   }, [composerModelGroups, writeAssistantModel, writeAssistantProviderId])
+  // 打开模型选择器 = 懒刷新触发点：loadComposerModels 有 in-flight 去重，
+  // 是否真的拉后端由 main 侧 TTL 门控决定；即使 TTL 内跳过，也会重读最新落盘
+  // settings（设置页手动刷新后的数据因此立即可见）。
+  const handleModelPickerOpen = useCallback((feature: 'code' | 'write', providerId: string): void => {
+    console.info(`[kun-gui] model picker opened feature=${feature} group=${providerId}`)
+    void useChatStore.getState().loadComposerModels()
+  }, [])
   const stageInsetClass = 'ds-stage-inset'
   const keyboardShortcuts = useKeyboardShortcutSettings()
   const shortcutPlatform = typeof window === 'undefined' ? undefined : window.kunGui?.platform
@@ -2414,6 +2418,7 @@ export function Workbench(): ReactElement {
                 composerReasoningEffort={composerReasoningEffort}
                 setComposerModel={setWriteAssistantModel}
                 setComposerReasoningEffort={setComposerReasoningEffort}
+                onModelPickerOpen={() => handleModelPickerOpen('write', resolvedWriteAssistantProviderId)}
                 queuedMessages={queuedMessages}
                 removeQueuedMessage={removeQueuedMessage}
                 attachments={composerAttachments}
@@ -2453,6 +2458,7 @@ export function Workbench(): ReactElement {
                 composerReasoningEffort={composerReasoningEffort}
                 setComposerModel={setWriteAssistantModel}
                 setComposerReasoningEffort={setComposerReasoningEffort}
+                onModelPickerOpen={() => handleModelPickerOpen('write', resolvedWriteAssistantProviderId)}
                 queuedMessages={queuedMessages}
                 removeQueuedMessage={removeQueuedMessage}
                 attachments={composerAttachments}
@@ -2867,6 +2873,7 @@ export function Workbench(): ReactElement {
                   route === 'chat' || route === 'claw' ? setComposerReasoningEffort : undefined
                 }
                 onConfigureProviders={() => openSettings('providers')}
+                onModelPickerOpen={() => handleModelPickerOpen('code', composerProviderId)}
                 onSend={handleSend}
                 attachments={composerAttachments}
                 attachmentUploadEnabled={attachmentUploadEnabled}

@@ -206,22 +206,24 @@ describe('chat-store Claw helpers', () => {
     ).toBe(true)
   })
 
-  it('keeps auto out of the composer pick list', () => {
+  it('keeps auto out of the composer pick list and never injects hardcoded defaults', () => {
     const pick = mergeComposerPickList(true, ['auto', 'custom-model', ' '])
 
     expect(pick).not.toContain('auto')
     expect(pick).toContain('custom-model')
-    expect(pick).toContain('deepseek-v4-pro')
-    expect(pick).toContain('deepseek-v4-flash')
-    expect(mergeComposerPickList(false, ['upstream-model'])).not.toContain('upstream-model')
+    // 07-10: 上游成功时列表只含 Claude360 分组模型,不再并入 deepseek hardcode。
+    expect(pick).toEqual(['custom-model'])
+    // 上游失败/未登录时列表为空,不得展示 hardcode 模型。
+    expect(mergeComposerPickList(false, ['upstream-model'])).toEqual([])
   })
 
-  it('falls back to the runtime default model, then known defaults', () => {
-    const pick = ['a-model', 'custom-model', 'deepseek-v4-flash', 'deepseek-v4-pro']
+  it('falls back to the runtime default model, then the first pick-list entry', () => {
+    const pick = ['a-model', 'custom-model']
 
     expect(fallbackComposerModel(pick, 'custom-model')).toBe('custom-model')
-    expect(fallbackComposerModel(pick, 'auto')).toBe('deepseek-v4-pro')
-    expect(fallbackComposerModel(pick, 'missing-model')).toBe('deepseek-v4-pro')
+    // runtimeDefault 不可用(auto/缺失)时回退列表首项,而非 hardcode 默认。
+    expect(fallbackComposerModel(pick, 'auto')).toBe('a-model')
+    expect(fallbackComposerModel(pick, 'missing-model')).toBe('a-model')
     expect(fallbackComposerModel(['a-model'], '')).toBe('a-model')
     expect(fallbackComposerModel([], '')).toBe('')
   })
