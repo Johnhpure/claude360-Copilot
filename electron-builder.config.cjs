@@ -203,14 +203,20 @@ module.exports = {
     // Ship a multi-size .ico so Explorer and the desktop render crisp icons at
     // small sizes. It is generated from the Claude360 Copilot official Logo.
     icon: './build/icon-claude360.ico',
-    // x64：nsis 安装包（双击安装）+ zip 便携包（免安装，解压后运行内含的
-    // "Claude360 Copilot.exe"）。二者均在 Windows/CI 上产出。
+    // nsis 安装包（双击安装）按 x64 + ia32 分架构各出一个 exe：
+    // 应用内更新（electron-updater findFile）按文件名里的 arch 子串匹配，
+    // latest.yml 的 files[] 必须同时含 -win-x64.exe 与 -win-ia32.exe 条目
+    // （两架构必须在同一次 electron-builder 调用里构建，latest.yml 才会合并）。
+    // zip 便携包（免安装，解压后运行内含的 "Claude360 Copilot.exe"）仅 x64。
     target: [
-      { target: 'nsis', arch: ['x64'] },
+      { target: 'nsis', arch: ['x64', 'ia32'] },
       { target: 'zip', arch: ['x64'] }
     ]
   },
   nsis: {
+    // 多 arch 时 electron-builder 默认会打一个 universal 单包（文件名无 arch
+    // 子串，electron-updater 无法按架构匹配）。关掉它，坚持分 arch 独立安装包。
+    buildUniversalInstaller: false,
     oneClick: false,
     allowToChangeInstallationDirectory: true,
     perMachine: false,

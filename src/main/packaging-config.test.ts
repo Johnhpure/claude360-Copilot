@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { builtinModules, createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 const require = createRequire(import.meta.url)
 const builderConfig = require('../../electron-builder.config.cjs')
 const afterPack = require('../../scripts/after-pack.cjs')
+const beforePack = require('../../scripts/before-pack.cjs')
 const macNotarize = require('../../scripts/mac-notarize.cjs')
 const rootPackageJson = require('../../package.json')
 
@@ -115,6 +116,41 @@ describe('electron-builder Claude360 Copilot packaging', () => {
     // 只保留简中/繁中/英文,裁掉其余 ~50 种 locale pak(~38M)。
     // 三平台通用:linux/win 过滤 locales/*.pak,mac 过滤 *.lproj。
     expect(builderConfig.electronLanguages).toEqual(['zh-CN', 'zh-TW', 'en-US', 'en-GB'])
+  })
+
+  it('builds per-arch Windows NSIS installers for x64 and ia32 in one invocation', () => {
+    // ia32 客户端应用内更新依赖 latest.yml files[] 同时含 -win-x64.exe 与
+    // -win-ia32.exe：两个 arch 必须在同一次 electron-builder 调用里构建才会
+    // 合并进同一份 latest.yml（分次构建会互相覆盖，另一 arch 触发 findFile
+    // fallback 拿错包）。
+    expect(builderConfig.win.target).toEqual([
+      { target: 'nsis', arch: ['x64', 'ia32'] },
+      { target: 'zip', arch: ['x64'] }
+    ])
+    // 多 arch 下 electron-builder 默认打 universal 单包（文件名无 arch 子串，
+    // electron-updater 无法按架构匹配），必须显式关闭。
+    expect(builderConfig.nsis.buildUniversalInstaller).toBe(false)
+    // dist:win 不得再用 CLI 限定 target/arch（如 `--win nsis zip --x64`）——
+    // CLI 会覆盖 config 的双 arch target，导致 latest.yml 只剩单 arch 条目。
+    expect(rootPackageJson.scripts['dist:win']).toBe('npm run dist -- --win')
+  })
+
+  it('maps electron-builder arch enum values including ia32 for the Whisper hooks', () => {
+    // electron-builder Arch 枚举：ia32=0（falsy！）、x64=1、armv7l=2、arm64=3。
+    expect(beforePack._internals.normalizeArch(0)).toBe('ia32')
+    expect(beforePack._internals.normalizeArch('ia32')).toBe('ia32')
+    expect(beforePack._internals.normalizeArch(1)).toBe('x64')
+    expect(beforePack._internals.normalizeArch('x64')).toBe('x64')
+    expect(beforePack._internals.normalizeArch(3)).toBe('arm64')
+    expect(() => beforePack._internals.normalizeArch(2)).toThrow(/Unsupported Whisper runner arch/)
+  })
+
+  it('keeps the win32-x64 Whisper baseline while ia32 packaging degrades voice-to-text', () => {
+    // 仓库基线：win32-x64 runner 在库、win32-ia32 无二进制。beforePack 对
+    // ia32 必须跳过 Whisper prepare/prune（不 throw），否则 prune 的
+    // keep=win32-ia32 会把 win32-x64 基线物理删除（dist 删基线事故的变体）。
+    expect(existsSync(beforePack._internals.whisperRunnerPath('win32', 'x64'))).toBe(true)
+    expect(existsSync(beforePack._internals.whisperRunnerPath('win32', 'ia32'))).toBe(false)
   })
 
   it('保持 jimp 不在应用直接依赖中（Step 3 源头守护）', () => {

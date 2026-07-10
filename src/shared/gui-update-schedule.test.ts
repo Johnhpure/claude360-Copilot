@@ -1,27 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import {
-  GUI_UPDATE_DAILY_CHECK_INTERVAL_MS,
+  GUI_UPDATE_STARTUP_CHECK_DELAY_MS,
   nextGuiUpdateCheckDelay
 } from './gui-update-schedule'
 
 describe('nextGuiUpdateCheckDelay', () => {
-  it('checks immediately when there is no previous check', () => {
-    expect(nextGuiUpdateCheckDelay(null, 1_000)).toBe(0)
-    expect(nextGuiUpdateCheckDelay(undefined, 1_000)).toBe(0)
-    expect(nextGuiUpdateCheckDelay(0, 1_000)).toBe(0)
+  it('schedules the once-per-launch check with a fixed startup delay', () => {
+    expect(nextGuiUpdateCheckDelay(false)).toBe(GUI_UPDATE_STARTUP_CHECK_DELAY_MS)
   })
 
-  it('waits until a full day has elapsed', () => {
-    const now = Date.UTC(2026, 4, 26, 12, 0, 0)
-    const lastCheckedAt = now - 3_600_000
-    expect(nextGuiUpdateCheckDelay(lastCheckedAt, now)).toBe(
-      GUI_UPDATE_DAILY_CHECK_INTERVAL_MS - 3_600_000
-    )
+  it('keeps the startup delay inside the required 3-5 second window', () => {
+    // 需求：启动后延迟 3-5 秒检查，不阻塞主界面启动。
+    expect(GUI_UPDATE_STARTUP_CHECK_DELAY_MS).toBeGreaterThanOrEqual(3_000)
+    expect(GUI_UPDATE_STARTUP_CHECK_DELAY_MS).toBeLessThanOrEqual(5_000)
   })
 
-  it('checks immediately once the next daily window is reached', () => {
-    const now = Date.UTC(2026, 4, 26, 12, 0, 0)
-    const lastCheckedAt = now - GUI_UPDATE_DAILY_CHECK_INTERVAL_MS - 60_000
-    expect(nextGuiUpdateCheckDelay(lastCheckedAt, now)).toBe(0)
+  it('never schedules another automatic check within the same process run', () => {
+    // 每次启动最多自动检查一次；手动检查不经过该调度函数，不受限制。
+    expect(nextGuiUpdateCheckDelay(true)).toBeNull()
   })
 })

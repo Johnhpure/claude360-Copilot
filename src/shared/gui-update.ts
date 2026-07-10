@@ -17,6 +17,7 @@ export type GuiUpdateFailureCode =
   | 'github_forbidden'
   | 'github_rate_limited'
   | 'no_stable_version'
+  | 'arch_mismatch'
   | 'unknown'
 
 export type GuiUpdateProgress = {

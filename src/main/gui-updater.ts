@@ -43,8 +43,9 @@ let beforeInstallUpdatePromise: Promise<void> | null = null
 let pendingVersionStateWrite: Promise<void> | null = null
 let backgroundCheckTimer: NodeJS.Timeout | null = null
 let backgroundCheckPromise: Promise<void> | null = null
+// 每次进程启动只自动检查一次（不落盘）：置位后本进程不再调度自动检查。
+let startupAutoCheckDone = false
 
-const GUI_UPDATE_SCHEDULE_FILE = 'gui-update-schedule.json'
 const GUI_VERSION_STATE_FILE = 'gui-version-state.json'
 const DEFAULT_CHANGELOG_URL = GITHUB_RELEASES_URL
 
@@ -68,10 +69,6 @@ function envUpdateUrl(channel: GuiUpdateChannel): string {
 
 function updateFeedManifestUrl(feedUrl: string): string {
   return `${feedUrl}${platformManifestName()}`
-}
-
-function guiUpdateSchedulePath(): string {
-  return join(app.getPath('userData'), GUI_UPDATE_SCHEDULE_FILE)
 }
 
 function guiVersionStatePath(): string {
@@ -131,27 +128,6 @@ async function selectedLocale(): Promise<'en' | 'zh'> {
   } catch {
     return app.getLocale().toLowerCase().startsWith('zh') ? 'zh' : 'en'
   }
-}
-
-async function readLastScheduledCheckAt(): Promise<number | null> {
-  try {
-    const raw = await readFile(guiUpdateSchedulePath(), 'utf8')
-    const parsed = JSON.parse(raw) as { lastCheckedAt?: unknown }
-    const ms = typeof parsed.lastCheckedAt === 'string' ? Date.parse(parsed.lastCheckedAt) : Number.NaN
-    return Number.isFinite(ms) ? ms : null
-  } catch {
-    return null
-  }
-}
-
-async function writeLastScheduledCheckAt(nowMs: number): Promise<void> {
-  const path = guiUpdateSchedulePath()
-  await mkdir(dirname(path), { recursive: true })
-  await writeFile(
-    path,
-    JSON.stringify({ lastCheckedAt: new Date(nowMs).toISOString() }, null, 2),
-    'utf8'
-  )
 }
 
 function normalizeGithubOwnerRepo(raw: string): string | null {
@@ -270,6 +246,76 @@ function platformManifestName(): string {
   return 'latest.yml'
 }
 
+// ── Windows 安装包架构守卫 ────────────────────────────────────────────────
+// electron-updater 的 findFile（providers/Provider.js）按 `process.arch` 子串
+// 匹配 files[] 里的安装包文件名，未命中时会静默 fallback 到第一个 exe ——
+// ia32 客户端会因此误下并安装 x64 包。这里复刻其选择逻辑，在进入下载前断言
+// 选中的文件与当前架构一致；不一致则按「未找到适用于当前架构的安装包」处理。
+
+/** 复刻 electron-updater findFile 的 Windows exe 选择：优先含 arch 子串，否则第一个 exe。 */
+export function selectWindowsInstallerUrl(fileUrls: string[], arch: string): string | null {
+  const exeUrls = fileUrls.filter((url) => url.toLowerCase().endsWith('.exe'))
+  if (exeUrls.length === 0) return null
+  return exeUrls.find((url) => url.includes(arch)) ?? exeUrls[0]
+}
+
+/** 选中的安装包是否与当前架构一致：ia32 必须含 'ia32'，非 ia32 不得误取 ia32 包。 */
+export function windowsInstallerMatchesArch(fileUrls: string[], arch: string): boolean {
+  const selected = selectWindowsInstallerUrl(fileUrls, arch)
+  if (!selected) return false
+  return arch === 'ia32' ? selected.includes('ia32') : !selected.includes('ia32')
+}
+
+function updateInfoFileUrls(updateInfo: UpdateInfo): string[] {
+  const files: unknown = updateInfo.files
+  if (!Array.isArray(files)) return []
+  return files
+    .map((file) => {
+      const url = (file as { url?: unknown } | null)?.url
+      return typeof url === 'string' ? url : ''
+    })
+    .filter(Boolean)
+}
+
+/** 仅在 win32 生效；mac/linux 与既有行为完全一致。mismatch 时输出 arch + files 日志。 */
+function windowsUpdateArchMismatch(updateInfo: UpdateInfo): boolean {
+  if (process.platform !== 'win32') return false
+  const fileUrls = updateInfoFileUrls(updateInfo)
+  if (windowsInstallerMatchesArch(fileUrls, process.arch)) return false
+  console.error(
+    `[kun-gui updater] no installer in the update feed matches this architecture (arch=${process.arch}); refusing to download. files=${JSON.stringify(fileUrls)}`
+  )
+  return true
+}
+
+async function archMismatchMessage(): Promise<string> {
+  const locale = await selectedLocale()
+  return locale === 'zh'
+    ? `未找到适用于当前架构（${process.arch}）的安装包。`
+    : `No installer is available for this system architecture (${process.arch}).`
+}
+
+async function archMismatchInfo(
+  channel: GuiUpdateChannel
+): Promise<Extract<GuiUpdateInfo, { ok: false }>> {
+  return {
+    ok: false,
+    currentVersion: app.getVersion(),
+    message: await archMismatchMessage(),
+    code: 'arch_mismatch',
+    releaseUrl: downloadPageUrl(),
+    channel
+  }
+}
+
+function emitArchMismatchError(channel: GuiUpdateChannel): void {
+  void archMismatchInfo(channel)
+    .then((info) => {
+      emitGuiUpdateState({ status: 'error', info, message: info.message, code: 'arch_mismatch' })
+    })
+    .catch(() => undefined)
+}
+
 function parseYamlScalar(source: string, key: string): string {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const match = source.match(new RegExp(`^${escaped}:\\s*['"]?([^'"\\n]+)['"]?\\s*$`, 'm'))
@@ -384,10 +430,12 @@ function shouldSkipScheduledCheck(): boolean {
   )
 }
 
-async function scheduleNextBackgroundCheck(): Promise<void> {
+// 启动自动检查：每次进程启动后延迟固定 4 秒检查一次（见 gui-update-schedule.ts），
+// 本进程生命周期内不再自动检查；设置页/顶栏手动检查不受此调度限制。
+function scheduleNextBackgroundCheck(): void {
   clearBackgroundCheckTimer()
-  const lastCheckedAtMs = await readLastScheduledCheckAt()
-  const delay = nextGuiUpdateCheckDelay(lastCheckedAtMs)
+  const delay = nextGuiUpdateCheckDelay(startupAutoCheckDone)
+  if (delay === null) return
   backgroundCheckTimer = setTimeout(() => {
     void runScheduledGuiUpdateCheck()
   }, delay)
@@ -397,15 +445,21 @@ async function runScheduledGuiUpdateCheck(): Promise<void> {
   if (backgroundCheckPromise) return backgroundCheckPromise
   backgroundCheckPromise = (async () => {
     try {
+      // 无论本次结果如何都视为已消耗本进程的自动检查额度（每次启动最多一次）。
+      startupAutoCheckDone = true
       if (shouldSkipScheduledCheck()) return
-      const nowMs = Date.now()
-      await writeLastScheduledCheckAt(nowMs)
-      await checkGuiUpdate()
+      console.info('[kun-gui updater] running startup GUI update check (once per launch)')
+      const info = await checkGuiUpdate()
+      if (!info.ok) {
+        // 自动检查失败只静默记日志，不打扰用户；手动检查才显式报错。
+        console.warn('[kun-gui updater] startup GUI update check failed:', info.message)
+      }
     } catch (error) {
       console.warn('[kun-gui updater] scheduled GUI update check failed:', error)
     } finally {
       backgroundCheckPromise = null
-      void scheduleNextBackgroundCheck()
+      // startupAutoCheckDone 已置位，nextGuiUpdateCheckDelay 返回 null → 不再调度。
+      scheduleNextBackgroundCheck()
     }
   })()
   return backgroundCheckPromise
@@ -585,6 +639,13 @@ export function initializeGuiUpdater(
 
   autoUpdater.on('update-available', (updateInfo: UpdateInfo) => {
     downloaded = false
+    if (windowsUpdateArchMismatch(updateInfo)) {
+      // 架构不匹配：不进入 available（不弹更新窗）、不缓存为可下载版本，
+      // 避免 electron-updater findFile fallback 静默下载错误架构的安装包。
+      lastInfo = null
+      emitArchMismatchError(configuredChannel)
+      return
+    }
     const info = toGuiInfo(updateInfo, true)
     lastInfo = info
     emitGuiUpdateState({ status: 'available', info })
@@ -626,7 +687,7 @@ export function initializeGuiUpdater(
     })
   })
 
-  void scheduleNextBackgroundCheck()
+  scheduleNextBackgroundCheck()
 }
 
 export async function showPostUpdateReleaseNotes(): Promise<void> {
@@ -697,6 +758,14 @@ export async function checkGuiUpdate(channel?: GuiUpdateChannel): Promise<GuiUpd
     const result = await autoUpdater.checkForUpdates()
     if (!result) {
       return checkManualUpdate(selectedChannel, 'not_configured')
+    }
+    if (result.isUpdateAvailable && windowsUpdateArchMismatch(result.updateInfo)) {
+      // 有新版本但 feed 中没有当前架构的安装包（如 latest.yml 缺 ia32 条目）：
+      // 显式报错并阻断下载，绝不 fallback 到其他架构的 exe。
+      lastInfo = null
+      const info = await archMismatchInfo(selectedChannel)
+      emitGuiUpdateState({ status: 'error', info, message: info.message, code: 'arch_mismatch' })
+      return info
     }
     const info = toGuiInfo(result.updateInfo, result.isUpdateAvailable)
     lastInfo = info

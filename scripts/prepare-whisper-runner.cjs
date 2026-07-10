@@ -12,7 +12,7 @@ const RESOURCES_DIR = join(ROOT, 'resources', 'whisper')
 
 function usage() {
   console.log(`Usage:
-  node scripts/prepare-whisper-runner.cjs [--platform darwin|win32|linux] [--arch arm64|x64] [--force]
+  node scripts/prepare-whisper-runner.cjs [--platform darwin|win32|linux] [--arch arm64|x64|ia32] [--force]
 
 Environment:
   KUN_WHISPER_CPP_REF=${DEFAULT_WHISPER_CPP_REF}
@@ -50,7 +50,9 @@ function normalizePlatform(value) {
 
 function normalizeArch(value) {
   const arch = String(value || process.arch).trim()
-  if (arch === 'x64' || arch === 'arm64') return arch
+  // ia32 仅在目标目录已有现成 runner 时可复用（main() 的 existsSync 短路）；
+  // 仓库当前没有 win32-ia32 基线，跨 arch 编译由 assertNativeBuildTarget 拦截。
+  if (arch === 'x64' || arch === 'arm64' || arch === 'ia32') return arch
   throw new Error(`Unsupported Whisper runner arch: ${arch}`)
 }
 

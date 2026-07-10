@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { GUI_UPDATE_STARTUP_CHECK_DELAY_MS } from '../shared/gui-update-schedule'
 
 type MockUpdater = EventEmitter & {
   autoDownload: boolean
@@ -34,6 +35,24 @@ function createUpdater(): MockUpdater {
     downloadUpdate: vi.fn(),
     quitAndInstall: vi.fn()
   })
+}
+
+// Windows 架构守卫测试需要伪装 process.platform / process.arch。
+const originalPlatformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')
+const originalArchDescriptor = Object.getOwnPropertyDescriptor(process, 'arch')
+
+function stubProcessPlatformArch(platform: string, arch: string): void {
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+  Object.defineProperty(process, 'arch', { value: arch, configurable: true })
+}
+
+function restoreProcessPlatformArch(): void {
+  if (originalPlatformDescriptor) Object.defineProperty(process, 'platform', originalPlatformDescriptor)
+  if (originalArchDescriptor) Object.defineProperty(process, 'arch', originalArchDescriptor)
+}
+
+async function flushMicrotasks(times = 8): Promise<void> {
+  for (let i = 0; i < times; i += 1) await Promise.resolve()
 }
 
 beforeEach(() => {
@@ -78,6 +97,7 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env = originalEnv
+  restoreProcessPlatformArch()
   vi.clearAllTimers()
   vi.useRealTimers()
   vi.unstubAllGlobals()
@@ -439,5 +459,159 @@ describe('showPostUpdateReleaseNotes', () => {
     expect(JSON.parse(mockedFiles.get(versionStatePath) ?? '{}')).toEqual({
       lastSeenVersion: '0.2.0'
     })
+  })
+})
+
+describe('windows installer arch guard (AC8)', () => {
+  const DUAL_ARCH_FILES = [
+    { url: 'Claude360-Copilot-0.2.0-win-x64.exe' },
+    { url: 'Claude360-Copilot-0.2.0-win-ia32.exe' },
+    { url: 'Claude360-Copilot-0.2.0-win-x64.zip' }
+  ]
+
+  it('replicates electron-updater findFile selection and validates the arch strictly', async () => {
+    const module = await import('./gui-updater')
+    const dual = DUAL_ARCH_FILES.map((file) => file.url)
+
+    expect(module.selectWindowsInstallerUrl(dual, 'ia32')).toBe('Claude360-Copilot-0.2.0-win-ia32.exe')
+    expect(module.selectWindowsInstallerUrl(dual, 'x64')).toBe('Claude360-Copilot-0.2.0-win-x64.exe')
+    expect(module.windowsInstallerMatchesArch(dual, 'ia32')).toBe(true)
+    expect(module.windowsInstallerMatchesArch(dual, 'x64')).toBe(true)
+
+    // findFile 的 fallback 陷阱：feed 缺当前 arch 条目时会静默取第一个 exe。
+    const x64Only = ['Claude360-Copilot-0.2.0-win-x64.exe']
+    expect(module.selectWindowsInstallerUrl(x64Only, 'ia32')).toBe('Claude360-Copilot-0.2.0-win-x64.exe')
+    expect(module.windowsInstallerMatchesArch(x64Only, 'ia32')).toBe(false)
+
+    const ia32Only = ['Claude360-Copilot-0.2.0-win-ia32.exe']
+    expect(module.windowsInstallerMatchesArch(ia32Only, 'x64')).toBe(false)
+
+    // 没有任何 exe（如坏 feed）按不匹配处理，宁可拒绝下载。
+    expect(module.windowsInstallerMatchesArch([], 'ia32')).toBe(false)
+  })
+
+  it('keeps the available flow when the feed contains the matching ia32 installer', async () => {
+    stubProcessPlatformArch('win32', 'ia32')
+    updater.checkForUpdates.mockResolvedValue({
+      updateInfo: {
+        version: '0.2.0',
+        releaseDate: '2026-06-06T00:00:00.000Z',
+        files: DUAL_ARCH_FILES
+      },
+      isUpdateAvailable: true
+    })
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({
+      ok: true,
+      latestVersion: '0.2.0',
+      hasUpdate: true
+    })
+    expect(module.getGuiUpdateState()).toMatchObject({ status: 'available' })
+  })
+
+  it('refuses the ia32 client when the feed only lists the x64 installer', async () => {
+    stubProcessPlatformArch('win32', 'ia32')
+    updater.checkForUpdates.mockResolvedValue({
+      updateInfo: {
+        version: '0.2.0',
+        releaseDate: '2026-06-06T00:00:00.000Z',
+        files: [{ url: 'Claude360-Copilot-0.2.0-win-x64.exe' }]
+      },
+      isUpdateAvailable: true
+    })
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable', undefined, () => 'zh')
+
+    const info = await module.checkGuiUpdate('stable')
+    expect(info.ok).toBe(false)
+    if (info.ok) throw new Error('expected the arch mismatch failure result')
+    expect(info.code).toBe('arch_mismatch')
+    expect(info.message).toContain('未找到适用于当前架构')
+    expect(info.message).toContain('ia32')
+    // 进入 error 而非 available：全局更新弹窗不弹、版本不缓存为可下载。
+    expect(module.getGuiUpdateState()).toMatchObject({ status: 'error', code: 'arch_mismatch' })
+
+    // 下载链路被阻断：重新检查仍是 mismatch，绝不调用 downloadUpdate。
+    const download = await module.downloadGuiUpdate('stable')
+    expect(download.ok).toBe(false)
+    expect(updater.downloadUpdate).not.toHaveBeenCalled()
+  })
+
+  it('blocks the x64 client from the findFile fallback onto an ia32-only feed', async () => {
+    stubProcessPlatformArch('win32', 'x64')
+    updater.checkForUpdates.mockResolvedValue({
+      updateInfo: {
+        version: '0.2.0',
+        releaseDate: '2026-06-06T00:00:00.000Z',
+        files: [{ url: 'Claude360-Copilot-0.2.0-win-ia32.exe' }]
+      },
+      isUpdateAvailable: true
+    })
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    const info = await module.checkGuiUpdate('stable')
+    expect(info.ok).toBe(false)
+    if (info.ok) throw new Error('expected the arch mismatch failure result')
+    expect(info.code).toBe('arch_mismatch')
+    expect(updater.downloadUpdate).not.toHaveBeenCalled()
+  })
+
+  it('drops a mismatched update-available event instead of caching it as downloadable', async () => {
+    stubProcessPlatformArch('win32', 'ia32')
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable', undefined, () => 'zh')
+
+    updater.emit('update-available', {
+      version: '0.2.0',
+      releaseDate: '2026-06-06T00:00:00.000Z',
+      files: [{ url: 'Claude360-Copilot-0.2.0-win-x64.exe' }]
+    })
+    await flushMicrotasks()
+
+    expect(module.getGuiUpdateState()).toMatchObject({ status: 'error', code: 'arch_mismatch' })
+
+    // 匹配的事件照常进入 available。
+    updater.emit('update-available', {
+      version: '0.2.0',
+      releaseDate: '2026-06-06T00:00:00.000Z',
+      files: DUAL_ARCH_FILES
+    })
+    await flushMicrotasks()
+
+    expect(module.getGuiUpdateState()).toMatchObject({ status: 'available' })
+  })
+})
+
+describe('startup automatic update check (AC6)', () => {
+  it('checks once per launch after the fixed 3-5s delay and never reschedules', async () => {
+    process.env.DEEPSEEK_GUI_ALLOW_UNSIGNED_UPDATES = '1'
+    updater.checkForUpdates.mockResolvedValue({
+      updateInfo: { version: '0.1.0', releaseDate: '2026-06-06T00:00:00.000Z' },
+      isUpdateAvailable: false
+    })
+
+    const module = await import('./gui-updater')
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    // 初始化本身不检查（不阻塞启动），到达固定延迟后才自动检查一次。
+    expect(updater.checkForUpdates).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(GUI_UPDATE_STARTUP_CHECK_DELAY_MS - 1)
+    expect(updater.checkForUpdates).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(1)
+
+    // 同一进程内不再自动检查：推进 24 小时也没有第二次（取代旧 24h 节流语义）。
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000)
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(1)
+
+    // 手动检查不受启动调度限制。
+    await module.checkGuiUpdate('stable')
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(2)
   })
 })
