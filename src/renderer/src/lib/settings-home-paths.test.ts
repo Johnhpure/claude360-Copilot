@@ -6,6 +6,7 @@ import {
   defaultModelProviderSettings,
   defaultScheduleSettings,
   defaultWorkflowSettings,
+  defaultImageWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
   defaultClaude360Settings,
@@ -143,6 +144,7 @@ function settings(): AppSettingsV1 {
       tasks: [scheduledTask('~/schedule/task-1')]
     },
     workflow: defaultWorkflowSettings(),
+    imageWorkflow: defaultImageWorkflowSettings(),
     terminal: defaultTerminalSettings(),
     claude360: defaultClaude360Settings(),
     guiUpdate: { channel: 'stable' },

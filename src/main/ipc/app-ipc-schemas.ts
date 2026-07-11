@@ -1,5 +1,10 @@
 import { z } from 'zod'
-import { CLAUDE360_IMAGE_OUTPUT_FORMATS, CLAUDE360_IMAGE_QUALITIES } from '../../shared/claude360-canvas'
+import {
+  CLAUDE360_IMAGE_MODERATIONS,
+  CLAUDE360_IMAGE_OUTPUT_FORMATS,
+  CLAUDE360_IMAGE_QUALITIES,
+  CLAUDE360_IMAGE_RESPONSE_FORMATS
+} from '../../shared/claude360-canvas'
 import type { Claude360ImageSize } from '../../shared/claude360-canvas'
 import {
   KUN_APPROVAL_TEMPLATE,
@@ -791,7 +796,15 @@ export const claude360CanvasGeneratePayloadSchema = z
     size: claude360ImageSizeSchema.optional(),
     n: z.number().int().min(1).max(4).optional(),
     quality: claude360ImageQualitySchema.optional(),
-    output_format: claude360ImageOutputFormatSchema.optional()
+    output_format: claude360ImageOutputFormatSchema.optional(),
+    // 07-11 image-workflow：Images API 扩展参数（timeout_ms 为本端 fetch 超时，
+    // service 层剥离不进上游 body；stream/codex_cli 透传上游现状忽略）。
+    output_compression: z.number().int().min(0).max(100).optional(),
+    moderation: z.enum(CLAUDE360_IMAGE_MODERATIONS).optional(),
+    response_format: z.enum(CLAUDE360_IMAGE_RESPONSE_FORMATS).optional(),
+    stream: z.boolean().optional(),
+    codex_cli: z.boolean().optional(),
+    timeout_ms: z.number().int().min(1_000).max(3_600_000).optional()
   })
   .strict()
 
@@ -893,12 +906,14 @@ export const mediaAssetsDeletePayloadSchema = z
   .strict()
 
 // Claude360 通用文本流式 chat（AI 写词助手）：model 必填，system/user 由渲染侧 buildLyricsPrompt 组装。
+// group 为可选文本分组覆盖（07-11 image-workflow：工作流按自身配置选分组），缺省走 selectedTextGroup。
 const MAX_CHAT_MESSAGE = 8_000
 export const claude360ChatStreamStartPayloadSchema = z
   .object({
     model: trimmedString(MAX_MODEL_ID_LENGTH),
     system: trimmedString(MAX_CHAT_MESSAGE),
     user: trimmedString(MAX_CHAT_MESSAGE),
+    group: z.string().trim().max(200).optional(),
     streamId: z.string().trim().min(1).max(200).optional()
   })
   .strict()
@@ -1564,6 +1579,31 @@ export const workflowRunNodePayloadSchema = z
   })
   .strict()
 
+// —— 生图工作台「创作工作流」settings slice（07-11 image-workflow）——
+// 顶层字段 strict、嵌套配置对象宽容（record），落盘前由
+// normalizeImageWorkflowSettings 做枚举回退 / 数值 clamp / 数组截尾。
+const imageWorkflowPatchSchema = z
+  .object({
+    id: z.string().max(MAX_ID_LENGTH).optional(),
+    name: z.string().max(512).optional(),
+    description: z.string().max(8_000).optional(),
+    category: z.string().max(200).optional(),
+    visibility: z.enum(['private', 'public']).optional(),
+    variables: z.array(z.record(z.string(), z.unknown())).max(50).optional(),
+    promptTemplate: z.record(z.string(), z.unknown()).optional(),
+    textExpansion: z.record(z.string(), z.unknown()).optional(),
+    imageConfig: z.record(z.string(), z.unknown()).optional(),
+    createdAt: z.number().optional(),
+    updatedAt: z.number().optional()
+  })
+  .strict()
+
+const imageWorkflowSettingsPatchSchema = z
+  .object({
+    workflows: z.array(imageWorkflowPatchSchema).max(200).optional()
+  })
+  .strict()
+
 export const workflowTestNodePayloadSchema = z
   .object({
     workflowId: trimmedString(MAX_ID_LENGTH),
@@ -1630,6 +1670,7 @@ const settingsPatchObjectSchema = z.object({
   claw: clawSettingsPatchSchema.optional(),
   schedule: scheduleSettingsPatchSchema.optional(),
   workflow: workflowSettingsPatchSchema.optional(),
+  imageWorkflow: imageWorkflowSettingsPatchSchema.optional(),
   terminal: terminalSettingsPatchSchema.optional(),
   claude360: claude360SettingsPatchSchema.optional(),
   guiUpdate: z.object({

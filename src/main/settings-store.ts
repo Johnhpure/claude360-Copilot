@@ -19,6 +19,7 @@ import {
   defaultModelProviderSettings,
   defaultScheduleSettings,
   defaultWorkflowSettings,
+  defaultImageWorkflowSettings,
   getKunRuntimeSettings,
   mergeKunRuntimeSettings,
   mergeModelProviderSettings,
@@ -27,6 +28,7 @@ import {
   mergeAppBehaviorSettings,
   mergeScheduleSettings,
   mergeWorkflowSettings,
+  mergeImageWorkflowSettings,
   mergeWriteSettings,
   defaultTerminalSettings,
   mergeTerminalSettings,
@@ -330,6 +332,7 @@ const defaultSettings = (): AppSettingsV1 => ({
   claw: defaultClawSettings(),
   schedule: defaultScheduleSettings(),
   workflow: defaultWorkflowSettings(),
+  imageWorkflow: defaultImageWorkflowSettings(),
   terminal: defaultTerminalSettings(),
   claude360: defaultClaude360Settings()
 })
@@ -356,6 +359,7 @@ function buildMergedSettings(parsed: Partial<AppSettingsV1>): AppSettingsV1 {
     claw: mergeClawSettings(defaults.claw, migrated.claw),
     schedule: mergeScheduleSettings(defaults.schedule, migrated.schedule),
     workflow: mergeWorkflowSettings(defaults.workflow, migrated.workflow),
+    imageWorkflow: mergeImageWorkflowSettings(defaults.imageWorkflow, migrated.imageWorkflow),
     terminal: mergeTerminalSettings(defaults.terminal, migrated.terminal),
     claude360: mergeClaude360Settings(defaults.claude360, migrated.claude360),
     guiUpdate: { ...defaults.guiUpdate, ...migrated.guiUpdate },
@@ -554,6 +558,7 @@ export class JsonSettingsStore {
       claw: mergeClawSettings(cur.claw, partial.claw),
       schedule: mergeScheduleSettings(cur.schedule, partial.schedule),
       workflow: mergeWorkflowSettings(cur.workflow, partial.workflow),
+      imageWorkflow: mergeImageWorkflowSettings(cur.imageWorkflow, partial.imageWorkflow),
       terminal: mergeTerminalSettings(cur.terminal, partial.terminal),
       claude360: mergeClaude360Settings(cur.claude360, partial.claude360),
       guiUpdate: { ...cur.guiUpdate, ...(partial.guiUpdate ?? {}) }

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from 'zustand'
 import { Image as ImageIcon } from 'lucide-react'
@@ -13,6 +13,16 @@ import {
   type Claude360ImageQuality,
   type Claude360ImageResolution
 } from '@shared/claude360-canvas'
+import {
+  defaultImageWorkflow,
+  generateImageWorkflowId,
+  isClaude360ImageModelId,
+  mergeImageWorkflowSettings,
+  normalizeImageWorkflowSettings,
+  type AppSettingsV1,
+  type ImageWorkflowV1
+} from '@shared/app-settings'
+import { rendererRuntimeClient } from '../../agent/runtime-client'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import {
   filterArtworks,
@@ -33,6 +43,19 @@ import {
   type CanvasPersistenceApi,
   type CanvasWorkbenchApi
 } from '../../canvas/canvas-workbench-actions'
+import {
+  resolveWorkflowValues,
+  runImageWorkflow,
+  type ImageWorkflowTaskResult
+} from '../../canvas/image-workflow-run'
+import { expandPrompts, type WorkflowChatApi } from '../../canvas/workflow-ai'
+import {
+  IMAGE_WORKFLOW_MULTI_CATEGORY,
+  duplicateImageWorkflow,
+  imageWorkflowIssueMessage,
+  validateImageWorkflow,
+  workflowOutputSize
+} from '../../canvas/image-workflow-ui'
 import { imageDataUrl } from '../../canvas/image-result-utils'
 import { useLocalAssetSrc } from '../../lib/use-local-asset-src'
 import { confirmDialog } from '../../lib/confirm-dialog'
@@ -42,6 +65,10 @@ import { CanvasToolbar } from './CanvasToolbar'
 import { ImagePromptPanel } from './ImagePromptPanel'
 import { ImageLightbox } from './ImageLightbox'
 import { ArtworkGrid } from './ArtworkGrid'
+import { WorkflowPanel } from './WorkflowPanel'
+import { WorkflowEditModal } from './WorkflowEditModal'
+import { WorkflowAiCreateModal } from './WorkflowAiCreateModal'
+import { WorkflowRunModal } from './WorkflowRunModal'
 import { ensureGroupKeyForSelection } from '../../lib/group-key-ensure'
 import { useGroupKeyPromptStore } from '../../store/group-key-prompt-store'
 
@@ -114,15 +141,32 @@ export function CanvasWorkbench({
   const setStatusFilter = useStore(useCanvasStore, (s) => s.setStatusFilter)
   const toggleSelectMode = useStore(useCanvasStore, (s) => s.toggleSelectMode)
   const toggleSelected = useStore(useCanvasStore, (s) => s.toggleSelected)
+  const beginWorkflowTask = useStore(useCanvasStore, (s) => s.beginWorkflowTask)
+  const resolveWorkflowTask = useStore(useCanvasStore, (s) => s.resolveWorkflowTask)
 
   const [lowBalance, setLowBalance] = useState(false)
   const [imageModels, setImageModels] = useState<string[]>([])
+  // 全量模型缓存（工作流的文本模型 = 剔除 image 模型后的余集，不硬编码白名单）。
+  const [allModels, setAllModels] = useState<string[]>([])
   // 当前 image 分组（执行时用于确保该分组已有 Key）。
   const [imageGroup, setImageGroup] = useState('')
+  // 当前 text 分组（工作流草稿/多图扩写走 chat 链路时的分组）。
+  const [textGroup, setTextGroup] = useState('')
   // 当前工作空间根：资产落盘 / 恢复的定位（07-05）。
   const [workspaceRoot, setWorkspaceRoot] = useState('')
   // 大图查看（lightbox，基于 ui/Modal，Esc/遮罩关闭由基类接管）。
   const [viewing, setViewing] = useState<CanvasArtwork | null>(null)
+  // —— 07-11 创作工作流 ——
+  // settings 快照（工作流 CRUD 的乐观更新基线，范式同 WorkflowView）。
+  const [appSettings, setAppSettings] = useState<AppSettingsV1 | null>(null)
+  // 编辑弹窗目标（null = 关闭；新建/AI 草稿/编辑既有共用）。
+  const [editingWorkflow, setEditingWorkflow] = useState<ImageWorkflowV1 | null>(null)
+  const [aiCreateOpen, setAiCreateOpen] = useState(false)
+  // 运行弹窗目标（有变量的工作流先弹变量表单）。
+  const [runTarget, setRunTarget] = useState<ImageWorkflowV1 | null>(null)
+  // 运行进度（null = 空闲；单实例运行，运行期间面板「运行」禁用）。
+  const [workflowRun, setWorkflowRun] = useState<{ done: number; total: number } | null>(null)
+  const workflowCancelRef = useRef(false)
 
   const visibleArtworks = useMemo(
     () => filterArtworks(artworks, statusFilter),
@@ -138,6 +182,7 @@ export function CanvasWorkbench({
   // 从设置里读取 image 模型缓存并过滤；默认模型取第一个 image 模型（不硬编码）。
   const applyModelsFromCache = useCallback(
     (models: string[]): void => {
+      setAllModels(models)
       const filtered = filterImageModels(models)
       setImageModels(filtered)
       const current = useCanvasStore.getState().model
@@ -150,6 +195,7 @@ export function CanvasWorkbench({
 
   // 首屏加载：读取 image 模型缓存 + 低余额标记（分组模式不在初始化时做任何 Key 检测）。
   // 07-05：顺带记录 workspaceRoot 并从磁盘恢复本工作空间的生图作品。
+  // 07-11：保留 settings 快照（工作流 CRUD 基线）与 text 分组。
   useEffect(() => {
     let alive = true
     const kun = api()
@@ -158,8 +204,10 @@ export function CanvasWorkbench({
     if (w?.getSettings) {
       void w.getSettings().then((settings) => {
         if (!alive) return
+        setAppSettings(settings)
         applyModelsFromCache(settings.claude360?.modelCache?.models ?? [])
         setImageGroup((settings.claude360?.selectedImageGroup ?? '').trim())
+        setTextGroup((settings.claude360?.selectedTextGroup ?? '').trim())
         const root = (settings.workspaceRoot ?? '').trim()
         setWorkspaceRoot(root)
         if (root) {
@@ -382,6 +430,334 @@ export function CanvasWorkbench({
     [removeArtwork, syncDiskDeletion]
   )
 
+  // ═══════════════ 07-11 创作工作流：CRUD + 运行编排 ═══════════════
+
+  // 工作流列表（settings slice，normalize 防坏数据；main 已归一化，这里再兜一层）。
+  const imageWorkflows = useMemo(
+    () => (appSettings ? normalizeImageWorkflowSettings(appSettings.imageWorkflow).workflows : []),
+    [appSettings]
+  )
+  // 文本模型 = 全量模型剔除 image 模型（modelCache 动态列表，禁止硬编码白名单）。
+  const textModels = useMemo(
+    () => allModels.filter((id) => !isClaude360ImageModelId(id)),
+    [allModels]
+  )
+  const claude360Groups = appSettings?.claude360?.modelCache?.groups ?? []
+  const editIsNew = editingWorkflow
+    ? !imageWorkflows.some((workflow) => workflow.id === editingWorkflow.id)
+    : false
+
+  /** chat 流式 IPC 子集（注入弹窗/扩写，模式同 MusicWorkbench.lyricsStreamApi）。 */
+  const workflowChatApi = (): WorkflowChatApi | null => {
+    const w = typeof window !== 'undefined' ? window.kunGui : undefined
+    if (!w?.claude360ChatStreamStart) return null
+    return {
+      claude360ChatStreamStart: w.claude360ChatStreamStart,
+      claude360ChatStreamStop: w.claude360ChatStreamStop,
+      onClaude360ChatDelta: w.onClaude360ChatDelta,
+      onClaude360ChatEnd: w.onClaude360ChatEnd,
+      onClaude360ChatError: w.onClaude360ChatError
+    }
+  }
+  const assetsApi =
+    typeof window !== 'undefined' && window.kunGui
+      ? (window.kunGui as unknown as CanvasPersistenceApi)
+      : null
+
+  // 持久化工作流列表：乐观更新 + setSettings 落盘（范式同 WorkflowView.tsx persist）。
+  const persistWorkflows = useCallback(
+    async (nextWorkflows: ImageWorkflowV1[]): Promise<boolean> => {
+      const base = appSettings ?? (await rendererRuntimeClient.getSettings().catch(() => null))
+      if (!base) {
+        toast.error(t('canvasWorkflowSaveFailed'))
+        return false
+      }
+      const nextSlice = mergeImageWorkflowSettings(base.imageWorkflow, { workflows: nextWorkflows })
+      setAppSettings({ ...base, imageWorkflow: nextSlice })
+      try {
+        const saved = await rendererRuntimeClient.setSettings({ imageWorkflow: nextSlice })
+        setAppSettings(saved)
+        return true
+      } catch {
+        toast.error(t('canvasWorkflowSaveFailed'))
+        return false
+      }
+    },
+    [appSettings, t]
+  )
+
+  /** 新建初始值：默认参数 + 预填当前第一个生图模型。 */
+  const newWorkflowBase = useCallback((): ImageWorkflowV1 => {
+    const workflow = defaultImageWorkflow(Date.now())
+    return { ...workflow, imageConfig: { ...workflow.imageConfig, model: imageModels[0] ?? '' } }
+  }, [imageModels])
+
+  const handleCreateBlank = useCallback((): void => {
+    setEditingWorkflow(newWorkflowBase())
+  }, [newWorkflowBase])
+
+  // 「新建多图」= 编辑弹窗预置多图规则开启 + 分类「多图生成」（prd R1）。
+  const handleCreateMulti = useCallback((): void => {
+    const workflow = newWorkflowBase()
+    setEditingWorkflow({
+      ...workflow,
+      category: IMAGE_WORKFLOW_MULTI_CATEGORY,
+      textExpansion: { ...workflow.textExpansion, enabled: true, model: textModels[0] ?? '' }
+    })
+  }, [newWorkflowBase, textModels])
+
+  const handleSaveWorkflow = useCallback(
+    (workflow: ImageWorkflowV1): void => {
+      const exists = imageWorkflows.some((item) => item.id === workflow.id)
+      const next = exists
+        ? imageWorkflows.map((item) => (item.id === workflow.id ? workflow : item))
+        : [...imageWorkflows, workflow]
+      setEditingWorkflow(null)
+      void persistWorkflows(next).then((ok) => {
+        if (ok) toast.success(t('canvasWorkflowSaved'))
+      })
+    },
+    [imageWorkflows, persistWorkflows, t]
+  )
+
+  const handleDuplicateWorkflow = useCallback(
+    (workflow: ImageWorkflowV1): void => {
+      const copy = duplicateImageWorkflow(workflow, Date.now())
+      void persistWorkflows([...imageWorkflows, copy]).then((ok) => {
+        if (ok) toast.success(t('canvasWorkflowDuplicated'))
+      })
+    },
+    [imageWorkflows, persistWorkflows, t]
+  )
+
+  const handleDeleteWorkflow = useCallback(
+    (workflow: ImageWorkflowV1): void => {
+      void confirmDialog(t('canvasWorkflowDeleteConfirm', { name: workflow.name })).then((ok) => {
+        if (!ok) return
+        void persistWorkflows(imageWorkflows.filter((item) => item.id !== workflow.id)).then(
+          (saved) => {
+            if (saved) toast.success(t('canvasWorkflowDeleted'))
+          }
+        )
+      })
+    },
+    [imageWorkflows, persistWorkflows, t]
+  )
+
+  /** AI 草稿 → 可保存工作流：换新 id / 时间戳，缺省模型回填当前列表首个。 */
+  const adoptDraft = useCallback(
+    (draft: ImageWorkflowV1): ImageWorkflowV1 => {
+      const now = Date.now()
+      return {
+        ...draft,
+        id: generateImageWorkflowId(),
+        createdAt: now,
+        updatedAt: now,
+        imageConfig: { ...draft.imageConfig, model: draft.imageConfig.model || imageModels[0] || '' },
+        textExpansion: {
+          ...draft.textExpansion,
+          model:
+            draft.textExpansion.model ||
+            (draft.textExpansion.enabled ? textModels[0] ?? '' : draft.textExpansion.model)
+        }
+      }
+    },
+    [imageModels, textModels]
+  )
+
+  const handleDraftContinueEdit = useCallback(
+    (draft: ImageWorkflowV1): void => {
+      setAiCreateOpen(false)
+      setEditingWorkflow(adoptDraft(draft))
+    },
+    [adoptDraft]
+  )
+
+  // 直接保存 AI 草稿：与编辑弹窗同源校验（validateImageWorkflow）。校验失败
+  // （如 modelCache 为空导致无生图模型可回填）→ toast + 返回中文文案给弹窗
+  // inline 展示，不关闭弹窗、不保存（验收补修）。
+  const handleDraftSaveDirect = useCallback(
+    (draft: ImageWorkflowV1): string | null => {
+      const workflow = adoptDraft(draft)
+      const { errors } = validateImageWorkflow(workflow)
+      if (errors.length > 0) {
+        const message = errors.map((issue) => imageWorkflowIssueMessage(issue, t)).join('；')
+        toast.error(message)
+        return message
+      }
+      setAiCreateOpen(false)
+      handleSaveWorkflow(workflow)
+      return null
+    },
+    [adoptDraft, handleSaveWorkflow, t]
+  )
+
+  /**
+   * 单个任务终态：成功先落盘（beforeSuccess 模式）再原位替换占位；失败/取消标 failed。
+   * 落盘失败不影响生成成功状态（静默降级，同单次生图语义）。
+   */
+  const finalizeWorkflowTask = useCallback(
+    async (
+      taskId: string,
+      result: ImageWorkflowTaskResult,
+      workflow: ImageWorkflowV1
+    ): Promise<void> => {
+      if (result.ok) {
+        let localArtifacts: Record<string, string> = {}
+        if (workspaceRoot && window.kunGui) {
+          try {
+            localArtifacts = await persistGeneratedImages(
+              window.kunGui as unknown as CanvasPersistenceApi,
+              null,
+              workspaceRoot,
+              result.images,
+              {
+                size: workflowOutputSize(workflow.imageConfig),
+                quality: workflow.imageConfig.quality,
+                format: workflow.imageConfig.format,
+                ...(imageGroup ? { group: imageGroup } : {})
+              }
+            )
+          } catch {
+            // 落盘失败静默（persistGeneratedImages 内部已 console.warn）。
+          }
+        }
+        resolveWorkflowTask(taskId, {
+          ok: true,
+          images: result.images,
+          ...(Object.keys(localArtifacts).length > 0 ? { localArtifacts } : {})
+        })
+      } else {
+        resolveWorkflowTask(taskId, { ok: false, message: result.message })
+      }
+      setWorkflowRun((prev) => (prev ? { ...prev, done: prev.done + 1 } : prev))
+    },
+    [imageGroup, resolveWorkflowTask, workspaceRoot]
+  )
+
+  /** 启动一次工作流运行：Key 检测 → 编排（占位/落盘/汇总均在回调中处理）。 */
+  const startWorkflowRun = useCallback(
+    async (workflow: ImageWorkflowV1, values: Record<string, string>): Promise<void> => {
+      const kun = api()
+      if (!kun || workflowRun) return
+      let resolved: Record<string, string>
+      try {
+        resolved = resolveWorkflowValues(workflow, values)
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : t('canvasWorkflowRunFailed'))
+        return
+      }
+      // 运行前确保 image 分组 Key（无则弹创建模态，取消→静默中止）。
+      const ready = await ensureGroupKeyForSelection(
+        imageGroup.trim() || null,
+        {
+          listTokens: () => kun.claude360TokensList(),
+          promptCreateAndEnsure: (grp) => useGroupKeyPromptStore.getState().open(grp, 'image')
+        },
+        { feature: '生图工作流', model: workflow.imageConfig.model }
+      )
+      if (!ready) return
+      const chat = workflowChatApi()
+      if (workflow.textExpansion.enabled) {
+        if (!chat) {
+          toast.error(t('canvasWorkflowAiUnavailable'))
+          return
+        }
+        // 多图规则走 chat 链路：同样确保 text 分组 Key。
+        const readyText = await ensureGroupKeyForSelection(
+          textGroup.trim() || null,
+          {
+            listTokens: () => kun.claude360TokensList(),
+            promptCreateAndEnsure: (grp) => useGroupKeyPromptStore.getState().open(grp, 'text')
+          },
+          { feature: '生图工作流', model: workflow.textExpansion.model }
+        )
+        if (!readyText) return
+      }
+
+      workflowCancelRef.current = false
+      setWorkflowRun({ done: 0, total: workflow.textExpansion.enabled ? workflow.textExpansion.count : 1 })
+      const sizeText = workflowOutputSize(workflow.imageConfig)
+      const workflowMeta = { id: workflow.id, name: workflow.name, variables: resolved }
+      try {
+        const summary = await runImageWorkflow(
+          {
+            generate: (payload) => kun.claude360CanvasGenerate(payload),
+            expand: (input) => {
+              if (!chat) return Promise.reject(new Error(t('canvasWorkflowAiUnavailable')))
+              return expandPrompts(chat, {
+                ...input,
+                ...(textGroup.trim() ? { group: textGroup.trim() } : {})
+              })
+            }
+          },
+          workflow,
+          resolved,
+          {
+            onPlanned: (total) => setWorkflowRun((prev) => (prev ? { ...prev, total } : { done: 0, total })),
+            onTaskStart: (taskId, prompt) =>
+              beginWorkflowTask(taskId, {
+                prompt,
+                model: workflow.imageConfig.model,
+                size: sizeText,
+                quality: workflow.imageConfig.quality,
+                outputFormat: workflow.imageConfig.format,
+                n: workflow.imageConfig.count,
+                workflow: workflowMeta
+              }),
+            onTaskDone: (taskId, result) => {
+              void finalizeWorkflowTask(taskId, result, workflow)
+            },
+            isCancelled: () => workflowCancelRef.current
+          }
+        )
+        // 运行结束 toast 汇总（部分失败如实呈现；有取消追加取消条数）。
+        const summaryText =
+          summary.cancelled > 0
+            ? t('canvasWorkflowRunSummaryCancelled', {
+                succeeded: summary.succeeded,
+                failed: summary.failed,
+                cancelled: summary.cancelled
+              })
+            : t('canvasWorkflowRunSummary', {
+                succeeded: summary.succeeded,
+                failed: summary.failed
+              })
+        if (summary.failed === 0 && summary.cancelled === 0) toast.success(summaryText)
+        else toast.info(summaryText)
+      } catch (e) {
+        // 扩写失败/模板渲染为空等整次终止：中文错误 toast，不崩页面。
+        toast.error(e instanceof Error && e.message ? e.message : t('canvasWorkflowRunFailed'))
+      } finally {
+        setWorkflowRun(null)
+      }
+    },
+    [beginWorkflowTask, finalizeWorkflowTask, imageGroup, t, textGroup, workflowRun]
+  )
+
+  const handleRunWorkflow = useCallback(
+    (workflow: ImageWorkflowV1): void => {
+      if (workflowRun) {
+        toast.info(t('canvasWorkflowRunBusy'))
+        return
+      }
+      // 有变量先弹变量表单；无变量直接运行。
+      if (workflow.variables.length > 0) {
+        setRunTarget(workflow)
+        return
+      }
+      void startWorkflowRun(workflow, {})
+    },
+    [startWorkflowRun, t, workflowRun]
+  )
+
+  const handleCancelWorkflowRun = useCallback((): void => {
+    workflowCancelRef.current = true
+    toast.info(t('canvasWorkflowCancelRequested'))
+  }, [t])
+
+  // ═══════════════ 07-11 创作工作流 END ═══════════════
+
   const headerInset = useMemo(
     () => (leftSidebarCollapsed ? 'ds-window-controls-collapsed-titlebar-inset' : ''),
     [leftSidebarCollapsed]
@@ -547,6 +923,27 @@ export function CanvasWorkbench({
             />
           </div>
         </section>
+
+        {/* 右列：创作工作流面板（07-11；三列版式参考 MusicWorkbench 第三列 aside）。
+            <lg 回退：置于作品区下方（跟随 main 的 flex-col）。 */}
+        <aside
+          data-testid="canvas-workflow-pane"
+          className="flex w-full shrink-0 flex-col gap-4 lg:w-[320px] lg:overflow-y-auto lg:border-l lg:border-ds-border lg:pl-4 xl:w-[340px]"
+        >
+          <WorkflowPanel
+            workflows={imageWorkflows}
+            running={workflowRun}
+            onRun={handleRunWorkflow}
+            onEdit={(workflow) => setEditingWorkflow(workflow)}
+            onDuplicate={handleDuplicateWorkflow}
+            onDelete={handleDeleteWorkflow}
+            onCreateAi={() => setAiCreateOpen(true)}
+            onCreateMulti={handleCreateMulti}
+            onCreateBlank={handleCreateBlank}
+            onCancelRun={handleCancelWorkflowRun}
+            t={t}
+          />
+        </aside>
       </main>
 
       {/* 大图查看：基于 ui/Modal 的轻玻璃 Lightbox（遮罩 blur + 降级开关由基类提供）。 */}
@@ -566,6 +963,43 @@ export function CanvasWorkbench({
           t={t}
         />
       ) : null}
+
+      {/* 07-11 创作工作流弹窗族：编辑 / AI 创建 / 运行变量表单 */}
+      <WorkflowEditModal
+        open={editingWorkflow !== null}
+        initial={editingWorkflow}
+        isNew={editIsNew}
+        imageModels={imageModels}
+        textModels={textModels}
+        onRefreshModels={refreshModels}
+        onSave={handleSaveWorkflow}
+        onClose={() => setEditingWorkflow(null)}
+        t={t}
+      />
+      <WorkflowAiCreateModal
+        open={aiCreateOpen}
+        textModels={textModels}
+        groups={claude360Groups}
+        defaultGroup={textGroup}
+        workspaceRoot={workspaceRoot}
+        chatApi={workflowChatApi()}
+        assetsApi={assetsApi}
+        onClose={() => setAiCreateOpen(false)}
+        onContinueEdit={handleDraftContinueEdit}
+        onSaveDirect={handleDraftSaveDirect}
+        t={t}
+      />
+      <WorkflowRunModal
+        open={runTarget !== null}
+        workflow={runTarget}
+        onStart={(values) => {
+          const target = runTarget
+          setRunTarget(null)
+          if (target) void startWorkflowRun(target, values)
+        }}
+        onClose={() => setRunTarget(null)}
+        t={t}
+      />
     </div>
   )
 }

@@ -14,6 +14,7 @@ import {
   mergeModelProviderSettings,
   mergeScheduleSettings,
   mergeWorkflowSettings,
+  mergeImageWorkflowSettings,
   mergeWriteSettings,
   mergeTerminalSettings,
   mergeClaude360Settings,
@@ -27,6 +28,7 @@ import {
   normalizeModelProviderSettings,
   normalizeScheduleSettings,
   normalizeWorkflowSettings,
+  normalizeImageWorkflowSettings,
   normalizeWriteSettings,
   normalizeTerminalSettings,
   normalizeChatContentMaxWidth,
@@ -87,6 +89,7 @@ export function mergeSettings(current: AppSettingsV1, patch: SettingsPatch): App
     claw: mergeClawSettings(safeCurrent.claw, patch.claw),
     schedule: mergeScheduleSettings(safeCurrent.schedule, patch.schedule),
     workflow: mergeWorkflowSettings(safeCurrent.workflow, patch.workflow),
+    imageWorkflow: mergeImageWorkflowSettings(safeCurrent.imageWorkflow, patch.imageWorkflow),
     terminal: mergeTerminalSettings(safeCurrent.terminal, patch.terminal),
     claude360: mergeClaude360Settings(safeCurrent.claude360, patch.claude360),
     guiUpdate: {
@@ -135,6 +138,7 @@ export function coerceRendererSettings(settings: AppSettingsV1): AppSettingsV1 {
     claw: normalizeClawSettings(raw.claw),
     schedule: normalizeScheduleSettings(raw.schedule),
     workflow: normalizeWorkflowSettings(raw.workflow),
+    imageWorkflow: normalizeImageWorkflowSettings(raw.imageWorkflow),
     terminal: normalizeTerminalSettings(raw.terminal),
     claude360: normalizeClaude360Settings(settings.claude360),
     guiUpdate: {

@@ -1809,6 +1809,105 @@ export type Claude360SettingsPatchV1 = Partial<Omit<Claude360SettingsV1, 'tokenR
   modelCache?: Partial<Claude360ModelCache>
 }
 
+// —— 生图工作台「创作工作流」（07-11 image-workflow）——
+// 用户把「提示词模板 + 输入变量 + 多图规则 + Images API 参数」沉淀为可复用工作流，
+// 作为 settings slice 持久化（kun-settings.json），范式对照 WorkflowSettingsV1。
+// 时间戳统一 Unix 毫秒（spec timestamp.md）。
+
+export const IMAGE_WORKFLOW_VARIABLE_TYPES = ['text', 'textarea', 'number', 'select'] as const
+export type ImageWorkflowVariableType = (typeof IMAGE_WORKFLOW_VARIABLE_TYPES)[number]
+
+/** 运行工作流时由用户填写的输入变量定义（模板中以 {{key}} 引用）。 */
+export type ImageWorkflowVariableV1 = {
+  /** 变量键，仅允许 ^[A-Za-z0-9_]+$。 */
+  key: string
+  /** 展示名（表单 label）。 */
+  label: string
+  type: ImageWorkflowVariableType
+  required: boolean
+  defaultValue: string
+  /** type==='select' 时的候选项；其余类型恒为 []。 */
+  options: string[]
+}
+
+/** 多图提示词规则：先调文本模型把主模板扩写成 N 条独立生图提示词。 */
+export type ImageWorkflowTextExpansionV1 = {
+  enabled: boolean
+  /** 文本模型 id（modelCache 动态列表，禁止硬编码白名单）。 */
+  model: string
+  /** 生成的提示词条数，1-20。 */
+  count: number
+  /** 生图请求并发数，1-6。 */
+  concurrency: number
+  /** 自然语言拆分规则文本。 */
+  rule: string
+  /** 「先串接提示词」：每条扩写提示词前拼接主模板渲染结果。 */
+  prependBasePrompt: boolean
+}
+
+/** 生图模型与 Images API 参数（保存的参数真正进入生成请求体，见 prd C4）。 */
+export type ImageWorkflowImageConfigV1 = {
+  /** 生图模型 id（modelCache image 模型动态列表）。 */
+  model: string
+  /** CLAUDE360_ASPECT_PRESETS 的 id 或 'custom'。 */
+  aspectPresetId: string
+  /** aspectPresetId==='custom' 时使用；预设时由 resolveImageSizeValue 派生。 */
+  width: number
+  height: number
+  resolution: '1K' | '2K' | '4K'
+  quality: 'auto' | 'high' | 'medium' | 'low'
+  /** 单条提示词一次生成张数，1-4（payload n 上限）。 */
+  count: number
+  /** 单张失败自动重试次数（仅 retryable 错误），0-5。 */
+  retry: number
+  format: 'png' | 'jpeg' | 'webp'
+  /** output_compression 0-100；仅 jpeg/webp 随请求发送。 */
+  compression: number
+  moderation: 'auto' | 'low'
+  /** 流式传输开关：落盘 + 随请求体透传（上游现状忽略，见 prd C4）。 */
+  stream: boolean
+  /** 返回 Base64：→ response_format: 'b64_json'。 */
+  returnBase64: boolean
+  /** Codex CLI 兼容：透传预留（上游现状忽略）。 */
+  codexCliCompatible: boolean
+  /** 单次生图请求超时（秒），本端 fetch 层真实生效；默认 600。 */
+  timeoutSeconds: number
+}
+
+export type ImageWorkflowV1 = {
+  id: string
+  name: string
+  description: string
+  /** 分类：预置（多图生成/电商海报/小红书封面/文章配图/产品图）或自定义。 */
+  category: string
+  /** 保留字段：本地应用无发布通道，仅展示标签，默认 private。 */
+  visibility: 'private' | 'public'
+  variables: ImageWorkflowVariableV1[]
+  promptTemplate: {
+    /** 系统提示词（可选，images API 无 system 概念，运行时在模板层合并）。 */
+    system: string
+    /** 正向提示词模板（必填）。 */
+    positive: string
+    /** 负面约束（可选）。 */
+    negative: string
+  }
+  textExpansion: ImageWorkflowTextExpansionV1
+  imageConfig: ImageWorkflowImageConfigV1
+  /** Unix 毫秒。 */
+  createdAt: number
+  /** Unix 毫秒。 */
+  updatedAt: number
+}
+
+export type ImageWorkflowSettingsV1 = {
+  workflows: ImageWorkflowV1[]
+}
+
+export type ImageWorkflowSettingsPatchV1 = {
+  /** present 即整体替换（同 workflow slice 语义）。 */
+  workflows?: Array<Partial<ImageWorkflowV1>>
+}
+
 export type AppSettingsV1 = {
   version: 1
   locale: 'en' | 'zh'
@@ -1831,6 +1930,7 @@ export type AppSettingsV1 = {
   claw: ClawSettingsV1
   schedule: ScheduleSettingsV1
   workflow: WorkflowSettingsV1
+  imageWorkflow: ImageWorkflowSettingsV1
   guiUpdate: GuiUpdateConfigV1
   terminal: TerminalSettingsV1
   claude360: Claude360SettingsV1
@@ -1840,7 +1940,7 @@ export type AppSettingsV1 = {
 }
 
 export type AppSettingsPatch = Partial<
-  Omit<AppSettingsV1, 'provider' | 'agents' | 'log' | 'checkpointCleanup' | 'notifications' | 'appBehavior' | 'keyboardShortcuts' | 'write' | 'claw' | 'schedule' | 'workflow' | 'guiUpdate' | 'terminal' | 'claude360'>
+  Omit<AppSettingsV1, 'provider' | 'agents' | 'log' | 'checkpointCleanup' | 'notifications' | 'appBehavior' | 'keyboardShortcuts' | 'write' | 'claw' | 'schedule' | 'workflow' | 'imageWorkflow' | 'guiUpdate' | 'terminal' | 'claude360'>
 > & {
   provider?: ModelProviderSettingsPatchV1
   agents?: KunSettingsEnvelopePatchV1
@@ -1853,6 +1953,7 @@ export type AppSettingsPatch = Partial<
   claw?: ClawSettingsPatchV1
   schedule?: ScheduleSettingsPatchV1
   workflow?: WorkflowSettingsPatchV1
+  imageWorkflow?: ImageWorkflowSettingsPatchV1
   guiUpdate?: Partial<GuiUpdateConfigV1>
   terminal?: TerminalSettingsPatchV1
   claude360?: Claude360SettingsPatchV1

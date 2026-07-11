@@ -50,6 +50,7 @@ export function registerClaude360ChatStreamIpc(options: {
           model: req.model,
           system: req.system,
           user: req.user,
+          group: req.group,
           signal: ac.signal,
           onDelta: (delta) => sendChat(wc, 'claude360:chat:delta', { streamId: id, delta })
         })

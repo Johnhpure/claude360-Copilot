@@ -34,6 +34,14 @@ export const CLAUDE360_IMAGE_QUALITIES: readonly Claude360ImageQuality[] = ['aut
 export type Claude360ImageOutputFormat = 'png' | 'jpeg' | 'webp'
 export const CLAUDE360_IMAGE_OUTPUT_FORMATS: readonly Claude360ImageOutputFormat[] = ['png', 'jpeg', 'webp']
 
+// —— 内容审核档（newapi 透传 moderation）——
+export type Claude360ImageModeration = 'auto' | 'low'
+export const CLAUDE360_IMAGE_MODERATIONS: readonly Claude360ImageModeration[] = ['auto', 'low']
+
+// —— 返回形态（url / 强制 base64）——
+export type Claude360ImageResponseFormat = 'url' | 'b64_json'
+export const CLAUDE360_IMAGE_RESPONSE_FORMATS: readonly Claude360ImageResponseFormat[] = ['url', 'b64_json']
+
 // —— 宽高比预设（严格迁移自 infinite-canvas image-size-presets.ts）——
 // 每档含 ratio 标签 + name + 三个分辨率档对应的具体像素串。
 export interface Claude360AspectPreset {
@@ -84,6 +92,11 @@ export interface Claude360CanvasImage {
 
 // —— 文本生图请求体（JSON POST /v1/images/generations）——
 // n：一次生成张数；size：派生像素串；quality/output_format：可选高级参数。
+// 07-11 image-workflow 扩展（全部 optional，不影响既有单次生图调用）：
+// - output_compression：0-100，仅对有损格式（jpeg/webp）有意义，service 层按格式过滤；
+// - moderation / response_format / stream / codex_cli：随请求体透传（stream/codex_cli
+//   上游现状忽略，见 prd C4）；
+// - timeout_ms：**本端专用**，service 层剥离转为 fetch 超时，绝不进上游 body。
 export interface Claude360ImageGeneratePayload {
   model: string
   prompt: string
@@ -91,6 +104,12 @@ export interface Claude360ImageGeneratePayload {
   n?: number
   quality?: Claude360ImageQuality
   output_format?: Claude360ImageOutputFormat
+  output_compression?: number
+  moderation?: Claude360ImageModeration
+  response_format?: Claude360ImageResponseFormat
+  stream?: boolean
+  codex_cli?: boolean
+  timeout_ms?: number
 }
 
 // —— 单图编辑请求体（multipart POST /v1/images/edits）——

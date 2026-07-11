@@ -37,6 +37,7 @@ import {
   mergeKunRuntimeSettings,
   mergeClawSettings,
   mergeWorkflowSettings,
+  mergeImageWorkflowSettings,
   mergeAppBehaviorSettings,
   mergeModelProviderSettings,
   mergeScheduleSettings,
@@ -1686,6 +1687,7 @@ app.whenReady().then(async () => {
       claw: mergeClawSettings(prev.claw, partial.claw),
       schedule: mergeScheduleSettings(prev.schedule, partial.schedule),
       workflow: mergeWorkflowSettings(prev.workflow, partial.workflow),
+      imageWorkflow: mergeImageWorkflowSettings(prev.imageWorkflow, partial.imageWorkflow),
       terminal: mergeTerminalSettings(prev.terminal, partial.terminal),
       claude360: mergeClaude360Settings(prev.claude360, partial.claude360),
       guiUpdate: { ...prev.guiUpdate, ...(partial.guiUpdate ?? {}) }

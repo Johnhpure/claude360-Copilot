@@ -30,6 +30,7 @@ import type {
 } from '../shared/app-settings'
 import { resolveKunImageGenerationSettings } from '../shared/app-settings'
 import { MAX_WORKFLOW_RUNS } from '../shared/app-settings-workflow'
+import { extractJsonObject } from '../shared/json-extract'
 import {
   SCHEDULER_INTERVAL_MS,
   hasEnabledScheduledTask,
@@ -724,28 +725,11 @@ function missingRequiredInput(schema: WorkflowInputFieldV1[] | undefined, input:
   return null
 }
 
-/** Parse a JSON object out of an LLM reply, tolerating ```json fences and surrounding prose. */
-function extractJsonObject(raw: string): Record<string, unknown> | null {
-  const text = raw
-    .trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/```\s*$/i, '')
-    .trim()
-  const tryParse = (candidate: string): Record<string, unknown> | null => {
-    try {
-      const parsed = JSON.parse(candidate)
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null
-    } catch {
-      return null
-    }
-  }
-  const direct = tryParse(text)
-  if (direct) return direct
-  const match = text.match(/\{[\s\S]*\}/)
-  return match ? tryParse(match[0]) : null
-}
-
-/** Run `fn` over items with at most `limit` in flight, preserving result order. */
+/**
+ * Run `fn` over items with at most `limit` in flight, preserving result order.
+ * A shared copy exists at src/shared/concurrency.ts (for renderer use); this
+ * private one is intentionally kept to avoid churn in the workflow engine.
+ */
 async function mapWithConcurrency<T, R>(
   items: T[],
   limit: number,

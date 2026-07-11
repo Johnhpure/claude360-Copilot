@@ -7,6 +7,7 @@ import {
   defaultModelProviderSettings,
   defaultScheduleSettings,
   defaultWorkflowSettings,
+  defaultImageWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
   defaultClaude360Settings,
@@ -59,6 +60,7 @@ function settings(options: { loggedIn?: boolean; runtimeModel?: string; provider
     claw: defaultClawSettings(),
     schedule: defaultScheduleSettings(),
     workflow: defaultWorkflowSettings(),
+    imageWorkflow: defaultImageWorkflowSettings(),
     terminal: defaultTerminalSettings(),
     claude360: {
       ...defaultClaude360Settings(),

@@ -157,6 +157,15 @@ export function ArtworkGrid({
                 title={artwork.prompt || t('canvasArtworkNoPrompt')}
                 meta={artwork.model || undefined}
               >
+                {/* 07-11：工作流溯源徽标（chip 约定：accent-soft 底 + accent 字） */}
+                {artwork.workflow ? (
+                  <span
+                    data-testid="artwork-workflow-badge"
+                    className="mb-1.5 inline-flex max-w-full items-center truncate rounded-full bg-ds-accent-soft px-2 py-0.5 text-[10.5px] font-medium text-ds-accent"
+                  >
+                    {artwork.workflow.name}
+                  </span>
+                ) : null}
                 {failed ? (
                   <div className="flex flex-col gap-2">
                     <p className="line-clamp-3 text-[12px] leading-[18px] text-ds-danger">
@@ -284,6 +293,15 @@ function SuccessArtworkCard({
                 >
                   {missingLocal ? t('canvasAssetMissing') : t(`canvasStatus_${artwork.status}`)}
                 </span>
+                {/* 07-11：工作流溯源徽标（chip 约定），显示来源工作流名 */}
+                {artwork.workflow ? (
+                  <span
+                    data-testid="artwork-workflow-badge"
+                    className="absolute left-1.5 top-7 max-w-[75%] truncate rounded-[var(--radius-sm)] bg-ds-accent-soft px-1.5 py-0.5 text-[10.5px] font-medium text-ds-accent"
+                  >
+                    {artwork.workflow.name}
+                  </span>
+                ) : null}
                 {selectMode ? <SelectBox selected={selected} /> : null}
               </>
             }

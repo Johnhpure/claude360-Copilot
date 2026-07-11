@@ -9,6 +9,7 @@ import {
   defaultModelProviderSettings,
   defaultScheduleSettings,
   defaultWorkflowSettings,
+  defaultImageWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
   defaultClaude360Settings,
@@ -41,6 +42,7 @@ function buildSettings(): AppSettingsV1 {
     write: defaultWriteSettings(),
     schedule: defaultScheduleSettings(),
     workflow: defaultWorkflowSettings(),
+    imageWorkflow: defaultImageWorkflowSettings(),
     claw: {
       ...defaultClawSettings(),
       enabled: true,

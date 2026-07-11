@@ -22,6 +22,7 @@ import {
   defaultModelProviderSettings,
   defaultScheduleSettings,
   defaultWorkflowSettings,
+  defaultImageWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
   defaultClaude360Settings,
@@ -62,6 +63,7 @@ function createSettings(patch: Partial<AppSettingsV1['schedule']['internal']> = 
       }
     },
     workflow: defaultWorkflowSettings(),
+    imageWorkflow: defaultImageWorkflowSettings(),
     terminal: defaultTerminalSettings(),
     claude360: defaultClaude360Settings(),
     guiUpdate: {

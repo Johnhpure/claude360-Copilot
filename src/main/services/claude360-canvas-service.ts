@@ -34,7 +34,8 @@ export type Claude360CanvasApiClientPort = {
   postImagesRaw(
     path: string,
     body: unknown,
-    token: string | undefined
+    token: string | undefined,
+    options?: { timeoutMs?: number }
   ): Promise<Claude360ImagesRawEnvelope>
   postImagesMultipart(
     path: string,
@@ -422,11 +423,33 @@ export class Claude360CanvasService {
     if (input.size) body.size = input.size
     if (input.quality) body.quality = input.quality
     if (input.output_format) body.output_format = input.output_format
+    // output_compression 仅对有损格式（jpeg/webp）发送；png 无压缩语义，上游会报参数错误。
+    if (
+      typeof input.output_compression === 'number' &&
+      (input.output_format === 'jpeg' || input.output_format === 'webp')
+    ) {
+      body.output_compression = input.output_compression
+    }
+    if (input.moderation) body.moderation = input.moderation
+    if (input.response_format) body.response_format = input.response_format
+    // stream / codex_cli：随请求体透传（newapi images 通道现状忽略，见 prd C4）。
+    if (typeof input.stream === 'boolean') body.stream = input.stream
+    if (typeof input.codex_cli === 'boolean') body.codex_cli = input.codex_cli
+    // timeout_ms 为本端专用：剥离出请求体，转为该次请求的 fetch 超时。
+    const timeoutMs =
+      typeof input.timeout_ms === 'number' && Number.isFinite(input.timeout_ms) && input.timeout_ms > 0
+        ? Math.floor(input.timeout_ms)
+        : undefined
     logImageRequest('/v1/images/generations', body)
 
     let env: Claude360ImagesRawEnvelope
     try {
-      env = await this.deps.apiClient.postImagesRaw('/v1/images/generations', body, apiKey)
+      env = await this.deps.apiClient.postImagesRaw(
+        '/v1/images/generations',
+        body,
+        apiKey,
+        timeoutMs !== undefined ? { timeoutMs } : undefined
+      )
     } catch (error) {
       // 网络/传输错误：可重试。
       return { ok: false, message: `接口请求失败：${errorMessage(error)}`, retryable: true }

@@ -6,6 +6,7 @@ import {
   defaultModelProviderSettings,
   defaultScheduleSettings,
   defaultWorkflowSettings,
+  defaultImageWorkflowSettings,
   defaultWriteSettings,
   defaultTerminalSettings,
   defaultClaude360Settings,
@@ -108,6 +109,7 @@ function settingsWith(
       ...schedulePatch
     }),
     workflow: defaultWorkflowSettings(),
+    imageWorkflow: defaultImageWorkflowSettings(),
     terminal: defaultTerminalSettings(),
     claude360: defaultClaude360Settings(),
     guiUpdate: { channel: 'stable' },

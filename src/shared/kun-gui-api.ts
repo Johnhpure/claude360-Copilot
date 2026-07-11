@@ -300,6 +300,8 @@ export type Claude360ChatStreamStartPayload = {
   model: string
   system: string
   user: string
+  /** 可选文本分组覆盖（生图工作流按工作流配置选分组）；缺省走 selectedTextGroup。 */
+  group?: string
   streamId?: string
 }
 export type Claude360ChatDeltaPayload = { streamId: string; delta: string }

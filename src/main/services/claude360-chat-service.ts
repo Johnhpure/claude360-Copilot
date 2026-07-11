@@ -26,6 +26,12 @@ export type Claude360ChatStreamParams = {
   model: string
   system: string
   user: string
+  /**
+   * 可选分组覆盖：非空时优先于 settings.selectedTextGroup（生图工作流按工作流
+   * 配置选文本分组）。分组名比较/归一化由 ensureGroupKey 链路内部处理
+   * （sameClaude360Group 语义），此处只做 trim 后透传。
+   */
+  group?: string
   signal: AbortSignal
   onDelta: (delta: string) => void
 }
@@ -38,9 +44,10 @@ export class Claude360ChatService {
   }
 
   /** 取 text 分组的 Key；未登录/未选分组由 ensureGroupKey 内部抛出可展示错误。 */
-  private async resolve(): Promise<{ apiKey: string; baseUrl: string }> {
+  private async resolve(groupOverride?: string): Promise<{ apiKey: string; baseUrl: string }> {
     const settings = await this.deps.readClaude360()
-    const group = (settings.selectedTextGroup ?? '').trim() || 'auto'
+    const group =
+      (groupOverride ?? '').trim() || (settings.selectedTextGroup ?? '').trim() || 'auto'
     const apiKey = await this.deps.ensureGroupKey(group, 'text')
     const baseUrl = (settings.baseUrl ?? DEFAULT_CLAUDE360_BASE_URL).replace(/\/+$/, '')
     return { apiKey, baseUrl }
@@ -52,7 +59,7 @@ export class Claude360ChatService {
    */
   async streamChat(params: Claude360ChatStreamParams): Promise<void> {
     const { model, system, user, signal, onDelta } = params
-    const { apiKey, baseUrl } = await this.resolve()
+    const { apiKey, baseUrl } = await this.resolve(params.group)
     const fetchImpl = this.deps.fetchImpl ?? fetch
 
     let res: Response

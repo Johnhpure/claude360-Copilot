@@ -15,11 +15,13 @@ import {
   loadPersistedArtworks,
   mergeDiskRecords,
   migrateLegacyHistory,
+  reduceBeginWorkflowTask,
   reduceFailPending,
   reduceResolvePending,
   sanitizeRehydratedArtworks,
   serializeArtworksForPersist,
   type CanvasArtwork,
+  type CanvasWorkflowTaskMeta,
   type DiskImageRecord
 } from './canvas-store'
 
@@ -385,5 +387,115 @@ describe('磁盘持久化恢复（07-05）', () => {
 
     store.getState().hydrateFromDisk([diskRecord('gone', { localPath: 'assets/images/gone.png' })], '/workspace/B')
     expect(store.getState().artworks.some((artwork) => artwork.id === 'gone')).toBe(true)
+  })
+})
+
+// —— 07-11 创作工作流批量任务 ——
+
+function workflowTaskMeta(overrides: Partial<CanvasWorkflowTaskMeta> = {}): CanvasWorkflowTaskMeta {
+  return {
+    prompt: '画一只柯基',
+    model: 'gpt-image-1',
+    size: '1024x1024',
+    quality: 'auto',
+    outputFormat: 'png',
+    n: 2,
+    workflow: { id: 'wf-1', name: '小红书封面', variables: { topic: '柯基' } },
+    ...overrides
+  }
+}
+
+describe('工作流批量任务：beginWorkflowTask / resolveWorkflowTask（07-11）', () => {
+  it('beginWorkflowTask 在宫格头部插入 pending 占位并带工作流溯源，不碰单次生图槽', () => {
+    const store = createCanvasStore({ initialArtworks: [successArtwork('old')] })
+    store.getState().beginWorkflowTask('task-1', workflowTaskMeta())
+
+    const s = store.getState()
+    expect(s.artworks.map((a) => a.id)).toEqual(['task-1', 'old'])
+    expect(s.artworks[0]).toMatchObject({
+      status: 'pending',
+      prompt: '画一只柯基',
+      model: 'gpt-image-1',
+      n: 2,
+      workflow: { id: 'wf-1', name: '小红书封面', variables: { topic: '柯基' } }
+    })
+    expect(s.pendingArtworkId).toBeNull()
+    expect(s.generating).toBe(false)
+  })
+
+  it('resolveWorkflowTask 成功时原位展开为 N 张 success 并继承工作流溯源', () => {
+    const store = createCanvasStore()
+    store.getState().beginWorkflowTask('task-1', workflowTaskMeta())
+    store.getState().resolveWorkflowTask('task-1', { ok: true, images: [image('a'), image('b')] })
+
+    const s = store.getState()
+    expect(s.artworks.map((a) => a.id)).toEqual(['a', 'b'])
+    expect(s.artworks[0]).toMatchObject({ status: 'success', n: 1 })
+    expect(s.artworks[0].workflow).toEqual({ id: 'wf-1', name: '小红书封面', variables: { topic: '柯基' } })
+    expect(s.artworks[1].workflow?.id).toBe('wf-1')
+  })
+
+  it('resolveWorkflowTask 失败时占位标 failed 并保留错误与溯源', () => {
+    const store = createCanvasStore()
+    store.getState().beginWorkflowTask('task-1', workflowTaskMeta())
+    store.getState().resolveWorkflowTask('task-1', { ok: false, message: '已取消' })
+
+    const failed = store.getState().artworks[0]
+    expect(failed).toMatchObject({ id: 'task-1', status: 'failed', error: '已取消' })
+    expect(failed.workflow?.name).toBe('小红书封面')
+  })
+
+  it('多任务并行各自结算，且与单次生图 pendingArtworkId 单槽互不影响', () => {
+    const store = createCanvasStore()
+    store.getState().setPrompt('单次生图')
+    store.getState().beginGenerate()
+    const singlePendingId = store.getState().pendingArtworkId as string
+
+    store.getState().beginWorkflowTask('task-1', workflowTaskMeta())
+    store.getState().beginWorkflowTask('task-2', workflowTaskMeta({ prompt: '第二条' }))
+    store.getState().resolveWorkflowTask('task-2', { ok: false, message: '生成失败' })
+    store.getState().resolveWorkflowTask('task-1', { ok: true, images: [image('w1')] })
+
+    const s = store.getState()
+    // 单次生图占位仍在且仍是 pending
+    expect(s.pendingArtworkId).toBe(singlePendingId)
+    expect(s.artworks.find((a) => a.id === singlePendingId)?.status).toBe('pending')
+    expect(s.generating).toBe(true)
+    // 工作流任务各自结算
+    expect(s.artworks.find((a) => a.id === 'w1')?.status).toBe('success')
+    expect(s.artworks.find((a) => a.id === 'task-2')).toMatchObject({ status: 'failed', error: '生成失败' })
+    // 单次生图结果照常结算
+    store.getState().generateSuccess([image('single')])
+    expect(store.getState().artworks.find((a) => a.id === 'single')?.status).toBe('success')
+  })
+
+  it('reduceBeginWorkflowTask 纯函数：截断到 CANVAS_HISTORY_LIMIT', () => {
+    const initial = Array.from({ length: CANVAS_HISTORY_LIMIT }, (_, i) => successArtwork(`s${i}`))
+    const next = reduceBeginWorkflowTask(initial, 'task-1', workflowTaskMeta())
+    expect(next).toHaveLength(CANVAS_HISTORY_LIMIT)
+    expect(next[0].id).toBe('task-1')
+  })
+
+  it('resolveWorkflowTask 成功可携带 localArtifacts 回写本地路径', () => {
+    const store = createCanvasStore()
+    store.getState().beginWorkflowTask('task-1', workflowTaskMeta())
+    store.getState().resolveWorkflowTask('task-1', {
+      ok: true,
+      images: [image('a')],
+      localArtifacts: { a: 'assets/images/a.png' }
+    })
+    expect(store.getState().artworks[0].localPath).toBe('assets/images/a.png')
+  })
+
+  it('sanitizeRehydratedArtworks 保留 workflow 溯源字段，坏 shape 丢字段不丢条目', () => {
+    const restored = sanitizeRehydratedArtworks([
+      successArtwork('with-wf', {
+        workflow: { id: 'wf-1', name: '小红书封面', variables: { topic: '柯基' } }
+      }),
+      { ...successArtwork('bad-wf'), workflow: { id: 42 } as unknown as CanvasArtwork['workflow'] }
+    ])
+    expect(restored[0].workflow).toEqual({ id: 'wf-1', name: '小红书封面', variables: { topic: '柯基' } })
+    expect(restored[1].id).toBe('bad-wf')
+    expect(restored[1].workflow).toBeUndefined()
   })
 })

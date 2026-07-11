@@ -75,7 +75,32 @@ export type CanvasArtwork = {
   fileMissing?: boolean
   /** 来自磁盘 metadata 恢复的条目（切换工作空间时按此清理，含仅剩远程回退的记录）。 */
   diskOrigin?: boolean
+  /** 07-11 image-workflow：工作流运行产物的溯源信息（success 随既有规则持久化）。 */
+  workflow?: CanvasArtworkWorkflowMeta
 }
+
+/** 工作流溯源：来源工作流 + 本次运行的输入变量快照。 */
+export type CanvasArtworkWorkflowMeta = {
+  id: string
+  name: string
+  variables: Record<string, string>
+}
+
+/** beginWorkflowTask 的占位参数快照（prompt/参数逐任务传入，不读表单）。 */
+export type CanvasWorkflowTaskMeta = {
+  prompt: string
+  model: string
+  size: string
+  quality: string
+  outputFormat: string
+  n: number
+  workflow: CanvasArtworkWorkflowMeta
+}
+
+/** resolveWorkflowTask 的终态结果（成功可携带落盘产物映射）。 */
+export type CanvasWorkflowTaskResult =
+  | { ok: true; images: Claude360CanvasImage[]; localArtifacts?: Record<string, string> }
+  | { ok: false; message: string }
 
 export interface CanvasState {
   // 表单参数
@@ -120,6 +145,9 @@ export interface CanvasState {
   beginEdit: () => void
   editSuccess: (images: Claude360CanvasImage[], localArtifacts?: Record<string, string>) => void
   editFailure: (message: string) => void
+  // actions —— 07-11 工作流批量任务（多占位，与单次生图的 pendingArtworkId 单槽互不影响）
+  beginWorkflowTask: (taskId: string, meta: CanvasWorkflowTaskMeta) => void
+  resolveWorkflowTask: (taskId: string, result: CanvasWorkflowTaskResult) => void
   // actions —— 作品管理
   removeArtwork: (id: string) => void
   removeSelected: () => void
@@ -227,6 +255,30 @@ export function reduceFailPending(
   )
 }
 
+/**
+ * 07-11 工作流任务占位：按传入 taskId 与参数快照在宫格头部插入 pending 条目。
+ * 与 beginGenerate 的单槽 pendingArtworkId 无关（多任务并行各自持 id）。
+ */
+export function reduceBeginWorkflowTask(
+  artworks: CanvasArtwork[],
+  taskId: string,
+  meta: CanvasWorkflowTaskMeta
+): CanvasArtwork[] {
+  const pending: CanvasArtwork = {
+    id: taskId,
+    status: 'pending',
+    prompt: meta.prompt,
+    model: meta.model,
+    size: meta.size,
+    quality: meta.quality,
+    outputFormat: meta.outputFormat,
+    n: meta.n,
+    createdAt: new Date().toISOString(),
+    workflow: meta.workflow
+  }
+  return [pending, ...artworks].slice(0, CANVAS_HISTORY_LIMIT)
+}
+
 /** 按状态筛选作品（'all' 原样返回）。 */
 export function filterArtworks(
   artworks: CanvasArtwork[],
@@ -244,6 +296,20 @@ function isUsableImage(image: unknown): image is Claude360CanvasImage {
   return Boolean(img.url) || Boolean(img.b64Json)
 }
 
+/** 恢复持久化条目里的工作流溯源（shape 校验，坏数据丢弃该字段不丢条目）。 */
+function sanitizeWorkflowMeta(value: unknown): CanvasArtworkWorkflowMeta | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const meta = value as Partial<CanvasArtworkWorkflowMeta>
+  if (typeof meta.id !== 'string' || typeof meta.name !== 'string') return undefined
+  const variables: Record<string, string> = {}
+  if (meta.variables && typeof meta.variables === 'object' && !Array.isArray(meta.variables)) {
+    for (const [key, val] of Object.entries(meta.variables)) {
+      if (typeof val === 'string') variables[key] = val
+    }
+  }
+  return { id: meta.id, name: meta.name, variables }
+}
+
 /** 从持久化恢复时过滤坏条目：保留带可用图片、或有本地文件路径的 success 作品。 */
 export function sanitizeRehydratedArtworks(artworks: unknown): CanvasArtwork[] {
   if (!Array.isArray(artworks)) return []
@@ -254,6 +320,7 @@ export function sanitizeRehydratedArtworks(artworks: unknown): CanvasArtwork[] {
     if (typeof artwork.id !== 'string' || artwork.status !== 'success') continue
     const hasLocalPath = typeof artwork.localPath === 'string' && artwork.localPath.length > 0
     if (!isUsableImage(artwork.image) && !hasLocalPath) continue
+    const workflowMeta = sanitizeWorkflowMeta(artwork.workflow)
     usable.push({
       id: artwork.id,
       status: 'success',
@@ -265,7 +332,8 @@ export function sanitizeRehydratedArtworks(artworks: unknown): CanvasArtwork[] {
       outputFormat: typeof artwork.outputFormat === 'string' ? artwork.outputFormat : '',
       n: 1,
       createdAt: typeof artwork.createdAt === 'string' ? artwork.createdAt : '',
-      ...(hasLocalPath ? { localPath: artwork.localPath } : {})
+      ...(hasLocalPath ? { localPath: artwork.localPath } : {}),
+      ...(workflowMeta ? { workflow: workflowMeta } : {})
     })
   }
   return usable.slice(0, CANVAS_HISTORY_LIMIT)
@@ -520,6 +588,15 @@ export function createCanvasStore(
         editing: false,
         pendingArtworkId: null,
         artworks: reduceFailPending(s.artworks, s.pendingArtworkId, message)
+      })),
+    // 07-11 工作流批量任务：多占位按 taskId 各自结算，不碰 generating/pendingArtworkId。
+    beginWorkflowTask: (taskId, meta) =>
+      set((s) => ({ artworks: reduceBeginWorkflowTask(s.artworks, taskId, meta) })),
+    resolveWorkflowTask: (taskId, result) =>
+      set((s) => ({
+        artworks: result.ok
+          ? reduceResolvePending(s.artworks, taskId, result.images, result.localArtifacts)
+          : reduceFailPending(s.artworks, taskId, result.message)
       })),
     removeArtwork: (id) =>
       set((s) => {

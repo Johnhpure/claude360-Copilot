@@ -147,15 +147,21 @@ export class Claude360ApiClient {
   /**
    * Images JSON raw POST（/v1/images/generations）：返回上游原始 body。
    * 与 postSunoRaw 一致，不做 `{success}` 解包；错误由调用方按 body 归一化。
+   * options.timeoutMs 可按请求覆盖默认 imagesTimeoutMs（工作流的超时配置在此生效）。
    */
   async postImagesRaw(
     path: string,
     body: unknown,
-    token: string | undefined
+    token: string | undefined,
+    options?: { timeoutMs?: number }
   ): Promise<Claude360ImagesRawEnvelope> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (token) headers.Authorization = `Bearer ${token}`
-    return this.imagesRequest(path, { method: 'POST', headers, body: JSON.stringify(body ?? {}) })
+    return this.imagesRequest(
+      path,
+      { method: 'POST', headers, body: JSON.stringify(body ?? {}) },
+      options?.timeoutMs
+    )
   }
 
   /**
@@ -174,10 +180,12 @@ export class Claude360ApiClient {
 
   private async imagesRequest(
     path: string,
-    init: RequestInit
+    init: RequestInit,
+    timeoutMs?: number
   ): Promise<Claude360ImagesRawEnvelope> {
-    // 生图上游耗时远超普通接口（实测 671s），用独立的更长超时。
-    const response = await this.fetchWithTimeout(`${this.baseUrl}${path}`, init, this.imagesTimeoutMs)
+    // 生图上游耗时远超普通接口（实测 671s），用独立的更长超时；调用方可按请求覆盖。
+    const effectiveTimeoutMs = timeoutMs && timeoutMs > 0 ? timeoutMs : this.imagesTimeoutMs
+    const response = await this.fetchWithTimeout(`${this.baseUrl}${path}`, init, effectiveTimeoutMs)
     if (process.env.NODE_ENV !== 'test') {
       // 排查生图误判失败用：真实 HTTP status / content-type（body 由 canvas service 打印）。
       console.info(

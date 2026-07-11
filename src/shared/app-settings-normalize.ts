@@ -37,6 +37,7 @@ import { normalizeDeepseekBaseUrl } from './app-settings-normalizers'
 import { normalizeClawSettings } from './app-settings-claw'
 import { normalizeScheduleSettings } from './app-settings-schedule'
 import { normalizeWorkflowSettings } from './app-settings-workflow'
+import { normalizeImageWorkflowSettings } from './app-settings-image-workflow'
 import { normalizeWriteSettings } from './app-settings-write'
 import { normalizeTerminalSettings, type TerminalSettingsPatchV1 } from './app-settings-terminal'
 import { normalizeClaude360Settings, type Claude360SettingsPatchV1 } from './app-settings-claude360'
@@ -111,6 +112,7 @@ export function normalizeAppSettings(settings: AppSettingsV1): AppSettingsV1 {
     claw: normalizeClawSettings(maybeSettings.claw),
     schedule: normalizeScheduleSettings(maybeSettings.schedule),
     workflow: normalizeWorkflowSettings(maybeSettings.workflow),
+    imageWorkflow: normalizeImageWorkflowSettings(maybeSettings.imageWorkflow),
     terminal: normalizeTerminalSettings(maybeSettings.terminal),
     claude360: normalizeClaude360Settings(maybeSettings.claude360),
     guiUpdate: {
