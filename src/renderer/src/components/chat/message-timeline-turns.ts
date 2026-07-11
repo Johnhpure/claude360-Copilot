@@ -46,12 +46,34 @@ export function sameTurnContent(left: Turn, right: Turn): boolean {
   return true
 }
 
+/**
+ * Matches every `<think>`/`<thinking>` segment (case-insensitive), tolerating a
+ * missing close tag mid-stream. Providers are inconsistent about which tag
+ * name they emit, so both must be treated as internal reasoning protocol.
+ */
+const THINK_SEGMENT_RE = /<think(?:ing)?>([\s\S]*?)(?:<\/think(?:ing)?>|$)/gi
+
+/**
+ * A trailing, half-streamed `<thinking>` / `</thinking>` tag prefix (e.g.
+ * `<thinki`). Stripped from visible content so raw tag characters never
+ * flicker through the typewriter while a chunk boundary splits the tag.
+ */
+const PARTIAL_THINK_TAG_RE = /<\/?(?:t(?:h(?:i(?:n(?:k(?:i(?:n(?:g)?)?)?)?)?)?)?)?$/i
+
 export function splitThink(text: string): { think: string; content: string } {
-  const match = text.match(/<think>([\s\S]*?)(?:<\/think>|$)/)
-  if (!match) return { think: '', content: text }
+  const thinkParts: string[] = []
+  const content = text.replace(THINK_SEGMENT_RE, (_segment, inner: string) => {
+    // A half-streamed close tag (`</thinkin`) falls inside `inner` until the
+    // next chunk completes it; strip it so reasoning text never shows raw tags.
+    const trimmed = inner.replace(PARTIAL_THINK_TAG_RE, '').trim()
+    // Empty <thinking></thinking> pairs carry no reasoning; drop them so the
+    // UI never renders blank reasoning sections or repeats them per tag.
+    if (trimmed) thinkParts.push(trimmed)
+    return ''
+  })
   return {
-    think: match[1].trim(),
-    content: text.replace(/<think>[\s\S]*?(?:<\/think>|$)/, '').trim()
+    think: thinkParts.join('\n\n'),
+    content: content.replace(PARTIAL_THINK_TAG_RE, '').trim()
   }
 }
 
