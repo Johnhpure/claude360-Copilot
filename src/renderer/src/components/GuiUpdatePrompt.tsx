@@ -225,7 +225,7 @@ export function GuiUpdatePromptPanel({
   const installing = state.status === 'installing'
   const percent = state.status === 'downloading' ? formatPercent(state.progress.percent) : 0
   const busy = downloading || installing
-  const notes = info.releaseNotes?.trim() || t('guiUpdatePromptReleaseNotesFallback')
+  const notes = parseReleaseNoteBlocks(info.releaseNotes, t('guiUpdatePromptReleaseNotesFallback'))
   const statusText = downloading
     ? t('guiUpdatePromptDownloading', { percent })
     : downloaded
@@ -273,7 +273,7 @@ export function GuiUpdatePromptPanel({
         ) : null}
 
         <div className="mt-4 max-h-48 overflow-y-auto rounded-[var(--radius-md)] border border-ds-border-muted bg-ds-card px-3 py-2.5 text-[13px] leading-5 text-ds-muted">
-          <div className="whitespace-pre-wrap break-words">{notes}</div>
+          <ReleaseNotesContent blocks={notes} />
         </div>
 
         {error ? (

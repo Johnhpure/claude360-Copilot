@@ -108,6 +108,84 @@ describe('GuiUpdatePromptPanel', () => {
     expect(html).not.toContain('guiUpdatePromptLater')
   })
 
+  it('renders available update html release notes without exposing html tags', () => {
+    const html = renderToStaticMarkup(
+      createElement(GuiUpdatePromptPanel, {
+        state: {
+          ...availableState,
+          info: {
+            ...availableState.info,
+            releaseNotes:
+              '<p>速度&nbsp;&amp;&nbsp;稳定性优化</p><ul><li>修复更新弹窗排版</li><li>优化下载进度显示</li></ul>'
+          }
+        },
+        error: null,
+        onDownload: vi.fn(),
+        onInstall: vi.fn(),
+        onLater: vi.fn(),
+        t
+      })
+    )
+
+    expect(html).toContain('速度 &amp; 稳定性优化')
+    expect(html).toContain('修复更新弹窗排版')
+    expect(html).toContain('优化下载进度显示')
+    expect(html).toContain('max-h-48')
+    expect(html).toContain('overflow-y-auto')
+    expect(html).not.toContain('nbsp')
+    expect(html).not.toContain('&lt;p&gt;')
+    expect(html).not.toContain('&lt;ul&gt;')
+    expect(html).not.toContain('&lt;li&gt;')
+    expect(html).not.toContain('&lt;/p&gt;')
+    expect(html).not.toContain('<p>')
+    expect(html).not.toContain('<ul>')
+    expect(html).not.toContain('<li>')
+  })
+
+  it('renders the fallback text when the available update has no release notes', () => {
+    for (const releaseNotes of [undefined, '   ']) {
+      const html = renderToStaticMarkup(
+        createElement(GuiUpdatePromptPanel, {
+          state: {
+            ...availableState,
+            info: { ...availableState.info, releaseNotes }
+          },
+          error: null,
+          onDownload: vi.fn(),
+          onInstall: vi.fn(),
+          onLater: vi.fn(),
+          t
+        })
+      )
+
+      expect(html).toContain('guiUpdatePromptReleaseNotesFallback')
+    }
+  })
+
+  it('renders markdown style release notes as paragraphs and list items', () => {
+    const html = renderToStaticMarkup(
+      createElement(GuiUpdatePromptPanel, {
+        state: {
+          ...availableState,
+          info: {
+            ...availableState.info,
+            releaseNotes: '本次更新重点：\n\n- 修复启动崩溃\n- 提升同步速度'
+          }
+        },
+        error: null,
+        onDownload: vi.fn(),
+        onInstall: vi.fn(),
+        onLater: vi.fn(),
+        t
+      })
+    )
+
+    expect(html).toContain('本次更新重点：')
+    expect(html).toContain('修复启动崩溃')
+    expect(html).toContain('提升同步速度')
+    expect(html).not.toContain('- 修复启动崩溃')
+  })
+
   it('renders completed update release notes without exposing html tags', () => {
     const html = renderToStaticMarkup(
       createElement(GuiUpdatePromptPanel, {
