@@ -27,8 +27,10 @@ import {
 import { FeatureSwitcher } from '../shell/FeatureSwitcher'
 import { isPrimaryRouteVisible } from '../../lib/feature-visibility'
 import { SidebarFooterNav } from '../sidebar/SidebarFooterNav'
+import { SidebarContextActions } from '../sidebar/SidebarContextActions'
+import { SidebarThemeToggle } from '../sidebar/SidebarThemeToggle'
 import {
-  SidebarCommandRow,
+  SidebarDivider,
   SidebarFrame,
   SidebarIconButton,
   SidebarSectionHeader,
@@ -40,12 +42,16 @@ type Props = {
   activeView: 'chat' | 'write' | 'claw' | 'schedule'
   onCodeOpen: () => void
   onWriteOpen: () => void
-  /** 打开生图工作台。四个功能入口（Code/写作/生图/音乐）在所有页面固定显示。 */
+  /** 打开生图工作台。五个一级功能入口（Code/写作/生图/音乐/对话）在所有页面固定显示。 */
   onOpenCanvas: () => void
   /** 打开音乐工作台。 */
   onOpenMusic: () => void
+  /** 打开「对话」一级视图（Workbench：回 chat route + 置 conversationView）。 */
+  onOpenConversation: () => void
   onOpenMy: () => void
   onOpenSettings: (section?: SettingsRouteSection) => void
+  /** 深色/明亮切换（footer 主题 accessory，07-11 与 chat 侧栏对齐）。 */
+  onToggleTheme: () => void
 }
 
 type EntryDialog =
@@ -62,8 +68,10 @@ export function WriteSidebar({
   onWriteOpen,
   onOpenCanvas,
   onOpenMusic,
+  onOpenConversation,
   onOpenMy,
-  onOpenSettings
+  onOpenSettings,
+  onToggleTheme
 }: Props): ReactElement {
   const { t } = useTranslation('common')
   const ensureWriteThreadForWorkspace = useChatStore((s) => s.ensureWriteThreadForWorkspace)
@@ -261,12 +269,13 @@ export function WriteSidebar({
         <SidebarFooterNav
           onOpenMy={onOpenMy}
           onOpenSettings={() => onOpenSettings('write')}
+          settingsAccessory={<SidebarThemeToggle onToggleTheme={onToggleTheme} />}
         />
       }
     >
       <div className="ds-no-drag flex flex-col px-0.5">
-        {/* 四工作台切换唯一入口（阶段2 统一为 FeatureSwitcher，与 chat 侧栏同源）。
-            四个功能入口在所有页面固定显示，写作页也不例外。 */}
+        {/* 区2 一级功能入口（Code/写作/生图/音乐/对话，与 chat 侧栏同源）。
+            写作侧栏只在 write 路由挂载，active 恒非 conversation。 */}
         <FeatureSwitcher
           active={activeView === 'write' ? 'write' : activeView === 'chat' ? 'chat' : null}
           visible={{
@@ -277,23 +286,31 @@ export function WriteSidebar({
             if (feature === 'chat') onCodeOpen()
             else if (feature === 'write') onWriteOpen()
             else if (feature === 'canvas') onOpenCanvas()
-            else onOpenMusic()
+            else if (feature === 'music') onOpenMusic()
+            else onOpenConversation()
           }}
         />
-        <SidebarCommandRow
-          icon={<FilePlus2 className="h-4 w-4" strokeWidth={1.9} />}
-          label={t('writeCreateFile')}
-          onClick={() => void openCreateFileDialog()}
-          variant="accent"
-        />
-        <SidebarCommandRow
-          icon={<FolderOpen className="h-4 w-4" strokeWidth={1.75} />}
-          label={t('writeAddWorkspace')}
-          onClick={() => void pickWriteWorkspace()}
+        {/* 区3 当前操作：新建写作(accent) + 添加写作空间，
+            经 SidebarContextActions 与一级入口分隔隔离（07-11 重排）。 */}
+        <SidebarContextActions
+          actions={[
+            {
+              icon: <FilePlus2 className="h-4 w-4" strokeWidth={1.9} />,
+              label: t('writeCreateFile'),
+              onClick: () => void openCreateFileDialog(),
+              accent: true
+            },
+            {
+              icon: <FolderOpen className="h-4 w-4" strokeWidth={1.75} />,
+              label: t('writeAddWorkspace'),
+              onClick: () => void pickWriteWorkspace()
+            }
+          ]}
         />
       </div>
 
-      <div className="ds-no-drag mx-1.5 my-3" />
+      {/* 区3/区4 分隔（原空 div 占位升级为分隔线，与 chat 侧栏一致）。 */}
+      <SidebarDivider className="my-1" />
 
       <div className="ds-no-drag flex min-h-0 flex-1 flex-col">
         <SidebarSectionHeader

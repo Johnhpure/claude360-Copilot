@@ -539,6 +539,10 @@ export function Workbench(): ReactElement {
   const [attachmentUploadBusy, setAttachmentUploadBusy] = useState(false)
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null)
   const [connectPhoneSidebarOpen, setConnectPhoneSidebarOpen] = useState(false)
+  /* 「对话」一级视图 UI 态（07-11 侧栏信息架构重构 design D1）：
+     对话线程与 Code 会话共享 chat route 与 openThread/startNewConversation 链路，
+     故不新增 AppRoute，仅用本地布尔切换侧栏显示形态。 */
+  const [conversationView, setConversationView] = useState(false)
   const [fileTreeSidePanelOpen, setFileTreeSidePanelOpen] = useState(false)
   const [openFilePreviewTargets, setOpenFilePreviewTargets] = useState<WorkspaceFileTarget[]>([])
   const [runtimeLogPath, setRuntimeLogPath] = useState('')
@@ -2245,6 +2249,7 @@ export function Workbench(): ReactElement {
   const startNewChat = (): void => {
     if (activeSddDraft) dismissActiveSddDraft({ closeAssistant: true })
     setConnectPhoneSidebarOpen(false)
+    setConversationView(false)
     setRoute('chat')
     void createThread({ useWorktreePool, worktreeBranch })
     if (useWorktreePool) setUseWorktreePool(false)
@@ -2253,6 +2258,7 @@ export function Workbench(): ReactElement {
   const startNewChatInWorkspace = (workspaceRoot: string): void => {
     if (activeSddDraft) dismissActiveSddDraft({ closeAssistant: true })
     setConnectPhoneSidebarOpen(false)
+    setConversationView(false)
     setRoute('chat')
     void createThread({ workspaceRoot, useWorktreePool, worktreeBranch })
     if (useWorktreePool) setUseWorktreePool(false)
@@ -2261,18 +2267,42 @@ export function Workbench(): ReactElement {
   const startNewConversation = (): void => {
     if (activeSddDraft) dismissActiveSddDraft({ closeAssistant: true })
     setConnectPhoneSidebarOpen(false)
+    // 新建对话必然处于/进入对话视图（4.4：新建后线程被选中、列表出现新项，行为不变）。
+    setConversationView(true)
     setRoute('chat')
     void createConversation()
   }
 
   const openCodeMode = (): void => {
     setConnectPhoneSidebarOpen(false)
+    setConversationView(false)
     void openCode()
   }
 
   const openWriteMode = (): void => {
     setConnectPhoneSidebarOpen(false)
+    setConversationView(false)
     void openWrite()
+  }
+
+  /* 「对话」一级入口（07-11 design D1）：route≠chat 时先回 chat route（openCode
+     业务链路复用），再置 conversationView。注意顺序——openCodeMode 内会清标记。 */
+  const openConversationView = (): void => {
+    if (route !== 'chat') openCodeMode()
+    else setConnectPhoneSidebarOpen(false)
+    setConversationView(true)
+  }
+
+  /* 生图/音乐入口：进入工作台初始新建态（design D4——两工作台无现成
+     「新建任务」action，music 表单为组件本地 state，禁止为此新增业务 action）。 */
+  const openCanvasView = (): void => {
+    setConversationView(false)
+    setRoute('canvas')
+  }
+
+  const openMusicView = (): void => {
+    setConversationView(false)
+    setRoute('music')
   }
 
   const openPluginsView = (): void => {
@@ -2306,6 +2336,9 @@ export function Workbench(): ReactElement {
       : route === 'write'
         ? 'write'
         : 'chat'
+
+  /* 「对话」一级视图激活态：寄生于 chat route（离开 chat 即失活，回来自动恢复）。 */
+  const conversationActive = route === 'chat' && conversationView
 
   const closeRightPanel = (): void => {
     if (route === 'write') {
@@ -2598,10 +2631,12 @@ export function Workbench(): ReactElement {
                 activeView="write"
                 onCodeOpen={openCodeMode}
                 onWriteOpen={openWriteMode}
-                onOpenCanvas={() => setRoute('canvas')}
-                onOpenMusic={() => setRoute('music')}
+                onOpenCanvas={openCanvasView}
+                onOpenMusic={openMusicView}
+                onOpenConversation={openConversationView}
                 onOpenMy={() => setRoute('my')}
                 onOpenSettings={(section) => openSettings(section)}
+                onToggleTheme={toggleTheme}
               />
             </Suspense>
           ) : (
@@ -2629,10 +2664,12 @@ export function Workbench(): ReactElement {
               onOpenPlugins={openPluginsView}
               onOpenMy={() => setRoute('my')}
               myActive={route === 'my'}
-              onOpenCanvas={() => setRoute('canvas')}
-              onOpenMusic={() => setRoute('music')}
+              onOpenCanvas={openCanvasView}
+              onOpenMusic={openMusicView}
               canvasActive={route === 'canvas'}
               musicActive={route === 'music'}
+              conversationActive={conversationActive}
+              onOpenConversation={openConversationView}
               onToggleTheme={toggleTheme}
               onToggleConnectPhone={toggleConnectPhone}
               onCodeOpen={openCodeMode}

@@ -20,6 +20,11 @@ type Props = {
   activeThreadId: string | null
   runtimeReady: boolean
   conversationRoot: string
+  /**
+   * fill 模式（07-11 对话一级视图）：区块占满侧栏剩余高度，列表由
+   * max-h-[40vh] 区块态改为 flex-1 撑满。默认 false 保持原区块形态。
+   */
+  fill?: boolean
   onNewConversation: () => void
   onSelectThread: (threadId: string) => void
   onRenameThread: (threadId: string, title: string) => Promise<void>
@@ -37,6 +42,7 @@ export function SidebarConversationsSection({
   activeThreadId,
   runtimeReady,
   conversationRoot,
+  fill = false,
   onNewConversation,
   onSelectThread,
   onRenameThread,
@@ -114,7 +120,7 @@ export function SidebarConversationsSection({
   const noOp = (): void => {}
 
   return (
-    <div className="ds-no-drag flex shrink-0 flex-col">
+    <div className={fill ? 'ds-no-drag flex min-h-0 flex-1 flex-col' : 'ds-no-drag flex shrink-0 flex-col'}>
       <div className="flex min-h-[34px] items-center justify-between px-2 pb-1 pt-2">
         <button
           type="button"
@@ -164,7 +170,13 @@ export function SidebarConversationsSection({
       ) : null}
 
       {!collapsed ? (
-        <div className="max-h-[40vh] min-h-0 shrink-0 overflow-y-auto px-1 pb-2 pt-0.5">
+        <div
+          className={
+            fill
+              ? 'min-h-0 flex-1 overflow-y-auto px-1 pb-2 pt-0.5'
+              : 'max-h-[40vh] min-h-0 shrink-0 overflow-y-auto px-1 pb-2 pt-0.5'
+          }
+        >
           {conversationThreads.length === 0 ? (
             <button
               type="button"

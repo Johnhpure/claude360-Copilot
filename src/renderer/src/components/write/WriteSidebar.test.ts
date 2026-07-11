@@ -72,27 +72,37 @@ function renderWriteSidebar(): string {
       onWriteOpen: vi.fn(),
       onOpenCanvas: vi.fn(),
       onOpenMusic: vi.fn(),
+      onOpenConversation: vi.fn(),
       onOpenMy: vi.fn(),
-      onOpenSettings: vi.fn()
+      onOpenSettings: vi.fn(),
+      onToggleTheme: vi.fn()
     })
   )
 }
 
 describe('WriteSidebar 功能入口', () => {
-  it('写作页仍渲染生图(canvas)/音乐(music)入口，与 Code/写作并列', () => {
+  it('写作页仍渲染生图(canvas)/音乐(music)/对话(conversation)入口，与 Code/写作并列', () => {
     const html = renderWriteSidebar()
     expect(html).toContain('data-testid="feature-switcher"')
-    // 四个 role="tab" 按钮：Code/写作 + 生图/音乐（防 aria-label 里的同名词误绿）
-    expect(html.match(/role="tab"/g)?.length).toBe(4)
+    // 五个 role="tab" 按钮：Code/写作 + 生图/音乐/对话（防 aria-label 里的同名词误绿）
+    expect(html.match(/role="tab"/g)?.length).toBe(5)
     expect(html).toContain('>canvas</span>')
     expect(html).toContain('>music</span>')
+    expect(html).toContain('>conversation</span>')
   })
 
-  it('写作路由下仅写作 tab 选中，生图/音乐恒非选中', () => {
+  it('写作路由下仅写作 tab 选中，生图/音乐/对话恒非选中', () => {
     const html = renderWriteSidebar()
     // activeView='write' → 只有写作 tab aria-selected="true"。
     expect(html.match(/aria-selected="true"/g)?.length).toBe(1)
-    expect(html.match(/aria-selected="false"/g)?.length).toBe(3)
+    expect(html.match(/aria-selected="false"/g)?.length).toBe(4)
+  })
+
+  it('区3 当前操作：新建写作/添加写作空间移入 SidebarContextActions（带小标题）', () => {
+    const html = renderWriteSidebar()
+    expect(html).toContain('currentActions')
+    expect(html).toContain('writeCreateFile')
+    expect(html).toContain('writeAddWorkspace')
   })
 
   it('底部统一显示我的和设置，不再显示连接手机入口', () => {
@@ -101,5 +111,10 @@ describe('WriteSidebar 功能入口', () => {
     expect(html).toContain('settings')
     expect(html).not.toContain('claw')
     expect(html).not.toContain('connect-phone-panel')
+  })
+
+  it('底部渲染主题切换 accessory（07-11 与 chat 侧栏对齐）', () => {
+    const html = renderWriteSidebar()
+    expect(html).toContain('toggleTheme')
   })
 })

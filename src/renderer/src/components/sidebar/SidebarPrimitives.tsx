@@ -49,11 +49,10 @@ export function SidebarFrame({
   className
 }: SidebarFrameProps): ReactElement {
   return (
-    /* data-theme="dark"：侧栏永久深色磨砂（产品级导航基调）。Tailwind darkMode
-       与 [data-theme='dark'] token 块均为属性选择器，子树内所有 ds-* token /
-       dark: 类自动取暗色值，明亮模式下主画布不受影响。 */
+    /* 侧栏跟随全局主题：明亮 OneUI 浅色 / 深色蓝黑磨砂（07-12 推翻永久深色契约）。
+       样式全部来自 --ds-sidebar-* 双值 token（base-shell.css :root / [data-theme='dark']），
+       禁止在此子树重新挂 data-theme 写入点。 */
     <aside
-      data-theme="dark"
       className={cx(
         'ds-drag ds-sidebar-shell relative flex h-full w-full shrink-0 flex-col overflow-hidden px-4 pb-3',
         className
@@ -168,6 +167,19 @@ export function SidebarCommandRow({
       {trailing ?? null}
       {showChevron ? <ChevronRight className="h-3.5 w-3.5 text-ds-faint" strokeWidth={1.8} /> : null}
     </button>
+  )
+}
+
+/**
+ * 侧栏区块分隔线（07-11 信息架构重构）：一级功能入口 / 当前操作 / 工作区内容
+ * 各层级之间的视觉隔离，统一引用 --ds-sidebar-divider token。
+ */
+export function SidebarDivider({ className }: { className?: string }): ReactElement {
+  return (
+    <div
+      aria-hidden
+      className={cx('ds-no-drag mx-2.5 border-t border-[var(--ds-sidebar-divider)]', className)}
+    />
   )
 }
 

@@ -83,6 +83,8 @@ function renderSidebar(overrides?: Partial<Parameters<typeof Sidebar>[0]>): stri
       onOpenMusic: vi.fn(),
       canvasActive: false,
       musicActive: false,
+      conversationActive: false,
+      onOpenConversation: vi.fn(),
       onToggleTheme: vi.fn(),
       onToggleConnectPhone: vi.fn(),
       onCodeOpen: vi.fn(),
@@ -131,5 +133,54 @@ describe('Sidebar 第一阶段入口可见性(plan-04 Task5)', () => {
     const html = renderSidebar()
     expect(html).not.toContain('ds-sidebar-mascot')
     expect(html).not.toContain('SidebarMascot')
+  })
+})
+
+describe('Sidebar 信息架构分区(07-11 重构)', () => {
+  it('Code 视图:区3 渲染新建会话/新建需求,区4 仅项目区块(对话区块已上移为一级视图)', () => {
+    const html = renderSidebar()
+    expect(html).toContain('currentActions')
+    expect(html).toContain('newAgent')
+    expect(html).toContain('sddNewRequirement')
+    expect(html).toContain('projects-section')
+    expect(html).not.toContain('conversations-section')
+  })
+
+  it('一级入口含第 5 项「对话」,Code 视图下选中态单值互斥', () => {
+    const html = renderSidebar()
+    expect(html).toContain('>conversation</span>')
+    expect(html.match(/role="tab"/g)?.length).toBe(5)
+    expect(html.match(/aria-selected="true"/g)?.length).toBe(1)
+  })
+
+  it('对话视图:区3 渲染新建对话,区4 仅对话区块(项目区块不渲染)', () => {
+    const html = renderSidebar({ conversationActive: true })
+    expect(html).toContain('newConversation')
+    expect(html).not.toContain('newAgent')
+    expect(html).toContain('conversations-section')
+    expect(html).not.toContain('projects-section')
+  })
+
+  it('生图页:区3 仅新建生图任务,区4 不渲染项目/对话区块', () => {
+    const html = renderSidebar({ canvasActive: true })
+    expect(html).toContain('newCanvasTask')
+    expect(html).not.toContain('newAgent')
+    expect(html).not.toContain('projects-section')
+    expect(html).not.toContain('conversations-section')
+  })
+
+  it('音乐页:区3 仅新建音乐任务,区4 不渲染项目/对话区块', () => {
+    const html = renderSidebar({ musicActive: true })
+    expect(html).toContain('newMusicTask')
+    expect(html).not.toContain('newAgent')
+    expect(html).not.toContain('projects-section')
+    expect(html).not.toContain('conversations-section')
+  })
+
+  it('claw 视图:无区3 当前操作,内容为 Claw 面板(现状保持)', () => {
+    const html = renderSidebar({ activeView: 'claw' })
+    expect(html).not.toContain('currentActions')
+    expect(html).not.toContain('newAgent')
+    expect(html).toContain('claw-content')
   })
 })

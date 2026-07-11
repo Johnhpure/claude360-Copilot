@@ -1,13 +1,14 @@
 import type { ReactElement } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Clock3,
   FileQuestion,
+  ImagePlus,
   LayoutGrid,
-  Moon,
+  ListMusic,
+  MessageCirclePlus,
   Plus,
-  Sun,
   Workflow
 } from 'lucide-react'
 import type { NormalizedThread } from '../../agent/types'
@@ -25,12 +26,17 @@ import { ClawAddImDialog } from './SidebarClawDialog'
 import { ConnectPhoneSidebarPanel } from './ConnectPhoneView'
 import { SidebarProjectsSection } from './SidebarProjectsSection'
 import { SidebarConversationsSection } from './SidebarConversationsSection'
-import { FeatureSwitcher } from '../shell/FeatureSwitcher'
+import { FeatureSwitcher, type Feature } from '../shell/FeatureSwitcher'
 import {
   SidebarCommandRow,
-  SidebarFrame,
-  SidebarIconButton
+  SidebarDivider,
+  SidebarFrame
 } from '../sidebar/SidebarPrimitives'
+import {
+  SidebarContextActions,
+  type SidebarContextAction
+} from '../sidebar/SidebarContextActions'
+import { SidebarThemeToggle } from '../sidebar/SidebarThemeToggle'
 import { SidebarFooterNav } from '../sidebar/SidebarFooterNav'
 
 type Props = {
@@ -61,6 +67,10 @@ type Props = {
   onOpenMusic: () => void
   canvasActive: boolean
   musicActive: boolean
+  /** 「对话」一级视图激活态（route==='chat' 且 Workbench 本地 conversationView）。 */
+  conversationActive: boolean
+  /** 打开「对话」一级视图（回 chat route + 置 conversationView）。 */
+  onOpenConversation: () => void
   onToggleTheme: () => void
   onToggleConnectPhone: () => void
   onCodeOpen: () => void
@@ -98,6 +108,8 @@ export function Sidebar({
   onOpenMusic,
   canvasActive,
   musicActive,
+  conversationActive,
+  onOpenConversation,
   onToggleTheme,
   onToggleConnectPhone,
   onCodeOpen,
@@ -107,17 +119,6 @@ export function Sidebar({
   onNewConversation
 }: Props): ReactElement {
   const { t, i18n } = useTranslation('common')
-  const [isDarkMode, setIsDarkMode] = useState(
-    () => typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark'
-  )
-
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDarkMode(document.documentElement.getAttribute('data-theme') === 'dark')
-    })
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-    return () => observer.disconnect()
-  }, [])
 
   const workspaceRoot = useChatStore((s) => s.workspaceRoot)
   const conversationWorkspaceRoot = useChatStore((s) => s.conversationWorkspaceRoot)
@@ -140,6 +141,76 @@ export function Sidebar({
     [clawChannels, activeClawChannelId]
   )
 
+  /* 当前激活的一级功能（07-11 信息架构重构 design D1/D3）。
+     单值互斥优先级：canvas → music → conversation → chat/write → null；
+     canvas/music/conversation 均寄生在派生 sidebarView='chat' 之上，必须先判。
+     claw/schedule/workflow 等辅助路由落 null（一级入口不高亮）。 */
+  const activeFeature: Feature | null = canvasActive
+    ? 'canvas'
+    : musicActive
+      ? 'music'
+      : conversationActive
+        ? 'conversation'
+        : activeView === 'chat' || activeView === 'write'
+          ? activeView
+          : null
+
+  /* 区3「当前操作」显示矩阵（design §2）：按激活功能给出二级操作。
+     - Code：新建会话(accent) + 新建需求（运行时未连接时禁用）
+     - 对话：新建对话(accent)（复用 onNewConversation 既有链路）
+     - 生图/音乐：新建任务(accent)——工作台无现成「新建任务」store action
+       （music 表单是组件本地 state），按 design D4 兜底为进入工作台初始新建态。
+     - claw/schedule/workflow：无区3（现状保持）。 */
+  const contextActions: SidebarContextAction[] =
+    activeFeature === 'chat'
+      ? [
+          {
+            icon: <Plus className="h-4 w-4" strokeWidth={2} />,
+            label: t('newAgent'),
+            onClick: runtimeReady ? onNewChat : undefined,
+            disabled: !runtimeReady,
+            disabledHint: t('runtimeActionNeedsConnection'),
+            accent: true
+          },
+          {
+            icon: <FileQuestion className="h-4 w-4" strokeWidth={1.9} />,
+            label: t('sddNewRequirement'),
+            onClick: runtimeReady ? onNewRequirement : undefined,
+            disabled: !runtimeReady,
+            disabledHint: t('runtimeActionNeedsConnection')
+          }
+        ]
+      : activeFeature === 'conversation'
+        ? [
+            {
+              icon: <MessageCirclePlus className="h-4 w-4" strokeWidth={1.9} />,
+              label: t('newConversation'),
+              onClick: runtimeReady ? onNewConversation : undefined,
+              disabled: !runtimeReady,
+              disabledHint: t('runtimeActionNeedsConnection'),
+              accent: true
+            }
+          ]
+        : activeFeature === 'canvas'
+          ? [
+              {
+                icon: <ImagePlus className="h-4 w-4" strokeWidth={1.9} />,
+                label: t('newCanvasTask'),
+                onClick: onOpenCanvas,
+                accent: true
+              }
+            ]
+          : activeFeature === 'music'
+            ? [
+                {
+                  icon: <ListMusic className="h-4 w-4" strokeWidth={1.9} />,
+                  label: t('newMusicTask'),
+                  onClick: onOpenMusic,
+                  accent: true
+                }
+              ]
+            : []
+
   return (
     <>
     <SidebarFrame
@@ -149,35 +220,15 @@ export function Sidebar({
           onOpenMy={onOpenMy}
           myActive={myActive}
           onOpenSettings={() => onOpenSettings('general')}
-          settingsAccessory={
-            <SidebarIconButton
-              title={isDarkMode ? t('switchToLight') : t('switchToDark')}
-              ariaLabel={t('toggleTheme')}
-              onClick={onToggleTheme}
-            >
-              {isDarkMode ? (
-                <Sun className="h-4 w-4" strokeWidth={1.75} />
-              ) : (
-                <Moon className="h-4 w-4" strokeWidth={1.75} />
-              )}
-            </SidebarIconButton>
-          }
+          settingsAccessory={<SidebarThemeToggle onToggleTheme={onToggleTheme} />}
         />
       }
     >
       <div className="ds-no-drag flex flex-col px-1">
-        {/* 四工作台切换唯一入口（阶段2 统一为 FeatureSwitcher，token 化）。
-            active 单值互斥：canvas/music 激活时 Code 不再同时高亮（修正旧缺陷）。 */}
+        {/* 区2 一级功能入口（Code/写作/生图/音乐/对话，07-11 起五项）。
+            active 单值互斥：canvas/music/conversation 激活时 Code 不同时高亮。 */}
         <FeatureSwitcher
-          active={
-            canvasActive
-              ? 'canvas'
-              : musicActive
-                ? 'music'
-                : activeView === 'chat' || activeView === 'write'
-                  ? activeView
-                  : null
-          }
+          active={activeFeature}
           visible={{
             canvas: isPrimaryRouteVisible('canvas'),
             music: isPrimaryRouteVisible('music')
@@ -186,29 +237,15 @@ export function Sidebar({
             if (feature === 'chat') onCodeOpen()
             else if (feature === 'write') onWriteOpen()
             else if (feature === 'canvas') onOpenCanvas()
-            else onOpenMusic()
+            else if (feature === 'music') onOpenMusic()
+            else onOpenConversation()
           }}
         />
 
-        {activeView !== 'claw' && activeView !== 'schedule' && activeView !== 'workflow' ? (
-          <>
-            <SidebarCommandRow
-              icon={<Plus className="h-4 w-4" strokeWidth={2} />}
-              label={t('newAgent')}
-              onClick={runtimeReady ? onNewChat : undefined}
-              disabled={!runtimeReady}
-              disabledHint={t('runtimeActionNeedsConnection')}
-              variant="accent"
-            />
-            <SidebarCommandRow
-              icon={<FileQuestion className="h-4 w-4" strokeWidth={1.9} />}
-              label={t('sddNewRequirement')}
-              onClick={runtimeReady ? onNewRequirement : undefined}
-              disabled={!runtimeReady}
-              disabledHint={t('runtimeActionNeedsConnection')}
-            />
-          </>
-        ) : null}
+        {/* 区3 当前操作：与一级入口分隔隔离，按 activeFeature 显示矩阵渲染
+            （claw/schedule/workflow 下矩阵为空，不渲染）。 */}
+        <SidebarContextActions actions={contextActions} />
+
         {/* 隐藏≠删除:第一阶段不暴露插件/定时任务/Workflow 入口,
             但保留 onOpenPlugins/onScheduleOpen/onWorkflowOpen 等 handler 与 props。 */}
         {isPrimaryRouteVisible('plugins') ? (
@@ -294,50 +331,60 @@ export function Sidebar({
           onSearchQueryChange={onThreadSearchChange}
           t={t}
         />
+      ) : canvasActive || musicActive ? null : conversationActive ? (
+        <>
+          {/* 区4·对话视图：仅对话线程列表（fill 占满剩余高度），项目区块不渲染。
+              区块 header 原有搜索/+ 按钮保留（design D5）。 */}
+          <SidebarDivider className="mb-1" />
+          <SidebarConversationsSection
+            threads={threads}
+            activeThreadId={activeThreadId}
+            runtimeReady={runtimeReady}
+            conversationRoot={conversationWorkspaceRoot}
+            fill
+            onNewConversation={onNewConversation}
+            onSelectThread={onSelectThread}
+            onRenameThread={onRenameThread}
+            onPinThread={onPinThread}
+            onArchiveThread={onArchiveThread}
+            onDeleteThread={onDeleteThread}
+            onRestoreThread={onRestoreThread}
+            t={t}
+          />
+        </>
       ) : (
-      <>
-      <SidebarProjectsSection
-        threads={threads}
-        activeView={activeView === 'write' ? 'write' : 'chat'}
-        activeThreadId={activeThreadId}
-        runtimeReady={runtimeReady}
-        searchQuery={threadSearch}
-        showArchived={showArchivedThreads}
-        workspaceRoot={workspaceRoot}
-        workspaceRoots={codeWorkspaceRoots}
-        conversationRoot={conversationWorkspaceRoot}
-        busy={busy}
-        watchTurnCompletion={watchTurnCompletion}
-        unreadThreadIds={unreadThreadIds}
-        locale={i18n.language}
-        onPickWorkspace={() => void chooseWorkspace()}
-        onRemoveWorkspace={deleteWorkspace}
-        onCreateThreadInWorkspace={onNewChatInWorkspace}
-        onOpenRequirementDraft={onOpenRequirementDraft}
-        onSelectThread={onSelectThread}
-        onRenameThread={onRenameThread}
-        onPinThread={onPinThread}
-        onArchiveThread={onArchiveThread}
-        onDeleteThread={onDeleteThread}
-        onRestoreThread={onRestoreThread}
-        onSearchQueryChange={onThreadSearchChange}
-        t={t}
-      />
-      <SidebarConversationsSection
-        threads={threads}
-        activeThreadId={activeThreadId}
-        runtimeReady={runtimeReady}
-        conversationRoot={conversationWorkspaceRoot}
-        onNewConversation={onNewConversation}
-        onSelectThread={onSelectThread}
-        onRenameThread={onRenameThread}
-        onPinThread={onPinThread}
-        onArchiveThread={onArchiveThread}
-        onDeleteThread={onDeleteThread}
-        onRestoreThread={onRestoreThread}
-        t={t}
-      />
-      </>
+        <>
+          {/* 区4·Code 视图：仅项目区块——左下角对话区块已上移为一级「对话」视图
+              （07-11 信息架构重构，R4/R5：Code 页不再渲染 SidebarConversationsSection）。 */}
+          <SidebarDivider className="mb-1" />
+          <SidebarProjectsSection
+            threads={threads}
+            activeView={activeView === 'write' ? 'write' : 'chat'}
+            activeThreadId={activeThreadId}
+            runtimeReady={runtimeReady}
+            searchQuery={threadSearch}
+            showArchived={showArchivedThreads}
+            workspaceRoot={workspaceRoot}
+            workspaceRoots={codeWorkspaceRoots}
+            conversationRoot={conversationWorkspaceRoot}
+            busy={busy}
+            watchTurnCompletion={watchTurnCompletion}
+            unreadThreadIds={unreadThreadIds}
+            locale={i18n.language}
+            onPickWorkspace={() => void chooseWorkspace()}
+            onRemoveWorkspace={deleteWorkspace}
+            onCreateThreadInWorkspace={onNewChatInWorkspace}
+            onOpenRequirementDraft={onOpenRequirementDraft}
+            onSelectThread={onSelectThread}
+            onRenameThread={onRenameThread}
+            onPinThread={onPinThread}
+            onArchiveThread={onArchiveThread}
+            onDeleteThread={onDeleteThread}
+            onRestoreThread={onRestoreThread}
+            onSearchQueryChange={onThreadSearchChange}
+            t={t}
+          />
+        </>
       )}
 
     </SidebarFrame>

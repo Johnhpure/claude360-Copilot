@@ -1,18 +1,21 @@
 import type { ReactElement } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Code2, Image, Music, PencilLine } from 'lucide-react'
+import { Code2, Image, MessagesSquare, Music, PencilLine } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 /**
- * FeatureSwitcher —— 四工作台切换（Code / 写作 / 生图 / 音乐）唯一入口
+ * FeatureSwitcher —— 一级功能入口（Code / 写作 / 生图 / 音乐 / 对话）唯一入口
  * （父任务 design §5 Pattern 层；阶段2 统一原 WorkspaceModeTabs + canvas/music
  * 手写分段两块分裂实现，样式全面 token 化，无字面量色）。
  *
- * 布局：纵向主导航（产品级侧栏重设计——单列 4 项，图标+文字，行高 48px）；
+ * 布局：纵向主导航（产品级侧栏重设计——单列 5 项，图标+文字，行高 48px）；
  * 选中态：accent 渐变背景 + 光晕阴影 + 白色文字，高亮明显；
  * 未选中：次级文字色，hover 轻背景提亮。行为与原实现一致（role=tablist/tab + aria-selected）。
+ *
+ * 「对话」（07-11 侧栏信息架构重构）：完整功能入口，复用 chat route 下的
+ * conversation 线程链路，恒可见（不进 visible 灰度控制），排在最后。
  */
-export type Feature = 'chat' | 'write' | 'canvas' | 'music'
+export type Feature = 'chat' | 'write' | 'canvas' | 'music' | 'conversation'
 
 type FeatureSwitcherProps = {
   /** 当前激活的工作台；辅助路由（plugins/schedule/…）下传 null */
@@ -81,7 +84,7 @@ export function FeatureSwitcher({
       <div
         role="tablist"
         aria-orientation="vertical"
-        aria-label={`${t('code')} / ${t('write')} / ${t('canvas')} / ${t('music')}`}
+        aria-label={`${t('code')} / ${t('write')} / ${t('canvas')} / ${t('music')} / ${t('conversation')}`}
         className={containerClass}
       >
         <FeatureTab
@@ -108,6 +111,12 @@ export function FeatureSwitcher({
             onOpen={onOpen}
           />
         ) : null}
+        {/* 对话：完整功能入口，恒可见（不进 visible 灰度控制）。 */}
+        <FeatureTab
+          spec={{ feature: 'conversation', icon: MessagesSquare, labelKey: 'conversation' }}
+          active={active === 'conversation'}
+          onOpen={onOpen}
+        />
       </div>
     </div>
   )
