@@ -38,7 +38,7 @@ const USAGE_RANGE_DAYS: Record<UsageRangeKey, number> = {
 }
 const USAGE_RANGE_KEYS: UsageRangeKey[] = ['all', '90d', '30d', '7d']
 // Data-viz ramp (usage bars / stacked breakdown): single-hue accent gradient via
-// color-mix so both themes derive from --ds-accent (light #0b6fd8 / dark #3e91ff).
+// color-mix so both themes derive from --ds-accent (light #1272cf / dark #3e91ff).
 const MODEL_USAGE_COLORS = [
   'var(--ds-accent)',
   'color-mix(in srgb, var(--ds-accent) 72%, var(--ds-surface-subtle))',

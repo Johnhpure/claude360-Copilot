@@ -27,32 +27,33 @@
   --ease-standard-decel: cubic-bezier(0.4, 0, 0.2, 1); /* 匀减速：不确定进度扫动 */
   --ease-sonar: cubic-bezier(0.25, 0.46, 0.45, 0.94); /* 声呐扩散 */
 
-  /* Calm Blue 语义 token(亮色):蓝白底 + 纯白不透明卡 + 深一档同源蓝强调 */
-  --c360-bg: #f4f6fb;
-  --c360-bg-sidebar: #edf1f9;
+  /* Calm Blue 语义 token(亮色):柔和灰蓝底 + 纯白不透明卡 + 深一档同源蓝强调
+     (2026-07 降刺眼调优:主底/画布/侧栏加深一档灰蓝,卡片保持白,层次靠背景差) */
+  --c360-bg: #eef2f9;
+  --c360-bg-sidebar: #e8eef7;
   --c360-surface: #ffffff;
   --c360-surface-elevated: #ffffff;
   --c360-border: rgba(35, 54, 89, 0.12);
   --c360-text-primary: #1f2f4d;
   --c360-text-secondary: #54678c;
-  --c360-accent: #0b6fd8;
-  --c360-accent-hover: #0a63c2;
-  --c360-accent-soft: rgba(11, 111, 216, 0.1);
+  --c360-accent: #1272cf;
+  --c360-accent-hover: #0f65ba;
+  --c360-accent-soft: rgba(18, 114, 207, 0.1);
   --c360-success: #128a4a;
   --c360-warning: #b97a0b;
   --c360-error: #d6493f;
-  --c360-shadow-sm: 0 6px 20px rgba(20, 47, 95, 0.1);
+  --c360-shadow-sm: 0 6px 20px rgba(20, 47, 95, 0.08);
   --c360-shadow-overlay: 0 24px 64px rgba(20, 47, 95, 0.18);
   /* 主 CTA / AI 激活态专用渐变(阶段9,Stitch Celestial Horizon):cyan 仅作渐变端点,
      不得单独用于交互强调(accent 唯一蓝约束不变,暗色端点见 dark 块覆写) */
-  --ds-accent-gradient: linear-gradient(135deg, #0b6fd8 0%, #0aa9d8 100%);
+  --ds-accent-gradient: linear-gradient(135deg, #1272cf 0%, #0aa9d8 100%);
   --ds-accent-gradient-glow: 0 4px 14px rgba(10, 169, 216, 0.24);
 
   /* Kun 吉祥物配色:鲸蓝 #6ca2dd / 小鸟浅蓝 #85c1f1 / 奶油 #fff2db / 珊瑚 #f47464 / 藏青描边 #0e2f66 / 淡紫天光 #f9f8ff */
   /* 旧基础 token 改为引用 Calm Blue 语义层(单一事实源,旧名保留供存量调用方渐进迁移) */
   --bg-app: var(--c360-bg);
   --bg-sidebar: var(--c360-bg-sidebar);
-  --bg-canvas: #fafbff;
+  --bg-canvas: #eff3fa;
   --surface-1: var(--c360-surface);
   --surface-2: var(--c360-surface-elevated);
   --surface-3: var(--c360-surface-elevated);
@@ -68,7 +69,7 @@
   --ds-bg-canvas: var(--bg-canvas);
   --ds-surface-card: var(--surface-1);
   --ds-surface-elevated: var(--surface-2);
-  --ds-surface-subtle: #eaf0f9;
+  --ds-surface-subtle: #e7edf6;
   --ds-surface-hover: rgba(59, 110, 187, 0.065);
   --ds-border: var(--border-soft);
   --ds-border-muted: rgba(20, 47, 95, 0.085);
@@ -96,14 +97,16 @@
   --ds-shadow-shell: var(--c360-shadow-sm);
   --ds-shadow-panel: var(--c360-shadow-sm);
   --ds-shadow-composer: var(--c360-shadow-sm);
-  --ds-stage-gradient: linear-gradient(180deg, #fafbff 0%, #ffffff 100%);
+  --ds-stage-gradient:
+    radial-gradient(circle at 30% 0%, rgba(18, 114, 207, 0.05), transparent 32%),
+    linear-gradient(180deg, #f5f8fd 0%, #eff3fa 100%);
   --ds-topbar-bg:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 58%, rgba(255, 255, 255, 0.3) 100%);
+    linear-gradient(180deg, rgba(246, 250, 254, 0.85) 0%, rgba(242, 247, 253, 0.6) 58%, rgba(238, 244, 251, 0.32) 100%);
   --ds-topbar-shadow:
     0 16px 42px rgba(20, 47, 95, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.64);
   --ds-sidebar-gradient:
-    linear-gradient(180deg, rgba(246, 249, 254, 0.98) 0%, rgba(237, 243, 252, 0.98) 100%);
+    linear-gradient(180deg, rgba(241, 246, 252, 0.98) 0%, rgba(230, 238, 249, 0.98) 100%);
   --ds-sidebar-haze:
     radial-gradient(circle at 62% -14%, rgba(133, 193, 241, 0.16), transparent 38%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0) 30%);
@@ -135,7 +138,7 @@
   --ds-table-head-bg: rgba(242, 246, 252, 0.96);
   --ds-scrollbar-thumb: rgba(84, 103, 140, 0.24);
   --ds-scrollbar-thumb-hover: rgba(84, 103, 140, 0.34);
-  --ds-selection: rgba(11, 111, 216, 0.2);
+  --ds-selection: rgba(18, 114, 207, 0.2);
   --ds-cursor-spotlight-rgb: 133 193 241;
   --ds-cursor-spotlight-edge-rgb: 108 162 221;
   --ds-cursor-spotlight-dark-rgb: 148 164 192;
@@ -695,7 +698,7 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: -2;
-  background: linear-gradient(180deg, #f7f9fe 0%, #f0f4fb 100%);
+  background: linear-gradient(180deg, #f3f7fc 0%, #eaf0f8 100%);
 }
 
 body::after {
@@ -706,8 +709,8 @@ body::after {
   pointer-events: none;
   background:
     radial-gradient(circle at 78% -10%, rgba(133, 193, 241, 0.16), transparent 40%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 22%),
-    linear-gradient(120deg, rgba(244, 244, 245, 0.2), transparent 34%, rgba(255, 255, 255, 0.12) 74%, transparent);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.38), transparent 22%),
+    linear-gradient(120deg, rgba(240, 244, 250, 0.2), transparent 34%, rgba(250, 252, 254, 0.12) 74%, transparent);
   opacity: 0.75;
 }
 
