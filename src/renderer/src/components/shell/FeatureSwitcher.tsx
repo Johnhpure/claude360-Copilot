@@ -8,9 +8,9 @@ import { useTranslation } from 'react-i18next'
  * （父任务 design §5 Pattern 层；阶段2 统一原 WorkspaceModeTabs + canvas/music
  * 手写分段两块分裂实现，样式全面 token 化，无字面量色）。
  *
- * 布局：两行分段（Code/写作、生图/音乐），保持侧栏 240px 下的信息密度；
- * 选中态：surface-elevated 白卡浮起（亮）/ 提亮一档（暗）+ 主文字色；
- * 未选中：次级文字色，hover 提亮。行为与原实现一致（role=tablist/tab + aria-selected）。
+ * 布局：纵向主导航（产品级侧栏重设计——单列 4 项，图标+文字，行高 48px）；
+ * 选中态：accent 渐变背景 + 光晕阴影 + 白色文字，高亮明显；
+ * 未选中：次级文字色，hover 轻背景提亮。行为与原实现一致（role=tablist/tab + aria-selected）。
  */
 export type Feature = 'chat' | 'write' | 'canvas' | 'music'
 
@@ -22,19 +22,18 @@ type FeatureSwitcherProps = {
   onOpen: (feature: Feature) => void
 }
 
-const containerClass =
-  'mb-1.5 flex flex-row gap-1 rounded-[var(--radius-sm)] bg-[color-mix(in_srgb,var(--ds-sidebar-field-bg)_72%,transparent)] p-0.5 shadow-[inset_0_0_0_1px_var(--ds-sidebar-divider)]'
+const containerClass = 'mb-1.5 flex flex-col gap-1'
 
 const tabClass = (active: boolean): string =>
-  `group inline-flex min-h-[28px] flex-1 min-w-0 items-center justify-center gap-1.5 rounded-[calc(var(--radius-sm)-2px)] px-2 py-0.5 text-[13px] outline-none transition-[background-color,color,box-shadow] duration-[var(--motion-fast)] focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--ds-accent)_40%,transparent)] ${
+  `group flex min-h-[48px] w-full min-w-0 items-center gap-3 rounded-[12px] px-3.5 text-[13.5px] outline-none transition-[background-color,color,box-shadow] duration-[var(--motion-fast)] focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--ds-accent)_40%,transparent)] ${
     active
-      ? 'bg-ds-elevated font-medium text-ds-ink shadow-[var(--ds-shadow-chip),inset_0_0_0_1px_color-mix(in_srgb,var(--ds-accent)_28%,transparent)]'
-      : 'font-normal text-ds-muted hover:text-ds-ink'
+      ? 'bg-[image:var(--ds-accent-gradient)] font-medium text-white shadow-[var(--ds-accent-gradient-glow)]'
+      : 'font-normal text-ds-muted hover:bg-[var(--ds-sidebar-row-hover)] hover:text-ds-ink'
   }`
 
 const tabIconClass = (active: boolean): string =>
-  `h-[15px] w-[15px] shrink-0 transition-colors duration-[var(--motion-fast)] ${
-    active ? 'text-ds-ink' : 'text-ds-faint group-hover:text-ds-ink'
+  `h-[17px] w-[17px] shrink-0 transition-colors duration-[var(--motion-fast)] ${
+    active ? 'text-white' : 'text-ds-faint group-hover:text-ds-ink'
   }`
 
 type TabSpec = {
@@ -79,7 +78,12 @@ export function FeatureSwitcher({
 
   return (
     <div data-testid="feature-switcher" className="flex flex-col">
-      <div role="tablist" aria-label={`${t('code')} / ${t('write')}`} className={containerClass}>
+      <div
+        role="tablist"
+        aria-orientation="vertical"
+        aria-label={`${t('code')} / ${t('write')} / ${t('canvas')} / ${t('music')}`}
+        className={containerClass}
+      >
         <FeatureTab
           spec={{ feature: 'chat', icon: Code2, labelKey: 'code' }}
           active={active === 'chat'}
@@ -90,29 +94,21 @@ export function FeatureSwitcher({
           active={active === 'write'}
           onOpen={onOpen}
         />
+        {showCanvas ? (
+          <FeatureTab
+            spec={{ feature: 'canvas', icon: Image, labelKey: 'canvas' }}
+            active={active === 'canvas'}
+            onOpen={onOpen}
+          />
+        ) : null}
+        {showMusic ? (
+          <FeatureTab
+            spec={{ feature: 'music', icon: Music, labelKey: 'music' }}
+            active={active === 'music'}
+            onOpen={onOpen}
+          />
+        ) : null}
       </div>
-      {showCanvas || showMusic ? (
-        <div
-          role="tablist"
-          aria-label={`${t('canvas')} / ${t('music')}`}
-          className={containerClass}
-        >
-          {showCanvas ? (
-            <FeatureTab
-              spec={{ feature: 'canvas', icon: Image, labelKey: 'canvas' }}
-              active={active === 'canvas'}
-              onOpen={onOpen}
-            />
-          ) : null}
-          {showMusic ? (
-            <FeatureTab
-              spec={{ feature: 'music', icon: Music, labelKey: 'music' }}
-              active={active === 'music'}
-              onOpen={onOpen}
-            />
-          ) : null}
-        </div>
-      ) : null}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactElement, ReactNode } from 'react'
-import { ChevronRight, Command, PanelLeft, Search, X } from 'lucide-react'
+import { ChevronRight, Command, PanelLeft, Search, Sparkles, X } from 'lucide-react'
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ')
@@ -49,7 +49,11 @@ export function SidebarFrame({
   className
 }: SidebarFrameProps): ReactElement {
   return (
+    /* data-theme="dark"：侧栏永久深色磨砂（产品级导航基调）。Tailwind darkMode
+       与 [data-theme='dark'] token 块均为属性选择器，子树内所有 ds-* token /
+       dark: 类自动取暗色值，明亮模式下主画布不受影响。 */
     <aside
+      data-theme="dark"
       className={cx(
         'ds-drag ds-sidebar-shell relative flex h-full w-full shrink-0 flex-col overflow-hidden px-4 pb-3',
         className
@@ -66,6 +70,20 @@ export function SidebarFrame({
               className="ds-sidebar-titlebar-toggle mt-[5px]"
             />
           ) : null}
+        </div>
+      </div>
+
+      {/* 品牌区：Logo + Claude360 / Copilot Workspace（品牌词不进 i18n） */}
+      <div className="ds-no-drag mb-3 flex shrink-0 items-center gap-3 px-1.5">
+        <span
+          aria-hidden
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[image:var(--ds-accent-gradient)] text-white shadow-[var(--ds-accent-gradient-glow)]"
+        >
+          <Sparkles className="h-[18px] w-[18px]" strokeWidth={1.9} />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-[15px] font-semibold leading-5 text-ds-ink">Claude360</p>
+          <p className="truncate text-[11.5px] leading-4 text-ds-faint">Copilot Workspace</p>
         </div>
       </div>
 
@@ -115,7 +133,12 @@ export function SidebarCommandRow({
       title={disabled ? disabledHint : undefined}
       onClick={onClick}
       className={cx(
-        'flex min-h-[34px] w-full items-center gap-2.5 rounded-[8px] px-3 py-1.5 text-[13px] font-normal transition',
+        'flex w-full items-center gap-2.5 transition',
+        /* 尺寸/字号类按变体分支给出，避免 Tailwind 同组工具类顺序冲突。
+           accent = 醒目 CTA（新对话/新建文件）：更高、更大圆角、渐变+光晕。 */
+        accent
+          ? 'my-1 min-h-[46px] rounded-[14px] px-3.5 py-2 text-[13.5px]'
+          : 'min-h-[34px] rounded-[8px] px-3 py-1.5 text-[13px] font-normal',
         disabled
           ? 'cursor-not-allowed text-ds-faint opacity-55'
           : active
