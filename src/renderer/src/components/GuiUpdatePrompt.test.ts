@@ -130,7 +130,7 @@ describe('GuiUpdatePromptPanel', () => {
     expect(html).toContain('速度 &amp; 稳定性优化')
     expect(html).toContain('修复更新弹窗排版')
     expect(html).toContain('优化下载进度显示')
-    expect(html).toContain('max-h-48')
+    expect(html).toContain('max-h-[min(720px,82vh)]')
     expect(html).toContain('overflow-y-auto')
     expect(html).not.toContain('nbsp')
     expect(html).not.toContain('&lt;p&gt;')

@@ -11,7 +11,7 @@ import { createPortal } from 'react-dom'
  * 动画：面板 scale .96→1 + fade（--motion-base / --ease-oneui）；遮罩 fade（linear）。
  * 交互：Esc 关闭、点击遮罩关闭（dismissable=false 时均禁用）、打开时焦点移入面板。
  */
-type ModalSize = 'sm' | 'md' | 'lg'
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl'
 
 type ModalProps = {
   open: boolean
@@ -28,7 +28,10 @@ type ModalProps = {
 const sizeClass: Record<ModalSize, string> = {
   sm: 'max-w-sm',
   md: 'max-w-lg',
-  lg: 'max-w-2xl'
+  lg: 'max-w-2xl',
+  // xl/2xl：大型工作区弹窗（生图工作流等）；小屏由 vw 上限兜底，lg+ 才启用最小宽度。
+  xl: 'max-w-[min(980px,92vw)] lg:min-w-[820px]',
+  '2xl': 'max-w-[min(1080px,94vw)] lg:min-w-[900px]'
 }
 
 export function Modal({

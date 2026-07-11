@@ -173,9 +173,9 @@ export function GuiUpdatePromptPanel({
           role="dialog"
           aria-modal="true"
           aria-labelledby="gui-update-prompt-title"
-          className="w-full max-w-[30rem] rounded-[var(--radius-md)] border border-ds-border bg-ds-elevated p-5 text-ds-ink shadow-[var(--c360-shadow-overlay)]"
+          className="flex max-h-[min(720px,82vh)] w-full max-w-[min(760px,88vw)] flex-col rounded-[var(--radius-md)] border border-ds-border bg-ds-elevated p-5 text-ds-ink shadow-[var(--c360-shadow-overlay)] md:min-w-[620px]"
         >
-          <div className="flex items-start gap-3">
+          <div className="flex shrink-0 items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-ds-success-soft text-ds-success">
               <CheckCircle2 className="h-5 w-5" strokeWidth={1.85} />
             </div>
@@ -186,16 +186,16 @@ export function GuiUpdatePromptPanel({
             </div>
           </div>
 
-          <div className="mt-4">
-            <h3 className="text-[13px] font-semibold text-ds-ink">
+          <div className="mt-4 flex min-h-0 flex-1 flex-col">
+            <h3 className="shrink-0 text-[13px] font-semibold text-ds-ink">
               {t('guiUpdatePromptReleaseNotesHeading')}
             </h3>
-            <div className="mt-2 max-h-60 overflow-y-auto rounded-[var(--radius-md)] border border-ds-border-muted bg-ds-card px-3 py-2.5 text-[13px] leading-5 text-ds-muted">
+            <div className="mt-2 min-h-[8rem] flex-1 overflow-y-auto rounded-[var(--radius-md)] border border-ds-border-muted bg-ds-card px-3 py-2.5 text-[13px] leading-5 text-ds-muted">
               <ReleaseNotesContent blocks={notes} />
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <div className="mt-5 flex shrink-0 flex-wrap justify-end gap-2">
             <button
               type="button"
               onClick={() => void onViewChangelog?.()}
@@ -240,9 +240,9 @@ export function GuiUpdatePromptPanel({
         role="dialog"
         aria-modal="true"
         aria-labelledby="gui-update-prompt-title"
-        className="w-full max-w-[32rem] rounded-[var(--radius-md)] border border-ds-border bg-ds-elevated p-5 text-ds-ink shadow-[var(--c360-shadow-overlay)]"
+        className="flex max-h-[min(720px,82vh)] w-full max-w-[min(760px,88vw)] flex-col rounded-[var(--radius-md)] border border-ds-border bg-ds-elevated p-5 text-ds-ink shadow-[var(--c360-shadow-overlay)] md:min-w-[620px]"
       >
-        <div className="flex items-start gap-3">
+        <div className="flex shrink-0 items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-ds-warning-soft text-ds-warning">
             {busy ? (
               <Loader2 className="h-5 w-5 animate-spin" strokeWidth={2} />
@@ -259,7 +259,7 @@ export function GuiUpdatePromptPanel({
         </div>
 
         {downloading ? (
-          <div className="mt-4">
+          <div className="mt-4 shrink-0">
             <div
               role="progressbar"
               aria-valuemin={0}
@@ -272,18 +272,18 @@ export function GuiUpdatePromptPanel({
           </div>
         ) : null}
 
-        <div className="mt-4 max-h-48 overflow-y-auto rounded-[var(--radius-md)] border border-ds-border-muted bg-ds-card px-3 py-2.5 text-[13px] leading-5 text-ds-muted">
+        <div className="mt-4 min-h-[8rem] flex-1 overflow-y-auto rounded-[var(--radius-md)] border border-ds-border-muted bg-ds-card px-3 py-2.5 text-[13px] leading-5 text-ds-muted">
           <ReleaseNotesContent blocks={notes} />
         </div>
 
         {error ? (
-          <div className="mt-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft px-3 py-2 text-[12.5px] leading-5 text-ds-danger">
+          <div className="mt-3 flex shrink-0 items-start gap-2 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft px-3 py-2 text-[12.5px] leading-5 text-ds-danger">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.8} />
             <span className="break-words">{error}</span>
           </div>
         ) : null}
 
-        <div className="mt-5 flex flex-wrap justify-end gap-2">
+        <div className="mt-5 flex shrink-0 flex-wrap justify-end gap-2">
           {!downloaded && !downloading && !installing ? (
             <button
               type="button"

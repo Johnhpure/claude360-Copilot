@@ -216,16 +216,17 @@ export function WorkflowAiCreateModal({
         open
         onClose={onClose}
         ariaLabel={t('canvasWorkflowAiTitle')}
-        size="lg"
+        size="xl"
         dismissable={!generating}
-        className="flex max-h-[86vh] flex-col"
+        className="flex h-[min(680px,82vh)] flex-col"
       >
         <h2 className="pb-1 text-[15px] font-semibold text-ds-ink">{t('canvasWorkflowAiTitle')}</h2>
         <p className="pb-3 text-[12px] text-ds-muted">{t('canvasWorkflowAiIntro')}</p>
 
-        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto pr-1 md:grid-cols-2">
+        {/* md+ 双栏各自独立滚动；<md 降级为整体纵向滚动的上下布局 */}
+        <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto pr-1 md:grid-cols-2 md:overflow-hidden md:pr-0">
           {/* —— 左栏：模型 / 分组 / 描述 / 参考图 / 生成 —— */}
-          <div className="flex min-w-0 flex-col gap-3">
+          <div className="flex min-w-0 flex-col gap-3 md:min-h-0 md:overflow-y-auto md:pr-1">
             <div className="flex flex-col gap-1">
               <span className="text-[12px] text-ds-muted">{t('canvasWorkflowAiModelLabel')}</span>
               {textModels.length > 0 ? (
@@ -266,9 +267,9 @@ export function WorkflowAiCreateModal({
                 data-testid="workflow-ai-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={6}
+                rows={9}
                 placeholder={t('canvasWorkflowAiDescPlaceholder')}
-                className="resize-none text-[12.5px]"
+                className="min-h-[140px] resize-none text-[12.5px]"
               />
             </label>
 
@@ -329,8 +330,8 @@ export function WorkflowAiCreateModal({
             </Button>
           </div>
 
-          {/* —— 右栏：草稿预览 —— */}
-          <div className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-md)] border border-ds-border bg-ds-main p-3">
+          {/* —— 右栏：草稿预览（高度跟随弹窗主体，内部滚动） —— */}
+          <div className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-md)] border border-ds-border bg-ds-main p-3 md:min-h-0 md:overflow-y-auto">
             {draft ? (
               <>
                 <h3 className="text-[13.5px] font-semibold text-ds-ink">{draft.name}</h3>

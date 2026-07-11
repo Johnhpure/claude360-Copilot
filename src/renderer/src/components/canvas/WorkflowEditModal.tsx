@@ -278,20 +278,20 @@ export function WorkflowEditModal({
       open
       onClose={onClose}
       ariaLabel={isNew ? t('canvasWorkflowEditTitleNew') : t('canvasWorkflowEditTitle')}
-      size="lg"
-      className="flex max-h-[86vh] flex-col"
+      size="2xl"
+      className="flex h-[min(760px,86vh)] flex-col"
     >
       <h2 className="pb-3 text-[15px] font-semibold text-ds-ink">
         {isNew ? t('canvasWorkflowEditTitleNew') : t('canvasWorkflowEditTitle')}
       </h2>
 
-      {/* 内容区：内部滚动；<md 上下、md+ 左右两栏 */}
+      {/* 内容区：<md 上下布局整体滚动；md+ 左右两栏（约 58:42）各自独立滚动 */}
       <div
         data-testid="workflow-edit-body"
-        className="grid min-h-0 flex-1 gap-4 overflow-y-auto pr-1 md:grid-cols-2"
+        className="grid min-h-0 flex-1 gap-5 overflow-y-auto pr-1 md:grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)] md:overflow-hidden md:pr-0"
       >
         {/* —— 左栏：基础信息 / 变量 / 模板 —— */}
-        <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex min-w-0 flex-col gap-3 md:min-h-0 md:overflow-y-auto md:pr-1">
           <label className="flex flex-col gap-1">
             <FieldLabel text={t('canvasWorkflowNameLabel')} required />
             <Input
@@ -466,8 +466,8 @@ export function WorkflowEditModal({
           </div>
         </div>
 
-        {/* —— 右栏：生成配置（折叠分组） —— */}
-        <div className="flex min-w-0 flex-col gap-3">
+        {/* —— 右栏：生成配置（折叠分组，独立滚动不受多图规则展开挤压） —— */}
+        <div className="flex min-w-0 flex-col gap-3 md:min-h-0 md:overflow-y-auto md:pr-1">
           <Section
             title={t('canvasWorkflowSectionModel')}
             open={sections.model}
@@ -581,7 +581,7 @@ export function WorkflowEditModal({
           >
             <div className="flex flex-col gap-1.5">
               <FieldLabel text={t('canvasAspectLabel')} />
-              <div className="grid grid-cols-4 gap-1.5" role="group" aria-label={t('canvasAspectLabel')}>
+              <div className="grid grid-cols-4 gap-2" role="group" aria-label={t('canvasAspectLabel')}>
                 {[...CLAUDE360_ASPECT_PRESETS.map((preset) => ({ id: preset.id, label: preset.ratio })), { id: 'custom', label: t('canvasWorkflowAspectCustom') }].map(
                   (preset) => {
                     const active = preset.id === config.aspectPresetId
@@ -591,7 +591,7 @@ export function WorkflowEditModal({
                         type="button"
                         aria-pressed={active}
                         onClick={() => patchImage({ aspectPresetId: preset.id })}
-                        className={`rounded-[var(--radius-sm)] border px-1 py-1.5 text-[11px] font-semibold tabular-nums transition-colors duration-[var(--motion-fast)] ${
+                        className={`rounded-[var(--radius-sm)] border px-1.5 py-2 text-[12px] font-semibold tabular-nums transition-colors duration-[var(--motion-fast)] ${
                           active
                             ? 'border-ds-accent bg-ds-accent-soft text-ds-accent'
                             : 'border-ds-border bg-ds-main text-ds-muted hover:border-ds-accent hover:text-ds-ink'
