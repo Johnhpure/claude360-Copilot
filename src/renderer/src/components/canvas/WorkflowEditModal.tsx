@@ -111,7 +111,7 @@ function Section({
   children: ReactNode
 }): ReactElement {
   return (
-    <div className="overflow-hidden rounded-[var(--radius-md)] border border-ds-border bg-ds-card">
+    <div className="shrink-0 overflow-hidden rounded-[var(--radius-md)] border border-ds-border bg-ds-card">
       <button
         type="button"
         onClick={onToggle}
@@ -287,15 +287,17 @@ export function WorkflowEditModal({
 
       {/* 内容区：<md 上下布局整体滚动；md+ 左右两栏各自独立滚动。
           grid-rows-[minmax(0,1fr)] 关键：锁死行轨道 = 容器高度，否则 auto 行按内容撑高、
-          两栏 overflow-y-auto 永不生效（内容被 overflow-hidden 截断）。 */}
+          两栏 overflow-y-auto 永不生效（内容被 overflow-hidden 截断）。
+          两栏内层滚动容器是定高 flex-col：直接子项必须 shrink-0，否则内容超高时
+          子项被均匀压扁（输入框/开关行显示一半）而不是触发滚动。 */}
       <div
         data-testid="workflow-edit-body"
         className="grid min-h-0 flex-1 gap-4 overflow-y-auto pr-1 md:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden md:pr-0"
       >
         {/* —— 左栏：基础信息 / 变量 / 模板（外层承载高度，内层独立滚动） —— */}
         <div className="min-w-0 md:min-h-0 md:overflow-hidden">
-          <div className="flex flex-col gap-3 md:h-full md:min-h-0 md:overflow-y-auto md:pb-5 md:pr-2">
-            <label className="flex flex-col gap-1">
+          <div className="flex flex-col gap-3 md:h-full md:min-h-0 md:overflow-y-auto md:pb-6 md:pr-2">
+            <label className="flex shrink-0 flex-col gap-1">
               <FieldLabel text={t('canvasWorkflowNameLabel')} required />
               <Input
                 data-testid="workflow-name-input"
@@ -306,7 +308,7 @@ export function WorkflowEditModal({
               />
             </label>
 
-            <label className="flex flex-col gap-1">
+            <label className="flex shrink-0 flex-col gap-1">
               <FieldLabel text={t('canvasWorkflowDescLabel')} />
               <Textarea
                 value={draft.description}
@@ -317,7 +319,7 @@ export function WorkflowEditModal({
               />
             </label>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex shrink-0 flex-col gap-1">
               <FieldLabel text={t('canvasWorkflowCategoryLabel')} />
               <Select
                 value={categoryChoice}
@@ -335,7 +337,7 @@ export function WorkflowEditModal({
             </div>
 
             {/* 输入变量编辑器 */}
-            <div className="flex flex-col gap-2">
+            <div className="flex shrink-0 flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
                 <FieldLabel text={t('canvasWorkflowVariablesTitle')} />
                 <Button variant="ghost" size="sm" data-testid="workflow-variable-add" onClick={addVariable}>
@@ -427,7 +429,7 @@ export function WorkflowEditModal({
             </div>
 
             {/* 提示词模板 */}
-            <div className="flex flex-col gap-2">
+            <div className="flex shrink-0 flex-col gap-2">
               <FieldLabel text={t('canvasWorkflowTemplateTitle')} />
               <label className="flex flex-col gap-1">
                 <span className="text-[11.5px] text-ds-faint">{t('canvasWorkflowTemplateSystem')}</span>
@@ -472,7 +474,7 @@ export function WorkflowEditModal({
 
         {/* —— 右栏：生成配置（外层承载高度，折叠分组展开由内层滚动消化，不撑破弹窗） —— */}
         <div className="min-w-0 md:min-h-0 md:overflow-hidden">
-          <div className="flex flex-col gap-3 md:h-full md:min-h-0 md:overflow-y-auto md:pb-5 md:pr-2">
+          <div className="flex flex-col gap-3 md:h-full md:min-h-0 md:overflow-y-auto md:pb-6 md:pr-2">
             <Section
               title={t('canvasWorkflowSectionModel')}
               open={sections.model}
@@ -503,8 +505,8 @@ export function WorkflowEditModal({
               open={sections.expansion}
               onToggle={() => toggleSection('expansion')}
             >
-              <label className="flex items-center justify-between gap-2 text-[12px] text-ds-muted">
-                {t('canvasWorkflowExpansionEnable')}
+              <label className="flex min-h-[44px] items-center justify-between gap-2 text-[12px] text-ds-muted">
+                <span className="min-w-0 flex-1">{t('canvasWorkflowExpansionEnable')}</span>
                 <Toggle
                   checked={draft.textExpansion.enabled}
                   onChange={(enabled) => patchExpansion({ enabled })}
@@ -563,8 +565,8 @@ export function WorkflowEditModal({
                       className="resize-none text-[12.5px]"
                     />
                   </label>
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="flex flex-col text-[12px] text-ds-muted">
+                  <div className="flex min-h-[44px] items-start justify-between gap-2">
+                    <span className="flex min-w-0 flex-1 flex-col text-[12px] text-ds-muted">
                       {t('canvasWorkflowExpansionPrepend')}
                       <span className="text-[11px] text-ds-faint">
                         {t('canvasWorkflowExpansionPrependHint')}
@@ -734,22 +736,22 @@ export function WorkflowEditModal({
                   onChange={(moderation) => patchImage({ moderation })}
                 />
               </div>
-              <div className="flex items-start justify-between gap-2">
-                <span className="flex flex-col text-[12px] text-ds-muted">
+              <div className="flex min-h-[44px] items-start justify-between gap-2">
+                <span className="flex min-w-0 flex-1 flex-col text-[12px] text-ds-muted">
                   {t('canvasWorkflowStream')}
                   <span className="text-[11px] text-ds-faint">{t('canvasWorkflowUpstreamHint')}</span>
                 </span>
                 <Toggle checked={config.stream} onChange={(stream) => patchImage({ stream })} />
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[12px] text-ds-muted">{t('canvasWorkflowReturnBase64')}</span>
+              <div className="flex min-h-[44px] items-center justify-between gap-2">
+                <span className="min-w-0 flex-1 text-[12px] text-ds-muted">{t('canvasWorkflowReturnBase64')}</span>
                 <Toggle
                   checked={config.returnBase64}
                   onChange={(returnBase64) => patchImage({ returnBase64 })}
                 />
               </div>
-              <div className="flex items-start justify-between gap-2">
-                <span className="flex flex-col text-[12px] text-ds-muted">
+              <div className="flex min-h-[44px] items-start justify-between gap-2">
+                <span className="flex min-w-0 flex-1 flex-col text-[12px] text-ds-muted">
                   {t('canvasWorkflowCodex')}
                   <span className="text-[11px] text-ds-faint">{t('canvasWorkflowUpstreamHint')}</span>
                 </span>

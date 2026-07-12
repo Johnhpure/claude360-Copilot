@@ -224,12 +224,13 @@ export function WorkflowAiCreateModal({
         <p className="shrink-0 pb-3 text-[12px] text-ds-muted">{t('canvasWorkflowAiIntro')}</p>
 
         {/* md+ 双栏各自独立滚动；<md 降级为整体纵向滚动的上下布局。
-            grid-rows-[minmax(0,1fr)] 锁死行轨道 = 容器高度，避免 auto 行按内容撑高导致栏内滚动失效。 */}
+            grid-rows-[minmax(0,1fr)] 锁死行轨道 = 容器高度，避免 auto 行按内容撑高导致栏内滚动失效。
+            定高 flex-col 滚动容器的直接子项必须 shrink-0，否则内容超高时被压扁而非触发滚动。 */}
         <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto pr-1 md:grid-cols-2 md:grid-rows-[minmax(0,1fr)] md:overflow-hidden md:pr-0">
           {/* —— 左栏：模型 / 分组 / 描述 / 参考图 / 生成（外层承载高度，内层独立滚动） —— */}
           <div className="min-w-0 md:min-h-0 md:overflow-hidden">
-            <div className="flex flex-col gap-3 md:h-full md:min-h-0 md:overflow-y-auto md:pb-5 md:pr-2">
-              <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-3 md:h-full md:min-h-0 md:overflow-y-auto md:pb-6 md:pr-2">
+              <div className="flex shrink-0 flex-col gap-1">
                 <span className="text-[12px] text-ds-muted">{t('canvasWorkflowAiModelLabel')}</span>
                 {textModels.length > 0 ? (
                   <Select
@@ -243,7 +244,7 @@ export function WorkflowAiCreateModal({
                 )}
               </div>
 
-              <div className="flex flex-col gap-1">
+              <div className="flex shrink-0 flex-col gap-1">
                 <span className="text-[12px] text-ds-muted">{t('canvasWorkflowAiGroupLabel')}</span>
                 <Select
                   value={group || null}
@@ -257,7 +258,7 @@ export function WorkflowAiCreateModal({
                 />
               </div>
 
-              <label className="flex flex-col gap-1">
+              <label className="flex shrink-0 flex-col gap-1">
                 <span className="text-[12px] text-ds-muted">
                   {t('canvasWorkflowAiDescLabel')}
                   <span className="text-ds-danger" aria-hidden="true">
@@ -275,7 +276,7 @@ export function WorkflowAiCreateModal({
                 />
               </label>
 
-              <div className="flex flex-col gap-1.5">
+              <div className="flex shrink-0 flex-col gap-1.5">
                 <span className="text-[12px] text-ds-muted">{t('canvasWorkflowAiReferenceLabel')}</span>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Button variant="secondary" size="sm" onClick={() => setPickerOpen(true)}>
@@ -314,7 +315,7 @@ export function WorkflowAiCreateModal({
               </div>
 
               {error ? (
-                <p role="alert" data-testid="workflow-ai-error" className="text-[12px] text-ds-danger">
+                <p role="alert" data-testid="workflow-ai-error" className="shrink-0 text-[12px] text-ds-danger">
                   {error}
                 </p>
               ) : null}
@@ -322,6 +323,7 @@ export function WorkflowAiCreateModal({
               <Button
                 variant="primary"
                 size="md"
+                className="shrink-0"
                 data-testid="workflow-ai-generate"
                 loading={generating}
                 disabled={textModels.length === 0}
@@ -338,18 +340,18 @@ export function WorkflowAiCreateModal({
             <div className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-md)] border border-ds-border bg-ds-main p-3 md:h-full md:min-h-0 md:overflow-y-auto">
               {draft ? (
                 <>
-                  <h3 className="text-[13.5px] font-semibold text-ds-ink">{draft.name}</h3>
+                  <h3 className="shrink-0 text-[13.5px] font-semibold text-ds-ink">{draft.name}</h3>
                   {draft.category ? (
-                    <span className="self-start rounded-full bg-ds-accent-soft px-2 py-0.5 text-[10.5px] font-medium text-ds-accent">
+                    <span className="shrink-0 self-start rounded-full bg-ds-accent-soft px-2 py-0.5 text-[10.5px] font-medium text-ds-accent">
                       {draft.category}
                     </span>
                   ) : null}
                   {draft.description ? (
-                    <p className="text-[12px] leading-[18px] text-ds-muted">{draft.description}</p>
+                    <p className="shrink-0 text-[12px] leading-[18px] text-ds-muted">{draft.description}</p>
                   ) : null}
 
                   {draft.variables.length > 0 ? (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex shrink-0 flex-col gap-1">
                       <span className="text-[11.5px] font-medium text-ds-muted">
                         {t('canvasWorkflowAiDraftVariables')}
                       </span>
@@ -366,7 +368,7 @@ export function WorkflowAiCreateModal({
                     </div>
                   ) : null}
 
-                  <div className="flex flex-col gap-1">
+                  <div className="flex shrink-0 flex-col gap-1">
                     <span className="text-[11.5px] font-medium text-ds-muted">
                       {t('canvasWorkflowAiDraftTemplate')}
                     </span>
@@ -375,7 +377,7 @@ export function WorkflowAiCreateModal({
                     </p>
                   </div>
 
-                  <div className="flex flex-col gap-1">
+                  <div className="flex shrink-0 flex-col gap-1">
                     <span className="text-[11.5px] font-medium text-ds-muted">
                       {t('canvasWorkflowAiDraftParams')}
                     </span>
@@ -394,7 +396,7 @@ export function WorkflowAiCreateModal({
                     </span>
                   </div>
 
-                  <div className="mt-auto flex items-center justify-end gap-2 pt-2">
+                  <div className="mt-auto flex shrink-0 items-center justify-end gap-2 pt-2">
                     <Button
                       variant="secondary"
                       size="sm"

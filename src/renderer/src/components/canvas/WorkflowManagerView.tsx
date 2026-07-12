@@ -177,8 +177,8 @@ export function WorkflowManagerView({
         </div>
       ) : null}
 
-      {/* 列表区：独立滚动；卡片按 auto-fill 自适应宫格排布（min 300px，卡片自身封顶 360px，
-          单卡时也不横向撑满整行） */}
+      {/* 列表区：独立滚动；卡片按 auto-fill 自适应宫格排布（min 360px，卡片自身封顶 420px，
+          单卡时也不横向撑满整行、也不小于 360px 宽度下限） */}
       <div className="min-h-0 flex-1 lg:overflow-y-auto lg:pr-1">
         {visible.length === 0 ? (
           <Card data-testid="workflow-list-empty" className="border-dashed">
@@ -189,30 +189,30 @@ export function WorkflowManagerView({
             />
           </Card>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-4">
             {visible.map((workflow) => (
               <Card
                 key={workflow.id}
                 unpadded
                 data-testid="workflow-card"
-                className="flex min-h-[180px] w-full max-w-[360px] flex-col gap-2 p-3"
+                className="flex min-h-[220px] w-full min-w-0 max-w-[420px] flex-col gap-3 p-5"
               >
                 <div className="flex items-start gap-2">
-                  <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ds-ink">
+                  <h3 className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ds-ink">
                     {workflow.name}
                   </h3>
                 </div>
                 {workflow.description ? (
-                  <p className="line-clamp-2 text-[12px] leading-[18px] text-ds-muted">
+                  <p className="line-clamp-2 text-[12.5px] leading-[19px] text-ds-muted">
                     {workflow.description}
                   </p>
                 ) : null}
                 {workflow.promptTemplate.positive ? (
-                  <p className="line-clamp-2 rounded-[var(--radius-sm)] bg-ds-main px-2 py-1 text-[11.5px] leading-[17px] text-ds-muted">
+                  <p className="line-clamp-3 rounded-[var(--radius-sm)] bg-ds-main px-2.5 py-1.5 text-[11.5px] leading-[17px] text-ds-muted">
                     {workflow.promptTemplate.positive}
                   </p>
                 ) : null}
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-2">
                   {workflow.textExpansion.enabled ? <Chip>{t('canvasWorkflowChipMulti')}</Chip> : null}
                   {workflow.variables.length > 0 ? (
                     <Chip>{t('canvasWorkflowChipVariables', { count: workflow.variables.length })}</Chip>
@@ -224,7 +224,7 @@ export function WorkflowManagerView({
                       : t('canvasWorkflowVisibilityPrivate')}
                   </Chip>
                 </div>
-                <div className="mt-auto flex items-center gap-1 pt-1">
+                <div className="mt-auto flex items-center gap-1 pt-2">
                   <span className="min-w-0 flex-1 truncate text-[11px] text-ds-faint">
                     {formatWorkflowTime(workflow.createdAt)}
                   </span>
