@@ -31,7 +31,7 @@ const sizeClass: Record<ModalSize, string> = {
   lg: 'max-w-2xl',
   // xl/2xl：大型工作区弹窗（生图工作流等）；小屏由 vw 上限兜底，lg+ 才启用最小宽度。
   xl: 'max-w-[min(980px,92vw)] lg:min-w-[820px]',
-  '2xl': 'max-w-[min(1080px,94vw)] lg:min-w-[900px]'
+  '2xl': 'max-w-[min(1080px,calc(100vw-48px))] lg:min-w-[1000px]'
 }
 
 export function Modal({

@@ -218,211 +218,216 @@ export function WorkflowAiCreateModal({
         ariaLabel={t('canvasWorkflowAiTitle')}
         size="xl"
         dismissable={!generating}
-        className="flex h-[min(680px,82vh)] flex-col"
+        className="flex h-[min(680px,82vh)] flex-col overflow-hidden"
       >
-        <h2 className="pb-1 text-[15px] font-semibold text-ds-ink">{t('canvasWorkflowAiTitle')}</h2>
-        <p className="pb-3 text-[12px] text-ds-muted">{t('canvasWorkflowAiIntro')}</p>
+        <h2 className="shrink-0 pb-1 text-[15px] font-semibold text-ds-ink">{t('canvasWorkflowAiTitle')}</h2>
+        <p className="shrink-0 pb-3 text-[12px] text-ds-muted">{t('canvasWorkflowAiIntro')}</p>
 
-        {/* md+ 双栏各自独立滚动；<md 降级为整体纵向滚动的上下布局 */}
-        <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto pr-1 md:grid-cols-2 md:overflow-hidden md:pr-0">
-          {/* —— 左栏：模型 / 分组 / 描述 / 参考图 / 生成 —— */}
-          <div className="flex min-w-0 flex-col gap-3 md:min-h-0 md:overflow-y-auto md:pr-1">
-            <div className="flex flex-col gap-1">
-              <span className="text-[12px] text-ds-muted">{t('canvasWorkflowAiModelLabel')}</span>
-              {textModels.length > 0 ? (
-                <Select
-                  value={model || null}
-                  options={textModels.map((item) => ({ value: item, label: item }))}
-                  onChange={setModel}
-                  aria-label={t('canvasWorkflowAiModelLabel')}
-                />
-              ) : (
-                <p className="text-[11.5px] text-ds-faint">{t('canvasWorkflowNoTextModels')}</p>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <span className="text-[12px] text-ds-muted">{t('canvasWorkflowAiGroupLabel')}</span>
-              <Select
-                value={group || null}
-                options={(groups.length > 0 ? groups : [defaultGroup].filter(Boolean)).map((item) => ({
-                  value: item,
-                  label: item
-                }))}
-                onChange={setGroup}
-                placeholder={t('canvasWorkflowAiGroupLabel')}
-                aria-label={t('canvasWorkflowAiGroupLabel')}
-              />
-            </div>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-[12px] text-ds-muted">
-                {t('canvasWorkflowAiDescLabel')}
-                <span className="text-ds-danger" aria-hidden="true">
-                  {' '}
-                  *
-                </span>
-              </span>
-              <Textarea
-                data-testid="workflow-ai-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={9}
-                placeholder={t('canvasWorkflowAiDescPlaceholder')}
-                className="min-h-[140px] resize-none text-[12.5px]"
-              />
-            </label>
-
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[12px] text-ds-muted">{t('canvasWorkflowAiReferenceLabel')}</span>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Button variant="secondary" size="sm" onClick={() => setPickerOpen(true)}>
-                  <Images className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                  {t('canvasWorkflowAiPickAssets')}
-                </Button>
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-ds-border bg-ds-elevated px-3 py-1.5 text-[12px] font-medium text-ds-ink transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover">
-                  <ImagePlus className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                  {t('canvasWorkflowAiUpload')}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    data-testid="workflow-ai-upload-input"
-                    onChange={handleUploadInput}
-                    className="hidden"
+        {/* md+ 双栏各自独立滚动；<md 降级为整体纵向滚动的上下布局。
+            grid-rows-[minmax(0,1fr)] 锁死行轨道 = 容器高度，避免 auto 行按内容撑高导致栏内滚动失效。 */}
+        <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto pr-1 md:grid-cols-2 md:grid-rows-[minmax(0,1fr)] md:overflow-hidden md:pr-0">
+          {/* —— 左栏：模型 / 分组 / 描述 / 参考图 / 生成（外层承载高度，内层独立滚动） —— */}
+          <div className="min-w-0 md:min-h-0 md:overflow-hidden">
+            <div className="flex flex-col gap-3 md:h-full md:min-h-0 md:overflow-y-auto md:pb-5 md:pr-2">
+              <div className="flex flex-col gap-1">
+                <span className="text-[12px] text-ds-muted">{t('canvasWorkflowAiModelLabel')}</span>
+                {textModels.length > 0 ? (
+                  <Select
+                    value={model || null}
+                    options={textModels.map((item) => ({ value: item, label: item }))}
+                    onChange={setModel}
+                    aria-label={t('canvasWorkflowAiModelLabel')}
                   />
-                </label>
+                ) : (
+                  <p className="text-[11.5px] text-ds-faint">{t('canvasWorkflowNoTextModels')}</p>
+                )}
               </div>
-              {references.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {references.map((item) => (
-                    <ReferenceThumb
-                      key={item.id}
-                      item={item}
-                      workspaceRoot={workspaceRoot}
-                      onRemove={() =>
-                        setReferences((prev) => prev.filter((ref) => ref.id !== item.id))
-                      }
-                      t={t}
-                    />
-                  ))}
-                </div>
-              ) : null}
-              <span className="text-[11px] text-ds-faint">{t('canvasWorkflowAiReferenceHint')}</span>
-            </div>
 
-            {error ? (
-              <p role="alert" data-testid="workflow-ai-error" className="text-[12px] text-ds-danger">
-                {error}
-              </p>
-            ) : null}
+              <div className="flex flex-col gap-1">
+                <span className="text-[12px] text-ds-muted">{t('canvasWorkflowAiGroupLabel')}</span>
+                <Select
+                  value={group || null}
+                  options={(groups.length > 0 ? groups : [defaultGroup].filter(Boolean)).map((item) => ({
+                    value: item,
+                    label: item
+                  }))}
+                  onChange={setGroup}
+                  placeholder={t('canvasWorkflowAiGroupLabel')}
+                  aria-label={t('canvasWorkflowAiGroupLabel')}
+                />
+              </div>
 
-            <Button
-              variant="primary"
-              size="md"
-              data-testid="workflow-ai-generate"
-              loading={generating}
-              disabled={textModels.length === 0}
-              onClick={handleGenerate}
-            >
-              {generating ? null : <Sparkles className="h-4 w-4" strokeWidth={1.75} aria-hidden />}
-              {generating ? t('canvasWorkflowAiGenerating') : t('canvasWorkflowAiGenerate')}
-            </Button>
-          </div>
-
-          {/* —— 右栏：草稿预览（高度跟随弹窗主体，内部滚动） —— */}
-          <div className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-md)] border border-ds-border bg-ds-main p-3 md:min-h-0 md:overflow-y-auto">
-            {draft ? (
-              <>
-                <h3 className="text-[13.5px] font-semibold text-ds-ink">{draft.name}</h3>
-                {draft.category ? (
-                  <span className="self-start rounded-full bg-ds-accent-soft px-2 py-0.5 text-[10.5px] font-medium text-ds-accent">
-                    {draft.category}
+              <label className="flex flex-col gap-1">
+                <span className="text-[12px] text-ds-muted">
+                  {t('canvasWorkflowAiDescLabel')}
+                  <span className="text-ds-danger" aria-hidden="true">
+                    {' '}
+                    *
                   </span>
-                ) : null}
-                {draft.description ? (
-                  <p className="text-[12px] leading-[18px] text-ds-muted">{draft.description}</p>
-                ) : null}
+                </span>
+                <Textarea
+                  data-testid="workflow-ai-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={9}
+                  placeholder={t('canvasWorkflowAiDescPlaceholder')}
+                  className="min-h-[140px] resize-none text-[12.5px]"
+                />
+              </label>
 
-                {draft.variables.length > 0 ? (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11.5px] font-medium text-ds-muted">
-                      {t('canvasWorkflowAiDraftVariables')}
-                    </span>
-                    {draft.variables.map((variable) => (
-                      <span key={variable.key} className="text-[11.5px] text-ds-muted">
-                        {variable.label || variable.key}
-                        <span className="text-ds-faint">
-                          {' '}
-                          · {variable.key}
-                          {variable.required ? ' · *' : ''}
-                        </span>
-                      </span>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[12px] text-ds-muted">{t('canvasWorkflowAiReferenceLabel')}</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Button variant="secondary" size="sm" onClick={() => setPickerOpen(true)}>
+                    <Images className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                    {t('canvasWorkflowAiPickAssets')}
+                  </Button>
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-ds-border bg-ds-elevated px-3 py-1.5 text-[12px] font-medium text-ds-ink transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover">
+                    <ImagePlus className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                    {t('canvasWorkflowAiUpload')}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      data-testid="workflow-ai-upload-input"
+                      onChange={handleUploadInput}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                {references.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {references.map((item) => (
+                      <ReferenceThumb
+                        key={item.id}
+                        item={item}
+                        workspaceRoot={workspaceRoot}
+                        onRemove={() =>
+                          setReferences((prev) => prev.filter((ref) => ref.id !== item.id))
+                        }
+                        t={t}
+                      />
                     ))}
                   </div>
                 ) : null}
-
-                <div className="flex flex-col gap-1">
-                  <span className="text-[11.5px] font-medium text-ds-muted">
-                    {t('canvasWorkflowAiDraftTemplate')}
-                  </span>
-                  <p className="line-clamp-4 rounded-[var(--radius-sm)] bg-ds-card px-2 py-1 text-[11.5px] leading-[17px] text-ds-muted">
-                    {draft.promptTemplate.positive}
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <span className="text-[11.5px] font-medium text-ds-muted">
-                    {t('canvasWorkflowAiDraftParams')}
-                  </span>
-                  <span className="text-[11.5px] text-ds-faint">
-                    {[
-                      workflowOutputSize(draft.imageConfig).replace('x', '×'),
-                      draft.imageConfig.resolution,
-                      draft.imageConfig.quality,
-                      draft.imageConfig.format.toUpperCase(),
-                      draft.textExpansion.enabled
-                        ? t('canvasWorkflowChipMulti')
-                        : null
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
-                </div>
-
-                <div className="mt-auto flex items-center justify-end gap-2 pt-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    data-testid="workflow-ai-continue-edit"
-                    onClick={() => onContinueEdit(draft)}
-                  >
-                    {t('canvasWorkflowAiContinueEdit')}
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    data-testid="workflow-ai-save-direct"
-                    onClick={() => {
-                      // 校验失败：容器返回中文错误文案 → inline 展示，弹窗保持打开不保存。
-                      const message = onSaveDirect(draft)
-                      setError(message)
-                    }}
-                  >
-                    {t('canvasWorkflowAiSaveDirect')}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div
-                data-testid="workflow-ai-draft-empty"
-                className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center"
-              >
-                <Sparkles className="h-8 w-8 text-ds-faint" strokeWidth={1.5} aria-hidden />
-                <p className="text-[13px] font-medium text-ds-ink">{t('canvasWorkflowAiEmptyTitle')}</p>
-                <p className="text-[12px] text-ds-muted">{t('canvasWorkflowAiEmptyDesc')}</p>
+                <span className="text-[11px] text-ds-faint">{t('canvasWorkflowAiReferenceHint')}</span>
               </div>
-            )}
+
+              {error ? (
+                <p role="alert" data-testid="workflow-ai-error" className="text-[12px] text-ds-danger">
+                  {error}
+                </p>
+              ) : null}
+
+              <Button
+                variant="primary"
+                size="md"
+                data-testid="workflow-ai-generate"
+                loading={generating}
+                disabled={textModels.length === 0}
+                onClick={handleGenerate}
+              >
+                {generating ? null : <Sparkles className="h-4 w-4" strokeWidth={1.75} aria-hidden />}
+                {generating ? t('canvasWorkflowAiGenerating') : t('canvasWorkflowAiGenerate')}
+              </Button>
+            </div>
+          </div>
+
+          {/* —— 右栏：草稿预览（外层承载高度，卡片内部滚动，不撑破弹窗） —— */}
+          <div className="min-w-0 md:min-h-0 md:overflow-hidden">
+            <div className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-md)] border border-ds-border bg-ds-main p-3 md:h-full md:min-h-0 md:overflow-y-auto">
+              {draft ? (
+                <>
+                  <h3 className="text-[13.5px] font-semibold text-ds-ink">{draft.name}</h3>
+                  {draft.category ? (
+                    <span className="self-start rounded-full bg-ds-accent-soft px-2 py-0.5 text-[10.5px] font-medium text-ds-accent">
+                      {draft.category}
+                    </span>
+                  ) : null}
+                  {draft.description ? (
+                    <p className="text-[12px] leading-[18px] text-ds-muted">{draft.description}</p>
+                  ) : null}
+
+                  {draft.variables.length > 0 ? (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11.5px] font-medium text-ds-muted">
+                        {t('canvasWorkflowAiDraftVariables')}
+                      </span>
+                      {draft.variables.map((variable) => (
+                        <span key={variable.key} className="text-[11.5px] text-ds-muted">
+                          {variable.label || variable.key}
+                          <span className="text-ds-faint">
+                            {' '}
+                            · {variable.key}
+                            {variable.required ? ' · *' : ''}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[11.5px] font-medium text-ds-muted">
+                      {t('canvasWorkflowAiDraftTemplate')}
+                    </span>
+                    <p className="line-clamp-4 rounded-[var(--radius-sm)] bg-ds-card px-2 py-1 text-[11.5px] leading-[17px] text-ds-muted">
+                      {draft.promptTemplate.positive}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[11.5px] font-medium text-ds-muted">
+                      {t('canvasWorkflowAiDraftParams')}
+                    </span>
+                    <span className="text-[11.5px] text-ds-faint">
+                      {[
+                        workflowOutputSize(draft.imageConfig).replace('x', '×'),
+                        draft.imageConfig.resolution,
+                        draft.imageConfig.quality,
+                        draft.imageConfig.format.toUpperCase(),
+                        draft.textExpansion.enabled
+                          ? t('canvasWorkflowChipMulti')
+                          : null
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  </div>
+
+                  <div className="mt-auto flex items-center justify-end gap-2 pt-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      data-testid="workflow-ai-continue-edit"
+                      onClick={() => onContinueEdit(draft)}
+                    >
+                      {t('canvasWorkflowAiContinueEdit')}
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      data-testid="workflow-ai-save-direct"
+                      onClick={() => {
+                        // 校验失败：容器返回中文错误文案 → inline 展示，弹窗保持打开不保存。
+                        const message = onSaveDirect(draft)
+                        setError(message)
+                      }}
+                    >
+                      {t('canvasWorkflowAiSaveDirect')}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div
+                  data-testid="workflow-ai-draft-empty"
+                  className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center"
+                >
+                  <Sparkles className="h-8 w-8 text-ds-faint" strokeWidth={1.5} aria-hidden />
+                  <p className="text-[13px] font-medium text-ds-ink">{t('canvasWorkflowAiEmptyTitle')}</p>
+                  <p className="text-[12px] text-ds-muted">{t('canvasWorkflowAiEmptyDesc')}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </Modal>

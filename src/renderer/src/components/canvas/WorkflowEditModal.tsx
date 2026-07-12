@@ -279,481 +279,487 @@ export function WorkflowEditModal({
       onClose={onClose}
       ariaLabel={isNew ? t('canvasWorkflowEditTitleNew') : t('canvasWorkflowEditTitle')}
       size="2xl"
-      className="flex h-[min(760px,86vh)] flex-col"
+      className="flex h-[78vh] max-h-[82vh] flex-col overflow-hidden"
     >
-      <h2 className="pb-3 text-[15px] font-semibold text-ds-ink">
+      <h2 className="shrink-0 pb-3 text-[15px] font-semibold text-ds-ink">
         {isNew ? t('canvasWorkflowEditTitleNew') : t('canvasWorkflowEditTitle')}
       </h2>
 
-      {/* 内容区：<md 上下布局整体滚动；md+ 左右两栏（约 58:42）各自独立滚动 */}
+      {/* 内容区：<md 上下布局整体滚动；md+ 左右两栏各自独立滚动。
+          grid-rows-[minmax(0,1fr)] 关键：锁死行轨道 = 容器高度，否则 auto 行按内容撑高、
+          两栏 overflow-y-auto 永不生效（内容被 overflow-hidden 截断）。 */}
       <div
         data-testid="workflow-edit-body"
-        className="grid min-h-0 flex-1 gap-5 overflow-y-auto pr-1 md:grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)] md:overflow-hidden md:pr-0"
+        className="grid min-h-0 flex-1 gap-4 overflow-y-auto pr-1 md:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden md:pr-0"
       >
-        {/* —— 左栏：基础信息 / 变量 / 模板 —— */}
-        <div className="flex min-w-0 flex-col gap-3 md:min-h-0 md:overflow-y-auto md:pr-1">
-          <label className="flex flex-col gap-1">
-            <FieldLabel text={t('canvasWorkflowNameLabel')} required />
-            <Input
-              data-testid="workflow-name-input"
-              value={draft.name}
-              onChange={(e) => patch({ name: e.target.value })}
-              placeholder={t('canvasWorkflowNamePlaceholder')}
-              invalid={attempted && !draft.name.trim()}
-            />
-          </label>
-
-          <label className="flex flex-col gap-1">
-            <FieldLabel text={t('canvasWorkflowDescLabel')} />
-            <Textarea
-              value={draft.description}
-              onChange={(e) => patch({ description: e.target.value })}
-              rows={2}
-              placeholder={t('canvasWorkflowDescPlaceholder')}
-              className="min-h-[52px] resize-none text-[12.5px]"
-            />
-          </label>
-
-          <div className="flex flex-col gap-1">
-            <FieldLabel text={t('canvasWorkflowCategoryLabel')} />
-            <Select
-              value={categoryChoice}
-              options={categoryOptions}
-              onChange={setCategoryChoice}
-              aria-label={t('canvasWorkflowCategoryLabel')}
-            />
-            {categoryChoice === CUSTOM_CATEGORY ? (
+        {/* —— 左栏：基础信息 / 变量 / 模板（外层承载高度，内层独立滚动） —— */}
+        <div className="min-w-0 md:min-h-0 md:overflow-hidden">
+          <div className="flex flex-col gap-3 md:h-full md:min-h-0 md:overflow-y-auto md:pb-5 md:pr-2">
+            <label className="flex flex-col gap-1">
+              <FieldLabel text={t('canvasWorkflowNameLabel')} required />
               <Input
-                value={customCategory}
-                onChange={(e) => setCustomCategory(e.target.value)}
-                placeholder={t('canvasWorkflowCategoryCustomPlaceholder')}
+                data-testid="workflow-name-input"
+                value={draft.name}
+                onChange={(e) => patch({ name: e.target.value })}
+                placeholder={t('canvasWorkflowNamePlaceholder')}
+                invalid={attempted && !draft.name.trim()}
               />
-            ) : null}
-          </div>
+            </label>
 
-          {/* 输入变量编辑器 */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <FieldLabel text={t('canvasWorkflowVariablesTitle')} />
-              <Button variant="ghost" size="sm" data-testid="workflow-variable-add" onClick={addVariable}>
-                <Plus className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                {t('canvasWorkflowVariableAdd')}
-              </Button>
+            <label className="flex flex-col gap-1">
+              <FieldLabel text={t('canvasWorkflowDescLabel')} />
+              <Textarea
+                value={draft.description}
+                onChange={(e) => patch({ description: e.target.value })}
+                rows={2}
+                placeholder={t('canvasWorkflowDescPlaceholder')}
+                className="min-h-[52px] resize-none text-[12.5px]"
+              />
+            </label>
+
+            <div className="flex flex-col gap-1">
+              <FieldLabel text={t('canvasWorkflowCategoryLabel')} />
+              <Select
+                value={categoryChoice}
+                options={categoryOptions}
+                onChange={setCategoryChoice}
+                aria-label={t('canvasWorkflowCategoryLabel')}
+              />
+              {categoryChoice === CUSTOM_CATEGORY ? (
+                <Input
+                  value={customCategory}
+                  onChange={(e) => setCustomCategory(e.target.value)}
+                  placeholder={t('canvasWorkflowCategoryCustomPlaceholder')}
+                />
+              ) : null}
             </div>
-            {draft.variables.length === 0 ? (
-              <p className="text-[11.5px] text-ds-faint">{t('canvasWorkflowVariablesEmpty')}</p>
-            ) : (
-              draft.variables.map((variable, index) => (
-                <div
-                  key={index}
-                  data-testid="workflow-variable-row"
-                  className="flex flex-col gap-2 rounded-[var(--radius-md)] border border-ds-border bg-ds-main p-2"
-                >
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      value={variable.key}
-                      onChange={(e) => patchVariable(index, { key: e.target.value })}
-                      placeholder={t('canvasWorkflowVariableKey')}
-                      aria-label={t('canvasWorkflowVariableKey')}
-                      className="h-8 text-[12px]"
-                    />
-                    <Input
-                      value={variable.label}
-                      onChange={(e) => patchVariable(index, { label: e.target.value })}
-                      placeholder={t('canvasWorkflowVariableLabel')}
-                      aria-label={t('canvasWorkflowVariableLabel')}
-                      className="h-8 text-[12px]"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Select
-                      value={variable.type}
-                      options={IMAGE_WORKFLOW_VARIABLE_TYPES.map((type) => ({
-                        value: type,
-                        label: variableTypeLabels[type]
-                      }))}
-                      onChange={(type) => patchVariable(index, { type })}
-                      aria-label={t('canvasWorkflowVariableType')}
-                      className="h-8 text-[12px]"
-                    />
-                    <Input
-                      value={variable.defaultValue}
-                      onChange={(e) => patchVariable(index, { defaultValue: e.target.value })}
-                      placeholder={t('canvasWorkflowVariableDefault')}
-                      aria-label={t('canvasWorkflowVariableDefault')}
-                      className="h-8 text-[12px]"
-                    />
-                  </div>
-                  {variable.type === 'select' ? (
-                    <Input
-                      value={variable.options.join(',')}
-                      onChange={(e) =>
-                        patchVariable(index, {
-                          options: e.target.value
-                            .split(/[,，]/)
-                            .map((option) => option.trim())
-                            .filter((option) => option.length > 0)
-                        })
-                      }
-                      placeholder={t('canvasWorkflowVariableOptions')}
-                      aria-label={t('canvasWorkflowVariableOptions')}
-                      className="h-8 text-[12px]"
-                    />
-                  ) : null}
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="flex items-center gap-2 text-[11.5px] text-ds-muted">
-                      <Toggle
-                        checked={variable.required}
-                        onChange={(required) => patchVariable(index, { required })}
-                      />
-                      {t('canvasWorkflowVariableRequired')}
-                    </label>
-                    <button
-                      type="button"
-                      title={t('canvasWorkflowVariableRemove')}
-                      aria-label={t('canvasWorkflowVariableRemove')}
-                      onClick={() => removeVariable(index)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
 
-          {/* 提示词模板 */}
-          <div className="flex flex-col gap-2">
-            <FieldLabel text={t('canvasWorkflowTemplateTitle')} />
-            <label className="flex flex-col gap-1">
-              <span className="text-[11.5px] text-ds-faint">{t('canvasWorkflowTemplateSystem')}</span>
-              <Textarea
-                value={draft.promptTemplate.system}
-                onChange={(e) => patchTemplate({ system: e.target.value })}
-                rows={2}
-                className="min-h-[48px] resize-none text-[12.5px]"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <FieldLabel text={t('canvasWorkflowTemplatePositive')} required />
-              <Textarea
-                data-testid="workflow-positive-input"
-                value={draft.promptTemplate.positive}
-                onChange={(e) => patchTemplate({ positive: e.target.value })}
-                rows={4}
-                invalid={attempted && !draft.promptTemplate.positive.trim()}
-                className="resize-none text-[12.5px]"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[11.5px] text-ds-faint">{t('canvasWorkflowTemplateNegative')}</span>
-              <Textarea
-                value={draft.promptTemplate.negative}
-                onChange={(e) => patchTemplate({ negative: e.target.value })}
-                rows={2}
-                className="min-h-[48px] resize-none text-[12.5px]"
-              />
-            </label>
-            <p className="text-[11px] text-ds-faint">
-              {t('canvasWorkflowTemplateHint', { example: '{{topic}}' })}
-            </p>
-            {validation.unusedVariables.length > 0 ? (
-              <p data-testid="workflow-unused-vars" className="text-[11px] text-ds-faint">
-                {t('canvasWorkflowUnusedVariables', { keys: validation.unusedVariables.join(', ') })}
+            {/* 输入变量编辑器 */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <FieldLabel text={t('canvasWorkflowVariablesTitle')} />
+                <Button variant="ghost" size="sm" data-testid="workflow-variable-add" onClick={addVariable}>
+                  <Plus className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                  {t('canvasWorkflowVariableAdd')}
+                </Button>
+              </div>
+              {draft.variables.length === 0 ? (
+                <p className="text-[11.5px] text-ds-faint">{t('canvasWorkflowVariablesEmpty')}</p>
+              ) : (
+                draft.variables.map((variable, index) => (
+                  <div
+                    key={index}
+                    data-testid="workflow-variable-row"
+                    className="flex flex-col gap-2 rounded-[var(--radius-md)] border border-ds-border bg-ds-main p-2"
+                  >
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={variable.key}
+                        onChange={(e) => patchVariable(index, { key: e.target.value })}
+                        placeholder={t('canvasWorkflowVariableKey')}
+                        aria-label={t('canvasWorkflowVariableKey')}
+                        className="h-8 text-[12px]"
+                      />
+                      <Input
+                        value={variable.label}
+                        onChange={(e) => patchVariable(index, { label: e.target.value })}
+                        placeholder={t('canvasWorkflowVariableLabel')}
+                        aria-label={t('canvasWorkflowVariableLabel')}
+                        className="h-8 text-[12px]"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select
+                        value={variable.type}
+                        options={IMAGE_WORKFLOW_VARIABLE_TYPES.map((type) => ({
+                          value: type,
+                          label: variableTypeLabels[type]
+                        }))}
+                        onChange={(type) => patchVariable(index, { type })}
+                        aria-label={t('canvasWorkflowVariableType')}
+                        className="h-8 text-[12px]"
+                      />
+                      <Input
+                        value={variable.defaultValue}
+                        onChange={(e) => patchVariable(index, { defaultValue: e.target.value })}
+                        placeholder={t('canvasWorkflowVariableDefault')}
+                        aria-label={t('canvasWorkflowVariableDefault')}
+                        className="h-8 text-[12px]"
+                      />
+                    </div>
+                    {variable.type === 'select' ? (
+                      <Input
+                        value={variable.options.join(',')}
+                        onChange={(e) =>
+                          patchVariable(index, {
+                            options: e.target.value
+                              .split(/[,，]/)
+                              .map((option) => option.trim())
+                              .filter((option) => option.length > 0)
+                          })
+                        }
+                        placeholder={t('canvasWorkflowVariableOptions')}
+                        aria-label={t('canvasWorkflowVariableOptions')}
+                        className="h-8 text-[12px]"
+                      />
+                    ) : null}
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="flex items-center gap-2 text-[11.5px] text-ds-muted">
+                        <Toggle
+                          checked={variable.required}
+                          onChange={(required) => patchVariable(index, { required })}
+                        />
+                        {t('canvasWorkflowVariableRequired')}
+                      </label>
+                      <button
+                        type="button"
+                        title={t('canvasWorkflowVariableRemove')}
+                        aria-label={t('canvasWorkflowVariableRemove')}
+                        onClick={() => removeVariable(index)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] text-ds-muted transition-colors duration-[var(--motion-fast)] hover:bg-ds-danger-soft hover:text-ds-danger"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* 提示词模板 */}
+            <div className="flex flex-col gap-2">
+              <FieldLabel text={t('canvasWorkflowTemplateTitle')} />
+              <label className="flex flex-col gap-1">
+                <span className="text-[11.5px] text-ds-faint">{t('canvasWorkflowTemplateSystem')}</span>
+                <Textarea
+                  value={draft.promptTemplate.system}
+                  onChange={(e) => patchTemplate({ system: e.target.value })}
+                  rows={2}
+                  className="min-h-[48px] resize-none text-[12.5px]"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <FieldLabel text={t('canvasWorkflowTemplatePositive')} required />
+                <Textarea
+                  data-testid="workflow-positive-input"
+                  value={draft.promptTemplate.positive}
+                  onChange={(e) => patchTemplate({ positive: e.target.value })}
+                  rows={4}
+                  invalid={attempted && !draft.promptTemplate.positive.trim()}
+                  className="resize-none text-[12.5px]"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[11.5px] text-ds-faint">{t('canvasWorkflowTemplateNegative')}</span>
+                <Textarea
+                  value={draft.promptTemplate.negative}
+                  onChange={(e) => patchTemplate({ negative: e.target.value })}
+                  rows={2}
+                  className="min-h-[48px] resize-none text-[12.5px]"
+                />
+              </label>
+              <p className="text-[11px] text-ds-faint">
+                {t('canvasWorkflowTemplateHint', { example: '{{topic}}' })}
               </p>
-            ) : null}
+              {validation.unusedVariables.length > 0 ? (
+                <p data-testid="workflow-unused-vars" className="text-[11px] text-ds-faint">
+                  {t('canvasWorkflowUnusedVariables', { keys: validation.unusedVariables.join(', ') })}
+                </p>
+              ) : null}
+            </div>
           </div>
         </div>
 
-        {/* —— 右栏：生成配置（折叠分组，独立滚动不受多图规则展开挤压） —— */}
-        <div className="flex min-w-0 flex-col gap-3 md:min-h-0 md:overflow-y-auto md:pr-1">
-          <Section
-            title={t('canvasWorkflowSectionModel')}
-            open={sections.model}
-            onToggle={() => toggleSection('model')}
-          >
-            {imageModels.length > 0 ? (
-              <Select
-                value={config.model || null}
-                options={imageModels.map((model) => ({ value: model, label: model }))}
-                onChange={(model) => patchImage({ model })}
-                placeholder={t('canvasModelLabel')}
-                invalid={attempted && !config.model.trim()}
-                aria-label={t('canvasModelLabel')}
-              />
-            ) : (
-              <div className="flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-dashed border-ds-border bg-ds-main px-3 py-2 text-[12px] text-ds-muted">
-                <span>{t('canvasNoImageModels')}</span>
-                <Button variant="secondary" size="sm" className="shrink-0" onClick={onRefreshModels}>
-                  <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                  {t('canvasRefreshModels')}
-                </Button>
-              </div>
-            )}
-          </Section>
+        {/* —— 右栏：生成配置（外层承载高度，折叠分组展开由内层滚动消化，不撑破弹窗） —— */}
+        <div className="min-w-0 md:min-h-0 md:overflow-hidden">
+          <div className="flex flex-col gap-3 md:h-full md:min-h-0 md:overflow-y-auto md:pb-5 md:pr-2">
+            <Section
+              title={t('canvasWorkflowSectionModel')}
+              open={sections.model}
+              onToggle={() => toggleSection('model')}
+            >
+              {imageModels.length > 0 ? (
+                <Select
+                  value={config.model || null}
+                  options={imageModels.map((model) => ({ value: model, label: model }))}
+                  onChange={(model) => patchImage({ model })}
+                  placeholder={t('canvasModelLabel')}
+                  invalid={attempted && !config.model.trim()}
+                  aria-label={t('canvasModelLabel')}
+                />
+              ) : (
+                <div className="flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-dashed border-ds-border bg-ds-main px-3 py-2 text-[12px] text-ds-muted">
+                  <span>{t('canvasNoImageModels')}</span>
+                  <Button variant="secondary" size="sm" className="shrink-0" onClick={onRefreshModels}>
+                    <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                    {t('canvasRefreshModels')}
+                  </Button>
+                </div>
+              )}
+            </Section>
 
-          <Section
-            title={t('canvasWorkflowSectionExpansion')}
-            open={sections.expansion}
-            onToggle={() => toggleSection('expansion')}
-          >
-            <label className="flex items-center justify-between gap-2 text-[12px] text-ds-muted">
-              {t('canvasWorkflowExpansionEnable')}
-              <Toggle
-                checked={draft.textExpansion.enabled}
-                onChange={(enabled) => patchExpansion({ enabled })}
-              />
-            </label>
-            {draft.textExpansion.enabled ? (
-              <>
-                <div className="flex flex-col gap-1">
-                  <FieldLabel text={t('canvasWorkflowExpansionModel')} required />
-                  {textModels.length > 0 ? (
-                    <Select
-                      value={draft.textExpansion.model || null}
-                      options={textModels.map((model) => ({ value: model, label: model }))}
-                      onChange={(model) => patchExpansion({ model })}
-                      placeholder={t('canvasWorkflowExpansionModel')}
-                      invalid={attempted && !draft.textExpansion.model.trim()}
-                      aria-label={t('canvasWorkflowExpansionModel')}
+            <Section
+              title={t('canvasWorkflowSectionExpansion')}
+              open={sections.expansion}
+              onToggle={() => toggleSection('expansion')}
+            >
+              <label className="flex items-center justify-between gap-2 text-[12px] text-ds-muted">
+                {t('canvasWorkflowExpansionEnable')}
+                <Toggle
+                  checked={draft.textExpansion.enabled}
+                  onChange={(enabled) => patchExpansion({ enabled })}
+                />
+              </label>
+              {draft.textExpansion.enabled ? (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <FieldLabel text={t('canvasWorkflowExpansionModel')} required />
+                    {textModels.length > 0 ? (
+                      <Select
+                        value={draft.textExpansion.model || null}
+                        options={textModels.map((model) => ({ value: model, label: model }))}
+                        onChange={(model) => patchExpansion({ model })}
+                        placeholder={t('canvasWorkflowExpansionModel')}
+                        invalid={attempted && !draft.textExpansion.model.trim()}
+                        aria-label={t('canvasWorkflowExpansionModel')}
+                      />
+                    ) : (
+                      <p className="text-[11.5px] text-ds-faint">{t('canvasWorkflowNoTextModels')}</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex flex-col gap-1">
+                      <FieldLabel text={t('canvasWorkflowExpansionCount')} />
+                      <Input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={draft.textExpansion.count}
+                        onChange={(e) =>
+                          patchExpansion({ count: clampInt(e.target.value, 4, 1, 20) })
+                        }
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <FieldLabel text={t('canvasWorkflowExpansionConcurrency')} />
+                      <Input
+                        type="number"
+                        min={1}
+                        max={6}
+                        value={draft.textExpansion.concurrency}
+                        onChange={(e) =>
+                          patchExpansion({ concurrency: clampInt(e.target.value, 2, 1, 6) })
+                        }
+                      />
+                    </label>
+                  </div>
+                  <label className="flex flex-col gap-1">
+                    <FieldLabel text={t('canvasWorkflowExpansionRule')} />
+                    <Textarea
+                      value={draft.textExpansion.rule}
+                      onChange={(e) => patchExpansion({ rule: e.target.value })}
+                      rows={3}
+                      placeholder={t('canvasWorkflowExpansionRulePlaceholder')}
+                      className="resize-none text-[12.5px]"
                     />
-                  ) : (
-                    <p className="text-[11.5px] text-ds-faint">{t('canvasWorkflowNoTextModels')}</p>
+                  </label>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="flex flex-col text-[12px] text-ds-muted">
+                      {t('canvasWorkflowExpansionPrepend')}
+                      <span className="text-[11px] text-ds-faint">
+                        {t('canvasWorkflowExpansionPrependHint')}
+                      </span>
+                    </span>
+                    <Toggle
+                      checked={draft.textExpansion.prependBasePrompt}
+                      onChange={(prependBasePrompt) => patchExpansion({ prependBasePrompt })}
+                    />
+                  </div>
+                </>
+              ) : null}
+            </Section>
+
+            <Section
+              title={t('canvasWorkflowSectionSize')}
+              open={sections.size}
+              onToggle={() => toggleSection('size')}
+            >
+              <div className="flex flex-col gap-1.5">
+                <FieldLabel text={t('canvasAspectLabel')} />
+                <div className="grid grid-cols-4 gap-2" role="group" aria-label={t('canvasAspectLabel')}>
+                  {[...CLAUDE360_ASPECT_PRESETS.map((preset) => ({ id: preset.id, label: preset.ratio })), { id: 'custom', label: t('canvasWorkflowAspectCustom') }].map(
+                    (preset) => {
+                      const active = preset.id === config.aspectPresetId
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => patchImage({ aspectPresetId: preset.id })}
+                          className={`rounded-[var(--radius-sm)] border px-1.5 py-2 text-[12px] font-semibold tabular-nums transition-colors duration-[var(--motion-fast)] ${
+                            active
+                              ? 'border-ds-accent bg-ds-accent-soft text-ds-accent'
+                              : 'border-ds-border bg-ds-main text-ds-muted hover:border-ds-accent hover:text-ds-ink'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      )
+                    }
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="flex flex-col gap-1">
-                    <FieldLabel text={t('canvasWorkflowExpansionCount')} />
-                    <Input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={draft.textExpansion.count}
-                      onChange={(e) =>
-                        patchExpansion({ count: clampInt(e.target.value, 4, 1, 20) })
-                      }
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <FieldLabel text={t('canvasWorkflowExpansionConcurrency')} />
-                    <Input
-                      type="number"
-                      min={1}
-                      max={6}
-                      value={draft.textExpansion.concurrency}
-                      onChange={(e) =>
-                        patchExpansion({ concurrency: clampInt(e.target.value, 2, 1, 6) })
-                      }
-                    />
-                  </label>
-                </div>
+                {isCustomAspect ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex flex-col gap-1">
+                      <FieldLabel text={t('canvasWorkflowWidth')} />
+                      <Input
+                        type="number"
+                        min={16}
+                        max={99999}
+                        value={config.width}
+                        onChange={(e) => patchImage({ width: clampInt(e.target.value, 1024, 16, 99_999) })}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <FieldLabel text={t('canvasWorkflowHeight')} />
+                      <Input
+                        type="number"
+                        min={16}
+                        max={99999}
+                        value={config.height}
+                        onChange={(e) => patchImage({ height: clampInt(e.target.value, 1024, 16, 99_999) })}
+                      />
+                    </label>
+                  </div>
+                ) : null}
+                <span className="text-[11px] text-ds-faint">
+                  {t('canvasWorkflowOutputSize', { size: outputSize })}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <FieldLabel text={t('canvasResolutionLabel')} />
+                <ChipRow
+                  options={CLAUDE360_IMAGE_RESOLUTIONS}
+                  value={config.resolution}
+                  label={t('canvasResolutionLabel')}
+                  disabled={isCustomAspect}
+                  onChange={(resolution) => patchImage({ resolution })}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <FieldLabel text={t('canvasQualityLabel')} />
+                <ChipRow
+                  options={CLAUDE360_IMAGE_QUALITIES}
+                  value={config.quality}
+                  label={t('canvasQualityLabel')}
+                  labelOf={(quality) => qualityLabels[quality]}
+                  onChange={(quality) => patchImage({ quality })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1">
-                  <FieldLabel text={t('canvasWorkflowExpansionRule')} />
-                  <Textarea
-                    value={draft.textExpansion.rule}
-                    onChange={(e) => patchExpansion({ rule: e.target.value })}
-                    rows={3}
-                    placeholder={t('canvasWorkflowExpansionRulePlaceholder')}
-                    className="resize-none text-[12.5px]"
+                  <FieldLabel text={t('canvasCountLabel')} />
+                  <Select
+                    value={String(config.count)}
+                    options={['1', '2', '3', '4'].map((count) => ({ value: count, label: count }))}
+                    onChange={(count) => patchImage({ count: clampInt(count, 1, 1, 4) })}
+                    aria-label={t('canvasCountLabel')}
                   />
                 </label>
-                <div className="flex items-start justify-between gap-2">
-                  <span className="flex flex-col text-[12px] text-ds-muted">
-                    {t('canvasWorkflowExpansionPrepend')}
-                    <span className="text-[11px] text-ds-faint">
-                      {t('canvasWorkflowExpansionPrependHint')}
-                    </span>
-                  </span>
-                  <Toggle
-                    checked={draft.textExpansion.prependBasePrompt}
-                    onChange={(prependBasePrompt) => patchExpansion({ prependBasePrompt })}
+                <label className="flex flex-col gap-1">
+                  <FieldLabel text={t('canvasOutputFormatLabel')} />
+                  <Select
+                    value={config.format}
+                    options={CLAUDE360_IMAGE_OUTPUT_FORMATS.map((format) => ({
+                      value: format,
+                      label: FORMAT_LABELS[format]
+                    }))}
+                    onChange={(format) => patchImage({ format })}
+                    aria-label={t('canvasOutputFormatLabel')}
                   />
-                </div>
-              </>
-            ) : null}
-          </Section>
-
-          <Section
-            title={t('canvasWorkflowSectionSize')}
-            open={sections.size}
-            onToggle={() => toggleSection('size')}
-          >
-            <div className="flex flex-col gap-1.5">
-              <FieldLabel text={t('canvasAspectLabel')} />
-              <div className="grid grid-cols-4 gap-2" role="group" aria-label={t('canvasAspectLabel')}>
-                {[...CLAUDE360_ASPECT_PRESETS.map((preset) => ({ id: preset.id, label: preset.ratio })), { id: 'custom', label: t('canvasWorkflowAspectCustom') }].map(
-                  (preset) => {
-                    const active = preset.id === config.aspectPresetId
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => patchImage({ aspectPresetId: preset.id })}
-                        className={`rounded-[var(--radius-sm)] border px-1.5 py-2 text-[12px] font-semibold tabular-nums transition-colors duration-[var(--motion-fast)] ${
-                          active
-                            ? 'border-ds-accent bg-ds-accent-soft text-ds-accent'
-                            : 'border-ds-border bg-ds-main text-ds-muted hover:border-ds-accent hover:text-ds-ink'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    )
-                  }
-                )}
+                </label>
               </div>
-              {isCustomAspect ? (
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="flex flex-col gap-1">
-                    <FieldLabel text={t('canvasWorkflowWidth')} />
-                    <Input
-                      type="number"
-                      min={16}
-                      max={99999}
-                      value={config.width}
-                      onChange={(e) => patchImage({ width: clampInt(e.target.value, 1024, 16, 99_999) })}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <FieldLabel text={t('canvasWorkflowHeight')} />
-                    <Input
-                      type="number"
-                      min={16}
-                      max={99999}
-                      value={config.height}
-                      onChange={(e) => patchImage({ height: clampInt(e.target.value, 1024, 16, 99_999) })}
-                    />
-                  </label>
-                </div>
-              ) : null}
-              <span className="text-[11px] text-ds-faint">
-                {t('canvasWorkflowOutputSize', { size: outputSize })}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <FieldLabel text={t('canvasResolutionLabel')} />
-              <ChipRow
-                options={CLAUDE360_IMAGE_RESOLUTIONS}
-                value={config.resolution}
-                label={t('canvasResolutionLabel')}
-                disabled={isCustomAspect}
-                onChange={(resolution) => patchImage({ resolution })}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <FieldLabel text={t('canvasQualityLabel')} />
-              <ChipRow
-                options={CLAUDE360_IMAGE_QUALITIES}
-                value={config.quality}
-                label={t('canvasQualityLabel')}
-                labelOf={(quality) => qualityLabels[quality]}
-                onChange={(quality) => patchImage({ quality })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="flex flex-col gap-1">
-                <FieldLabel text={t('canvasCountLabel')} />
-                <Select
-                  value={String(config.count)}
-                  options={['1', '2', '3', '4'].map((count) => ({ value: count, label: count }))}
-                  onChange={(count) => patchImage({ count: clampInt(count, 1, 1, 4) })}
-                  aria-label={t('canvasCountLabel')}
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <FieldLabel text={t('canvasOutputFormatLabel')} />
-                <Select
-                  value={config.format}
-                  options={CLAUDE360_IMAGE_OUTPUT_FORMATS.map((format) => ({
-                    value: format,
-                    label: FORMAT_LABELS[format]
-                  }))}
-                  onChange={(format) => patchImage({ format })}
-                  aria-label={t('canvasOutputFormatLabel')}
-                />
-              </label>
-            </div>
-          </Section>
+            </Section>
 
-          <Section
-            title={t('canvasWorkflowSectionAdvanced')}
-            open={sections.advanced}
-            onToggle={() => toggleSection('advanced')}
-          >
-            <div className="grid grid-cols-2 gap-2">
+            <Section
+              title={t('canvasWorkflowSectionAdvanced')}
+              open={sections.advanced}
+              onToggle={() => toggleSection('advanced')}
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1">
+                  <FieldLabel text={t('canvasWorkflowRetryLabel')} />
+                  <Input
+                    type="number"
+                    min={0}
+                    max={5}
+                    value={config.retry}
+                    onChange={(e) => patchImage({ retry: clampInt(e.target.value, 0, 0, 5) })}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <FieldLabel text={t('canvasWorkflowTimeout')} />
+                  <Input
+                    type="number"
+                    min={30}
+                    max={3600}
+                    value={config.timeoutSeconds}
+                    onChange={(e) =>
+                      patchImage({ timeoutSeconds: clampInt(e.target.value, 600, 30, 3_600) })
+                    }
+                  />
+                </label>
+              </div>
               <label className="flex flex-col gap-1">
-                <FieldLabel text={t('canvasWorkflowRetryLabel')} />
+                <FieldLabel text={t('canvasWorkflowCompression')} />
                 <Input
                   type="number"
                   min={0}
-                  max={5}
-                  value={config.retry}
-                  onChange={(e) => patchImage({ retry: clampInt(e.target.value, 0, 0, 5) })}
+                  max={100}
+                  disabled={compressionDisabled}
+                  value={config.compression}
+                  onChange={(e) => patchImage({ compression: clampInt(e.target.value, 100, 0, 100) })}
                 />
+                {compressionDisabled ? (
+                  <span className="text-[11px] text-ds-faint">{t('canvasWorkflowCompressionPngHint')}</span>
+                ) : null}
               </label>
-              <label className="flex flex-col gap-1">
-                <FieldLabel text={t('canvasWorkflowTimeout')} />
-                <Input
-                  type="number"
-                  min={30}
-                  max={3600}
-                  value={config.timeoutSeconds}
-                  onChange={(e) =>
-                    patchImage({ timeoutSeconds: clampInt(e.target.value, 600, 30, 3_600) })
-                  }
+              <div className="flex flex-col gap-1">
+                <FieldLabel text={t('canvasWorkflowModeration')} />
+                <ChipRow
+                  options={CLAUDE360_IMAGE_MODERATIONS}
+                  value={config.moderation}
+                  label={t('canvasWorkflowModeration')}
+                  labelOf={(moderation) => moderationLabels[moderation]}
+                  onChange={(moderation) => patchImage({ moderation })}
                 />
-              </label>
-            </div>
-            <label className="flex flex-col gap-1">
-              <FieldLabel text={t('canvasWorkflowCompression')} />
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                disabled={compressionDisabled}
-                value={config.compression}
-                onChange={(e) => patchImage({ compression: clampInt(e.target.value, 100, 0, 100) })}
-              />
-              {compressionDisabled ? (
-                <span className="text-[11px] text-ds-faint">{t('canvasWorkflowCompressionPngHint')}</span>
-              ) : null}
-            </label>
-            <div className="flex flex-col gap-1">
-              <FieldLabel text={t('canvasWorkflowModeration')} />
-              <ChipRow
-                options={CLAUDE360_IMAGE_MODERATIONS}
-                value={config.moderation}
-                label={t('canvasWorkflowModeration')}
-                labelOf={(moderation) => moderationLabels[moderation]}
-                onChange={(moderation) => patchImage({ moderation })}
-              />
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <span className="flex flex-col text-[12px] text-ds-muted">
-                {t('canvasWorkflowStream')}
-                <span className="text-[11px] text-ds-faint">{t('canvasWorkflowUpstreamHint')}</span>
-              </span>
-              <Toggle checked={config.stream} onChange={(stream) => patchImage({ stream })} />
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[12px] text-ds-muted">{t('canvasWorkflowReturnBase64')}</span>
-              <Toggle
-                checked={config.returnBase64}
-                onChange={(returnBase64) => patchImage({ returnBase64 })}
-              />
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <span className="flex flex-col text-[12px] text-ds-muted">
-                {t('canvasWorkflowCodex')}
-                <span className="text-[11px] text-ds-faint">{t('canvasWorkflowUpstreamHint')}</span>
-              </span>
-              <Toggle
-                checked={config.codexCliCompatible}
-                onChange={(codexCliCompatible) => patchImage({ codexCliCompatible })}
-              />
-            </div>
-          </Section>
+              </div>
+              <div className="flex items-start justify-between gap-2">
+                <span className="flex flex-col text-[12px] text-ds-muted">
+                  {t('canvasWorkflowStream')}
+                  <span className="text-[11px] text-ds-faint">{t('canvasWorkflowUpstreamHint')}</span>
+                </span>
+                <Toggle checked={config.stream} onChange={(stream) => patchImage({ stream })} />
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[12px] text-ds-muted">{t('canvasWorkflowReturnBase64')}</span>
+                <Toggle
+                  checked={config.returnBase64}
+                  onChange={(returnBase64) => patchImage({ returnBase64 })}
+                />
+              </div>
+              <div className="flex items-start justify-between gap-2">
+                <span className="flex flex-col text-[12px] text-ds-muted">
+                  {t('canvasWorkflowCodex')}
+                  <span className="text-[11px] text-ds-faint">{t('canvasWorkflowUpstreamHint')}</span>
+                </span>
+                <Toggle
+                  checked={config.codexCliCompatible}
+                  onChange={(codexCliCompatible) => patchImage({ codexCliCompatible })}
+                />
+              </div>
+            </Section>
+          </div>
         </div>
       </div>
 
@@ -762,7 +768,7 @@ export function WorkflowEditModal({
         <div
           data-testid="workflow-edit-errors"
           role="alert"
-          className="mt-3 flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-ds-danger bg-ds-danger-soft px-3 py-2"
+          className="mt-3 flex shrink-0 flex-col gap-0.5 rounded-[var(--radius-md)] border border-ds-danger bg-ds-danger-soft px-3 py-2"
         >
           {validation.errors.map((issue, index) => (
             <span key={index} className="text-[12px] text-ds-danger">
