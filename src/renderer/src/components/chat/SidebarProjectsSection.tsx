@@ -472,10 +472,69 @@ function sddDraftHistoryForWorkspace(
   return []
 }
 
+export type SidebarGroupExpansionPlan = {
+  /** 建档/合并新增后的已知分组集合；null 表示尚未建档（继续等待首个非空快照）。 */
+  nextKnownGroupKeys: ReadonlySet<string> | null
+  /** 本轮需要定向展开的分组路径（不含用户手动开合）。 */
+  autoExpandPaths: string[]
+}
+
+/**
+ * 「新项目定向展开」核心判定（纯函数，便于单测覆盖冷启动异步数据场景）：
+ * - 未建档（known 为 null）且快照为空 → 不建档、继续等待：组件首轮挂载时
+ *   threads/workspaceRoots 往往尚未异步加载完成、displayGroups 为空数组，若此时把
+ *   空集合建档，数据到达后所有分组都不在 known 中，会被误判为「新增项目」而
+ *   全量自动展开——这是生产环境「项目默认折叠失效」的根因（07-12）。
+ *   防回归：勿改回「首轮无条件建档」。
+ * - 首个非空快照才建档：只记录不展开（保持默认折叠）；仅当 bootstrapExpandPath
+ *   （「添加项目」兜底 / 活跃会话所属项目）落在快照内时，定向展开这一个分组。
+ * - 建档后：已知 key 只增不减（搜索过滤导致分组消失又出现不算新增），新增
+ *   分组视为用户新建项目并定向展开。
+ */
+export function planSidebarGroupAutoExpansion(options: {
+  knownGroupKeys: ReadonlySet<string> | null
+  groupPaths: readonly string[]
+  /** 建档时刻的定向展开候选；空串表示无候选。建档后此参数被忽略。 */
+  bootstrapExpandPath?: string
+}): SidebarGroupExpansionPlan {
+  const { knownGroupKeys, groupPaths } = options
+  if (knownGroupKeys === null) {
+    if (groupPaths.length === 0) {
+      return { nextKnownGroupKeys: null, autoExpandPaths: [] }
+    }
+    const bootstrapExpandPath = options.bootstrapExpandPath ?? ''
+    return {
+      nextKnownGroupKeys: new Set(groupPaths),
+      autoExpandPaths:
+        bootstrapExpandPath && groupPaths.includes(bootstrapExpandPath)
+          ? [bootstrapExpandPath]
+          : []
+    }
+  }
+  const added = groupPaths.filter((workspacePath) => !knownGroupKeys.has(workspacePath))
+  return {
+    nextKnownGroupKeys: added.length > 0 ? new Set([...knownGroupKeys, ...added]) : knownGroupKeys,
+    autoExpandPaths: added
+  }
+}
+
+/** 按工作目录身份 key 在分组路径中定位展示路径（展开态字典以该路径为键）。 */
+export function sidebarGroupPathForWorkspace(
+  groupPaths: readonly string[],
+  workspacePath: string
+): string {
+  const key = workspaceRootIdentityKey(normalizeWorkspaceRoot(workspacePath))
+  if (!key) return ''
+  return groupPaths.find((path) => workspaceRootIdentityKey(path) === key) ?? ''
+}
+
 /* 项目分组展开状态缓存（应用会话级，07-12）：组件随一级功能切换会卸载重建
    （写作页替换为 WriteSidebar），useState 本地态会丢；模块级缓存让手动
    展开/折叠在会话内保留。默认全折叠（opt-in 展开，进入 Code 页保持整洁）。 */
 let expandedGroupsSessionCache: Record<string, boolean> = {}
+/* 会话内是否写过展开态（手动开合/新建会话/新项目定向展开都算）。一旦为 true，
+   建档时不再做「活跃会话所属项目预展开」，避免覆盖用户已表达的开合意图。 */
+let expandedGroupsSessionTouched = false
 
 export function SidebarProjectsSection({
   threads,
@@ -526,6 +585,7 @@ export function SidebarProjectsSection({
   const updateExpandedGroups = (
     updater: (current: Record<string, boolean>) => Record<string, boolean>
   ): void => {
+    expandedGroupsSessionTouched = true
     setExpandedGroups((current) => {
       const next = updater(current)
       expandedGroupsSessionCache = next
@@ -537,6 +597,16 @@ export function SidebarProjectsSection({
   const createThreadInWorkspaceExpanded = (workspacePath: string): void => {
     updateExpandedGroups((current) => ({ ...current, [workspacePath]: true }))
     onCreateThreadInWorkspace(workspacePath)
+  }
+
+  /* 「添加项目」挂起标记：chooseWorkspace 要等原生目录选择器异步返回，点击
+     回调本身拿不到目标路径，无法当场写 expanded=true。记录点击时刻的选中
+     目录，建档 effect 用「选中目录是否变化」判定首个非空快照是否来自用户
+     刚新建的第一个项目（取消选择则目录不变、不展开）。 */
+  const pendingWorkspacePickRef = useRef<string | null>(null)
+  const handlePickWorkspace = (): void => {
+    pendingWorkspacePickRef.current = workspaceRoot
+    onPickWorkspace()
   }
 
   useEffect(() => {
@@ -587,26 +657,46 @@ export function SidebarProjectsSection({
   const allGroupsCollapsed = displayGroups.length > 0 && displayGroups.every(([workspacePath]) => expandedGroups[workspacePath] !== true)
   const workspaceHistoryKey = draftHistoryWorkspacePaths.join('\n')
 
-  /* 新项目定向展开：仅对首次出现的分组（chooseWorkspace 新增项目）自动展开；
-     已见过的 key 只增不减，避免搜索过滤/清空导致分组消失又出现时被误判为新增。
-     初次挂载只记录不展开（默认整洁）。 */
-  const knownGroupKeysRef = useRef<Set<string> | null>(null)
+  /* 新项目定向展开：建档/增量判定收敛在 planSidebarGroupAutoExpansion（纯函数，
+     含「空快照不建档」的根因说明与防回归注释）。effect 只负责组装建档时刻的
+     定向展开候选（至多展开一个分组，其余保持默认折叠）：
+     1) 用户刚点过「添加项目」且选中目录已变化 → 展开刚选的新项目：从零新建
+        第一个项目时它就是首个非空快照本身，增量 diff 检测不到；
+     2) 会话内从未写过展开态且存在活跃会话 → 预展开其所属项目（进入 Code 页
+        直达当前上下文；用户手动开合过就不再干预）。 */
+  const knownGroupKeysRef = useRef<ReadonlySet<string> | null>(null)
   useEffect(() => {
     const known = knownGroupKeysRef.current
-    if (known === null) {
-      knownGroupKeysRef.current = new Set(displayGroups.map(([workspacePath]) => workspacePath))
-      return
+    const groupPaths = displayGroups.map(([workspacePath]) => workspacePath)
+    let bootstrapExpandPath = ''
+    if (known === null && groupPaths.length > 0) {
+      const pickBaseline = pendingWorkspacePickRef.current
+      pendingWorkspacePickRef.current = null
+      if (pickBaseline !== null && workspaceRoot && workspaceRoot !== pickBaseline) {
+        bootstrapExpandPath = sidebarGroupPathForWorkspace(groupPaths, workspaceRoot)
+      }
+      if (!bootstrapExpandPath && !expandedGroupsSessionTouched && activeThreadId) {
+        const activeThread = threads.find((item) => item.id === activeThreadId)
+        if (activeThread) {
+          bootstrapExpandPath = sidebarGroupPathForWorkspace(
+            groupPaths,
+            sidebarWorkspacePathForThread(
+              activeThread,
+              threadWorktrees,
+              sidebarWorkspaceResolutionCandidates({ workspaceRoot, workspaceRoots, threadWorktrees, threads })
+            )
+          )
+        }
+      }
     }
-    const added = displayGroups
-      .map(([workspacePath]) => workspacePath)
-      .filter((workspacePath) => !known.has(workspacePath))
-    if (added.length === 0) return
-    added.forEach((workspacePath) => known.add(workspacePath))
+    const plan = planSidebarGroupAutoExpansion({ knownGroupKeys: known, groupPaths, bootstrapExpandPath })
+    knownGroupKeysRef.current = plan.nextKnownGroupKeys
+    if (plan.autoExpandPaths.length === 0) return
     updateExpandedGroups((current) => ({
       ...current,
-      ...Object.fromEntries(added.map((workspacePath) => [workspacePath, true]))
+      ...Object.fromEntries(plan.autoExpandPaths.map((workspacePath) => [workspacePath, true]))
     }))
-  }, [displayGroups])
+  }, [activeThreadId, displayGroups, threadWorktrees, threads, workspaceRoot, workspaceRoots])
 
   useEffect(() => {
     if (
@@ -979,7 +1069,7 @@ export function SidebarProjectsSection({
             <Search className="h-3.5 w-3.5" strokeWidth={1.85} />
           </SidebarIconButton>
           <SidebarIconButton
-            onClick={onPickWorkspace}
+            onClick={handlePickWorkspace}
             className="h-7 w-7"
             title={workspaceRoot ? t('changeWorkspace') : t('selectWorkspace')}
             ariaLabel={workspaceRoot ? t('changeWorkspace') : t('selectWorkspace')}
@@ -1005,7 +1095,7 @@ export function SidebarProjectsSection({
           <SidebarEmpty
             runtimeReady={runtimeReady}
             hasWorkspace={!!workspaceRoot}
-            onPickWorkspace={onPickWorkspace}
+            onPickWorkspace={handlePickWorkspace}
             t={t}
           />
         ) : null}
