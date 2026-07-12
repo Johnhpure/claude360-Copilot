@@ -570,9 +570,9 @@ html {
     linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(246, 248, 251, 0.72));
 }
 
-[data-cursor-spotlight='off'] [data-cursor-spotlight-target] {
-  background-image: none;
-}
+/* 注意：不要写 [data-cursor-spotlight='off'] … { background-image: none } 之类的
+   全局清除规则——off 时上方 on 规则本就不匹配，而强制 none 会连带清掉元素自身的
+   背景图（如 accent 渐变选中态/CTA），导致高亮丢失（07-12 修复）。 */
 
 [data-theme='dark'] .ds-windows-titlebar {
   background:

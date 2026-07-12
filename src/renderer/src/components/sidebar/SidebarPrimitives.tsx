@@ -127,7 +127,9 @@ export function SidebarCommandRow({
   return (
     <button
       type="button"
-      data-cursor-spotlight-target
+      /* accent CTA 不挂 spotlight target：spotlight hover/focus 规则会替换
+         background-image，夺走 accent 渐变（CTA 自带 hover:brightness 光效）。 */
+      data-cursor-spotlight-target={accent ? undefined : ''}
       disabled={disabled}
       title={disabled ? disabledHint : undefined}
       onClick={onClick}
@@ -145,7 +147,8 @@ export function SidebarCommandRow({
             : footer
               ? 'text-ds-muted hover:bg-[var(--ds-sidebar-row-hover)] hover:text-ds-ink'
               : accent
-                ? 'bg-[image:var(--ds-accent-gradient)] font-medium text-white shadow-[var(--ds-accent-gradient-glow)] hover:brightness-110'
+                ? /* 纯色 bg 兜底 + 渐变图层：背景图被全局规则清除时仍保持蓝底白字 */
+                  'bg-[var(--ds-accent)] bg-[image:var(--ds-accent-gradient)] font-medium text-white shadow-[var(--ds-accent-gradient-glow)] hover:brightness-110'
                 : 'text-ds-muted hover:bg-[var(--ds-sidebar-row-hover)] hover:text-ds-ink'
       )}
     >

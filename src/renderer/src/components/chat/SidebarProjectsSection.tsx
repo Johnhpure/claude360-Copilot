@@ -1,5 +1,5 @@
 import type { FormEvent, MouseEvent as ReactMouseEvent, ReactElement } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -472,6 +472,11 @@ function sddDraftHistoryForWorkspace(
   return []
 }
 
+/* 项目分组展开状态缓存（应用会话级，07-12）：组件随一级功能切换会卸载重建
+   （写作页替换为 WriteSidebar），useState 本地态会丢；模块级缓存让手动
+   展开/折叠在会话内保留。默认全折叠（opt-in 展开，进入 Code 页保持整洁）。 */
+let expandedGroupsSessionCache: Record<string, boolean> = {}
+
 export function SidebarProjectsSection({
   threads,
   activeView,
@@ -499,7 +504,11 @@ export function SidebarProjectsSection({
   onSearchQueryChange,
   t
 }: SidebarProjectsSectionProps): ReactElement {
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  /* 分组展开态：expandedGroups[path] === true 才展开（默认折叠）；
+     写入同步到模块缓存，保证卸载重建后会话内状态保留。 */
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
+    () => expandedGroupsSessionCache
+  )
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Record<string, boolean>>({})
   const [deletingThreadIds, setDeletingThreadIds] = useState<Record<string, boolean>>({})
   const [deletingDraftIds, setDeletingDraftIds] = useState<Record<string, boolean>>({})
@@ -513,6 +522,22 @@ export function SidebarProjectsSection({
   const [draftHistoryByWorkspace, setDraftHistoryByWorkspace] = useState<Record<string, SddDraftHistoryItem[]>>({})
   const [threadWorktrees, setThreadWorktrees] = useState<SidebarThreadWorktrees>(() => readThreadWorktreeRegistry().worktrees)
   const activeSddDraftId = useSddDraftStore((s) => s.activeDraft?.id ?? '')
+
+  const updateExpandedGroups = (
+    updater: (current: Record<string, boolean>) => Record<string, boolean>
+  ): void => {
+    setExpandedGroups((current) => {
+      const next = updater(current)
+      expandedGroupsSessionCache = next
+      return next
+    })
+  }
+
+  /* 新建会话前先展开目标分组：新会话所在项目立即可见，其余保持折叠。 */
+  const createThreadInWorkspaceExpanded = (workspacePath: string): void => {
+    updateExpandedGroups((current) => ({ ...current, [workspacePath]: true }))
+    onCreateThreadInWorkspace(workspacePath)
+  }
 
   useEffect(() => {
     setThreadWorktrees(readThreadWorktreeRegistry().worktrees)
@@ -559,8 +584,29 @@ export function SidebarProjectsSection({
   }, [filteredDraftHistoryByWorkspace, groups, workspaceRoot])
 
   const searchVisible = searchOpen || searchQuery.trim().length > 0
-  const allGroupsCollapsed = displayGroups.length > 0 && displayGroups.every(([workspacePath]) => collapsed[workspacePath] === true)
+  const allGroupsCollapsed = displayGroups.length > 0 && displayGroups.every(([workspacePath]) => expandedGroups[workspacePath] !== true)
   const workspaceHistoryKey = draftHistoryWorkspacePaths.join('\n')
+
+  /* 新项目定向展开：仅对首次出现的分组（chooseWorkspace 新增项目）自动展开；
+     已见过的 key 只增不减，避免搜索过滤/清空导致分组消失又出现时被误判为新增。
+     初次挂载只记录不展开（默认整洁）。 */
+  const knownGroupKeysRef = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    const known = knownGroupKeysRef.current
+    if (known === null) {
+      knownGroupKeysRef.current = new Set(displayGroups.map(([workspacePath]) => workspacePath))
+      return
+    }
+    const added = displayGroups
+      .map(([workspacePath]) => workspacePath)
+      .filter((workspacePath) => !known.has(workspacePath))
+    if (added.length === 0) return
+    added.forEach((workspacePath) => known.add(workspacePath))
+    updateExpandedGroups((current) => ({
+      ...current,
+      ...Object.fromEntries(added.map((workspacePath) => [workspacePath, true]))
+    }))
+  }, [displayGroups])
 
   useEffect(() => {
     if (
@@ -618,10 +664,12 @@ export function SidebarProjectsSection({
   const toggleAllGroups = (): void => {
     if (displayGroups.length === 0) return
     if (allGroupsCollapsed) {
-      setCollapsed({})
+      updateExpandedGroups(() =>
+        Object.fromEntries(displayGroups.map(([workspacePath]) => [workspacePath, true]))
+      )
       return
     }
-    setCollapsed(Object.fromEntries(displayGroups.map(([workspacePath]) => [workspacePath, true])))
+    updateExpandedGroups(() => ({}))
   }
 
   const openActionDialog = (dialog: Omit<SidebarActionDialogState, 'submitting'>): void => {
@@ -965,7 +1013,7 @@ export function SidebarProjectsSection({
         {displayGroups.map(([workspacePath, list]) => {
           const folderName = workspaceLabelFromPath(workspacePath)
           const workspaceContext = workspaceContextLabel(workspacePath, folderName)
-          const isCollapsed = collapsed[workspacePath] === true
+          const isCollapsed = expandedGroups[workspacePath] !== true
           const draftHistory = sddDraftHistoryForWorkspace(filteredDraftHistoryByWorkspace, workspacePath)
           const sortedThreads = sortSidebarThreads(
             filterEmptySddAssistantThreadsFromSidebar(list, draftHistory)
@@ -980,7 +1028,7 @@ export function SidebarProjectsSection({
               <SidebarTreeRow
                 title={workspacePath}
                 onClick={() =>
-                  setCollapsed((current) => ({ ...current, [workspacePath]: !current[workspacePath] }))
+                  updateExpandedGroups((current) => ({ ...current, [workspacePath]: !current[workspacePath] }))
                 }
                 onContextMenu={(event) => openWorkspaceContextMenu(event, workspacePath)}
                 className="min-h-[36px] text-[13.5px]"
@@ -990,7 +1038,7 @@ export function SidebarProjectsSection({
                 actions={
                   <>
                     <SidebarIconButton
-                      onClick={() => onCreateThreadInWorkspace(workspacePath)}
+                      onClick={() => createThreadInWorkspaceExpanded(workspacePath)}
                       title={t('sidebarWorkspaceNewThread')}
                       ariaLabel={t('sidebarWorkspaceNewThread')}
                       className="h-6 w-6"
@@ -1048,7 +1096,7 @@ export function SidebarProjectsSection({
                         <button
                           type="button"
                           data-cursor-spotlight-target
-                          onClick={() => onCreateThreadInWorkspace(workspacePath)}
+                          onClick={() => createThreadInWorkspaceExpanded(workspacePath)}
                           className="shrink-0 rounded-md px-2 py-1 text-[12px] font-medium text-ds-faint transition hover:bg-[var(--ds-sidebar-row-hover)] hover:text-ds-ink"
                         >
                           {t('sidebarWorkspaceNewThread')}
@@ -1129,7 +1177,7 @@ export function SidebarProjectsSection({
         <WorkspaceContextMenu
           state={workspaceContextMenu}
           onClose={() => setWorkspaceContextMenu(null)}
-          onNewThread={() => onCreateThreadInWorkspace(workspaceContextMenu.workspacePath)}
+          onNewThread={() => createThreadInWorkspaceExpanded(workspaceContextMenu.workspacePath)}
           onOpenInSystem={() => void openWorkspaceInSystem(workspaceContextMenu.workspacePath)}
           onRemove={() => void handleRemoveWorkspace(workspaceContextMenu.workspacePath)}
           t={t}

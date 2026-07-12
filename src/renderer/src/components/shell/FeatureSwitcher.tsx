@@ -27,10 +27,13 @@ type FeatureSwitcherProps = {
 
 const containerClass = 'mb-1.5 flex flex-col gap-1'
 
+/* 选中态显式设置 background-color（--ds-accent 纯蓝兜底）+ 渐变图层：
+   即使全局规则清掉 background-image（如 cursor-spotlight 机制），仍保持蓝底白字，
+   高亮不依赖背景继承。 */
 const tabClass = (active: boolean): string =>
   `group flex min-h-[48px] w-full min-w-0 items-center gap-3 rounded-[12px] px-3.5 text-[13.5px] outline-none transition-[background-color,color,box-shadow] duration-[var(--motion-fast)] focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--ds-accent)_40%,transparent)] ${
     active
-      ? 'bg-[image:var(--ds-accent-gradient)] font-medium text-white shadow-[var(--ds-accent-gradient-glow)]'
+      ? 'bg-[var(--ds-accent)] bg-[image:var(--ds-accent-gradient)] font-medium text-white shadow-[var(--ds-accent-gradient-glow)]'
       : 'font-normal text-ds-muted hover:bg-[var(--ds-sidebar-row-hover)] hover:text-ds-ink'
   }`
 
@@ -58,7 +61,9 @@ function FeatureTab({
   return (
     <button
       type="button"
-      data-cursor-spotlight-target
+      /* active 不挂 spotlight target：spotlight 的 hover/focus 规则会替换
+         background-image，夺走 accent 渐变高亮（选中态本身无需悬停光效）。 */
+      data-cursor-spotlight-target={active ? undefined : ''}
       role="tab"
       aria-selected={active}
       onClick={() => onOpen(spec.feature)}
