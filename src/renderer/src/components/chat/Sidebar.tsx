@@ -65,10 +65,10 @@ type Props = {
   myActive: boolean
   onOpenCanvas: () => void
   onOpenMusic: () => void
-  /** 生图页：打开「创作工作流」管理面板（07-12 入口从右侧栏改造为左侧二级操作）。 */
+  /** 生图页：主内容区切换为「创作工作流」管理视图（07-12 生图 IA 重构）。 */
   onOpenCanvasWorkflows: () => void
-  /** 生图页：新建工作流（复用工作台既有新建弹窗链路）。 */
-  onNewCanvasWorkflow: () => void
+  /** 生图页当前是否处于工作流管理视图（左侧二级入口互斥选中态依据）。 */
+  canvasWorkflowsActive: boolean
   canvasActive: boolean
   musicActive: boolean
   /** 「对话」一级视图激活态（route==='chat' 且 Workbench 本地 conversationView）。 */
@@ -111,7 +111,7 @@ export function Sidebar({
   onOpenCanvas,
   onOpenMusic,
   onOpenCanvasWorkflows,
-  onNewCanvasWorkflow,
+  canvasWorkflowsActive,
   canvasActive,
   musicActive,
   conversationActive,
@@ -164,8 +164,10 @@ export function Sidebar({
   /* 区3「当前操作」显示矩阵（design §2）：按激活功能给出二级操作。
      - Code：新建会话(accent) + 新建需求（运行时未连接时禁用）
      - 对话：新建对话(accent)（复用 onNewConversation 既有链路）
-     - 生图：新建任务(accent) + 新建工作流 + 创作工作流（07-12 入口改造：
-       工作流管理入口从右侧栏迁到左侧二级操作，复用工作台既有链路）
+     - 生图：新建生图任务 + 创作工作流，仅两项（07-12 生图 IA 重构：
+       「新建工作流」入口删除——与「创作工作流」语义重复，新建能力收进
+       工作流管理视图内部；accent 跟随当前视图互斥，任意时刻恰一枚高亮，
+       即为二级入口的选中态）。
      - 音乐：新建任务(accent)——工作台无现成「新建任务」store action
        （music 表单是组件本地 state），按 design D4 兜底为进入工作台初始新建态。
      - claw/schedule/workflow：无区3（现状保持）。 */
@@ -205,17 +207,13 @@ export function Sidebar({
                 icon: <ImagePlus className="h-4 w-4" strokeWidth={1.9} />,
                 label: t('newCanvasTask'),
                 onClick: onOpenCanvas,
-                accent: true
-              },
-              {
-                icon: <Plus className="h-4 w-4" strokeWidth={1.9} />,
-                label: t('canvasWorkflowCreateBlank'),
-                onClick: onNewCanvasWorkflow
+                accent: !canvasWorkflowsActive
               },
               {
                 icon: <Workflow className="h-4 w-4" strokeWidth={1.9} />,
                 label: t('canvasWorkflowPanelTitle'),
-                onClick: onOpenCanvasWorkflows
+                onClick: onOpenCanvasWorkflows,
+                accent: canvasWorkflowsActive
               }
             ]
           : activeFeature === 'music'

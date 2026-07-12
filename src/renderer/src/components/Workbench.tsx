@@ -543,11 +543,10 @@ export function Workbench(): ReactElement {
      对话线程与 Code 会话共享 chat route 与 openThread/startNewConversation 链路，
      故不新增 AppRoute，仅用本地布尔切换侧栏显示形态。 */
   const [conversationView, setConversationView] = useState(false)
-  /* 生图右侧「创作工作流」面板 UI 态（07-12 侧栏入口改造）：默认隐藏，由左侧
-     二级入口「创作工作流/新建工作流」打开；「新建工作流」用自增令牌传递请求，
-     CanvasWorkbench 打开新建弹窗后回执清零（不新增业务 store action）。 */
-  const [canvasWorkflowPaneOpen, setCanvasWorkflowPaneOpen] = useState(false)
-  const [canvasWorkflowCreateRequest, setCanvasWorkflowCreateRequest] = useState(0)
+  /* 生图「创作工作流」视图 UI 态（07-12 生图 IA 重构）：true 时 CanvasWorkbench
+     主内容区整体切换为工作流管理视图（右侧不再有工作流面板）；由左侧二级入口
+     「新建生图任务/创作工作流」互斥切换，选中态（accent）跟随本状态。 */
+  const [canvasWorkflowsView, setCanvasWorkflowsView] = useState(false)
   const [fileTreeSidePanelOpen, setFileTreeSidePanelOpen] = useState(false)
   const [openFilePreviewTargets, setOpenFilePreviewTargets] = useState<WorkspaceFileTarget[]>([])
   const [runtimeLogPath, setRuntimeLogPath] = useState('')
@@ -2300,25 +2299,19 @@ export function Workbench(): ReactElement {
 
   /* 生图/音乐入口：进入工作台初始新建态（design D4——两工作台无现成
      「新建任务」action，music 表单为组件本地 state，禁止为此新增业务 action）。
-     生图入口同时收起工作流面板，回到纯生成版式（07-12）。 */
+     生图入口（=「新建生图任务」）同时退出工作流视图，回到生成工作台（07-12）。 */
   const openCanvasView = (): void => {
     setConversationView(false)
-    setCanvasWorkflowPaneOpen(false)
+    setCanvasWorkflowsView(false)
     setRoute('canvas')
   }
 
-  /* 生图「创作工作流」二级入口（07-12）：进入工作台并展示右侧工作流管理面板
-     （复用既有 WorkflowPanel 列表/编辑/运行链路，只改入口导航）。 */
+  /* 生图「创作工作流」二级入口（07-12 生图 IA 重构）：进入生图并把主内容区
+     切换为工作流管理视图（列表/新建/搜索/分类在主区展示，非右侧面板）。 */
   const openCanvasWorkflowsView = (): void => {
     setConversationView(false)
     setRoute('canvas')
-    setCanvasWorkflowPaneOpen(true)
-  }
-
-  /* 生图「新建工作流」二级入口（07-12）：进入工作流面板 + 令牌触发新建弹窗。 */
-  const newCanvasWorkflowView = (): void => {
-    openCanvasWorkflowsView()
-    setCanvasWorkflowCreateRequest((token) => token + 1)
+    setCanvasWorkflowsView(true)
   }
 
   const openMusicView = (): void => {
@@ -2688,8 +2681,8 @@ export function Workbench(): ReactElement {
               onOpenCanvas={openCanvasView}
               onOpenMusic={openMusicView}
               onOpenCanvasWorkflows={openCanvasWorkflowsView}
-              onNewCanvasWorkflow={newCanvasWorkflowView}
               canvasActive={route === 'canvas'}
+              canvasWorkflowsActive={route === 'canvas' && canvasWorkflowsView}
               musicActive={route === 'music'}
               conversationActive={conversationActive}
               onOpenConversation={openConversationView}
@@ -2775,10 +2768,7 @@ export function Workbench(): ReactElement {
               leftSidebarCollapsed={leftSidebarCollapsed}
               onToggleLeftSidebar={toggleLeftSidebar}
               onOpenMy={() => setRoute('my')}
-              workflowPaneOpen={canvasWorkflowPaneOpen}
-              onCloseWorkflowPane={() => setCanvasWorkflowPaneOpen(false)}
-              workflowCreateRequest={canvasWorkflowCreateRequest}
-              onWorkflowCreateHandled={() => setCanvasWorkflowCreateRequest(0)}
+              workflowsView={canvasWorkflowsView}
             />
           </Suspense>
         ) : route === 'write' ? (

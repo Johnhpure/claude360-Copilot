@@ -65,7 +65,7 @@ import { CanvasToolbar } from './CanvasToolbar'
 import { ImagePromptPanel } from './ImagePromptPanel'
 import { ImageLightbox } from './ImageLightbox'
 import { ArtworkGrid } from './ArtworkGrid'
-import { WorkflowPanel } from './WorkflowPanel'
+import { WorkflowManagerView } from './WorkflowManagerView'
 import { WorkflowEditModal } from './WorkflowEditModal'
 import { WorkflowAiCreateModal } from './WorkflowAiCreateModal'
 import { WorkflowRunModal } from './WorkflowRunModal'
@@ -77,14 +77,9 @@ type Props = {
   onToggleLeftSidebar: () => void
   /** 跳转「我的」页（低余额充值入口）。 */
   onOpenMy: () => void
-  /** 右侧「创作工作流」面板是否展示（07-12 侧栏入口改造：默认隐藏，经左侧二级入口打开）。 */
-  workflowPaneOpen?: boolean
-  /** 关闭右侧工作流面板（面板头部 ×）。 */
-  onCloseWorkflowPane?: () => void
-  /** 侧栏「新建工作流」请求令牌：>0 时打开新建弹窗（复用 handleCreateBlank 链路）。 */
-  workflowCreateRequest?: number
-  /** 新建请求处理回执（父层清零令牌，防重复/重挂载误触发）。 */
-  onWorkflowCreateHandled?: () => void
+  /** 主内容区展示「创作工作流」管理视图（07-12 生图 IA 重构：true 时整体替换
+      生成工作台——参数面板 + 作品宫格；经左侧二级入口「创作工作流」切换）。 */
+  workflowsView?: boolean
 }
 
 /** 从像素尺寸串反查（宽高比预设, 分辨率），用于「重新生成」回填表单；未命中返回 null。 */
@@ -111,10 +106,7 @@ export function CanvasWorkbench({
   leftSidebarCollapsed,
   onToggleLeftSidebar,
   onOpenMy,
-  workflowPaneOpen = false,
-  onCloseWorkflowPane,
-  workflowCreateRequest = 0,
-  onWorkflowCreateHandled
+  workflowsView = false
 }: Props): ReactElement {
   const { t } = useTranslation('common')
   const prompt = useStore(useCanvasStore, (s) => s.prompt)
@@ -508,14 +500,6 @@ export function CanvasWorkbench({
     setEditingWorkflow(newWorkflowBase())
   }, [newWorkflowBase])
 
-  // 侧栏「新建工作流」入口（07-12）：令牌 >0 → 复用 handleCreateBlank 打开新建弹窗，
-  // 随后回执父层清零；令牌归零/依赖变化时守卫直接返回，避免重复触发。
-  useEffect(() => {
-    if (workflowCreateRequest <= 0) return
-    handleCreateBlank()
-    onWorkflowCreateHandled?.()
-  }, [workflowCreateRequest, handleCreateBlank, onWorkflowCreateHandled])
-
   // 「新建多图」= 编辑弹窗预置多图规则开启 + 分类「多图生成」（prd R1）。
   const handleCreateMulti = useCallback((): void => {
     const workflow = newWorkflowBase()
@@ -808,8 +792,26 @@ export function CanvasWorkbench({
       />
 
       {/* 左右分栏：左=创作配置区（固定宽、独立滚动），右=作品宫格区（占满剩余、独立滚动）。
-          小屏（<lg）回退为上下排布并整体滚动。页边距 24px / 卡间距 16px（Calm Blue 语义常量）。 */}
+          小屏（<lg）回退为上下排布并整体滚动。页边距 24px / 卡间距 16px（Calm Blue 语义常量）。
+          07-12 生图 IA 重构：workflowsView=true 时主内容区整体切换为「创作工作流」管理视图
+          （右侧不再有工作流常驻/侧挂面板；右侧区域只服务作品详情/预览）。 */}
       <main className="ds-no-drag flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6 pt-1 lg:flex-row lg:overflow-hidden">
+        {workflowsView ? (
+          <WorkflowManagerView
+            workflows={imageWorkflows}
+            running={workflowRun}
+            onRun={handleRunWorkflow}
+            onEdit={(workflow) => setEditingWorkflow(workflow)}
+            onDuplicate={handleDuplicateWorkflow}
+            onDelete={handleDeleteWorkflow}
+            onCreateAi={() => setAiCreateOpen(true)}
+            onCreateMulti={handleCreateMulti}
+            onCreateBlank={handleCreateBlank}
+            onCancelRun={handleCancelWorkflowRun}
+            t={t}
+          />
+        ) : (
+          <>
         <aside
           data-testid="canvas-config-pane"
           className="flex w-full shrink-0 flex-col gap-4 lg:w-[350px] lg:overflow-y-auto lg:pr-1"
@@ -943,31 +945,8 @@ export function CanvasWorkbench({
             />
           </div>
         </section>
-
-        {/* 右列：创作工作流面板（07-11；三列版式参考 MusicWorkbench 第三列 aside）。
-            07-12 侧栏入口改造：面板默认隐藏，改由左侧「创作工作流/新建工作流」二级
-            入口按需展示（右侧不再作为常驻主要入口）。<lg 回退：置于作品区下方。 */}
-        {workflowPaneOpen ? (
-          <aside
-            data-testid="canvas-workflow-pane"
-            className="flex w-full shrink-0 flex-col gap-4 lg:w-[320px] lg:overflow-y-auto lg:border-l lg:border-ds-border lg:pl-4 xl:w-[340px]"
-          >
-            <WorkflowPanel
-              workflows={imageWorkflows}
-              running={workflowRun}
-              onRun={handleRunWorkflow}
-              onEdit={(workflow) => setEditingWorkflow(workflow)}
-              onDuplicate={handleDuplicateWorkflow}
-              onDelete={handleDeleteWorkflow}
-              onCreateAi={() => setAiCreateOpen(true)}
-              onCreateMulti={handleCreateMulti}
-              onCreateBlank={handleCreateBlank}
-              onCancelRun={handleCancelWorkflowRun}
-              onClose={onCloseWorkflowPane}
-              t={t}
-            />
-          </aside>
-        ) : null}
+          </>
+        )}
       </main>
 
       {/* 大图查看：基于 ui/Modal 的轻玻璃 Lightbox（遮罩 blur + 降级开关由基类提供）。 */}

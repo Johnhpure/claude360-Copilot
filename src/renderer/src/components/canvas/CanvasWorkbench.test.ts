@@ -70,26 +70,37 @@ describe('CanvasWorkbench · 左右分栏工作台', () => {
   })
 })
 
-describe('CanvasWorkbench · 创作工作流面板按需展示(07-12 侧栏入口改造)', () => {
-  it('默认不渲染右侧工作流面板(入口迁至左侧二级操作)', () => {
+describe('CanvasWorkbench · 工作流管理视图(07-12 生图 IA 重构)', () => {
+  it('默认生成工作台：无工作流视图、无右侧工作流面板残留', () => {
     const html = renderWorkbench()
+    expect(html).toContain('canvas-config-pane')
+    expect(html).toContain('canvas-artworks-pane')
+    expect(html).not.toContain('workflow-manager-view')
+    // 右侧工作流常驻/侧挂面板已整体删除(任何交互路径都不应出现)
     expect(html).not.toContain('canvas-workflow-pane')
     expect(html).not.toContain('canvas-workflow-panel')
+    expect(html).not.toContain('workflow-panel-close')
   })
 
-  it('workflowPaneOpen=true 渲染面板与关闭按钮', () => {
+  it('workflowsView=true：主内容区整体切换为工作流管理视图，生成工作台隐藏', () => {
     const html = renderToStaticMarkup(
       createElement(CanvasWorkbench, {
         leftSidebarCollapsed: false,
         onToggleLeftSidebar: () => undefined,
         onOpenMy: () => undefined,
-        workflowPaneOpen: true,
-        onCloseWorkflowPane: () => undefined
+        workflowsView: true
       })
     )
-    expect(html).toContain('canvas-workflow-pane')
-    expect(html).toContain('canvas-workflow-panel')
-    expect(html).toContain('workflow-panel-close')
+    expect(html).toContain('workflow-manager-view')
+    // 管理视图要素：新建按钮组 + 搜索 + 空态(store 初始无工作流)
+    expect(html).toContain('workflow-create-ai')
+    expect(html).toContain('workflow-create-multi')
+    expect(html).toContain('workflow-create-blank')
+    expect(html).toContain('workflow-search-input')
+    expect(html).toContain('workflow-list-empty')
+    // 生成工作台(参数面板+作品宫格)被整体替换
+    expect(html).not.toContain('canvas-config-pane')
+    expect(html).not.toContain('canvas-artworks-pane')
   })
 })
 

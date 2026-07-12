@@ -82,7 +82,7 @@ function renderSidebar(overrides?: Partial<Parameters<typeof Sidebar>[0]>): stri
       onOpenCanvas: vi.fn(),
       onOpenMusic: vi.fn(),
       onOpenCanvasWorkflows: vi.fn(),
-      onNewCanvasWorkflow: vi.fn(),
+      canvasWorkflowsActive: false,
       canvasActive: false,
       musicActive: false,
       conversationActive: false,
@@ -163,17 +163,37 @@ describe('Sidebar 信息架构分区(07-11 重构)', () => {
     expect(html).not.toContain('projects-section')
   })
 
-  it('生图页:区3 为新建生图任务/新建工作流/创作工作流三项,区4 flex 占位固定 footer', () => {
+  it('生图页:区3 仅新建生图任务/创作工作流两项,区4 flex 占位固定 footer', () => {
     const html = renderSidebar({ canvasActive: true })
     expect(html).toContain('newCanvasTask')
-    // 07-12 入口改造:工作流管理入口迁到左侧二级操作(复用既有 i18n key)。
-    expect(html).toContain('canvasWorkflowCreateBlank')
     expect(html).toContain('canvasWorkflowPanelTitle')
+    // 07-12 生图 IA 重构:「新建工作流」入口删除(与「创作工作流」语义重复,
+    // 新建能力收进工作流管理视图内部)。
+    expect(html).not.toContain('canvasWorkflowCreateBlank')
     expect(html).not.toContain('newAgent')
     expect(html).not.toContain('projects-section')
     expect(html).not.toContain('conversations-section')
     // 区4 弹性占位:保证「我的/设置」footer 不上移(07-12 统一三段布局)。
     expect(html).toContain('sidebar-flex-spacer')
+  })
+
+  it('生图页:二级入口互斥 accent 选中态跟随视图(min-h-[46px]=accent 变体)', () => {
+    // 生成工作台视图:新建生图任务 accent,创作工作流 flat。
+    const generateHtml = renderSidebar({ canvasActive: true, canvasWorkflowsActive: false })
+    const taskBtn = generateHtml.split('<button').find((chunk) => chunk.includes('newCanvasTask'))
+    const flowBtn = generateHtml
+      .split('<button')
+      .find((chunk) => chunk.includes('canvasWorkflowPanelTitle'))
+    expect(taskBtn).toContain('min-h-[46px]')
+    expect(flowBtn).toContain('min-h-[34px]')
+    // 工作流管理视图:accent 互换,任意时刻恰一枚高亮。
+    const workflowsHtml = renderSidebar({ canvasActive: true, canvasWorkflowsActive: true })
+    const taskBtn2 = workflowsHtml.split('<button').find((chunk) => chunk.includes('newCanvasTask'))
+    const flowBtn2 = workflowsHtml
+      .split('<button')
+      .find((chunk) => chunk.includes('canvasWorkflowPanelTitle'))
+    expect(taskBtn2).toContain('min-h-[34px]')
+    expect(flowBtn2).toContain('min-h-[46px]')
   })
 
   it('音乐页:区3 仅新建音乐任务,区4 flex 占位固定 footer', () => {
