@@ -70,6 +70,29 @@ describe('CanvasWorkbench · 左右分栏工作台', () => {
   })
 })
 
+describe('CanvasWorkbench · 创作工作流面板按需展示(07-12 侧栏入口改造)', () => {
+  it('默认不渲染右侧工作流面板(入口迁至左侧二级操作)', () => {
+    const html = renderWorkbench()
+    expect(html).not.toContain('canvas-workflow-pane')
+    expect(html).not.toContain('canvas-workflow-panel')
+  })
+
+  it('workflowPaneOpen=true 渲染面板与关闭按钮', () => {
+    const html = renderToStaticMarkup(
+      createElement(CanvasWorkbench, {
+        leftSidebarCollapsed: false,
+        onToggleLeftSidebar: () => undefined,
+        onOpenMy: () => undefined,
+        workflowPaneOpen: true,
+        onCloseWorkflowPane: () => undefined
+      })
+    )
+    expect(html).toContain('canvas-workflow-pane')
+    expect(html).toContain('canvas-workflow-panel')
+    expect(html).toContain('workflow-panel-close')
+  })
+})
+
 describe('CanvasToolbar · 低余额入口', () => {
   it('低余额显示充值入口', () => {
     const html = renderToStaticMarkup(

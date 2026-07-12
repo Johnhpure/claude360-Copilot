@@ -81,6 +81,8 @@ function renderSidebar(overrides?: Partial<Parameters<typeof Sidebar>[0]>): stri
       myActive: false,
       onOpenCanvas: vi.fn(),
       onOpenMusic: vi.fn(),
+      onOpenCanvasWorkflows: vi.fn(),
+      onNewCanvasWorkflow: vi.fn(),
       canvasActive: false,
       musicActive: false,
       conversationActive: false,
@@ -161,20 +163,26 @@ describe('Sidebar 信息架构分区(07-11 重构)', () => {
     expect(html).not.toContain('projects-section')
   })
 
-  it('生图页:区3 仅新建生图任务,区4 不渲染项目/对话区块', () => {
+  it('生图页:区3 为新建生图任务/新建工作流/创作工作流三项,区4 flex 占位固定 footer', () => {
     const html = renderSidebar({ canvasActive: true })
     expect(html).toContain('newCanvasTask')
+    // 07-12 入口改造:工作流管理入口迁到左侧二级操作(复用既有 i18n key)。
+    expect(html).toContain('canvasWorkflowCreateBlank')
+    expect(html).toContain('canvasWorkflowPanelTitle')
     expect(html).not.toContain('newAgent')
     expect(html).not.toContain('projects-section')
     expect(html).not.toContain('conversations-section')
+    // 区4 弹性占位:保证「我的/设置」footer 不上移(07-12 统一三段布局)。
+    expect(html).toContain('sidebar-flex-spacer')
   })
 
-  it('音乐页:区3 仅新建音乐任务,区4 不渲染项目/对话区块', () => {
+  it('音乐页:区3 仅新建音乐任务,区4 flex 占位固定 footer', () => {
     const html = renderSidebar({ musicActive: true })
     expect(html).toContain('newMusicTask')
     expect(html).not.toContain('newAgent')
     expect(html).not.toContain('projects-section')
     expect(html).not.toContain('conversations-section')
+    expect(html).toContain('sidebar-flex-spacer')
   })
 
   it('claw 视图:无区3 当前操作,内容为 Claw 面板(现状保持)', () => {

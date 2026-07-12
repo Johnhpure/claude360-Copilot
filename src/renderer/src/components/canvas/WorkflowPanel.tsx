@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactElement } from 'react'
-import { Copy, Pencil, Play, Plus, Sparkles, Trash2, Workflow as WorkflowIcon } from 'lucide-react'
+import { Copy, Pencil, Play, Plus, Sparkles, Trash2, Workflow as WorkflowIcon, X } from 'lucide-react'
 import type { ImageWorkflowV1 } from '@shared/app-settings-types'
 import { Button, Card, EmptyState, Input, Select } from '../ui'
 import {
@@ -22,6 +22,8 @@ type Props = {
   onCreateMulti: () => void
   onCreateBlank: () => void
   onCancelRun: () => void
+  /** 关闭面板（07-12 侧栏入口改造：面板改为按需展示）；缺省不渲染关闭按钮。 */
+  onClose?: () => void
   t: TFn
 }
 
@@ -82,6 +84,7 @@ export function WorkflowPanel({
   onCreateMulti,
   onCreateBlank,
   onCancelRun,
+  onClose,
   t
 }: Props): ReactElement {
   const [category, setCategory] = useState('')
@@ -108,6 +111,11 @@ export function WorkflowPanel({
         <span className="ml-auto text-[11.5px] text-ds-faint">
           {t('canvasWorkflowCount', { count: workflows.length })}
         </span>
+        {onClose ? (
+          <CardAction label={t('close')} testId="workflow-panel-close" onClick={onClose}>
+            <X className="h-3.5 w-3.5" strokeWidth={1.75} />
+          </CardAction>
+        ) : null}
       </div>
 
       {/* 三个新建入口：AI 创建（primary）/ 新建多图 / 新建工作流 */}

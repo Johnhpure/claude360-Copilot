@@ -65,6 +65,10 @@ type Props = {
   myActive: boolean
   onOpenCanvas: () => void
   onOpenMusic: () => void
+  /** 生图页：打开「创作工作流」管理面板（07-12 入口从右侧栏改造为左侧二级操作）。 */
+  onOpenCanvasWorkflows: () => void
+  /** 生图页：新建工作流（复用工作台既有新建弹窗链路）。 */
+  onNewCanvasWorkflow: () => void
   canvasActive: boolean
   musicActive: boolean
   /** 「对话」一级视图激活态（route==='chat' 且 Workbench 本地 conversationView）。 */
@@ -106,6 +110,8 @@ export function Sidebar({
   myActive,
   onOpenCanvas,
   onOpenMusic,
+  onOpenCanvasWorkflows,
+  onNewCanvasWorkflow,
   canvasActive,
   musicActive,
   conversationActive,
@@ -158,7 +164,9 @@ export function Sidebar({
   /* 区3「当前操作」显示矩阵（design §2）：按激活功能给出二级操作。
      - Code：新建会话(accent) + 新建需求（运行时未连接时禁用）
      - 对话：新建对话(accent)（复用 onNewConversation 既有链路）
-     - 生图/音乐：新建任务(accent)——工作台无现成「新建任务」store action
+     - 生图：新建任务(accent) + 新建工作流 + 创作工作流（07-12 入口改造：
+       工作流管理入口从右侧栏迁到左侧二级操作，复用工作台既有链路）
+     - 音乐：新建任务(accent)——工作台无现成「新建任务」store action
        （music 表单是组件本地 state），按 design D4 兜底为进入工作台初始新建态。
      - claw/schedule/workflow：无区3（现状保持）。 */
   const contextActions: SidebarContextAction[] =
@@ -198,6 +206,16 @@ export function Sidebar({
                 label: t('newCanvasTask'),
                 onClick: onOpenCanvas,
                 accent: true
+              },
+              {
+                icon: <Plus className="h-4 w-4" strokeWidth={1.9} />,
+                label: t('canvasWorkflowCreateBlank'),
+                onClick: onNewCanvasWorkflow
+              },
+              {
+                icon: <Workflow className="h-4 w-4" strokeWidth={1.9} />,
+                label: t('canvasWorkflowPanelTitle'),
+                onClick: onOpenCanvasWorkflows
               }
             ]
           : activeFeature === 'music'
@@ -331,7 +349,12 @@ export function Sidebar({
           onSearchQueryChange={onThreadSearchChange}
           t={t}
         />
-      ) : canvasActive || musicActive ? null : conversationActive ? (
+      ) : canvasActive || musicActive ? (
+        /* 区4·生图/音乐视图：无工作区列表，用 flex-1 弹性占位撑满中间区，
+           保证底部「我的/设置」footer 固定在最底部——SidebarFrame 的 footer
+           跟随普通文档流，区4 塌陷时会被顶上来（07-12 统一三段布局修复）。 */
+        <div aria-hidden data-testid="sidebar-flex-spacer" className="ds-no-drag min-h-0 flex-1" />
+      ) : conversationActive ? (
         <>
           {/* 区4·对话视图：仅对话线程列表（fill 占满剩余高度），项目区块不渲染。
               区块 header 原有搜索/+ 按钮保留（design D5）。 */}
