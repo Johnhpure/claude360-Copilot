@@ -249,8 +249,9 @@ describe('startKunChild', () => {
       ].join('\n')
     )
     const module = await import('./kun-process')
+    // 品牌重命名后错误文案为「Claude360 Copilot runtime exited …」（不再是「Kun exited …」）。
     await expect(module.startKunChild(createSettings(script))).rejects.toThrow(
-      /Kun exited during startup with code 23[\s\S]*bind failed on port 18899/
+      /Claude360 Copilot runtime exited during startup with code 23[\s\S]*bind failed on port 18899/
     )
     expect(module.isKunChildRunning()).toBe(false)
     await module.stopKunChildAndWait()

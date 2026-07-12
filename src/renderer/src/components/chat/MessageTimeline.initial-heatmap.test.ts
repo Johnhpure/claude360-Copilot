@@ -41,7 +41,8 @@ describe('MessageTimeline initial heatmap empty hero routing', () => {
   it('keeps offline, missing-workspace, and Claw empty states gated away from the heatmap', () => {
     const offlineHtml = renderHero({ ready: false })
     expect(offlineHtml).toContain('Claude360 Copilot is waking the local agent')
-    expect(offlineHtml).toContain('ds-kun-state-sleep')
+    // 61de212 起离线唤醒页以动态文字品牌 BrandHero 替代 Kun 图形（sleep 态已移除）。
+    expect(offlineHtml).toContain('ds-brand-hero')
     const workspaceHtml = renderHero({ hasWorkspace: false })
     expect(workspaceHtml).toContain('Choose working directory')
     expect(workspaceHtml).toContain('ds-kun-state-sit')
