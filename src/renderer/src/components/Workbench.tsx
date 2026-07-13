@@ -2872,6 +2872,7 @@ export function Workbench(): ReactElement {
                   planActionsBusy={busy}
                   onBuildPlan={() => void buildGuiPlan()}
                   onOpenPlan={openGuiPlanPanel}
+                  conversationNavigator
                   devPreviewCard={
                     showDevPreviewCard ? (
                       <DevPreviewLaunchCard

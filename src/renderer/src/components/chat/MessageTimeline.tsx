@@ -53,6 +53,14 @@ type Props = {
   /** Opens/focuses the Plan panel (Open button on the inline card). */
   onOpenPlan?: () => void
   compactCards?: boolean
+  /**
+   * Opt-in for the right-hand conversation navigator (turn outline +
+   * scroll-spy + jump). Only the MAIN chat timeline in `Workbench` sets
+   * this; side-panel hosts (write/sdd assistant panels) keep it off —
+   * their narrow, differently-positioned containers were never designed
+   * to anchor the navigator's absolutely positioned pieces.
+   */
+  conversationNavigator?: boolean
 }
 
 type CompactionTimelineBlock = Extract<ChatBlock, { kind: 'compaction' }>
@@ -150,7 +158,8 @@ export function MessageTimeline({
   planActionsBusy,
   onBuildPlan,
   onOpenPlan,
-  compactCards = false
+  compactCards = false,
+  conversationNavigator = false
 }: Props): ReactElement {
   const { t } = useTranslation('common')
   const {
@@ -211,10 +220,14 @@ export function MessageTimeline({
   // Conversation navigator entries cover EVERY turn (collapsed history
   // included) — jumping into history is the point. Memoized on the turns
   // reference: user titles are fixed once a turn starts, so streaming
-  // deltas never recompute this.
+  // deltas never recompute this. Hosts without the navigator skip the
+  // derivation entirely.
   const navItems = useMemo(
-    () => deriveTurnNavItems(turns, (turnNumber) => t('timelineNavTurnFallback', { index: turnNumber })),
-    [t, turns]
+    () =>
+      conversationNavigator
+        ? deriveTurnNavItems(turns, (turnNumber) => t('timelineNavTurnFallback', { index: turnNumber }))
+        : [],
+    [conversationNavigator, t, turns]
   )
 
   // Scroll-spy: highlights the turn owning the anchor line. Runs on a
@@ -236,6 +249,7 @@ export function MessageTimeline({
   }, [])
 
   useEffect(() => {
+    if (!conversationNavigator) return
     const el = containerRef.current
     if (!el) return
     const onScroll = (): void => {
@@ -250,27 +264,32 @@ export function MessageTimeline({
         navSpyFrameRef.current = null
       }
     }
-  }, [measureActiveNavKey])
+  }, [conversationNavigator, measureActiveNavKey])
 
   // Re-measure when the mounted turn set changes (thread switch, expand /
   // collapse, new turns) — scroll events alone would miss these.
   useEffect(() => {
+    if (!conversationNavigator) return
     measureActiveNavKey()
-  }, [measureActiveNavKey, activeThreadId, visibleTurnCount, hiddenTurnCount, turns.length])
+  }, [conversationNavigator, measureActiveNavKey, activeThreadId, visibleTurnCount, hiddenTurnCount, turns.length])
 
   // Navigator jump: mounted targets scroll directly; collapsed-history
   // targets expand the window first and scroll once the wrapper ref mounts
-  // (effect below picks it up on the visible-window change).
+  // (effect below picks it up on the visible-window change). BOTH paths go
+  // through `expandToTurn` first: for mounted targets the visible window is
+  // unchanged (React bails out of the setState), but the call still drops
+  // the stick-to-bottom intent so a streaming snap cannot yank the viewport
+  // back down mid-jump (design §3.4).
   const pendingNavScrollKeyRef = useRef<string | null>(null)
   const handleNavigate = useCallback(
     (item: TurnNavItem): void => {
+      expandToTurn(item.index)
       const mounted = turnRefMap.current.get(item.key)
       if (mounted) {
         mounted.scrollIntoView({ behavior: 'smooth', block: 'start' })
         return
       }
       pendingNavScrollKeyRef.current = item.key
-      expandToTurn(item.index)
     },
     [expandToTurn]
   )
@@ -446,8 +465,9 @@ export function MessageTimeline({
     {/* Conversation navigator: absolutely positioned sibling of the scroll
         container, anchored to the Workbench's `relative` timeline wrapper —
         top edge sits below the topbar, bottom edge stops above the composer.
-        Hidden for compact hosts (write/sdd side panels) and short chats. */}
-    {!compactCards && navItems.length >= 2 ? (
+        Opt-in via `conversationNavigator` (main chat only; write/sdd side
+        panels never set it) and hidden for short chats. */}
+    {conversationNavigator && navItems.length >= 2 ? (
       <TimelineNavigator items={navItems} activeKey={activeNavKey} onNavigate={handleNavigate} />
     ) : null}
     </InjectedMemoryLookupProvider>

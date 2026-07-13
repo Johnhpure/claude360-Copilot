@@ -2517,7 +2517,13 @@ pre {
   bottom: 0.5rem;
   z-index: 30;
   display: none;
-  width: 232px;
+  /* Never intrude into the (user-configurable, up to 1200px) content column:
+   * cap the width at the actual side gap — (stage − column)/2 minus the
+   * 0.75rem inset and a 0.75rem breathing gap. At the 95rem display
+   * threshold with the default 63rem column this resolves to the full
+   * 232px; with a wider user column the panel narrows (titles ellipsize)
+   * instead of overlapping message text. */
+  width: min(232px, calc((100cqw - var(--ds-chat-content-max-width, 63rem)) / 2 - 1.5rem));
   flex-direction: column;
   gap: 0.3rem;
   padding: 0.4rem 0.2rem 0.6rem;
