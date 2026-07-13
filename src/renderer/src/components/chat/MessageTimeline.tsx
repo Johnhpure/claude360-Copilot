@@ -314,6 +314,8 @@ export function MessageTimeline({
             hasWorkspace={!!workspaceRoot}
             runtimeError={runtimeError}
             activeClawChannel={activeClawChannel}
+            codeHome={route === 'chat'}
+            workspaceRoot={workspaceRoot}
             onPickWorkspace={() => void chooseWorkspace()}
             onRetry={onRetryConnection}
             onOpenSettings={onOpenSettings}

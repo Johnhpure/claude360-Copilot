@@ -5,6 +5,8 @@ import type { ClawImChannelV1 } from '@shared/app-settings'
 import { KunStateFigure } from './AnimatedWorkLogo'
 import { InitialSessionUsageHeatmap } from './InitialSessionUsageHeatmap'
 import { BrandHero } from './BrandHero'
+import { CodeStarterDeck } from './CodeStarterDeck'
+import { workspaceLabelFromPath } from '../../lib/workspace-label'
 
 /**
  * Empty / hero states rendered by `MessageTimeline` when there is no
@@ -119,12 +121,66 @@ function RuntimeWakeHero({
   )
 }
 
+/**
+ * Code 首页就绪空态「开发者启动工作台」（07-13-code-home-workbench R1）。
+ * 信息层级自上而下：收紧版 BrandHero → 工作台引导行（当前项目名大字 +
+ * 引导语；无项目时回退通用引导）→ 8 张快捷任务卡（CodeStarterDeck，点击
+ * 经 onSelectSuggestion 填充 composer 并聚焦）→ 内嵌的用量日历（默认折叠）。
+ *
+ * 项目名来自 chat-store `workspaceRoot` 的同步纯函数转换（零 IO 零异步）；
+ * 路径/分支细节不在此重复展示——底部 composer 状态栏已有（design §1）。
+ */
+function CodeHomeWorkbench({
+  workspaceRoot,
+  onSelectSuggestion
+}: {
+  workspaceRoot: string
+  onSelectSuggestion?: (prompt: string) => void
+}): ReactElement {
+  const { t } = useTranslation('common')
+  const hasProject = workspaceRoot.trim().length > 0
+  const projectLabel = hasProject ? workspaceLabelFromPath(workspaceRoot) : ''
+
+  return (
+    <div
+      className="ds-code-home-workbench ds-no-drag mx-auto flex w-full min-w-0 items-center justify-center px-3 py-6 sm:px-5 sm:py-8"
+      data-testid="code-home-workbench"
+    >
+      <div className="ds-chat-content-max-width flex w-full min-w-0 flex-col items-center">
+        <BrandHero compact />
+
+        <div className="ds-code-home-intro">
+          <p className="ds-code-home-intro-kicker">
+            {hasProject ? t('codeHomeProjectKicker') : t('codeHomeWorkbenchKicker')}
+          </p>
+          <h1 className="ds-code-home-intro-title" title={hasProject ? workspaceRoot : undefined}>
+            {hasProject ? projectLabel : t('codeHomeIntroFallbackTitle')}
+          </h1>
+          <p className="ds-code-home-intro-sub">
+            {hasProject ? t('codeHomeIntroSub') : t('codeHomeIntroFallbackSub')}
+          </p>
+        </div>
+
+        <div className="ds-code-home-deck w-full min-w-0">
+          <CodeStarterDeck onSelect={(prompt) => onSelectSuggestion?.(prompt)} />
+        </div>
+
+        <div className="ds-code-home-usage w-full min-w-0">
+          <InitialSessionUsageHeatmap embedded />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function MessageTimelineEmptyHero({
   route,
   ready,
   hasWorkspace,
   runtimeError,
   activeClawChannel,
+  codeHome = false,
+  workspaceRoot = '',
   onPickWorkspace,
   onRetry,
   onOpenSettings,
@@ -135,6 +191,14 @@ export function MessageTimelineEmptyHero({
   hasWorkspace: boolean
   runtimeError?: string | null
   activeClawChannel: ClawImChannelV1 | null
+  /**
+   * 宿主是否是 Code 首页（Workbench 的 chat 场景，store route === 'chat'）。
+   * write/sdd 助手面板复用本组件时为 false——它们的就绪空态保持原独立
+   * 热力图形态，不渲染开发者启动工作台。
+   */
+  codeHome?: boolean
+  /** 当前工作目录绝对路径（工作台引导行项目名用；空串回退通用引导）。 */
+  workspaceRoot?: string
   onPickWorkspace: () => void
   onRetry: () => void
   onOpenSettings: () => void
@@ -171,6 +235,15 @@ export function MessageTimelineEmptyHero({
     return (
       <ClawEmptyHero
         channel={activeClawChannel}
+        onSelectSuggestion={onSelectSuggestion}
+      />
+    )
+  }
+
+  if (codeHome) {
+    return (
+      <CodeHomeWorkbench
+        workspaceRoot={workspaceRoot}
         onSelectSuggestion={onSelectSuggestion}
       />
     )

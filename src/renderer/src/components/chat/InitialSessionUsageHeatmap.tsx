@@ -742,7 +742,15 @@ function UsagePanelCard({ children }: { children: ReactElement }): ReactElement 
   )
 }
 
-export function InitialSessionUsageHeatmap(): ReactElement {
+/**
+ * `embedded`（07-13 code-home-workbench）：作为「开发者启动工作台」的一个
+ * 区块内嵌渲染——跳过自带的 BrandHero/标题 hero 区与 min-h 垂直居中壳
+ * （宿主提供品牌区与列宽约束），只保留折叠开关/展开面板本体。
+ * 默认 false = 原独立空态形态，行为不变。
+ */
+export function InitialSessionUsageHeatmap({
+  embedded = false
+}: { embedded?: boolean } = {}): ReactElement {
   const [refreshKey, setRefreshKey] = useState(0)
   const [rangeKey, setRangeKey] = useState<UsageRangeKey>('all')
   const state = useDailyUsageState(true, refreshKey, USAGE_RANGE_DAYS.all)
@@ -754,6 +762,7 @@ export function InitialSessionUsageHeatmap(): ReactElement {
       modelState={modelState}
       rangeKey={rangeKey}
       initialCollapsed
+      embedded={embedded}
       onRangeChange={setRangeKey}
       onRefresh={() => setRefreshKey((value) => value + 1)}
     />
@@ -767,6 +776,7 @@ export function InitialSessionUsageHeatmapView({
   initialCollapsed = false,
   initialActiveTab = 'overview',
   initialModelHoverIndex = null,
+  embedded = false,
   onRangeChange,
   onRefresh
 }: {
@@ -776,6 +786,8 @@ export function InitialSessionUsageHeatmapView({
   initialCollapsed?: boolean
   initialActiveTab?: UsageTabKey
   initialModelHoverIndex?: number | null
+  /** 内嵌于 Code 首页工作台：不渲染 hero 区与 min-h 居中壳（见容器组件注释）。 */
+  embedded?: boolean
   onRangeChange?: (rangeKey: UsageRangeKey) => void
   onRefresh?: () => void
 }): ReactElement {
@@ -836,13 +848,27 @@ export function InitialSessionUsageHeatmapView({
   }, [])
 
   return (
-    <div className="ds-initial-usage-heatmap ds-no-drag mx-auto flex min-h-[min(620px,calc(100dvh-220px))] w-full items-center justify-center px-3 py-6 text-left sm:px-5 sm:py-8">
-      <div className="ds-chat-content-max-width flex w-full min-w-0 flex-col gap-5">
-        <UsageHeroSection
-          title={heroTitle}
-          sub={heroSub}
-          showText={mode !== 'populated'}
-        />
+    <div
+      className={
+        embedded
+          ? 'ds-initial-usage-heatmap ds-no-drag flex w-full min-w-0 justify-center text-left'
+          : 'ds-initial-usage-heatmap ds-no-drag mx-auto flex min-h-[min(620px,calc(100dvh-220px))] w-full items-center justify-center px-3 py-6 text-left sm:px-5 sm:py-8'
+      }
+    >
+      <div
+        className={
+          embedded
+            ? 'flex w-full min-w-0 flex-col gap-5'
+            : 'ds-chat-content-max-width flex w-full min-w-0 flex-col gap-5'
+        }
+      >
+        {embedded ? null : (
+          <UsageHeroSection
+            title={heroTitle}
+            sub={heroSub}
+            showText={mode !== 'populated'}
+          />
+        )}
         {collapsed ? (
           <CollapsedCalendarCard onExpand={() => setCollapsed(false)} />
         ) : (

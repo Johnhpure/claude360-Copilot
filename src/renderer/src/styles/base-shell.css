@@ -4287,3 +4287,103 @@ pre {
     animation: none;
   }
 }
+
+/* ============================================================
+   07-13 Code 首页就绪空态「开发者启动工作台」（CodeHomeWorkbench）：
+   收紧版 BrandHero → 项目引导行 → 8 张快捷任务卡 → 折叠用量日历。
+   仅布局网格 / 字号层次 / 间距节奏，无新增动效（PRD R4：不靠动画
+   堆科技感）；颜色全部走 --ds-* token，双主题自适应。
+   ============================================================ */
+
+/* BrandHero 收紧一档：品牌区让位给引导行与任务卡，动效沿用基类。 */
+.ds-brand-hero-compact {
+  gap: 12px;
+  padding: 14px 0 6px;
+}
+
+.ds-brand-hero-compact .ds-brand-hero-title {
+  font-size: clamp(28px, 4.2vw, 40px);
+}
+
+.ds-brand-hero-compact .ds-brand-hero-beam {
+  width: min(240px, 52%);
+}
+
+/* 工作台外壳：沿用原独立热力图空态的视口内垂直居中约束。 */
+.ds-code-home-workbench {
+  min-height: min(620px, calc(100dvh - 220px));
+}
+
+/* 引导行：kicker（当前项目）→ 项目名大字 → 引导语。 */
+.ds-code-home-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  text-align: center;
+}
+
+.ds-code-home-intro-kicker {
+  margin: 0;
+  color: var(--ds-accent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ds-code-home-intro-title {
+  margin: 0;
+  max-width: min(720px, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ds-text);
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.ds-code-home-intro-sub {
+  margin: 0;
+  max-width: 640px;
+  color: var(--ds-text-muted);
+  font-size: 14.5px;
+  line-height: 1.65;
+}
+
+/* 卡片区 / 用量日历的垂直节奏。 */
+.ds-code-home-deck {
+  margin-top: 28px;
+}
+
+.ds-code-home-usage {
+  margin-top: 22px;
+}
+
+/* 矮窗口：隐藏卡片副文案并收紧卡高与区块间距，保证底部 composer
+   始终可见易达（PRD R5）。 */
+@media (max-height: 820px) {
+  .ds-brand-hero-compact {
+    gap: 10px;
+    padding: 8px 0 4px;
+  }
+
+  .ds-code-home-deck {
+    margin-top: 18px;
+  }
+
+  .ds-code-home-usage {
+    margin-top: 14px;
+  }
+
+  .ds-code-home-workbench .ds-empty-hero-card {
+    min-height: 64px;
+  }
+
+  .ds-code-home-workbench .ds-empty-hero-card-sub {
+    display: none;
+  }
+}
