@@ -63,7 +63,7 @@ export function normalizeUiFontScale(value: unknown): UiFontScale {
 export type ChatContentMaxWidthPx = number
 export const CHAT_CONTENT_MAX_WIDTH_MIN = 640
 export const CHAT_CONTENT_MAX_WIDTH_MAX = 1200
-export const DEFAULT_CHAT_CONTENT_MAX_WIDTH_PX = 896
+export const DEFAULT_CHAT_CONTENT_MAX_WIDTH_PX = 1008
 export function normalizeChatContentMaxWidth(value: unknown): ChatContentMaxWidthPx {
   const num = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(num)) return DEFAULT_CHAT_CONTENT_MAX_WIDTH_PX

@@ -81,9 +81,9 @@ function settings(): AppSettingsV1 {
 }
 
 describe('chat content max width', () => {
-  it('defaults invalid values to 896px', () => {
-    expect(normalizeChatContentMaxWidth(undefined)).toBe(896)
-    expect(normalizeChatContentMaxWidth('bad')).toBe(896)
+  it('defaults invalid values to 1008px', () => {
+    expect(normalizeChatContentMaxWidth(undefined)).toBe(1008)
+    expect(normalizeChatContentMaxWidth('bad')).toBe(1008)
   })
 
   it('clamps and rounds to 8px steps', () => {

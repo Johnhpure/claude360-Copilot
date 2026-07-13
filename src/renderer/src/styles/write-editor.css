@@ -10,7 +10,7 @@
 }
 
 .ds-user-message-bubble {
-  max-width: min(72%, 640px);
+  max-width: min(72%, 720px);
   min-width: 0;
   border-radius: 20px;
   background: var(--ds-bubble-user);

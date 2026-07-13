@@ -1,5 +1,5 @@
 import type { ReactElement, RefObject } from 'react'
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ChatBlock, RuntimeConnectionStatus } from '../../agent/types'
 import { useChatStore } from '../../store/chat-store'
@@ -335,33 +335,37 @@ export function MessageTimeline({
             forkBoundaryTurnCount !== undefined && absoluteTurnIndex === forkBoundaryTurnCount
           const turnKey = stableTurnKey(turn, absoluteTurnIndex)
           return (
-            <div
-              key={turnKey}
-              ref={(node) => {
-                if (node) {
-                  turnRefMap.current.set(turnKey, node)
-                } else {
-                  turnRefMap.current.delete(turnKey)
-                }
-              }}
-              className="scroll-mt-6"
-            >
-              {showForkPoint ? <ThreadForkPoint parentTitle={forkedFromTitle} /> : null}
-              <MemoMessageTurn
-                turn={turn}
-                isProcessing={(busy && isLatestTurn) || turnPending || hasLiveStream}
-                liveReasoning={isLatestTurn ? liveReasoning : ''}
-                live={isLatestTurn ? live : ''}
-                durationMs={durationMs}
-                reasoningDurationMs={reasoningDurationMs}
-                devPreviewCard={isLatestTurn ? devPreviewCard : null}
-                planActionsBusy={planActionsBusy}
-                onBuildPlan={onBuildPlan}
-                onOpenPlan={onOpenPlan}
-                viewportRef={containerRef}
-                compactCards={compactCards}
-              />
-            </div>
+            <Fragment key={turnKey}>
+              {index > 0 && !showForkPoint ? (
+                <div role="presentation" className="timeline-turn-divider" />
+              ) : null}
+              <div
+                ref={(node) => {
+                  if (node) {
+                    turnRefMap.current.set(turnKey, node)
+                  } else {
+                    turnRefMap.current.delete(turnKey)
+                  }
+                }}
+                className="scroll-mt-6"
+              >
+                {showForkPoint ? <ThreadForkPoint parentTitle={forkedFromTitle} /> : null}
+                <MemoMessageTurn
+                  turn={turn}
+                  isProcessing={(busy && isLatestTurn) || turnPending || hasLiveStream}
+                  liveReasoning={isLatestTurn ? liveReasoning : ''}
+                  live={isLatestTurn ? live : ''}
+                  durationMs={durationMs}
+                  reasoningDurationMs={reasoningDurationMs}
+                  devPreviewCard={isLatestTurn ? devPreviewCard : null}
+                  planActionsBusy={planActionsBusy}
+                  onBuildPlan={onBuildPlan}
+                  onOpenPlan={onOpenPlan}
+                  viewportRef={containerRef}
+                  compactCards={compactCards}
+                />
+              </div>
+            </Fragment>
           )
         })}
 

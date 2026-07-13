@@ -2490,11 +2490,11 @@ pre {
 }
 
 .ds-chat-column-inset {
-  padding-inline: clamp(0.75rem, calc((100% - var(--ds-chat-content-max-width, 56rem)) / 2 + 1rem), 2rem);
+  padding-inline: clamp(0.75rem, calc((100% - var(--ds-chat-content-max-width, 63rem)) / 2 + 1rem), 2rem);
 }
 
 .ds-chat-content-max-width {
-  max-width: var(--ds-chat-content-max-width, 56rem);
+  max-width: var(--ds-chat-content-max-width, 63rem);
 }
 
 .ds-chat-stage {
@@ -2625,6 +2625,17 @@ pre {
   padding-bottom: 1.25rem;
 }
 
+/* Turn-to-turn separator: a restrained 1px rule rendered between visible turns.
+ * It sits as a direct flex child of .ds-message-timeline-content, so the column
+ * gap (1.25rem, 0.875rem on short viewports) provides symmetric breathing room
+ * above and below the line without extra margins. */
+.timeline-turn-divider {
+  flex: none;
+  width: 100%;
+  height: 1px;
+  background: var(--ds-border-muted);
+}
+
 .chat-topbar-grid {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -2702,7 +2713,7 @@ pre {
   }
 
   .ds-chat-column-inset {
-    padding-inline: clamp(0.5rem, calc((100% - 48rem) / 2 + 0.75rem), 1.5rem);
+    padding-inline: clamp(0.5rem, calc((100% - var(--ds-chat-content-max-width, 63rem)) / 2 + 0.75rem), 1.5rem);
   }
 
   .ds-message-timeline-content {

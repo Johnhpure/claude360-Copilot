@@ -43,7 +43,7 @@ function BackgroundShellNoticeBubble({
 
   return (
     <div className={nested ? 'min-w-0' : 'flex w-full justify-start'}>
-      <div className="w-full max-w-[min(640px,calc(100vw-3rem))] rounded-[18px] border border-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--ds-accent)_6%,transparent),color-mix(in_srgb,var(--ds-accent)_10%,transparent))] px-3.5 py-3 text-ds-muted shadow-sm">
+      <div className="w-full max-w-[min(720px,calc(100vw-3rem))] rounded-[18px] border border-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--ds-accent)_6%,transparent),color-mix(in_srgb,var(--ds-accent)_10%,transparent))] px-3.5 py-3 text-ds-muted shadow-sm">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-[color-mix(in_srgb,var(--ds-accent)_25%,transparent)] bg-accent-soft px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent">
             {t('backgroundShellNotice.kindLabel', { defaultValue: 'Background callback' })}
