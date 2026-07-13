@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { planExpandToTurnCount } from './timeline-navigator'
 
 /** Threshold (px) from the top of the scroll container that triggers
  * auto-loading earlier turns. */
@@ -24,6 +25,10 @@ export type UseTimelineScrollResult = {
   hiddenTurnCount: number
   loadEarlierTurns: (options?: { userInitiated?: boolean }) => void
   collapseEarlierTurns: () => void
+  /** Expands the visible window (page-aligned) so the ABSOLUTE turn index is
+   * mounted. Used by the conversation navigator to jump into collapsed
+   * history; the caller owns the follow-up scroll once the ref mounts. */
+  expandToTurn: (targetIndex: number) => void
 }
 
 export function deriveTimelineVisibleTurnCount({
@@ -106,6 +111,29 @@ export function useTimelineScroll({
     historyExpansionRequestedRef.current = false
     setVisibleTurnCount(pageSize)
   }, [pageSize])
+
+  // Navigator jump into collapsed history. Deliberately DIFFERENT from
+  // `loadEarlierTurns`: no `pendingPrependRef` snapshot is written because a
+  // jump intentionally moves the viewport — the prepend position-keeping
+  // effect must not fight the caller's follow-up `scrollIntoView`. The two
+  // paths stay mutually exclusive.
+  const expandToTurn = useCallback(
+    (targetIndex: number): void => {
+      // The user is deliberately leaving the bottom; a streaming snap must
+      // not yank the viewport back down mid-jump.
+      stickToBottomRef.current = false
+      historyExpansionRequestedRef.current = true
+      setVisibleTurnCount((count) =>
+        planExpandToTurnCount({
+          targetIndex,
+          totalTurns,
+          visibleTurnCount: count,
+          pageSize
+        })
+      )
+    },
+    [pageSize, totalTurns]
+  )
 
   // A freshly submitted user turn should become visible even if the user was
   // reading older history before pressing Enter. Runs as a layout effect so the
@@ -239,6 +267,7 @@ export function useTimelineScroll({
     visibleTurnCount,
     hiddenTurnCount,
     loadEarlierTurns,
-    collapseEarlierTurns
+    collapseEarlierTurns,
+    expandToTurn
   }
 }

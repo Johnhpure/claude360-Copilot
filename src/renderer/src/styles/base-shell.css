@@ -2501,66 +2501,224 @@ pre {
   container-type: inline-size;
 }
 
-.timeline-jump-rail {
-  position: fixed;
-  top: 7.6rem;
-  right: 1.55rem;
-  z-index: 45;
-  display: flex;
-  box-sizing: border-box;
-  width: 2.4rem;
-  min-width: 2.4rem;
-  max-height: min(48vh, 22rem);
+/* Conversation navigator (replaces the numeric timeline-jump-rail).
+ * All three pieces are absolutely positioned siblings of the timeline scroll
+ * container inside the Workbench's `relative` wrapper, so they naturally sit
+ * below the topbar and above the composer, and NEVER overlap the dock right
+ * panel / file tree aside (those live outside `.ds-chat-stage`). The docked
+ * panel appears only when the stage is wide enough to host it beside the
+ * content column — the `@container` query reads `.ds-chat-stage`'s inline
+ * size, so opening the dock right panel automatically collapses the panel
+ * into the floating entry button (no layout-prop plumbing). */
+.timeline-navigator {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  bottom: 0.5rem;
+  z-index: 30;
+  display: none;
+  width: 232px;
   flex-direction: column;
-  align-items: center;
   gap: 0.3rem;
+  padding: 0.4rem 0.2rem 0.6rem;
+}
+
+.timeline-nav-header {
+  flex: none;
+  padding: 0.2rem 0.65rem;
+  color: var(--ds-text-faint);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.timeline-nav-list {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
   overflow-y: auto;
-  border: 1px solid color-mix(in srgb, var(--ds-border) 82%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ds-surface-card) 96%, transparent);
-  padding: 0.34rem;
-  box-shadow:
-    0 12px 34px rgba(15, 23, 42, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(20px);
+  overscroll-behavior: contain;
   scrollbar-width: none;
 }
 
-.timeline-jump-rail::-webkit-scrollbar {
+.timeline-nav-list::-webkit-scrollbar {
   display: none;
 }
 
-.timeline-jump-rail-button {
+.timeline-nav-item {
+  position: relative;
+  display: flex;
+  flex: none;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.34rem 0.65rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ds-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: left;
+  transition:
+    background var(--motion-fast) var(--ease-oneui),
+    color var(--motion-fast) var(--ease-oneui);
+}
+
+.timeline-nav-item:hover,
+.timeline-nav-item:focus-visible {
+  background: var(--ds-surface-hover);
+  color: var(--ds-text);
+  outline: none;
+}
+
+.timeline-nav-item-index {
+  flex: none;
+  min-width: 1.1rem;
+  color: var(--ds-text-faint);
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.timeline-nav-item-title {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-nav-item-active {
+  background: var(--ds-accent-soft);
+  color: var(--ds-accent);
+}
+
+.timeline-nav-item-active .timeline-nav-item-index {
+  color: var(--ds-accent);
+}
+
+.timeline-nav-item-active::before {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 2.5px;
+  height: 55%;
+  border-radius: 999px;
+  background: var(--ds-accent);
+  content: '';
+  transform: translateY(-50%);
+}
+
+/* Narrow-stage entry button: opens the overlay card below. */
+.timeline-nav-fab {
+  position: absolute;
+  top: 50%;
+  right: 0.9rem;
+  z-index: 30;
   display: inline-flex;
   box-sizing: border-box;
-  width: 1.7rem;
-  min-width: 1.7rem;
-  height: 1.7rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ds-border) 82%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ds-surface-card) 96%, transparent);
+  color: var(--ds-text-muted);
+  box-shadow: var(--c360-shadow-sm);
+  backdrop-filter: blur(20px);
+  transform: translateY(-50%);
+  transition:
+    background var(--motion-fast) var(--ease-oneui),
+    color var(--motion-fast) var(--ease-oneui);
+}
+
+.timeline-nav-fab:hover,
+.timeline-nav-fab:focus-visible {
+  background: var(--ds-accent-soft);
+  color: var(--ds-accent);
+  outline: none;
+}
+
+.timeline-nav-overlay-root {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+}
+
+.timeline-nav-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.timeline-nav-overlay-card {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  box-sizing: border-box;
+  width: min(248px, calc(100% - 1.5rem));
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem 0.3rem 0.6rem;
+  border: 1px solid var(--ds-border);
+  border-radius: 14px;
+  background: var(--ds-surface-card);
+  box-shadow: var(--c360-shadow-overlay);
+}
+
+.timeline-nav-overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.timeline-nav-overlay-close {
+  display: inline-flex;
+  width: 1.5rem;
+  height: 1.5rem;
   align-items: center;
   justify-content: center;
   padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ds-text) 7%, transparent);
-  color: var(--ds-text-muted);
-  font-size: 0.76rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  white-space: nowrap;
-  text-align: center;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ds-text-faint);
   transition:
     background var(--motion-fast) var(--ease-oneui),
-    color var(--motion-fast) var(--ease-oneui),
-    transform var(--motion-fast) var(--ease-oneui);
+    color var(--motion-fast) var(--ease-oneui);
 }
 
-.timeline-jump-rail-button:hover,
-.timeline-jump-rail-button:focus-visible {
-  background: var(--ds-accent-soft);
-  color: var(--ds-accent);
-  transform: translateY(-1px);
+.timeline-nav-overlay-close:hover,
+.timeline-nav-overlay-close:focus-visible {
+  background: var(--ds-surface-hover);
+  color: var(--ds-text);
   outline: none;
+}
+
+/* Docked panel needs the default content column (63rem) plus a 232px panel
+ * with breathing room on BOTH sides of the centered column: 63rem + 2×16rem
+ * = 95rem. Below that, the entry button + overlay take over. */
+@container (min-width: 95rem) {
+  .timeline-navigator {
+    display: flex;
+  }
+
+  .timeline-nav-fab,
+  .timeline-nav-overlay-root {
+    display: none;
+  }
 }
 
 .ds-plan-panel-overlay {
@@ -2597,7 +2755,8 @@ pre {
 }
 
 @media (max-width: 720px) {
-  .timeline-jump-rail {
+  .timeline-nav-fab,
+  .timeline-nav-overlay-root {
     display: none;
   }
 

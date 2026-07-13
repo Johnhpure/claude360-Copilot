@@ -1,5 +1,5 @@
 import type { ReactElement, RefObject } from 'react'
-import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ChatBlock, RuntimeConnectionStatus } from '../../agent/types'
 import { useChatStore } from '../../store/chat-store'
@@ -11,6 +11,12 @@ import { MessageTimelineEmptyHero, ThreadForkBanner, ThreadForkPoint } from './m
 import { GeneratedFilesPanel, MessageBubble } from './message-timeline-bubbles'
 import { ReviewPlanCard, ReviewSummaryCard, TurnChangeSummary, WorkMetaRow } from './message-timeline-cards'
 import { ProcessSectionRow, groupProcessSections } from './message-timeline-process'
+import { TimelineNavigator } from './TimelineNavigator'
+import {
+  deriveTurnNavItems,
+  resolveActiveTurnKey,
+  type TurnNavItem
+} from './timeline-navigator'
 import {
   AnimatedWorkLogo,
   WORK_LOGO_SWIM_MODE_LABEL_KEYS,
@@ -18,7 +24,6 @@ import {
 } from './AnimatedWorkLogo'
 import {
   groupTurns,
-  isBackgroundShellNoticeBlock,
   sameTurnContent,
   splitThink,
   stableTurnKey,
@@ -54,6 +59,9 @@ type CompactionTimelineBlock = Extract<ChatBlock, { kind: 'compaction' }>
 
 const TURN_PAGE_SIZE = 18
 const AUTO_COLLAPSE_THRESHOLD = 24
+/** Scroll-spy anchor line: a turn whose wrapper top sits at or above
+ * `scrollTop + this` owns the highlight in the conversation navigator. */
+const NAV_SCROLL_SPY_ANCHOR_PX = 120
 
 export function goalTimelinePaddingClass(route: 'chat' | 'claw', hasActiveGoal: boolean): string {
   return route === 'chat' && hasActiveGoal ? 'pb-32 md:pb-40' : 'pb-10'
@@ -84,19 +92,6 @@ function blockScrollStamp(block: ChatBlock | undefined): string {
     default:
       return ''
   }
-}
-
-function turnPreview(turn: Turn, fallback: string): string {
-  if (turn.user && isBackgroundShellNoticeBlock(turn.user)) {
-    const display = turn.user.meta?.displayText?.trim()
-    if (display) {
-      return display.length > 48 ? `${display.slice(0, 47).trimEnd()}...` : display
-    }
-  }
-  const text = turn.user?.text.trim() ?? ''
-  if (!text) return fallback
-  const oneLine = text.replace(/\s+/g, ' ')
-  return oneLine.length > 48 ? `${oneLine.slice(0, 47).trimEnd()}...` : oneLine
 }
 
 function processBlockHasError(block: ChatBlock): boolean {
@@ -193,7 +188,8 @@ export function MessageTimeline({
     visibleTurnCount,
     hiddenTurnCount,
     loadEarlierTurns,
-    collapseEarlierTurns
+    collapseEarlierTurns,
+    expandToTurn
   } = useTimelineScroll({
     containerRef,
     endRef,
@@ -212,29 +208,84 @@ export function MessageTimeline({
     () => (hiddenTurnCount > 0 ? turns.slice(hiddenTurnCount) : turns),
     [hiddenTurnCount, turns]
   )
-  const visibleTurnAnchors = useMemo(
-    () => {
-      const anchors: { key: string; label: string; title: string }[] = []
-      let questionIndex = turns
-        .slice(0, hiddenTurnCount)
-        .filter((turn) => turn.user)
-        .length
-
-      visibleTurns.forEach((turn, index) => {
-        if (!turn.user) return
-        questionIndex += 1
-        const absoluteTurnIndex = hiddenTurnCount + index
-        const key = stableTurnKey(turn, absoluteTurnIndex)
-        anchors.push({
-          key,
-          label: String(questionIndex),
-          title: turnPreview(turn, t('timelineJumpTurn', { index: questionIndex }))
-        })
-      })
-      return anchors
-    },
-    [hiddenTurnCount, t, turns, visibleTurns]
+  // Conversation navigator entries cover EVERY turn (collapsed history
+  // included) — jumping into history is the point. Memoized on the turns
+  // reference: user titles are fixed once a turn starts, so streaming
+  // deltas never recompute this.
+  const navItems = useMemo(
+    () => deriveTurnNavItems(turns, (turnNumber) => t('timelineNavTurnFallback', { index: turnNumber })),
+    [t, turns]
   )
+
+  // Scroll-spy: highlights the turn owning the anchor line. Runs on a
+  // rAF-throttled scroll listener that is deliberately independent of the
+  // useTimelineScroll state machine; only an actual activeKey change hits
+  // setState, so streaming/scrolling never re-renders the timeline per frame.
+  const [activeNavKey, setActiveNavKey] = useState<string | null>(null)
+  const navSpyFrameRef = useRef<number | null>(null)
+  const measureActiveNavKey = useCallback((): void => {
+    navSpyFrameRef.current = null
+    const el = containerRef.current
+    if (!el) return
+    const offsets: { key: string; top: number }[] = []
+    turnRefMap.current.forEach((node, key) => {
+      offsets.push({ key, top: node.offsetTop })
+    })
+    const next = resolveActiveTurnKey(offsets, el.scrollTop, NAV_SCROLL_SPY_ANCHOR_PX)
+    setActiveNavKey((prev) => (prev === next ? prev : next))
+  }, [])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onScroll = (): void => {
+      if (navSpyFrameRef.current !== null) return
+      navSpyFrameRef.current = window.requestAnimationFrame(measureActiveNavKey)
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      if (navSpyFrameRef.current !== null) {
+        window.cancelAnimationFrame(navSpyFrameRef.current)
+        navSpyFrameRef.current = null
+      }
+    }
+  }, [measureActiveNavKey])
+
+  // Re-measure when the mounted turn set changes (thread switch, expand /
+  // collapse, new turns) — scroll events alone would miss these.
+  useEffect(() => {
+    measureActiveNavKey()
+  }, [measureActiveNavKey, activeThreadId, visibleTurnCount, hiddenTurnCount, turns.length])
+
+  // Navigator jump: mounted targets scroll directly; collapsed-history
+  // targets expand the window first and scroll once the wrapper ref mounts
+  // (effect below picks it up on the visible-window change).
+  const pendingNavScrollKeyRef = useRef<string | null>(null)
+  const handleNavigate = useCallback(
+    (item: TurnNavItem): void => {
+      const mounted = turnRefMap.current.get(item.key)
+      if (mounted) {
+        mounted.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        return
+      }
+      pendingNavScrollKeyRef.current = item.key
+      expandToTurn(item.index)
+    },
+    [expandToTurn]
+  )
+  useEffect(() => {
+    const key = pendingNavScrollKeyRef.current
+    if (!key) return
+    const node = turnRefMap.current.get(key)
+    if (!node) return
+    pendingNavScrollKeyRef.current = null
+    node.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [visibleTurnCount, hiddenTurnCount])
+  // Drop a stale pending jump target when the thread switches.
+  useEffect(() => {
+    pendingNavScrollKeyRef.current = null
+  }, [activeThreadId])
   const forkedFromTitle = activeThread?.forkedFromTitle?.trim() ?? ''
   const forkBoundaryTurnCount =
     typeof activeThread?.forkedFromTurnCount === 'number'
@@ -250,34 +301,9 @@ export function MessageTimeline({
     return () => window.clearInterval(id)
   }, [busy, currentTurnUserId])
 
-  const jumpToTurn = (key: string): void => {
-    const target = turnRefMap.current.get(key)
-    if (!target) return
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   return (
     <InjectedMemoryLookupProvider workspaceRoot={workspaceRoot}>
     <div ref={containerRef} className="ds-no-drag relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
-      {visibleTurnAnchors.length > 2 ? (
-        <nav
-          aria-label={t('timelineJumpRailLabel')}
-          className="timeline-jump-rail"
-        >
-          {visibleTurnAnchors.map((anchor) => (
-            <button
-              key={anchor.key}
-              type="button"
-              className="timeline-jump-rail-button"
-              title={anchor.title}
-              aria-label={anchor.title}
-              onClick={() => jumpToTurn(anchor.key)}
-            >
-              {anchor.label}
-            </button>
-          ))}
-        </nav>
-      ) : null}
       <div className={`ds-message-timeline-content ds-chat-column-inset ds-chat-content-max-width mx-auto flex w-full min-w-0 flex-col gap-8 pt-8 ${
         goalTimelinePaddingClass(heroRoute, Boolean(activeThreadGoal))
       }`}>
@@ -415,6 +441,13 @@ export function MessageTimeline({
         <div ref={endRef} aria-hidden className="h-px w-full shrink-0" />
       </div>
     </div>
+    {/* Conversation navigator: absolutely positioned sibling of the scroll
+        container, anchored to the Workbench's `relative` timeline wrapper —
+        top edge sits below the topbar, bottom edge stops above the composer.
+        Hidden for compact hosts (write/sdd side panels) and short chats. */}
+    {!compactCards && navItems.length >= 2 ? (
+      <TimelineNavigator items={navItems} activeKey={activeNavKey} onNavigate={handleNavigate} />
+    ) : null}
     </InjectedMemoryLookupProvider>
   )
 }
