@@ -1,12 +1,14 @@
-import { Fragment, useState, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, CornerUpLeft, GitFork, RefreshCw, Settings } from 'lucide-react'
+import { Bot, CornerUpLeft, Folder, FolderOpen, GitFork, RefreshCw, Settings } from 'lucide-react'
 import type { ClawImChannelV1 } from '@shared/app-settings'
 import { KunStateFigure } from './AnimatedWorkLogo'
 import { InitialSessionUsageHeatmap } from './InitialSessionUsageHeatmap'
 import { BrandHero } from './BrandHero'
-import { CodeStarterDeck } from './CodeStarterDeck'
+import { CodeStarterDeck, ConversationStarterDeck } from './CodeStarterDeck'
+import { buildRecentProjectItems } from './home-empty-state'
 import { workspaceLabelFromPath } from '../../lib/workspace-label'
+import { isNoProjectWorkspace } from '../../lib/workspace-path'
 
 /**
  * Empty / hero states rendered by `MessageTimeline` when there is no
@@ -124,11 +126,13 @@ function RuntimeWakeHero({
 /**
  * Code 首页就绪空态「开发者启动工作台」（07-13-code-home-workbench R1）。
  * 信息层级自上而下：收紧版 BrandHero → 工作台引导行（当前项目名大字 +
- * 引导语；无项目时回退通用引导）→ 8 张快捷任务卡（CodeStarterDeck，点击
- * 经 onSelectSuggestion 填充 composer 并聚焦）→ 内嵌的用量日历（默认折叠）。
+ * 引导语）→ 8 张快捷任务卡（CodeStarterDeck，点击经 onSelectSuggestion
+ * 填充 composer 并聚焦）→ 内嵌的用量日历（默认折叠）。
  *
  * 项目名来自 chat-store `workspaceRoot` 的同步纯函数转换（零 IO 零异步）；
  * 路径/分支细节不在此重复展示——底部 composer 状态栏已有（design §1）。
+ * 到达本组件时必有真实项目：未打开项目（空串/default_workspace）已由
+ * 上游分流到 NoProjectWelcome（07-13-code-home-polish R2）。
  */
 function CodeHomeWorkbench({
   workspaceRoot,
@@ -138,8 +142,7 @@ function CodeHomeWorkbench({
   onSelectSuggestion?: (prompt: string) => void
 }): ReactElement {
   const { t } = useTranslation('common')
-  const hasProject = workspaceRoot.trim().length > 0
-  const projectLabel = hasProject ? workspaceLabelFromPath(workspaceRoot) : ''
+  const projectLabel = workspaceLabelFromPath(workspaceRoot)
 
   return (
     <div
@@ -150,15 +153,11 @@ function CodeHomeWorkbench({
         <BrandHero compact />
 
         <div className="ds-code-home-intro">
-          <p className="ds-code-home-intro-kicker">
-            {hasProject ? t('codeHomeProjectKicker') : t('codeHomeWorkbenchKicker')}
-          </p>
-          <h1 className="ds-code-home-intro-title" title={hasProject ? workspaceRoot : undefined}>
-            {hasProject ? projectLabel : t('codeHomeIntroFallbackTitle')}
+          <p className="ds-code-home-intro-kicker">{t('codeHomeProjectKicker')}</p>
+          <h1 className="ds-code-home-intro-title" title={workspaceRoot}>
+            {projectLabel}
           </h1>
-          <p className="ds-code-home-intro-sub">
-            {hasProject ? t('codeHomeIntroSub') : t('codeHomeIntroFallbackSub')}
-          </p>
+          <p className="ds-code-home-intro-sub">{t('codeHomeIntroSub')}</p>
         </div>
 
         <div className="ds-code-home-deck w-full min-w-0">
@@ -173,62 +172,166 @@ function CodeHomeWorkbench({
   )
 }
 
+/**
+ * 「未打开项目」空态（07-13-code-home-polish R2）：workspaceRoot 为空或指向
+ * default_workspace（主进程兜底产物）时替代开发工作台。页面唯一品牌出现点是
+ * BrandHero；主标题行动导向（打开项目），副文案明确区分「普通对话可直接输入」
+ * 与「项目任务需先打开项目」。不渲染依赖项目上下文的开发卡与用量日历。
+ */
+function NoProjectWelcome({
+  recentWorkspaceRoots,
+  onPickWorkspace,
+  onSelectWorkspaceRoot
+}: {
+  recentWorkspaceRoots: readonly string[]
+  onPickWorkspace: () => void
+  onSelectWorkspaceRoot?: (root: string) => void
+}): ReactElement {
+  const { t } = useTranslation('common')
+  // 过滤默认工作区/对话目录/worktree 后的最近项目(最多 5 条,近似 MRU)。
+  const recentItems = buildRecentProjectItems(recentWorkspaceRoots)
+
+  return (
+    <div
+      className="ds-code-home-workbench ds-no-drag mx-auto flex w-full min-w-0 items-center justify-center px-3 py-6 sm:px-5 sm:py-8"
+      data-testid="no-project-welcome"
+    >
+      <div className="ds-chat-content-max-width flex w-full min-w-0 flex-col items-center">
+        <BrandHero compact />
+
+        <div className="ds-code-home-intro">
+          <h1 className="ds-code-home-intro-title">{t('noProjectTitle')}</h1>
+          <p className="ds-code-home-intro-sub">{t('noProjectSub')}</p>
+        </div>
+
+        <button
+          type="button"
+          className="mt-7 inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_10px_24px_color-mix(in_srgb,var(--ds-accent)_22%,transparent)] transition hover:brightness-110"
+          onClick={onPickWorkspace}
+        >
+          <FolderOpen className="h-4 w-4" strokeWidth={1.8} />
+          {t('noProjectPickAction')}
+        </button>
+
+        {recentItems.length > 0 ? (
+          <section className="mt-8 w-full max-w-[520px]">
+            <h2 className="px-1 text-[12px] font-semibold uppercase tracking-[0.02em] text-ds-faint">
+              {t('noProjectRecentTitle')}
+            </h2>
+            <div className="mt-2.5 flex flex-col gap-2">
+              {recentItems.map((item) => (
+                <button
+                  key={item.root}
+                  type="button"
+                  className="flex items-center gap-3 rounded-[14px] border border-ds-border bg-ds-card px-4 py-3 text-left shadow-[var(--c360-shadow-sm)] transition duration-[var(--motion-base)] hover:border-[color-mix(in_srgb,var(--ds-accent)_18%,transparent)] hover:bg-ds-elevated"
+                  title={item.root}
+                  onClick={() => onSelectWorkspaceRoot?.(item.root)}
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-accent-soft text-accent">
+                    <Folder className="h-4 w-4" strokeWidth={1.8} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13.5px] font-semibold text-ds-ink">
+                      {item.label}
+                    </span>
+                    {item.parentDir ? (
+                      <span className="mt-0.5 block truncate text-[12px] text-ds-faint">
+                        {item.parentDir}
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 「对话」视图空态的通用 AI 首页（07-13-code-home-polish R3）：复用工作台
+ * 外壳与 intro 样式骨架，但不出现任何 Code 专属内容（项目名/开发卡）。
+ * 8 张通用快捷卡走既有 onSelectSuggestion 通道填充 composer 并聚焦。
+ */
+function ConversationHomeWorkbench({
+  onSelectSuggestion
+}: {
+  onSelectSuggestion?: (prompt: string) => void
+}): ReactElement {
+  const { t } = useTranslation('common')
+
+  return (
+    <div
+      className="ds-code-home-workbench ds-no-drag mx-auto flex w-full min-w-0 items-center justify-center px-3 py-6 sm:px-5 sm:py-8"
+      data-testid="conversation-home"
+    >
+      <div className="ds-chat-content-max-width flex w-full min-w-0 flex-col items-center">
+        <BrandHero compact />
+
+        <div className="ds-code-home-intro">
+          <p className="ds-code-home-intro-kicker">{t('conversationHomeKicker')}</p>
+          <h1 className="ds-code-home-intro-title">{t('conversationHomeTitle')}</h1>
+          <p className="ds-code-home-intro-sub">{t('conversationHomeSub')}</p>
+        </div>
+
+        <div className="ds-code-home-deck w-full min-w-0">
+          <ConversationStarterDeck onSelect={(prompt) => onSelectSuggestion?.(prompt)} />
+        </div>
+
+        <div className="ds-code-home-usage w-full min-w-0">
+          <InitialSessionUsageHeatmap embedded />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function MessageTimelineEmptyHero({
   route,
   ready,
-  hasWorkspace,
   runtimeError,
   activeClawChannel,
   codeHome = false,
+  conversationHome = false,
   workspaceRoot = '',
+  recentWorkspaceRoots = [],
   onPickWorkspace,
+  onSelectWorkspaceRoot,
   onRetry,
   onOpenSettings,
   onSelectSuggestion
 }: {
   route: 'chat' | 'claw'
   ready: boolean
-  hasWorkspace: boolean
   runtimeError?: string | null
   activeClawChannel: ClawImChannelV1 | null
   /**
-   * 宿主是否是 Code 首页（Workbench 的 chat 场景，store route === 'chat'）。
-   * write/sdd 助手面板复用本组件时为 false——它们的就绪空态保持原独立
-   * 热力图形态，不渲染开发者启动工作台。
+   * 宿主是否是 Code 首页（Workbench 的 chat 场景，store route === 'chat'
+   * 且非对话视图）。write/sdd 助手面板复用本组件时为 false——它们的就绪
+   * 空态保持原独立热力图形态，不渲染开发者启动工作台。
    */
   codeHome?: boolean
-  /** 当前工作目录绝对路径（工作台引导行项目名用；空串回退通用引导）。 */
+  /**
+   * 宿主是否是「对话」视图空态（Workbench 本地 conversationView 经 prop
+   * 下传，与 codeHome 在装配层互斥）。true 时渲染通用 AI 首页，不出现
+   * 任何 Code 专属内容（07-13-code-home-polish R3）。
+   */
+  conversationHome?: boolean
+  /** 当前工作目录绝对路径（工作台引导行项目名 / 未打开项目判定用）。 */
   workspaceRoot?: string
+  /** 最近项目候选（chat-store codeWorkspaceRoots，未打开项目空态展示用）。 */
+  recentWorkspaceRoots?: readonly string[]
   onPickWorkspace: () => void
+  /** 点击最近项目直接切换（chat-store selectWorkspaceRoot）。 */
+  onSelectWorkspaceRoot?: (root: string) => void
   onRetry: () => void
   onOpenSettings: () => void
   onSelectSuggestion?: (prompt: string) => void
 }): ReactElement {
-  const { t } = useTranslation('common')
-
   if (!ready) {
     return <RuntimeWakeHero runtimeError={runtimeError} onRetry={onRetry} onOpenSettings={onOpenSettings} />
-  }
-
-  if (!hasWorkspace) {
-    return (
-      <div className="ds-no-drag flex flex-col items-center justify-center px-6 py-24 text-center">
-        <KunStateFigure kind="sit" className="mb-4 h-16 w-16" />
-        <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-ds-ink">
-          {t('selectWorkspace')}
-        </h1>
-        <p className="mt-2 max-w-sm text-[14.5px] leading-6 text-ds-muted">
-          {t('emptyHeroSubNoWorkspace')}
-        </p>
-        <button
-          type="button"
-          className="ds-chip mt-5 rounded-full px-5 py-2.5 text-[13px] font-medium text-ds-ink transition hover:text-ds-ink"
-          onClick={onPickWorkspace}
-        >
-          {t('selectWorkspace')}
-        </button>
-      </div>
-    )
   }
 
   if (route === 'claw') {
@@ -240,7 +343,22 @@ export function MessageTimelineEmptyHero({
     )
   }
 
+  if (conversationHome) {
+    return <ConversationHomeWorkbench onSelectSuggestion={onSelectSuggestion} />
+  }
+
   if (codeHome) {
+    // 未打开项目(空串或 default_workspace 兜底路径)时不再伪装「当前项目 /
+    // Claude360 Copilot」,改为行动导向的打开项目空态(R2)。
+    if (isNoProjectWorkspace(workspaceRoot)) {
+      return (
+        <NoProjectWelcome
+          recentWorkspaceRoots={recentWorkspaceRoots}
+          onPickWorkspace={onPickWorkspace}
+          onSelectWorkspaceRoot={onSelectWorkspaceRoot}
+        />
+      )
+    }
     return (
       <CodeHomeWorkbench
         workspaceRoot={workspaceRoot}

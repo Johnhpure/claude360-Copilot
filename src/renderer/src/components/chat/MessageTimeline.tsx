@@ -54,6 +54,12 @@ type Props = {
   onOpenPlan?: () => void
   compactCards?: boolean
   /**
+   * 宿主是否处于「对话」视图（Workbench 本地 conversationView 状态下传）。
+   * true 时空态渲染通用 AI 首页（conversation-home），与 Code 开发工作台
+   * 在装配层互斥（07-13-code-home-polish R3）。
+   */
+  conversationHome?: boolean
+  /**
    * Opt-in for the right-hand conversation navigator (turn outline +
    * scroll-spy + jump). Only the MAIN chat timeline in `Workbench` sets
    * this; side-panel hosts (write/sdd assistant panels) keep it off —
@@ -159,13 +165,16 @@ export function MessageTimeline({
   onBuildPlan,
   onOpenPlan,
   compactCards = false,
+  conversationHome = false,
   conversationNavigator = false
 }: Props): ReactElement {
   const { t } = useTranslation('common')
   const {
     route,
     workspaceRoot,
+    codeWorkspaceRoots,
     chooseWorkspace,
+    selectWorkspaceRoot,
     activeClawChannel,
     busy,
     currentTurnUserId,
@@ -330,12 +339,14 @@ export function MessageTimeline({
           <MessageTimelineEmptyHero
             route={heroRoute}
             ready={runtimeConnection === 'ready'}
-            hasWorkspace={!!workspaceRoot}
             runtimeError={runtimeError}
             activeClawChannel={activeClawChannel}
-            codeHome={route === 'chat'}
+            codeHome={route === 'chat' && !conversationHome}
+            conversationHome={route === 'chat' && conversationHome}
             workspaceRoot={workspaceRoot}
+            recentWorkspaceRoots={codeWorkspaceRoots}
             onPickWorkspace={() => void chooseWorkspace()}
+            onSelectWorkspaceRoot={(root) => void selectWorkspaceRoot(root)}
             onRetry={onRetryConnection}
             onOpenSettings={onOpenSettings}
             onSelectSuggestion={onSelectSuggestion}

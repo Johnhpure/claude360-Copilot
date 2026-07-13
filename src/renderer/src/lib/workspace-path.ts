@@ -46,6 +46,16 @@ export function workspaceRootIdentityKey(path?: string): string {
   return normalized
 }
 
+// 「未打开项目」判定（07-13-code-home-polish R2）:主进程会把空 workspaceRoot
+// 兜底成 default_workspace,所以渲染层看到的「无项目」既可能是空串,也可能是
+// 默认工作区路径(含 legacy ~/.kun、~/.deepseekgui 形态与 ~ 展开后的绝对路径)。
+// 两种形态统一视作未打开项目,供 Code 首页空态分流。
+export function isNoProjectWorkspace(root: string): boolean {
+  const trimmed = root?.trim() ?? ''
+  if (!trimmed) return true
+  return isDefaultWorkspacePath(normalizePathForMatch(trimmed))
+}
+
 export function isInternalTemporaryWorkspace(path?: string): boolean {
   const trimmed = path?.trim() ?? ''
   if (!trimmed) return false

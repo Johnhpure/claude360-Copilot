@@ -29,7 +29,8 @@ export const CODE_STARTER_TONE_CLASS: Record<CodeStarterTone, string> = {
   skill: 'bg-ds-skill-soft text-ds-skill'
 }
 
-export type CodeStarterCard = {
+/** 快捷任务卡通用形状（07-13-code-home-polish 泛化：Code 版与对话版共用）。 */
+export type StarterCard = {
   id: string
   icon: LucideIcon
   tone: CodeStarterTone
@@ -38,8 +39,11 @@ export type CodeStarterCard = {
   promptKey: string
 }
 
+/** 兼容别名：泛化前的旧名，存量引用无需迁移。 */
+export type CodeStarterCard = StarterCard
+
 /** 8 张快捷任务卡（顺序即渲染顺序；tone 按 accent/success/skill 循环着色）。 */
-export const CODE_STARTER_CARDS: readonly CodeStarterCard[] = [
+export const CODE_STARTER_CARDS: readonly StarterCard[] = [
   {
     id: 'feature',
     icon: Rocket,

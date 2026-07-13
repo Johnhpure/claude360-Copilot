@@ -4092,9 +4092,6 @@ pre {
   }
 
   .ds-empty-hero-card-title {
-    overflow: visible;
-    text-overflow: clip;
-    white-space: normal;
     font-size: 15px;
     line-height: 1.25;
   }
@@ -4369,8 +4366,8 @@ pre {
   margin-top: 22px;
 }
 
-/* 矮窗口：隐藏卡片副文案并收紧卡高与区块间距，保证底部 composer
-   始终可见易达（PRD R5）。 */
+/* 矮窗口：收紧卡高与区块间距，保证底部 composer 始终可见易达。
+   副文案保持完整可见——禁止 display:none 隐藏（07-13-code-home-polish R1）。 */
 @media (max-height: 820px) {
   .ds-brand-hero-compact {
     gap: 10px;
@@ -4386,10 +4383,6 @@ pre {
   }
 
   .ds-code-home-workbench .ds-empty-hero-card {
-    min-height: 64px;
-  }
-
-  .ds-code-home-workbench .ds-empty-hero-card-sub {
-    display: none;
+    min-height: 56px;
   }
 }

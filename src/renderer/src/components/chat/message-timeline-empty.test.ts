@@ -19,7 +19,6 @@ function renderOfflineHero(runtimeError: string | null = null): string {
     createElement(MessageTimelineEmptyHero, {
       route: 'chat',
       ready: false,
-      hasWorkspace: true,
       runtimeError,
       activeClawChannel: null,
       onPickWorkspace: () => undefined,

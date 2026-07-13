@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_CONVERSATION_WORKSPACE_ROOT,
   defaultConversationWorkspaceRoot,
-  isConversationWorkspacePath
+  isConversationWorkspacePath,
+  isNoProjectWorkspace
 } from './workspace-path'
 
 describe('defaultConversationWorkspaceRoot', () => {
@@ -78,5 +79,39 @@ describe('isConversationWorkspacePath', () => {
     expect(
       isConversationWorkspacePath('/home/alice/.local/share/Claude360 Copilot/conversations/20260626-153012')
     ).toBe(true)
+  })
+})
+
+describe('isNoProjectWorkspace', () => {
+  it('treats empty and whitespace-only paths as no project', () => {
+    expect(isNoProjectWorkspace('')).toBe(true)
+    expect(isNoProjectWorkspace('   ')).toBe(true)
+  })
+
+  it('treats the default workspace (tilde form) as no project', () => {
+    expect(isNoProjectWorkspace('~/Claude360 Copilot/default_workspace')).toBe(true)
+  })
+
+  it('treats the expanded default workspace path as no project', () => {
+    // 主进程 normalize 会把 ~ 展开成绝对路径,渲染层拿到的是这种形态。
+    expect(isNoProjectWorkspace('/root/Claude360 Copilot/default_workspace')).toBe(true)
+    expect(isNoProjectWorkspace('/Users/alice/Claude360 Copilot/default_workspace/')).toBe(true)
+  })
+
+  it('treats legacy default workspace paths as no project', () => {
+    expect(isNoProjectWorkspace('~/.kun/default_workspace')).toBe(true)
+    expect(isNoProjectWorkspace('~/.deepseekgui/default_workspace')).toBe(true)
+    expect(isNoProjectWorkspace('/home/alice/.kun/default_workspace')).toBe(true)
+  })
+
+  it('handles backslash separators (Windows)', () => {
+    expect(isNoProjectWorkspace('C:\\Users\\alice\\Claude360 Copilot\\default_workspace')).toBe(true)
+  })
+
+  it('keeps real project paths as opened projects', () => {
+    expect(isNoProjectWorkspace('/root/projects/demo-app')).toBe(false)
+    expect(isNoProjectWorkspace('~/projects/demo-app')).toBe(false)
+    // 名字里恰好含 default_workspace 的兄弟目录不能误伤。
+    expect(isNoProjectWorkspace('/root/projects/default_workspace_backup')).toBe(false)
   })
 })

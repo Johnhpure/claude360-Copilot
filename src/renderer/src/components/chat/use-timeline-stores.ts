@@ -12,7 +12,11 @@ import type { AppRoute } from '../../store/chat-store-types'
 export type TimelineStores = {
   route: AppRoute
   workspaceRoot: string
+  /** 已知/最近项目列表（近似 MRU，未打开项目空态的最近项目区数据源）。 */
+  codeWorkspaceRoots: string[]
   chooseWorkspace: () => Promise<string | null>
+  /** 切换到已知项目（最近项目行点击用，含 runtime ready 守卫）。 */
+  selectWorkspaceRoot: (workspaceRoot: string) => Promise<string | null>
   clawChannels: ClawImChannelV1[]
   activeClawChannel: ClawImChannelV1 | null
   busy: boolean
@@ -28,7 +32,9 @@ export type TimelineStores = {
 export function useTimelineStores(activeThreadId: string | null): TimelineStores {
   const route = useChatStore((s) => s.route)
   const workspaceRoot = useChatStore((s) => s.workspaceRoot)
+  const codeWorkspaceRoots = useChatStore((s) => s.codeWorkspaceRoots)
   const chooseWorkspace = useChatStore((s) => s.chooseWorkspace)
+  const selectWorkspaceRoot = useChatStore((s) => s.selectWorkspaceRoot)
   const clawChannels = useChatStore((s) => s.clawChannels)
   const activeClawChannelId = useChatStore((s) => s.activeClawChannelId)
   const busy = useChatStore((s) => s.busy)
@@ -49,7 +55,9 @@ export function useTimelineStores(activeThreadId: string | null): TimelineStores
   return {
     route,
     workspaceRoot,
+    codeWorkspaceRoots,
     chooseWorkspace,
+    selectWorkspaceRoot,
     clawChannels,
     activeClawChannel,
     busy,
