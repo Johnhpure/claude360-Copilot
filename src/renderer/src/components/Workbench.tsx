@@ -45,7 +45,8 @@ import { SubagentReturnBar } from './chat/message-timeline-empty'
 import {
   FloatingComposer,
   type ComposerExecutionSettings,
-  type ComposerFileReference
+  type ComposerFileReference,
+  type FloatingComposerHandle
 } from './chat/FloatingComposer'
 import { ChatFileTreePanel, type ChatFileTreeReference } from './chat/ChatFileTreePanel'
 import {
@@ -525,6 +526,9 @@ export function Workbench(): ReactElement {
     }))
   )
   const [input, setInput] = useState('')
+  /* Code 空态快捷任务卡填充模板后聚焦 composer 用的命令句柄
+     （07-13 启动工作台联动，仅主聊天 composer 持有）。 */
+  const composerRef = useRef<FloatingComposerHandle | null>(null)
   const [useWorktreePool, setUseWorktreePool] = useState(false)
   const [worktreeBranch, setWorktreeBranch] = useState('')
   const [composerReasoningEffort, setComposerReasoningEffort] =
@@ -2860,7 +2864,11 @@ export function Workbench(): ReactElement {
                   runtimeError={error}
                   onRetryConnection={() => void probeRuntime('user', { restart: true })}
                   onOpenSettings={() => openSettings('agents')}
-                  onSelectSuggestion={(text) => setInput(text)}
+                  onSelectSuggestion={(text) => {
+                    setInput(text)
+                    // 快捷卡/建议填充后立即聚焦输入框，光标置末尾（R2 联动）。
+                    composerRef.current?.focus()
+                  }}
                   planActionsBusy={busy}
                   onBuildPlan={() => void buildGuiPlan()}
                   onOpenPlan={openGuiPlanPanel}
@@ -2888,6 +2896,7 @@ export function Workbench(): ReactElement {
               />
               ) : (
               <FloatingComposer
+                ref={composerRef}
                 input={input}
                 setInput={setInput}
                 mode={composerMode}

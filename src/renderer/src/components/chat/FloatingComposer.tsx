@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -8,7 +9,8 @@ import {
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
-  type ReactElement
+  type ReactElement,
+  type Ref
 } from 'react'
 import {
   Archive,
@@ -132,7 +134,18 @@ function formatContextCapacityChipNumber(value: number | null): string {
   return String(Math.round(percent))
 }
 
+/**
+ * Composer 对外的命令句柄（React 19 ref-as-prop，无需 forwardRef）。
+ * Code 空态快捷任务卡填充模板后经此聚焦输入框（07-13 启动工作台联动）。
+ */
+export type FloatingComposerHandle = {
+  /** 聚焦内部 textarea 并把光标移到文本末尾（rAF 时机，等受控 value 落地）。 */
+  focus: () => void
+}
+
 type Props = {
+  /** 暴露 FloatingComposerHandle 的命令句柄（可选，装配点按需持有）。 */
+  ref?: Ref<FloatingComposerHandle>
   variant?: 'default' | 'compact'
   workspaceRootOverride?: string
   input: string
@@ -463,6 +476,7 @@ export function shouldShowGoalFloater({
 }
 
 export function FloatingComposer({
+  ref,
   variant = 'default',
   workspaceRootOverride,
   input,
@@ -654,6 +668,24 @@ export function FloatingComposer({
   const draft = useComposerDraft({ input, canCompose: canEditComposer })
   const slashQuery = getSlashQuery(input)
   const [composerCursor, setComposerCursor] = useState(() => input.length)
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => {
+        // 与 draft.focusComposer 相同的 rAF 时机：等本轮受控 value 渲染落地后
+        // 再聚焦，这样「setInput(模板) 后立刻 focus()」时光标能落在新文本末尾。
+        window.requestAnimationFrame(() => {
+          const el = draft.textareaRef.current
+          if (!el) return
+          el.focus()
+          const end = el.value.length
+          el.setSelectionRange(end, end)
+          setComposerCursor(end)
+        })
+      }
+    }),
+    [draft.textareaRef]
+  )
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0)
   const [fileMentionSuggestions, setFileMentionSuggestions] = useState<ComposerFileReference[]>([])
   const [fileMentionLoading, setFileMentionLoading] = useState(false)
