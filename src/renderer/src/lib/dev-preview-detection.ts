@@ -184,3 +184,77 @@ export function formatDevPreviewUrlLabel(url: string): string {
     return url
   }
 }
+
+/**
+ * The block list dev-preview detection scans: history blocks plus a synthetic
+ * assistant block for the still-streaming live text (so a dev URL printed
+ * mid-reply is detected before turn completion). Shared by the Workbench
+ * selector below and the DevBrowser panel adapter.
+ */
+export function buildDevPreviewScanBlocks(blocks: ChatBlock[], liveAssistant: string): ChatBlock[] {
+  if (!liveAssistant.trim()) return blocks
+  return [
+    ...blocks,
+    {
+      kind: 'assistant',
+      id: '__live-assistant-dev-preview',
+      text: liveAssistant
+    }
+  ]
+}
+
+export type LatestTurnDevPreviewState = {
+  /** URLs eligible for the inline "open dev preview" card. */
+  detectedUrls: string[]
+  /** URLs eligible for auto-opening the dev browser panel. */
+  autoOpenUrls: string[]
+}
+
+const EMPTY_DEV_PREVIEW_STATE: LatestTurnDevPreviewState = { detectedUrls: [], autoOpenUrls: [] }
+
+let latestTurnDevPreviewCache: {
+  blocks: ChatBlock[]
+  liveAssistant: string
+  value: LatestTurnDevPreviewState
+} | null = null
+
+function sameStringArray(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return false
+  }
+  return true
+}
+
+/**
+ * Reference-stable zustand selector for the latest-turn dev preview URLs
+ * (07-14-timeline-performance R2). The Workbench must not subscribe to raw
+ * `blocks`/`liveAssistant` just to derive these; this recomputes only when
+ * either input reference changes (once per SSE batch at most, exactly the
+ * cadence the old render-path useMemo paid) and carries the previous result
+ * object over whenever the URL contents are unchanged — so Object.is keeps
+ * the subscribing component quiet during streaming.
+ */
+export function selectLatestTurnDevPreviewState(
+  blocks: ChatBlock[],
+  liveAssistant: string
+): LatestTurnDevPreviewState {
+  const cached = latestTurnDevPreviewCache
+  if (cached && cached.blocks === blocks && cached.liveAssistant === liveAssistant) {
+    return cached.value
+  }
+  const scanBlocks = buildDevPreviewScanBlocks(blocks, liveAssistant)
+  const detectedUrls = extractLatestTurnDevPreviewUrls(scanBlocks)
+  const autoOpenUrls = extractLatestTurnAutoOpenDevPreviewUrls(scanBlocks)
+  const previous = cached?.value
+  const value =
+    detectedUrls.length === 0 && autoOpenUrls.length === 0
+      ? EMPTY_DEV_PREVIEW_STATE
+      : previous &&
+          sameStringArray(previous.detectedUrls, detectedUrls) &&
+          sameStringArray(previous.autoOpenUrls, autoOpenUrls)
+        ? previous
+        : { detectedUrls, autoOpenUrls }
+  latestTurnDevPreviewCache = { blocks, liveAssistant, value }
+  return value
+}

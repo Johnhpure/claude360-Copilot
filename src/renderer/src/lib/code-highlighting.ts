@@ -205,7 +205,9 @@ const DOWNLOAD_EXTENSIONS: Record<string, string> = {
 }
 
 const MAX_HIGHLIGHT_CHARS = 250_000
-export const MAX_HIGHLIGHT_CACHE_ENTRIES = 120
+// 120 → 400（07-14-timeline-performance R3）：18 个可见 turn 的代码块量级下
+// 120 条会被回滚历史时挤掉；流式前缀不再入缓存后 400 条足够覆盖长会话。
+export const MAX_HIGHLIGHT_CACHE_ENTRIES = 400
 
 let shikiPromise: Promise<typeof import('shiki')> | null = null
 const highlightCache = new Map<string, string>()
@@ -288,7 +290,22 @@ export function languageFromFilePath(path: string): string {
   return FILE_EXTENSION_LANGUAGES[extension] ?? ''
 }
 
-export async function highlightCodeHtml(code: string, language: string): Promise<string> {
+export type HighlightCodeOptions = {
+  /**
+   * When false (streaming, incomplete code), the result is NOT written to the
+   * LRU cache: a growing code block would otherwise flood the cache with
+   * one-shot prefixes and evict real entries (07-14-timeline-performance R3).
+   * Cache reads still apply. Defaults to true (completed code).
+   */
+  persist?: boolean
+}
+
+export async function highlightCodeHtml(
+  code: string,
+  language: string,
+  options: HighlightCodeOptions = {}
+): Promise<string> {
+  const persist = options.persist !== false
   const normalized = normalizeCodeLanguage(language)
   const cacheKey = highlightCacheKey(code, normalized)
   const cached = readHighlightCache(cacheKey)
@@ -300,7 +317,7 @@ export async function highlightCodeHtml(code: string, language: string): Promise
   const task = (async () => {
     if (!normalized || code.length > MAX_HIGHLIGHT_CHARS) {
       const fallback = renderFallbackCodeHtml(code)
-      writeHighlightCache(cacheKey, fallback)
+      if (persist) writeHighlightCache(cacheKey, fallback)
       return fallback
     }
 
@@ -310,19 +327,22 @@ export async function highlightCodeHtml(code: string, language: string): Promise
         lang: normalized,
         themes: SHIKI_THEMES
       })
-      writeHighlightCache(cacheKey, html)
+      if (persist) writeHighlightCache(cacheKey, html)
       return html
     } catch {
       const fallback = renderFallbackCodeHtml(code)
-      writeHighlightCache(cacheKey, fallback)
+      if (persist) writeHighlightCache(cacheKey, fallback)
       return fallback
     }
   })()
 
-  inflightHighlights.set(cacheKey, task)
+  // Only persisted (completed-code) tasks register as inflight: a streaming
+  // prefix task must never satisfy a later completed-code call that expects
+  // its result to enter the cache.
+  if (persist) inflightHighlights.set(cacheKey, task)
   try {
     return await task
   } finally {
-    inflightHighlights.delete(cacheKey)
+    if (persist) inflightHighlights.delete(cacheKey)
   }
 }

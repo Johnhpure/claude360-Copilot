@@ -1,4 +1,5 @@
 import {
+  memo,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -475,7 +476,7 @@ export function shouldShowGoalFloater({
   return !compact && hasActiveGoal && slashQuery == null && !goalPanelOpen && !composerMenuOpen
 }
 
-export function FloatingComposer({
+function FloatingComposerComponent({
   ref,
   variant = 'default',
   workspaceRootOverride,
@@ -2551,3 +2552,14 @@ export function FloatingComposer({
     </div>
   )
 }
+
+/**
+ * Memoized (07-14-timeline-performance R2): every function prop from the
+ * Workbench is stabilized (useStableCallback / store actions) and object
+ * props come from state or reference-stable selectors, so the shallow compare
+ * holds except when composer-relevant inputs actually change (typing updates
+ * `input`, which legitimately re-renders this controlled component). The
+ * composer's own `s.blocks` subscriptions (pending user-input panel, context
+ * gauge) keep working independently of the parent.
+ */
+export const FloatingComposer = memo(FloatingComposerComponent)

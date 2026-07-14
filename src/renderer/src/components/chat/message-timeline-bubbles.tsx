@@ -18,6 +18,7 @@ import { ModelMetaTag, WritePromptMetaDisclosure } from './message-timeline-card
 import { readNumber, formatDuration, formatToolTitle, summarizeBackgroundShellToolBlock } from './message-timeline-tools'
 import { answersByQuestionId, shouldShowQuestionHeader } from './user-input-panel-logic'
 import { InjectedMemoryMetaChip } from './injected-memory-meta-chip'
+import { TruncatedDetailText } from './truncated-detail'
 
 const COPY_FEEDBACK_RESET_MS = 1600
 
@@ -1634,7 +1635,7 @@ function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boole
             <DiffView patch={patchText} filePath={block.filePath} />
           ) : (
             <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-ds-ink">
-              {block.detail}
+              <TruncatedDetailText text={block.detail ?? ''} />
             </pre>
           )}
         </div>

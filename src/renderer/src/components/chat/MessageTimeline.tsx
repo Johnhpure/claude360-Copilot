@@ -485,6 +485,23 @@ export function MessageTimeline({
   )
 }
 
+type MessageTurnProps = {
+  turn: Turn
+  isProcessing: boolean
+  liveReasoning: string
+  live: string
+  durationMs?: number
+  reasoningDurationMs?: number
+  devPreviewCard?: ReactElement | null
+  planActionsBusy?: boolean
+  onBuildPlan?: () => void
+  onOpenPlan?: () => void
+  viewportRef: RefObject<HTMLDivElement | null>
+  compactCards?: boolean
+}
+
+export type { MessageTurnProps }
+
 function MessageTurn({
   turn,
   isProcessing,
@@ -498,20 +515,7 @@ function MessageTurn({
   onOpenPlan,
   viewportRef,
   compactCards = false
-}: {
-  turn: Turn
-  isProcessing: boolean
-  liveReasoning: string
-  live: string
-  durationMs?: number
-  reasoningDurationMs?: number
-  devPreviewCard?: ReactElement | null
-  planActionsBusy?: boolean
-  onBuildPlan?: () => void
-  onOpenPlan?: () => void
-  viewportRef: RefObject<HTMLDivElement | null>
-  compactCards?: boolean
-}): ReactElement {
+}: MessageTurnProps): ReactElement {
   const workspaceRoot = useChatStore((s) => s.workspaceRoot)
   const activeThreadGoal = useChatStore((s) => s.activeThreadGoal)
   const forkThreadFromTurn = useChatStore((s) => s.forkThreadFromTurn)
@@ -736,17 +740,35 @@ function LiveTurnProgressRow({ hasActiveGoal }: { hasActiveGoal: boolean }): Rea
   )
 }
 
-const MemoMessageTurn = memo(MessageTurn, (prev, next) => (
-  sameTurnContent(prev.turn, next.turn) &&
-  prev.isProcessing === next.isProcessing &&
-  prev.liveReasoning === next.liveReasoning &&
-  prev.live === next.live &&
-  prev.durationMs === next.durationMs &&
-  prev.reasoningDurationMs === next.reasoningDurationMs &&
-  prev.devPreviewCard === next.devPreviewCard &&
-  prev.planActionsBusy === next.planActionsBusy &&
-  prev.onBuildPlan === next.onBuildPlan &&
-  prev.onOpenPlan === next.onOpenPlan &&
-  prev.compactCards === next.compactCards &&
-  prev.viewportRef === next.viewportRef
-))
+/**
+ * MemoMessageTurn contract (07-14-timeline-performance R1): during streaming
+ * batches every prop of a HISTORICAL turn must stay reference/value-stable so
+ * this returns true and the turn subtree bails out. Turn wrapper objects are
+ * rebuilt by `groupTurns` — `sameTurnContent` compares the user block + per
+ * block references instead. Function props (`onBuildPlan`/`onOpenPlan`) rely
+ * on the host stabilizing them (useStableCallback / useCallback in
+ * Workbench); the comparator deliberately keeps comparing identities so a
+ * regression re-renders (safe) instead of going stale (unsafe).
+ * Exported for the memo-contract unit test.
+ */
+export function areMessageTurnPropsEqual(
+  prev: MessageTurnProps,
+  next: MessageTurnProps
+): boolean {
+  return (
+    sameTurnContent(prev.turn, next.turn) &&
+    prev.isProcessing === next.isProcessing &&
+    prev.liveReasoning === next.liveReasoning &&
+    prev.live === next.live &&
+    prev.durationMs === next.durationMs &&
+    prev.reasoningDurationMs === next.reasoningDurationMs &&
+    prev.devPreviewCard === next.devPreviewCard &&
+    prev.planActionsBusy === next.planActionsBusy &&
+    prev.onBuildPlan === next.onBuildPlan &&
+    prev.onOpenPlan === next.onOpenPlan &&
+    prev.compactCards === next.compactCards &&
+    prev.viewportRef === next.viewportRef
+  )
+}
+
+const MemoMessageTurn = memo(MessageTurn, areMessageTurnPropsEqual)

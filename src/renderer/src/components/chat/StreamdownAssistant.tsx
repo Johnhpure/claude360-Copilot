@@ -9,6 +9,7 @@ import { useValidatedFileReference } from '../../lib/file-reference-validation'
 import { openWorkspacePathInEditor } from '../../lib/open-workspace-path'
 import { previewWorkspaceFile } from '../../lib/workspace-file-preview'
 import { useChatStore } from '../../store/chat-store'
+import { AssistantStreamingContext } from './assistant-stream-context'
 import { StreamdownCode } from './StreamdownCode'
 
 /** Reveal ~1/8 of the outstanding backlog per frame… */
@@ -17,6 +18,15 @@ const CATCHUP_DIVISOR = 8
  * thread, burst from a fast model) drains as fast typing instead of a
  * near-instant wall of text. */
 const MAX_STEP_PER_FRAME = 32
+/**
+ * Above this many characters the typewriter degrades to direct rendering
+ * (07-14-timeline-performance R4): streamdown re-lexes the FULL text on every
+ * revealed frame, so a per-frame setState over a 100KB reply costs O(n) at
+ * 60Hz. Past the threshold we render whole SSE batches as they arrive
+ * (~10Hz) instead of per-frame slices. The switch is one-way per reply to
+ * avoid mode flapping; a live-text reset (new turn / interrupt) re-arms it.
+ */
+export const TYPEWRITER_MAX_CHARS = 32_000
 
 export function nextVisibleLength(current: number, target: number): number {
   if (current === target) return current
@@ -24,6 +34,21 @@ export function nextVisibleLength(current: number, target: number): number {
   if (current > target) return target
   const backlog = target - current
   return current + Math.min(MAX_STEP_PER_FRAME, Math.max(1, Math.ceil(backlog / CATCHUP_DIVISOR)))
+}
+
+/**
+ * One-way "direct render" switch for oversized streaming replies.
+ * - Growing text crossing `TYPEWRITER_MAX_CHARS` latches direct mode on.
+ * - Once on, it stays on while the reply keeps growing (no flapping).
+ * - A shrink (live text reset for a new turn) re-evaluates from scratch.
+ */
+export function nextTypewriterDirectMode(
+  previousLength: number,
+  nextLength: number,
+  wasDirect: boolean
+): boolean {
+  if (nextLength < previousLength) return nextLength > TYPEWRITER_MAX_CHARS
+  return wasDirect || nextLength > TYPEWRITER_MAX_CHARS
 }
 
 /**
@@ -39,8 +64,16 @@ function useTypewriterText(text: string, streaming: boolean): string {
   const targetRef = useRef(text.length)
   targetRef.current = text.length
 
+  // Oversized-reply degradation (R4). Ref writes during render are
+  // idempotent here (same inputs → same result within a render pass).
+  const prevLengthRef = useRef(text.length)
+  const directRef = useRef(text.length > TYPEWRITER_MAX_CHARS)
+  directRef.current = nextTypewriterDirectMode(prevLengthRef.current, text.length, directRef.current)
+  prevLengthRef.current = text.length
+  const direct = directRef.current
+
   useEffect(() => {
-    if (!streaming) return
+    if (!streaming || direct) return
     let raf = requestAnimationFrame(function tick() {
       // When caught up this returns the same value, so React bails out of
       // re-rendering and the idle loop costs only the rAF callback.
@@ -48,9 +81,13 @@ function useTypewriterText(text: string, streaming: boolean): string {
       raf = requestAnimationFrame(tick)
     })
     return () => cancelAnimationFrame(raf)
-  }, [streaming])
+  }, [streaming, direct])
 
   if (!streaming) return text
+  // Direct mode: no per-frame reveal — render each SSE batch in full. The
+  // stale `visibleLength` is irrelevant here and gets snapped by
+  // `nextVisibleLength` if the reply ever resets below the threshold.
+  if (direct) return text
   let length = Math.min(visibleLength, text.length)
   // Don't cut a surrogate pair in half mid-reveal.
   const code = text.charCodeAt(length - 1)
@@ -159,22 +196,24 @@ export function StreamdownAssistant({ text, streaming, className }: Props): Reac
   const pacedText = useTypewriterText(text, streaming)
 
   return (
-    <Streamdown
-      className={className}
-      mode="static"
-      parseIncompleteMarkdown={false}
-      isAnimating={false}
-      // The pacing hook above is the typewriter. Keep Streamdown's own
-      // streaming/remend pipeline disabled here: in long Markdown responses
-      // with GFM tables, its block repair path can leave stale text fragments
-      // next to the repaired block, producing copied DOM text such as
-      // "Work Workstreamstream".
-      animated={false}
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={rehypePlugins}
-      components={components}
-    >
-      {pacedText}
-    </Streamdown>
+    <AssistantStreamingContext.Provider value={streaming}>
+      <Streamdown
+        className={className}
+        mode="static"
+        parseIncompleteMarkdown={false}
+        isAnimating={false}
+        // The pacing hook above is the typewriter. Keep Streamdown's own
+        // streaming/remend pipeline disabled here: in long Markdown responses
+        // with GFM tables, its block repair path can leave stale text fragments
+        // next to the repaired block, producing copied DOM text such as
+        // "Work Workstreamstream".
+        animated={false}
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={rehypePlugins}
+        components={components}
+      >
+        {pacedText}
+      </Streamdown>
+    </AssistantStreamingContext.Provider>
   )
 }

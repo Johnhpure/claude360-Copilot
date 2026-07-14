@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import type { ComponentProps } from 'react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
@@ -21,23 +22,30 @@ import {
 import type { DesktopCommand, ModelProviderModelGroup, SkillListItem } from '@shared/kun-gui-api'
 import type { WriteRetrievalContext } from '@shared/write-retrieval'
 import type { ClipboardImageReadResult, WorkspaceFileTarget } from '@shared/workspace-file'
-import type { AttachmentReference, ChatBlock, NormalizedThread, UserFileReference } from '../agent/types'
+import type {
+  AttachmentReference,
+  ChatBlock,
+  NormalizedThread,
+  RuntimeConnectionStatus,
+  UserFileReference
+} from '../agent/types'
 import type { CoreRuntimeInfoJson, CoreRuntimeSkillJson } from '../agent/kun-contract'
 import { getProvider } from '../agent/registry'
 import { rendererRuntimeClient } from '../agent/runtime-client'
 import { applyTheme } from '../lib/apply-theme'
 import { useChatStore } from '../store/chat-store'
 import {
-  conversationHasVisionAttachments,
+  conversationHasVisionAttachmentsCached,
   isClawThread,
   providerIdForComposerModel,
   resolveComposerContextWindowTokens
 } from '../store/chat-store-helpers'
 import { threadHasPendingRuntimeWork } from '../store/chat-store-runtime-helpers'
 import {
-  extractLatestTurnAutoOpenDevPreviewUrls,
-  extractLatestTurnDevPreviewUrls
+  buildDevPreviewScanBlocks,
+  selectLatestTurnDevPreviewState
 } from '../lib/dev-preview-detection'
+import { useStableCallback } from '../hooks/use-stable-callback'
 import { Sidebar } from './chat/Sidebar'
 import { WorkbenchShell } from './shell/WorkbenchShell'
 import { WorkbenchTopBar, type RightPanelMode } from './chat/WorkbenchTopBar'
@@ -91,7 +99,7 @@ import { prepareImageAttachmentUpload } from '../lib/image-attachment-upload'
 import { isChatAttachmentUploadEnabled } from '../lib/attachment-upload-availability'
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useKeyboardShortcutSettings } from '../lib/keyboard-shortcut-settings'
-import { collectComposerChangeSummary } from '../lib/composer-change-summary'
+import { selectComposerChangeSummary } from '../lib/composer-change-summary'
 import { formatWorkspacePickerError } from '../lib/format-workspace-picker-error'
 import { invalidateGroupKeyCache } from '../lib/group-key-ensure'
 import {
@@ -176,6 +184,134 @@ const SideConversationPanel = lazy(() =>
 
 function WorkbenchPaneFallback(): ReactElement {
   return <div className="h-full min-h-0 w-full bg-ds-main" aria-hidden />
+}
+
+/* ————— R2 订阅下沉小组件（07-14-timeline-performance） —————
+   高频流式字段（blocks / liveAssistant / liveReasoning：每 100ms SSE 批变化）
+   的 JSX 消费段收拢到以下模块级小组件内部自行订阅：流式批更新只重渲染这些
+   区域，3000 行的装配层 Workbench 及其 Sidebar / FloatingComposer 子树不再
+   每批重渲染。组件必须定义在模块顶层，避免随 Workbench 渲染重挂载。 */
+
+type ChatTimelineRegionProps = {
+  activeThreadId: string | null
+  runtimeConnection: RuntimeConnectionStatus
+  runtimeError: string | null
+  planActionsBusy: boolean
+  conversationHome: boolean
+  devPreviewCard: ReactElement | null
+  onRetryConnection: () => void
+  onOpenSettings: () => void
+  onSelectSuggestion: (prompt: string) => void
+  onBuildPlan: () => void
+  onOpenPlan: () => void
+}
+
+function ChatTimelineRegion({
+  activeThreadId,
+  runtimeConnection,
+  runtimeError,
+  planActionsBusy,
+  conversationHome,
+  devPreviewCard,
+  onRetryConnection,
+  onOpenSettings,
+  onSelectSuggestion,
+  onBuildPlan,
+  onOpenPlan
+}: ChatTimelineRegionProps): ReactElement {
+  const blocks = useChatStore((s) => s.blocks)
+  const liveReasoning = useChatStore((s) => s.liveReasoning)
+  const liveAssistant = useChatStore((s) => s.liveAssistant)
+  return (
+    <MessageTimeline
+      blocks={blocks}
+      liveReasoning={liveReasoning}
+      live={liveAssistant}
+      activeThreadId={activeThreadId}
+      runtimeConnection={runtimeConnection}
+      runtimeError={runtimeError}
+      onRetryConnection={onRetryConnection}
+      onOpenSettings={onOpenSettings}
+      onSelectSuggestion={onSelectSuggestion}
+      planActionsBusy={planActionsBusy}
+      onBuildPlan={onBuildPlan}
+      onOpenPlan={onOpenPlan}
+      conversationHome={conversationHome}
+      conversationNavigator
+      devPreviewCard={devPreviewCard}
+    />
+  )
+}
+
+function DevBrowserRegion({
+  preferredUrl,
+  className,
+  onCollapse
+}: {
+  preferredUrl: string | null
+  className: string
+  onCollapse: () => void
+}): ReactElement {
+  const blocks = useChatStore((s) => s.blocks)
+  const liveAssistant = useChatStore((s) => s.liveAssistant)
+  const devPreviewBlocks = useMemo(
+    () => buildDevPreviewScanBlocks(blocks, liveAssistant),
+    [blocks, liveAssistant]
+  )
+  return (
+    <DevBrowserPanel
+      blocks={devPreviewBlocks}
+      preferredUrl={preferredUrl}
+      className={className}
+      onCollapse={onCollapse}
+    />
+  )
+}
+
+function ChangeInspectorRegion({
+  className,
+  onCollapse
+}: {
+  className: string
+  onCollapse: () => void
+}): ReactElement {
+  const blocks = useChatStore((s) => s.blocks)
+  return <ChangeInspector blocks={blocks} className={className} onCollapse={onCollapse} />
+}
+
+/** 桥接层：为 write/sdd 助手面板补上其 props 里的三个高频流式字段。 */
+type AssistantPanelLiveProps = 'blocks' | 'liveReasoning' | 'liveAssistant'
+
+function WriteAssistantPanelRegion(
+  props: Omit<ComponentProps<typeof WriteAssistantPanel>, AssistantPanelLiveProps>
+): ReactElement {
+  const blocks = useChatStore((s) => s.blocks)
+  const liveReasoning = useChatStore((s) => s.liveReasoning)
+  const liveAssistant = useChatStore((s) => s.liveAssistant)
+  return (
+    <WriteAssistantPanel
+      {...props}
+      blocks={blocks}
+      liveReasoning={liveReasoning}
+      liveAssistant={liveAssistant}
+    />
+  )
+}
+
+function SddAssistantPanelRegion(
+  props: Omit<ComponentProps<typeof SddAssistantPanel>, AssistantPanelLiveProps>
+): ReactElement {
+  const blocks = useChatStore((s) => s.blocks)
+  const liveReasoning = useChatStore((s) => s.liveReasoning)
+  const liveAssistant = useChatStore((s) => s.liveAssistant)
+  return (
+    <SddAssistantPanel
+      {...props}
+      blocks={blocks}
+      liveReasoning={liveReasoning}
+      liveAssistant={liveAssistant}
+    />
+  )
 }
 
 type PendingSddPlanTarget = {
@@ -408,9 +544,6 @@ export function Workbench(): ReactElement {
     selectThread,
     createThread,
     createConversation,
-    blocks,
-    liveReasoning,
-    liveAssistant,
     error,
     runtimeErrorDetail,
     runtimeStatus,
@@ -458,11 +591,13 @@ export function Workbench(): ReactElement {
     deleteThread,
     spawnSideConversation,
     openSideConversationDraft,
-    selectSideConversation,
     setSidePanelOpen,
-    sideConversations,
     sidePanel
   } = useChatStore(
+    // R2（07-14-timeline-performance）：装配层宽订阅只保留低频字段。
+    // 高频流式字段（blocks / liveAssistant / liveReasoning / sideConversations
+    // ——前三者每 100ms SSE 批变化，最后者在旁聊流式时同频变化）一律不进这里：
+    // 消费点已下沉到模块顶部的 *Region 小组件，或改走下方的稳定引用选择器。
     useShallow((s) => ({
       threads: s.threads,
       threadSearch: s.threadSearch,
@@ -473,9 +608,6 @@ export function Workbench(): ReactElement {
       selectThread: s.selectThread,
       createThread: s.createThread,
       createConversation: s.createConversation,
-      blocks: s.blocks,
-      liveReasoning: s.liveReasoning,
-      liveAssistant: s.liveAssistant,
       error: s.error,
       runtimeErrorDetail: s.runtimeErrorDetail,
       runtimeStatus: s.runtimeStatus,
@@ -523,12 +655,34 @@ export function Workbench(): ReactElement {
       deleteThread: s.deleteThread,
       spawnSideConversation: s.spawnSideConversation,
       openSideConversationDraft: s.openSideConversationDraft,
-      selectSideConversation: s.selectSideConversation,
       setSidePanelOpen: s.setSidePanelOpen,
-      sideConversations: s.sideConversations,
       sidePanel: s.sidePanel
     }))
   )
+  // —— R2 高频字段窄订阅：一律通过稳定引用/原始值选择器订阅，流式批更新期间
+  //    返回值不变（Object.is 命中），Workbench 不随每批 setState 重渲染。
+  const lockVisionToTextModelSwitch = useChatStore(
+    (s) => s.route === 'chat' && conversationHasVisionAttachmentsCached(s.blocks)
+  )
+  const devPreviewState = useChatStore((s) =>
+    selectLatestTurnDevPreviewState(s.blocks, s.liveAssistant)
+  )
+  const sideChatCount = useChatStore((s) => {
+    if (!s.activeThreadId) return 0
+    let count = 0
+    for (const side of Object.values(s.sideConversations)) {
+      if (side.parentThreadId === s.activeThreadId) count += 1
+    }
+    return count
+  })
+  const sideChatRunningCount = useChatStore((s) => {
+    if (!s.activeThreadId) return 0
+    let count = 0
+    for (const side of Object.values(s.sideConversations)) {
+      if (side.parentThreadId === s.activeThreadId && side.busy) count += 1
+    }
+    return count
+  })
   const [input, setInput] = useState('')
   /* Code 空态快捷任务卡填充模板后聚焦 composer 用的命令句柄
      （07-13 启动工作台联动，仅主聊天 composer 持有）。 */
@@ -619,30 +773,8 @@ export function Workbench(): ReactElement {
   const sddUpgradeTargetRef = useRef<PendingSddPlanTarget | null>(null)
   const sddTitleSyncTimerRef = useRef<number | null>(null)
   const lastSyncedSddTitleRef = useRef<Record<string, string>>({})
-  const timelineBlocks = blocks
-  const lockVisionToTextModelSwitch = route === 'chat' && conversationHasVisionAttachments(timelineBlocks)
-  const timelineLiveReasoning = liveReasoning
-  const timelineLiveAssistant = liveAssistant
-  const devPreviewBlocks = useMemo<ChatBlock[]>(() => {
-    const liveText = timelineLiveAssistant.trim()
-    if (!liveText) return timelineBlocks
-    return [
-      ...timelineBlocks,
-      {
-        kind: 'assistant',
-        id: '__live-assistant-dev-preview',
-        text: timelineLiveAssistant
-      }
-    ]
-  }, [timelineBlocks, timelineLiveAssistant])
-  const detectedDevPreviewUrls = useMemo(
-    () => extractLatestTurnDevPreviewUrls(devPreviewBlocks),
-    [devPreviewBlocks]
-  )
-  const autoOpenDevPreviewUrls = useMemo(
-    () => extractLatestTurnAutoOpenDevPreviewUrls(devPreviewBlocks),
-    [devPreviewBlocks]
-  )
+  const latestDevPreviewUrl = devPreviewState.detectedUrls[0] ?? null
+  const latestAutoOpenDevPreviewUrl = devPreviewState.autoOpenUrls[0] ?? null
   const activeClawChannel = useMemo(
     () => clawChannels.find((channel) => channel.id === activeClawChannelId) ?? null,
     [activeClawChannelId, clawChannels]
@@ -651,22 +783,10 @@ export function Workbench(): ReactElement {
     () => threads.find((thread) => thread.id === activeThreadId)?.workspace || workspaceRoot || '',
     [activeThreadId, threads, workspaceRoot]
   )
-  const composerChangeSummary = useMemo(
-    () => collectComposerChangeSummary(timelineBlocks, activeSkillWorkspace),
-    [activeSkillWorkspace, timelineBlocks]
-  )
-  const latestDevPreviewUrl = detectedDevPreviewUrls[0] ?? null
-  const latestAutoOpenDevPreviewUrl = autoOpenDevPreviewUrls[0] ?? null
-  const currentSideConversations = useMemo(
-    () =>
-      Object.values(sideConversations)
-        .filter((side) => side.parentThreadId === activeThreadId)
-        .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
-    [activeThreadId, sideConversations]
-  )
-  const currentSideRunningCount = currentSideConversations.reduce(
-    (count, side) => count + (side.busy ? 1 : 0),
-    0
+  // 稳定引用选择器：工具批更新重建 blocks 但文件统计未变时返回上一次对象，
+  // FloatingComposer 的 changedFiles/changedFileStats props 保持引用稳定。
+  const composerChangeSummary = useChatStore((s) =>
+    selectComposerChangeSummary(s.blocks, activeSkillWorkspace)
   )
   const {
     beginLeftResize,
@@ -731,7 +851,6 @@ export function Workbench(): ReactElement {
     sendPlanTurn,
     verifyGuiPlan
   } = useWorkbenchPlanController({
-    blocks,
     busy,
     mode: composerMode,
     route,
@@ -872,14 +991,18 @@ export function Workbench(): ReactElement {
     }
   }, [activeThreadId, setSidePanelOpen, sidePanel.open])
 
-  const openSideChat = (): void => {
-    const latestSide = currentSideConversations.at(-1)
+  const openSideChat = useStableCallback((): void => {
+    const state = useChatStore.getState()
+    const sides = Object.values(state.sideConversations)
+      .filter((side) => side.parentThreadId === state.activeThreadId)
+      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+    const latestSide = sides.at(-1)
     if (latestSide) {
-      selectSideConversation(latestSide.threadId)
+      state.selectSideConversation(latestSide.threadId)
       return
     }
-    openSideConversationDraft()
-  }
+    state.openSideConversationDraft()
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -897,7 +1020,7 @@ export function Workbench(): ReactElement {
     }
   }, [])
 
-  const updateComposerExecutionSettings = (patch: Partial<ComposerExecutionSettings>): void => {
+  const updateComposerExecutionSettings = useStableCallback((patch: Partial<ComposerExecutionSettings>): void => {
     if (!composerExecutionSettings || composerExecutionApplying) return
     const previous = composerExecutionSettings
     const next = { ...previous, ...patch }
@@ -920,7 +1043,7 @@ export function Workbench(): ReactElement {
       setComposerExecutionSettings(previous)
       setError(error instanceof Error ? error.message : String(error))
     }).finally(() => setComposerExecutionApplying(false))
-  }
+  })
 
   const codeThreads = useMemo(
     () => threads.filter((thread) =>
@@ -1100,9 +1223,9 @@ export function Workbench(): ReactElement {
     setComposerFileReferences([])
   }
 
-  const addComposerFileReference = (reference: ComposerFileReference): void => {
+  const addComposerFileReference = useStableCallback((reference: ComposerFileReference): void => {
     setComposerFileReferences((current) => mergeComposerFileReferences(current, reference))
-  }
+  })
 
   const pickComposerFileReferences = async (): Promise<void> => {
     const result = await window.kunGui.pickLocalFiles(activeSkillWorkspace || undefined)
@@ -1112,14 +1235,14 @@ export function Workbench(): ReactElement {
     }
   }
 
-  const removeComposerFileReference = (relativePath: string): void => {
+  const removeComposerFileReference = useStableCallback((relativePath: string): void => {
     const key = relativePath.trim().replaceAll('\\', '/').replace(/\/+/g, '/').toLowerCase()
     setComposerFileReferences((current) =>
       current.filter((reference) =>
         reference.relativePath.trim().replaceAll('\\', '/').replace(/\/+/g, '/').toLowerCase() !== key
       )
     )
-  }
+  })
 
   const openWorkspaceFilePreviewTarget = (target: WorkspaceFileTarget): void => {
     const nextTarget = {
@@ -1166,9 +1289,9 @@ export function Workbench(): ReactElement {
     setFileTreeSidePanelOpen((open) => !open)
   }
 
-  const openFileTreeSidePanel = (): void => {
+  const openFileTreeSidePanel = useStableCallback((): void => {
     setFileTreeSidePanelOpen(true)
-  }
+  })
 
   useEffect(() => {
     if (rightPanelMode !== 'file' || !filePreviewTarget) return
@@ -1265,9 +1388,9 @@ export function Workbench(): ReactElement {
     }
   }
 
-  const removeComposerAttachment = (id: string): void => {
+  const removeComposerAttachment = useStableCallback((id: string): void => {
     setComposerAttachments((current) => current.filter((attachment) => attachment.id !== id))
-  }
+  })
 
   const handlePasteClipboardImage = async (options: { silentNoImage?: boolean } = {}): Promise<void> => {
     if (!attachmentUploadEnabled) return
@@ -1916,7 +2039,7 @@ export function Workbench(): ReactElement {
     const planRelativePath = sddDraftPlanRelativePath(draft)
     const planId = buildGuiPlanId(draft.workspaceRoot, planRelativePath)
     const sourceRequest = sddDraftSourceRequest(latestDraftContent, draft.relativePath)
-    const assistantContext = sddAssistantContextFromBlocks(blocks)
+    const assistantContext = sddAssistantContextFromBlocks(useChatStore.getState().blocks)
     const prompt = buildSddDraftToPlanPrompt({
       draftMarkdown: latestDraftContent,
       draftRelativePath: draft.relativePath,
@@ -2033,9 +2156,9 @@ export function Workbench(): ReactElement {
     return entries
   }
 
-  const handleSend = (): void => {
+  const handleSend = useStableCallback((): void => {
     void handleSendAsync()
-  }
+  })
 
   const handleSendAsync = async (): Promise<void> => {
     const v = input.trim()
@@ -2241,7 +2364,7 @@ export function Workbench(): ReactElement {
     })()
   }
 
-  const openThread = (id: string): void => {
+  const openThread = useStableCallback((id: string): void => {
     setConnectPhoneSidebarOpen(false)
     void (async () => {
       const thread = threads.find((item) => item.id === id) ?? null
@@ -2256,97 +2379,97 @@ export function Workbench(): ReactElement {
       setRoute('chat')
       await selectThread(id)
     })()
-  }
+  })
 
-  const startNewChat = (): void => {
+  const startNewChat = useStableCallback((): void => {
     if (activeSddDraft) dismissActiveSddDraft({ closeAssistant: true })
     setConnectPhoneSidebarOpen(false)
     setConversationView(false)
     setRoute('chat')
     void createThread({ useWorktreePool, worktreeBranch })
     if (useWorktreePool) setUseWorktreePool(false)
-  }
+  })
 
-  const startNewChatInWorkspace = (workspaceRoot: string): void => {
+  const startNewChatInWorkspace = useStableCallback((workspaceRoot: string): void => {
     if (activeSddDraft) dismissActiveSddDraft({ closeAssistant: true })
     setConnectPhoneSidebarOpen(false)
     setConversationView(false)
     setRoute('chat')
     void createThread({ workspaceRoot, useWorktreePool, worktreeBranch })
     if (useWorktreePool) setUseWorktreePool(false)
-  }
+  })
 
-  const startNewConversation = (): void => {
+  const startNewConversation = useStableCallback((): void => {
     if (activeSddDraft) dismissActiveSddDraft({ closeAssistant: true })
     setConnectPhoneSidebarOpen(false)
     // 新建对话必然处于/进入对话视图（4.4：新建后线程被选中、列表出现新项，行为不变）。
     setConversationView(true)
     setRoute('chat')
     void createConversation()
-  }
+  })
 
-  const openCodeMode = (): void => {
+  const openCodeMode = useStableCallback((): void => {
     setConnectPhoneSidebarOpen(false)
     setConversationView(false)
     void openCode()
-  }
+  })
 
-  const openWriteMode = (): void => {
+  const openWriteMode = useStableCallback((): void => {
     setConnectPhoneSidebarOpen(false)
     setConversationView(false)
     void openWrite()
-  }
+  })
 
   /* 「对话」一级入口（07-11 design D1）：route≠chat 时先回 chat route（openCode
      业务链路复用），再置 conversationView。注意顺序——openCodeMode 内会清标记。 */
-  const openConversationView = (): void => {
+  const openConversationView = useStableCallback((): void => {
     if (route !== 'chat') openCodeMode()
     else setConnectPhoneSidebarOpen(false)
     setConversationView(true)
-  }
+  })
 
   /* 生图/音乐入口：进入工作台初始新建态（design D4——两工作台无现成
      「新建任务」action，music 表单为组件本地 state，禁止为此新增业务 action）。
      生图入口（=「新建生图任务」）同时退出工作流视图，回到生成工作台（07-12）。 */
-  const openCanvasView = (): void => {
+  const openCanvasView = useStableCallback((): void => {
     setConversationView(false)
     setCanvasWorkflowsView(false)
     setRoute('canvas')
-  }
+  })
 
   /* 生图「创作工作流」二级入口（07-12 生图 IA 重构）：进入生图并把主内容区
      切换为工作流管理视图（列表/新建/搜索/分类在主区展示，非右侧面板）。 */
-  const openCanvasWorkflowsView = (): void => {
+  const openCanvasWorkflowsView = useStableCallback((): void => {
     setConversationView(false)
     setRoute('canvas')
     setCanvasWorkflowsView(true)
-  }
+  })
 
-  const openMusicView = (): void => {
+  const openMusicView = useStableCallback((): void => {
     setConversationView(false)
     setRoute('music')
-  }
+  })
 
-  const openPluginsView = (): void => {
+  const openPluginsView = useStableCallback((): void => {
     setConnectPhoneSidebarOpen(false)
     openPlugins(sidebarView === 'claw' ? 'claw' : 'chat')
-  }
+  })
 
-  const openScheduleView = (): void => {
+  const openScheduleView = useStableCallback((): void => {
     setConnectPhoneSidebarOpen(false)
     openSchedule()
-  }
+  })
 
-  const openWorkflowView = (): void => {
+  const openWorkflowView = useStableCallback((): void => {
     setConnectPhoneSidebarOpen(false)
     openWorkflow()
-  }
+  })
 
-  const toggleConnectPhone = (): void => {
+  const toggleConnectPhone = useStableCallback((): void => {
     if (activeSddDraft) dismissActiveSddDraft({ closeAssistant: true })
     openClaw()
     setConnectPhoneSidebarOpen((open) => !open)
-  }
+  })
 
   const sidebarView: 'chat' | 'write' | 'claw' | 'schedule' | 'workflow' | 'subagents' =
     route === 'claw' || (route === 'plugins' && pluginHostRoute === 'claw')
@@ -2428,6 +2551,112 @@ export function Workbench(): ReactElement {
   const rightPanelDockedVisible = rightPanelVisible && !planPanelInOverlay
   const fileTreeSidePanelOffset = fileTreeSidePanelOpen ? FILE_TREE_SIDEBAR_WIDTH + 24 : 0
 
+  /* —— R1 函数 props 稳定化（07-14-timeline-performance）：以下引用传给
+     memo 化的 Sidebar / FloatingComposer 及 ChatTimelineRegion（最终进入
+     MemoMessageTurn 比较函数），必须跨渲染保持稳定。 */
+  const retryRuntimeConnection = useStableCallback((): void => {
+    void probeRuntime('user', { restart: true })
+  })
+  const openAgentSettings = useStableCallback((): void => {
+    openSettings('agents')
+  })
+  const openProviderSettings = useStableCallback((): void => {
+    openSettings('providers')
+  })
+  const selectSuggestion = useStableCallback((text: string): void => {
+    setInput(text)
+    // 快捷卡/建议填充后立即聚焦输入框，光标置末尾（R2 联动）。
+    composerRef.current?.focus()
+  })
+  const buildActivePlan = useStableCallback((): void => {
+    void buildGuiPlan()
+  })
+  const verifyActivePlan = useStableCallback((): void => {
+    void verifyGuiPlan()
+  })
+  const replanChangedFromPanel = useStableCallback((ids: string[]): void => {
+    void replanChangedRequirements(ids)
+  })
+  const openMyView = useStableCallback((): void => {
+    setRoute('my')
+  })
+  const archiveThreadFromSidebar = useStableCallback((id: string) => archiveThread(id, true))
+  const restoreThreadFromSidebar = useStableCallback((id: string) => archiveThread(id, false))
+  const handleNewRequirement = useStableCallback((): void => {
+    void startNewSddRequirement()
+  })
+  const handleOpenRequirementDraft = useStableCallback((draft: SddDraft): void => {
+    void openSddRequirementDraftFromHistory(draft)
+  })
+  const pickAttachments = useStableCallback((files: File[]): void => {
+    void handlePickAttachments(files)
+  })
+  const pasteClipboardImage = useStableCallback(
+    (options?: { silentNoImage?: boolean }): void => {
+      void handlePasteClipboardImage(options)
+    }
+  )
+  const handlePickFileReferences = useStableCallback((): void => {
+    void pickComposerFileReferences()
+  })
+  const openCodeModelPicker = useStableCallback((): void => {
+    handleModelPickerOpen('code', composerProviderId)
+  })
+  const changeComposerModel = useStableCallback((modelId: string, providerId?: string): void => {
+    if (route === 'claw' && activeClawChannelId) {
+      void setClawChannelModel(activeClawChannelId, modelId)
+      return
+    }
+    setComposerModel(modelId, providerId)
+  })
+  const interruptTurn = useStableCallback(
+    (options?: Parameters<typeof interrupt>[0]): void => {
+      void interrupt(options)
+    }
+  )
+  const runPlanCommand = useStableCallback((): void => {
+    void handleGuiPlanCommand()
+  })
+  const toggleWorktreeMode = useStableCallback((): void => {
+    setUseWorktreePool((v) => !v)
+  })
+  const createThreadInActiveWorkspace = useStableCallback((): void => {
+    void createThread({ workspaceRoot: activeSkillWorkspace, forceNew: true })
+  })
+  const runReviewCommand = useStableCallback(
+    (target: Parameters<typeof reviewActiveThread>[0]): void => {
+      void reviewActiveThread(target)
+    }
+  )
+  const openChangesPanel = useStableCallback((): void => {
+    setRightPanelMode('changes')
+  })
+  const reviewUncommittedChanges = useStableCallback((): void => {
+    void reviewActiveThread({ kind: 'uncommittedChanges' })
+  })
+  const runBtwCommand = useStableCallback((seedText?: string): void => {
+    if (seedText?.trim()) {
+      void spawnSideConversation(seedText)
+      return
+    }
+    openSideConversationDraft()
+  })
+  const openDevPreviewStable = useStableCallback((): void => {
+    openDevPreview()
+  })
+  // 稳定元素：只在 URL/面板开合真正变化时才重建，历史 turn 恒收 null，
+  // 最新 turn 的 MemoMessageTurn 比较由本引用兜住。
+  const devPreviewCard = useMemo<ReactElement | null>(() => {
+    if (!showDevPreviewCard || !latestDevPreviewUrl) return null
+    return (
+      <DevPreviewLaunchCard
+        url={latestDevPreviewUrl}
+        opened={rightPanelMode === 'browser'}
+        onOpen={openDevPreviewStable}
+      />
+    )
+  }, [showDevPreviewCard, latestDevPreviewUrl, rightPanelMode, openDevPreviewStable])
+
   const renderPlanPanel = (className: string): ReactElement => (
     <PlanPanel
       workspaceRoot={activeSkillWorkspace}
@@ -2436,9 +2665,9 @@ export function Workbench(): ReactElement {
       busy={busy}
       className={className}
       onCollapse={closeRightPanel}
-      onBuildPlan={() => void buildGuiPlan()}
-      onVerifyPlan={() => void verifyGuiPlan()}
-      onReplanChanged={(ids) => void replanChangedRequirements(ids)}
+      onBuildPlan={buildActivePlan}
+      onVerifyPlan={verifyActivePlan}
+      onReplanChanged={replanChangedFromPanel}
     />
   )
 
@@ -2455,7 +2684,7 @@ export function Workbench(): ReactElement {
         <div className="h-full min-h-0 shrink-0" style={{ width: rightSidebarWidth }}>
           <Suspense fallback={<div className="h-full w-full bg-ds-sidebar" />}>
             {route === 'write' && writeAssistantOpen ? (
-              <WriteAssistantPanel
+              <WriteAssistantPanelRegion
                 input={input}
                 setInput={setInput}
                 mode={composerMode}
@@ -2463,9 +2692,6 @@ export function Workbench(): ReactElement {
                 busy={busy}
                 runtimeConnection={runtimeConnection}
                 activeThreadId={activeThreadId}
-                blocks={blocks}
-                liveReasoning={liveReasoning}
-                liveAssistant={liveAssistant}
                 composerModel={writeAssistantModel}
                 composerProviderId={resolvedWriteAssistantProviderId}
                 composerPickList={writeAssistantPickList}
@@ -2480,21 +2706,21 @@ export function Workbench(): ReactElement {
                 attachmentUploadEnabled={attachmentUploadEnabled}
                 attachmentUploadBusy={attachmentUploadBusy}
                 attachmentUploadError={attachmentUploadError}
-                onPickAttachments={(files) => void handlePickAttachments(files)}
-                onPasteClipboardImage={(options) => void handlePasteClipboardImage(options)}
+                onPickAttachments={pickAttachments}
+                onPasteClipboardImage={pasteClipboardImage}
                 onRemoveAttachment={removeComposerAttachment}
                 onSend={handleSend}
-                onInterrupt={(options) => void interrupt(options)}
-                onRetryConnection={() => void probeRuntime('user', { restart: true })}
-                onOpenSettings={() => openSettings('agents')}
-                onConfigureProviders={() => openSettings('providers')}
+                onInterrupt={interruptTurn}
+                onRetryConnection={retryRuntimeConnection}
+                onOpenSettings={openAgentSettings}
+                onConfigureProviders={openProviderSettings}
                 onNewConversation={startNewWriteAssistantConversation}
                 onPickWorkspace={() => void pickWriteAssistantWorkspace()}
                 onCollapse={closeRightPanel}
                 className="h-full max-h-full w-full"
               />
             ) : rightPanelMode === 'sdd-ai' && activeSddDraft ? (
-              <SddAssistantPanel
+              <SddAssistantPanelRegion
                 draft={activeSddDraft}
                 input={input}
                 setInput={setInput}
@@ -2503,9 +2729,6 @@ export function Workbench(): ReactElement {
                 busy={busy}
                 runtimeConnection={runtimeConnection}
                 activeThreadId={activeThreadId}
-                blocks={blocks}
-                liveReasoning={liveReasoning}
-                liveAssistant={liveAssistant}
                 composerModel={writeAssistantModel}
                 composerProviderId={resolvedWriteAssistantProviderId}
                 composerPickList={writeAssistantPickList}
@@ -2520,14 +2743,14 @@ export function Workbench(): ReactElement {
                 attachmentUploadEnabled={attachmentUploadEnabled}
                 attachmentUploadBusy={attachmentUploadBusy}
                 attachmentUploadError={attachmentUploadError}
-                onPickAttachments={(files) => void handlePickAttachments(files)}
-                onPasteClipboardImage={(options) => void handlePasteClipboardImage(options)}
+                onPickAttachments={pickAttachments}
+                onPasteClipboardImage={pasteClipboardImage}
                 onRemoveAttachment={removeComposerAttachment}
                 onSend={handleSend}
-                onInterrupt={(options) => void interrupt(options)}
-                onRetryConnection={() => void probeRuntime('user', { restart: true })}
-                onOpenSettings={() => openSettings('agents')}
-                onConfigureProviders={() => openSettings('providers')}
+                onInterrupt={interruptTurn}
+                onRetryConnection={retryRuntimeConnection}
+                onOpenSettings={openAgentSettings}
+                onConfigureProviders={openProviderSettings}
                 onApplyFramework={applySddFramework}
                 onNewConversation={() => {
                   setInput('')
@@ -2544,8 +2767,7 @@ export function Workbench(): ReactElement {
                 onCollapse={closeRightPanel}
               />
             ) : rightPanelMode === 'changes' ? (
-              <ChangeInspector
-                blocks={blocks}
+              <ChangeInspectorRegion
                 className="h-full max-h-full w-full flex-col"
                 onCollapse={closeRightPanel}
               />
@@ -2556,8 +2778,7 @@ export function Workbench(): ReactElement {
                 onOpenPlan={openGuiPlanPanel}
               />
             ) : rightPanelMode === 'browser' ? (
-              <DevBrowserPanel
-                blocks={devPreviewBlocks}
+              <DevBrowserRegion
                 preferredUrl={latestDevPreviewUrl}
                 className="h-full max-h-full w-full flex-col"
                 onCollapse={closeRightPanel}
@@ -2675,16 +2896,16 @@ export function Workbench(): ReactElement {
               onSelectThread={openThread}
               onRenameThread={renameThread}
               onPinThread={pinThread}
-              onArchiveThread={(id) => archiveThread(id, true)}
+              onArchiveThread={archiveThreadFromSidebar}
               onDeleteThread={deleteThread}
-              onRestoreThread={(id) => archiveThread(id, false)}
+              onRestoreThread={restoreThreadFromSidebar}
               onNewChat={startNewChat}
               onNewChatInWorkspace={startNewChatInWorkspace}
-              onNewRequirement={() => void startNewSddRequirement()}
-              onOpenRequirementDraft={(draft) => void openSddRequirementDraftFromHistory(draft)}
-              onOpenSettings={(section) => openSettings(section)}
+              onNewRequirement={handleNewRequirement}
+              onOpenRequirementDraft={handleOpenRequirementDraft}
+              onOpenSettings={openSettings}
               onOpenPlugins={openPluginsView}
-              onOpenMy={() => setRoute('my')}
+              onOpenMy={openMyView}
               myActive={route === 'my'}
               onOpenCanvas={openCanvasView}
               onOpenMusic={openMusicView}
@@ -2845,8 +3066,8 @@ export function Workbench(): ReactElement {
                     planPanelEnabled={Boolean(activeGuiPlan)}
                     terminalOpen={terminalOpen}
                     onToggleTerminal={toggleTerminal}
-                    sideChatCount={currentSideConversations.length}
-                    sideChatRunningCount={currentSideRunningCount}
+                    sideChatCount={sideChatCount}
+                    sideChatRunningCount={sideChatRunningCount}
                     sideChatOpen={sidePanel.open}
                     sideChatEnabled={runtimeConnection === 'ready' && Boolean(activeThreadId)}
                     fileTreeOpen={fileTreeSidePanelOpen}
@@ -2859,34 +3080,20 @@ export function Workbench(): ReactElement {
             </header>
             <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
               <Suspense fallback={<WorkbenchPaneFallback />}>
-                <MessageTimeline
-                  blocks={timelineBlocks}
-                  liveReasoning={timelineLiveReasoning}
-                  live={timelineLiveAssistant}
+                {/* R2：blocks/live 文本由 ChatTimelineRegion 内部订阅，装配层不再
+                    因流式批更新重渲染；全部函数 props 已稳定化（R1）。 */}
+                <ChatTimelineRegion
                   activeThreadId={activeThreadId}
                   runtimeConnection={runtimeConnection}
                   runtimeError={error}
-                  onRetryConnection={() => void probeRuntime('user', { restart: true })}
-                  onOpenSettings={() => openSettings('agents')}
-                  onSelectSuggestion={(text) => {
-                    setInput(text)
-                    // 快捷卡/建议填充后立即聚焦输入框，光标置末尾（R2 联动）。
-                    composerRef.current?.focus()
-                  }}
+                  onRetryConnection={retryRuntimeConnection}
+                  onOpenSettings={openAgentSettings}
+                  onSelectSuggestion={selectSuggestion}
                   planActionsBusy={busy}
-                  onBuildPlan={() => void buildGuiPlan()}
+                  onBuildPlan={buildActivePlan}
                   onOpenPlan={openGuiPlanPanel}
                   conversationHome={conversationActive}
-                  conversationNavigator
-                  devPreviewCard={
-                    showDevPreviewCard ? (
-                      <DevPreviewLaunchCard
-                        url={latestDevPreviewUrl}
-                        opened={rightPanelMode === 'browser'}
-                        onOpen={openDevPreview}
-                      />
-                    ) : null
-                  }
+                  devPreviewCard={devPreviewCard}
                 />
               </Suspense>
             </div>
@@ -2931,18 +3138,12 @@ export function Workbench(): ReactElement {
                   route === 'chat' || route === 'claw' ? composerReasoningEffort : undefined
                 }
                 lockVisionToTextModelSwitch={lockVisionToTextModelSwitch}
-                onComposerModelChange={(modelId, providerId) => {
-                  if (route === 'claw' && activeClawChannelId) {
-                    void setClawChannelModel(activeClawChannelId, modelId)
-                    return
-                  }
-                  setComposerModel(modelId, providerId)
-                }}
+                onComposerModelChange={changeComposerModel}
                 onComposerReasoningEffortChange={
                   route === 'chat' || route === 'claw' ? setComposerReasoningEffort : undefined
                 }
-                onConfigureProviders={() => openSettings('providers')}
-                onModelPickerOpen={() => handleModelPickerOpen('code', composerProviderId)}
+                onConfigureProviders={openProviderSettings}
+                onModelPickerOpen={openCodeModelPicker}
                 onSend={handleSend}
                 attachments={composerAttachments}
                 attachmentUploadEnabled={attachmentUploadEnabled}
@@ -2957,34 +3158,28 @@ export function Workbench(): ReactElement {
                 changedFileStats={composerChangeSummary}
                 skillCommands={runtimeSkills}
                 disabledSkillIds={disabledSkillIds}
-                onPickAttachments={(files) => void handlePickAttachments(files)}
-                onPasteClipboardImage={(options) => void handlePasteClipboardImage(options)}
+                onPickAttachments={pickAttachments}
+                onPasteClipboardImage={pasteClipboardImage}
                 onRemoveAttachment={removeComposerAttachment}
                 onAddFileReference={addComposerFileReference}
-                onPickFileReferences={() => void pickComposerFileReferences()}
+                onPickFileReferences={handlePickFileReferences}
                 onOpenFileReferencePicker={openFileTreeSidePanel}
                 onRemoveFileReference={removeComposerFileReference}
                 queuedMessages={queuedMessages}
                 onRemoveQueuedMessage={removeQueuedMessage}
-                onInterrupt={(options) => void interrupt(options)}
-                onPlanCommand={() => void handleGuiPlanCommand()}
+                onInterrupt={interruptTurn}
+                onPlanCommand={runPlanCommand}
                 useWorktreePool={useWorktreePool}
                 worktreeBranch={worktreeBranch}
                 onWorktreeBranchChange={setWorktreeBranch}
-                onToggleWorktreeMode={() => setUseWorktreePool((v) => !v)}
-                onNewCommand={() => void createThread({ workspaceRoot: activeSkillWorkspace, forceNew: true })}
-                onReviewCommand={(target) => void reviewActiveThread(target)}
+                onToggleWorktreeMode={toggleWorktreeMode}
+                onNewCommand={createThreadInActiveWorkspace}
+                onReviewCommand={runReviewCommand}
                 onExecutionSettingsChange={updateComposerExecutionSettings}
-                onOpenChanges={() => setRightPanelMode('changes')}
-                onReviewChanges={() => void reviewActiveThread({ kind: 'uncommittedChanges' })}
+                onOpenChanges={openChangesPanel}
+                onReviewChanges={reviewUncommittedChanges}
                 reviewChangesDisabled={busy || runtimeConnection !== 'ready'}
-                onBtwCommand={(seedText) => {
-                  if (seedText?.trim()) {
-                    void spawnSideConversation(seedText)
-                    return
-                  }
-                  openSideConversationDraft()
-                }}
+                onBtwCommand={runBtwCommand}
               />
               )}
             </div>

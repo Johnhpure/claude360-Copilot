@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import type { ChatBlock } from '../agent/types'
 import { useChatStore } from '../store/chat-store'
 import type { ChatState } from '../store/chat-store-types'
@@ -26,10 +26,7 @@ import type { RightPanelMode } from './chat/WorkbenchTopBar'
 import type { GuiPlanMessageContext, SendMessageOverrides } from '../store/chat-store-types'
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 
-type PlanResultMatch = {
-  blockId: string
-  meta: NonNullable<ReturnType<typeof extractPlanMetadataFromBlock>>
-}
+type PlanToolMetadata = NonNullable<ReturnType<typeof extractPlanMetadataFromBlock>>
 
 type PlanTurnOverrides = Pick<
   SendMessageOverrides,
@@ -39,7 +36,6 @@ type PlanTurnOverrides = Pick<
 }
 
 type WorkbenchPlanControllerOptions = {
-  blocks: ChatBlock[]
   busy: boolean
   mode: 'plan' | 'agent'
   route: ChatState['route']
@@ -53,15 +49,31 @@ type WorkbenchPlanControllerOptions = {
   onPlanBuildStarted?: (plan: GuiPlanArtifact) => void | Promise<void>
 }
 
-function latestSuccessfulPlanBlock(blocks: ChatBlock[]): PlanResultMatch | null {
+/**
+ * Stable-reference selector for "the latest successful create_plan tool
+ * block" (07-14-timeline-performance R2). The controller must not subscribe
+ * to the whole `blocks` array — that re-renders the 3000-line Workbench on
+ * every tool-event batch. Block objects are reference-stable across array
+ * rebuilds, so returning the block itself keeps zustand's Object.is check
+ * quiet until an actual new plan block lands. Single-slot cache keyed on the
+ * blocks array reference bounds the per-setState cost to O(1) while only
+ * `liveAssistant`/seq fields change.
+ */
+let latestPlanToolBlockCache: { blocks: ChatBlock[]; value: ChatBlock | null } | null = null
+
+export function selectLatestSuccessfulPlanToolBlock(blocks: ChatBlock[]): ChatBlock | null {
+  if (latestPlanToolBlockCache?.blocks === blocks) return latestPlanToolBlockCache.value
+  let value: ChatBlock | null = null
   for (let index = blocks.length - 1; index >= 0; index -= 1) {
     const block = blocks[index]
     if (block.kind !== 'tool' || block.status !== 'success') continue
-    const meta = extractPlanMetadataFromBlock(block)
-    if (!meta) continue
-    return { blockId: block.id, meta }
+    if (extractPlanMetadataFromBlock(block)) {
+      value = block
+      break
+    }
   }
-  return null
+  latestPlanToolBlockCache = { blocks, value }
+  return value
 }
 
 export function resolvePlanTurnWorkspaceRoot(
@@ -138,7 +150,6 @@ export function buildDraftGuiPlanTurnOverrides(input: {
 }
 
 export function useWorkbenchPlanController({
-  blocks,
   busy,
   mode,
   route,
@@ -152,66 +163,29 @@ export function useWorkbenchPlanController({
   onPlanBuildStarted
 }: WorkbenchPlanControllerOptions) {
   const activeGuiPlan = useGuiPlanStore((s) => s.activePlan)
-  const latestPlanBlock = useMemo(() => latestSuccessfulPlanBlock(blocks), [blocks])
+  // R2 订阅下沉：不再由 Workbench 传入 blocks —— 这里只订阅「最近成功的
+  // create_plan 块」的稳定引用，流式/工具批更新不再触发装配层重渲染。
+  const latestPlanToolBlock = useChatStore((s) => selectLatestSuccessfulPlanToolBlock(s.blocks))
   const planTurnInFlightThreadIdRef = useRef<string | null>(null)
   const lastLoadedPlanBlockIdRef = useRef<string | null>(null)
+
+  // R1 引用稳定化（ref 模式）：返回的动作函数全部 useCallback([])，通过本 ref
+  // 读取最新依赖，避免 Workbench 每次渲染都产生新函数引用击穿下游 memo
+  // （MemoMessageTurn 的 onBuildPlan、PlanPanel 等）。渲染期写 ref 幂等，
+  // 沿用 FloatingComposer 中 lastKnownWindowRef 的既有先例。
+  const optionsRef = useRef({ onPlanBuildStarted, sendMessage, setComposerMode, setError, t, workspaceRoot })
+  optionsRef.current = { onPlanBuildStarted, sendMessage, setComposerMode, setError, t, workspaceRoot }
 
   const openGuiPlanPanel = useCallback((): void => {
     setRightSidebarWidth((width) => Math.max(width, CODE_PANEL_PREFERRED))
     setRightPanelMode('plan')
   }, [setRightPanelMode, setRightSidebarWidth])
 
-  const savePlanContentToDisk = async (
-    plan: GuiPlanArtifact,
-    contentToSave: string
-  ): Promise<boolean> => {
-    const planStore = useGuiPlanStore.getState()
-    planStore.setSaveStatus('saving')
-    try {
-      const result = await window.kunGui.writeWorkspaceFile({
-        workspaceRoot: plan.workspaceRoot,
-        path: plan.relativePath,
-        content: contentToSave
-      })
-      if (!result.ok) {
-        useGuiPlanStore.getState().setSaveStatus('error', result.message)
-        return false
-      }
-      const latest = useGuiPlanStore.getState()
-      if (latest.activePlan?.id === plan.id) {
-        latest.markSaved(contentToSave)
-      }
-      return true
-    } catch (error) {
-      useGuiPlanStore.getState().setSaveStatus(
-        'error',
-        error instanceof Error ? error.message : String(error)
-      )
-      return false
-    }
-  }
-
-  const readExistingPlanRelativePaths = async (
-    targetWorkspaceRoot: string
-  ): Promise<string[]> => {
-    try {
-      const result = await window.kunGui.listWorkspaceDirectory({
-        workspaceRoot: targetWorkspaceRoot,
-        path: GUI_PLAN_RELATIVE_DIR
-      })
-      if (!result.ok) return []
-      return result.entries
-        .filter((entry) => entry.type === 'file' && entry.name.toLowerCase().endsWith('.md'))
-        .map((entry) => `${GUI_PLAN_RELATIVE_DIR}/${entry.name}`)
-    } catch {
-      return []
-    }
-  }
-
-  const sendPlanTurn = async (
+  const sendPlanTurn = useCallback(async (
     text: string,
     overrides?: PlanTurnOverrides
   ): Promise<boolean> => {
+    const { sendMessage, setError, t, workspaceRoot } = optionsRef.current
     const currentChatState = useChatStore.getState()
     const currentPlan = useGuiPlanStore.getState().activePlan
     const fallbackWorkspaceRoot =
@@ -255,10 +229,10 @@ export function useWorkbenchPlanController({
       planTurnInFlightThreadIdRef.current = useChatStore.getState().activeThreadId ?? null
     }
     return sent
-  }
+  }, [])
 
   const loadPlanFromMeta = useCallback(async (
-    meta: PlanResultMatch['meta'],
+    meta: PlanToolMetadata,
     shouldOpen: boolean
   ): Promise<void> => {
     const result = await window.kunGui.readWorkspaceFile({
@@ -281,7 +255,8 @@ export function useWorkbenchPlanController({
     if (shouldOpen) openGuiPlanPanel()
   }, [openGuiPlanPanel])
 
-  const buildGuiPlan = async (): Promise<void> => {
+  const buildGuiPlan = useCallback(async (): Promise<void> => {
+    const { onPlanBuildStarted, sendMessage, setComposerMode, setError, t } = optionsRef.current
     const snapshot = useGuiPlanStore.getState()
     const plan = snapshot.activePlan
     if (!plan) return
@@ -299,18 +274,19 @@ export function useWorkbenchPlanController({
     if (sent) {
       await onPlanBuildStarted?.(plan)
     }
-  }
+  }, [])
 
-  const handleGuiPlanCommand = async (request?: string): Promise<void> => {
-    setComposerMode('plan')
+  const handleGuiPlanCommand = useCallback(async (request?: string): Promise<void> => {
+    optionsRef.current.setComposerMode('plan')
     if (request?.trim()) {
       await sendPlanTurn(request.trim())
     }
-  }
+  }, [sendPlanTurn])
 
   // SDD acceptance turn: the agent verifies every requirement block's
   // acceptance criteria and updates requirement.md in place.
-  const verifyGuiPlan = async (): Promise<void> => {
+  const verifyGuiPlan = useCallback(async (): Promise<void> => {
+    const { sendMessage, setComposerMode, setError, t } = optionsRef.current
     const plan = useGuiPlanStore.getState().activePlan
     if (!plan) return
     const draftRelativePath = sddDraftRelativePathForPlanPath(plan.relativePath)
@@ -329,11 +305,12 @@ export function useWorkbenchPlanController({
       'agent',
       { displayText: `${t('planVerify')}: ${draftRelativePath}` }
     )
-  }
+  }, [])
 
   // SDD incremental replan: feed only the changed requirement blocks back
   // into a refine turn, then re-baseline the trace snapshot.
-  const replanChangedRequirements = async (changedIds: string[]): Promise<void> => {
+  const replanChangedRequirements = useCallback(async (changedIds: string[]): Promise<void> => {
+    const { setComposerMode, setError, t } = optionsRef.current
     const snapshot = useGuiPlanStore.getState()
     const plan = snapshot.activePlan
     if (!plan || changedIds.length === 0) return
@@ -403,7 +380,7 @@ export function useWorkbenchPlanController({
           .catch(() => undefined)
       }
     }
-  }
+  }, [sendPlanTurn])
 
   useEffect(() => {
     if (route !== 'chat' && mode === 'plan') {
@@ -412,9 +389,11 @@ export function useWorkbenchPlanController({
   }, [mode, route, setComposerMode])
 
   useEffect(() => {
-    if (latestPlanBlock && lastLoadedPlanBlockIdRef.current === latestPlanBlock.blockId) return
-    if (!latestPlanBlock) return
-    lastLoadedPlanBlockIdRef.current = latestPlanBlock.blockId
+    if (!latestPlanToolBlock) return
+    if (lastLoadedPlanBlockIdRef.current === latestPlanToolBlock.id) return
+    const meta = extractPlanMetadataFromBlock(latestPlanToolBlock)
+    if (!meta) return
+    lastLoadedPlanBlockIdRef.current = latestPlanToolBlock.id
     // Auto-open the preview only for a plan we just generated in this thread's
     // plan turn. Loading an old thread that merely contains a plan — or a plan
     // turn started in a different thread we've since switched away from — must
@@ -424,13 +403,13 @@ export function useWorkbenchPlanController({
       useChatStore.getState().activeThreadId
     )
     planTurnInFlightThreadIdRef.current = null
-    void loadPlanFromMeta(latestPlanBlock.meta, shouldOpen).catch((error) => {
+    void loadPlanFromMeta(meta, shouldOpen).catch((error) => {
       useGuiPlanStore.getState().setOperationStatus(
         'error',
         error instanceof Error ? error.message : String(error)
       )
     })
-  }, [latestPlanBlock, loadPlanFromMeta])
+  }, [latestPlanToolBlock, loadPlanFromMeta])
 
   useEffect(() => {
     if (!busy) planTurnInFlightThreadIdRef.current = null
@@ -444,5 +423,52 @@ export function useWorkbenchPlanController({
     replanChangedRequirements,
     sendPlanTurn,
     verifyGuiPlan
+  }
+}
+
+async function savePlanContentToDisk(
+  plan: GuiPlanArtifact,
+  contentToSave: string
+): Promise<boolean> {
+  const planStore = useGuiPlanStore.getState()
+  planStore.setSaveStatus('saving')
+  try {
+    const result = await window.kunGui.writeWorkspaceFile({
+      workspaceRoot: plan.workspaceRoot,
+      path: plan.relativePath,
+      content: contentToSave
+    })
+    if (!result.ok) {
+      useGuiPlanStore.getState().setSaveStatus('error', result.message)
+      return false
+    }
+    const latest = useGuiPlanStore.getState()
+    if (latest.activePlan?.id === plan.id) {
+      latest.markSaved(contentToSave)
+    }
+    return true
+  } catch (error) {
+    useGuiPlanStore.getState().setSaveStatus(
+      'error',
+      error instanceof Error ? error.message : String(error)
+    )
+    return false
+  }
+}
+
+async function readExistingPlanRelativePaths(
+  targetWorkspaceRoot: string
+): Promise<string[]> {
+  try {
+    const result = await window.kunGui.listWorkspaceDirectory({
+      workspaceRoot: targetWorkspaceRoot,
+      path: GUI_PLAN_RELATIVE_DIR
+    })
+    if (!result.ok) return []
+    return result.entries
+      .filter((entry) => entry.type === 'file' && entry.name.toLowerCase().endsWith('.md'))
+      .map((entry) => `${GUI_PLAN_RELATIVE_DIR}/${entry.name}`)
+  } catch {
+    return []
   }
 }

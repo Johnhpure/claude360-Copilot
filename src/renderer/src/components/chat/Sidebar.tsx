@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, memo, Suspense, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Clock3,
@@ -91,7 +91,7 @@ type Props = {
   onNewConversation: () => void
 }
 
-export function Sidebar({
+function SidebarComponent({
   threads,
   activeThreadId,
   activeView,
@@ -440,3 +440,13 @@ export function Sidebar({
     </>
   )
 }
+
+/**
+ * Memoized (07-14-timeline-performance R2): the sidebar renders 400+ lines of
+ * navigation/thread UI and takes no streaming state — with the Workbench's
+ * handler props stabilized via useStableCallback, this shallow-compare bails
+ * out on parent re-renders (input typing, banner/error updates, busy flips
+ * are the remaining parents; streaming batches no longer re-render the parent
+ * at all).
+ */
+export const Sidebar = memo(SidebarComponent)

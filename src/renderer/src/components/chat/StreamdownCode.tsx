@@ -31,6 +31,8 @@ import {
   highlightCodeHtml,
   renderFallbackCodeHtml
 } from '../../lib/code-highlighting'
+import { createTrailingThrottle, type TrailingThrottle } from '../../lib/trailing-throttle'
+import { useAssistantStreaming } from './assistant-stream-context'
 import { useChatStore } from '../../store/chat-store'
 
 const LANGUAGE_REGEX = /language-([^\s]+)/
@@ -38,6 +40,12 @@ const TRAILING_NEWLINES_REGEX = /\n+$/
 const PLAIN_TEXT_LANGUAGES = new Set(['', 'plain', 'plaintext', 'text', 'txt'])
 const COLLAPSE_HEIGHT = 200
 const COPY_RESET_MS = 2000
+/**
+ * While the surrounding assistant text is still streaming, code re-renders
+ * (fallback innerHTML swap + shiki full-highlight) run at most once per this
+ * window instead of per typewriter frame (07-14-timeline-performance R3).
+ */
+export const STREAM_HIGHLIGHT_INTERVAL_MS = 150
 
 type CodeProps = DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
   'data-block'?: string | boolean
@@ -170,6 +178,7 @@ function CodeBlock({
   language: string
 }): ReactNode {
   const { isAnimating } = useContext(StreamdownContext)
+  const streaming = useAssistantStreaming()
   const trimmedCode = useMemo(() => code.replace(TRAILING_NEWLINES_REGEX, ''), [code])
   const [html, setHtml] = useState(() => renderFallbackCodeHtml(trimmedCode))
   const [isCopied, setIsCopied] = useState(false)
@@ -177,20 +186,48 @@ function CodeBlock({
   const [expanded, setExpanded] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
   const copyResetRef = useRef<number | null>(null)
+  const highlightThrottleRef = useRef<TrailingThrottle | null>(null)
   const displayLanguage = displayCodeLanguage(language)
+
+  useEffect(
+    () => () => {
+      highlightThrottleRef.current?.cancel()
+    },
+    []
+  )
 
   useEffect(() => {
     let cancelled = false
-    setHtml(renderFallbackCodeHtml(trimmedCode))
+    const applyHighlight = (persist: boolean): void => {
+      setHtml(renderFallbackCodeHtml(trimmedCode))
+      void highlightCodeHtml(trimmedCode, language, { persist }).then((nextHtml) => {
+        if (!cancelled) setHtml(nextHtml)
+      })
+    }
 
-    void highlightCodeHtml(trimmedCode, language).then((nextHtml) => {
-      if (!cancelled) setHtml(nextHtml)
+    if (!streaming) {
+      // Completed (or historical) code: render + highlight immediately, and
+      // let the result enter the LRU cache.
+      highlightThrottleRef.current?.cancel()
+      applyHighlight(true)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    // Streaming (incomplete) code: trailing throttle bounds the fallback
+    // innerHTML swap + shiki full-highlight to one run per window. Between
+    // windows the previously rendered html stays on screen (no clearing, no
+    // flicker), and prefix results never enter the highlight cache.
+    highlightThrottleRef.current ??= createTrailingThrottle(STREAM_HIGHLIGHT_INTERVAL_MS)
+    highlightThrottleRef.current.schedule(() => {
+      if (cancelled) return
+      applyHighlight(false)
     })
-
     return () => {
       cancelled = true
     }
-  }, [trimmedCode, language])
+  }, [trimmedCode, language, streaming])
 
   useEffect(() => {
     const el = bodyRef.current
@@ -206,7 +243,10 @@ function CodeBlock({
     const observer = new ResizeObserver(() => update())
     observer.observe(el)
     return () => observer.disconnect()
-  }, [html, trimmedCode])
+    // `html` alone gates the layout read: during streaming the rendered DOM
+    // only changes when `html` changes (throttled), so keying on the raw code
+    // would re-read scrollHeight on every typewriter frame for nothing.
+  }, [html])
 
   useEffect(() => {
     setExpanded(false)

@@ -228,6 +228,22 @@ export function conversationHasVisionAttachments(blocks: readonly ChatBlock[]): 
   })
 }
 
+const visionAttachmentsByBlocks = new WeakMap<readonly ChatBlock[], boolean>()
+
+/**
+ * WeakMap-memoized variant for use inside zustand selectors
+ * (07-14-timeline-performance R2): selectors run on EVERY store setState
+ * (20Hz during streaming), so the O(user blocks) scan must be keyed on the
+ * blocks array reference — unchanged blocks cost O(1).
+ */
+export function conversationHasVisionAttachmentsCached(blocks: readonly ChatBlock[]): boolean {
+  const cached = visionAttachmentsByBlocks.get(blocks)
+  if (cached !== undefined) return cached
+  const value = conversationHasVisionAttachments(blocks)
+  visionAttachmentsByBlocks.set(blocks, value)
+  return value
+}
+
 function modelProfileForComposerSelection(
   modelGroups: readonly ModelProviderModelGroup[],
   modelId: string,

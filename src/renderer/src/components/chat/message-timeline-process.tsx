@@ -35,6 +35,7 @@ import {
 } from './message-timeline-tools'
 import { SubagentGroup } from './SubagentCallCard'
 import { InjectedMemoryMetaChip } from './injected-memory-meta-chip'
+import { TruncatedDetailText } from './truncated-detail'
 
 export type ProcessSection = {
   id: string
@@ -1041,6 +1042,27 @@ export function summarizeToolBlock(
   block: ToolBlock,
   t: (key: string, opts?: Record<string, unknown>) => string
 ): string {
+  // Summaries run regex extraction over summary+detail on EVERY render of the
+  // live turn's process rows (per 100ms SSE batch). Block objects are
+  // immutable — the store replaces a block on change — so a per-block-ref
+  // WeakMap memo is exact (07-14-timeline-performance R5). `t` participates in
+  // the key so a language switch recomputes.
+  const cached = toolBlockSummaryCache.get(block)
+  if (cached && cached.t === t) return cached.value
+  const value = computeToolBlockSummary(block, t)
+  toolBlockSummaryCache.set(block, { t, value })
+  return value
+}
+
+const toolBlockSummaryCache = new WeakMap<
+  ToolBlock,
+  { t: (key: string, opts?: Record<string, unknown>) => string; value: string }
+>()
+
+function computeToolBlockSummary(
+  block: ToolBlock,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string {
   const rawSummary = block.summary?.trim() ?? ''
   const toolName = toolNameForBlock(block)
   const label = builtInToolLabel(toolName, t) || humanizeToolName(toolName) || formatToolTitle(block, t)
@@ -1092,7 +1114,30 @@ function normalizeProcessText(text: string): string {
   return text.replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
-function getProcessDetail(block: ChatBlock, summaryText?: string): ProcessDetail {
+/**
+ * Memoized per block reference (see `summarizeToolBlock`): the diff
+ * extraction / normalization over a full command output must not re-run on
+ * every streaming batch for unchanged blocks. Exported for the memo-contract
+ * unit test.
+ */
+export function getProcessDetail(block: ChatBlock, summaryText?: string): ProcessDetail {
+  const summaryKey = summaryText ?? PROCESS_DETAIL_NO_SUMMARY_KEY
+  let perBlock = processDetailCache.get(block)
+  const hit = perBlock?.get(summaryKey)
+  if (hit) return hit
+  const value = computeProcessDetail(block, summaryText)
+  if (!perBlock) {
+    perBlock = new Map()
+    processDetailCache.set(block, perBlock)
+  }
+  perBlock.set(summaryKey, value)
+  return value
+}
+
+const PROCESS_DETAIL_NO_SUMMARY_KEY = '\u0000no-summary'
+const processDetailCache = new WeakMap<ChatBlock, Map<string, ProcessDetail>>()
+
+function computeProcessDetail(block: ChatBlock, summaryText?: string): ProcessDetail {
   if (block.kind === 'reasoning') {
     return block.text.trim() ? { kind: 'reasoning', text: block.text } : { kind: 'none' }
   }
@@ -1181,14 +1226,14 @@ function ProcessEntryDetail({
             </div>
           ) : null}
           <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words px-3 py-2.5 font-mono text-[12px] leading-6 text-ds-warning">
-            {detail.text}
+            <TruncatedDetailText text={detail.text} />
           </pre>
         </div>
       )
     }
     return (
       <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-ds-ink">
-        {detail.text}
+        <TruncatedDetailText text={detail.text} />
       </pre>
     )
   }

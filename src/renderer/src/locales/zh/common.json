@@ -728,6 +728,7 @@
   "confirm": "确认",
   "processExpandDetail": "展开详情",
   "processCollapseDetail": "收起详情",
+  "toolDetailShowAll": "展开全部（还有 {{count}} 字符）",
   "scheduleSubtitle": "按计划运行任务，或在需要时随时启动。",
   "scheduleNewTask": "新建任务",
   "scheduleAwakeNotice": "定时任务仅在电脑唤醒状态下运行。",
