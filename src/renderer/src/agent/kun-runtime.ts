@@ -76,6 +76,53 @@ function createSseStreamId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `sse-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+// ---------------------------------------------------------------------------
+// SSE 批应用耗时本地聚合（07-14-perf-baseline R13/AC4）
+//
+// renderer 侧只做 O(1) 累加：每批记录 receive → dispatch 完成 的耗时，及
+// envelope 带 sentAt 时的 main→renderer IPC 转发延迟。dev 下每 60s console
+// 一行聚合，不逐事件打日志、不回传 main。
+// ---------------------------------------------------------------------------
+
+const sseApplyTotals = {
+  batches: 0,
+  events: 0,
+  totalDispatchMs: 0,
+  maxDispatchMs: 0,
+  ipcDelaySamples: 0,
+  totalIpcDelayMs: 0,
+  maxIpcDelayMs: 0
+}
+let sseApplyReportTimer: ReturnType<typeof setInterval> | null = null
+
+function noteSseBatchApplied(batchSize: number, dispatchMs: number, ipcDelayMs?: number): void {
+  sseApplyTotals.batches += 1
+  sseApplyTotals.events += batchSize
+  sseApplyTotals.totalDispatchMs += dispatchMs
+  if (dispatchMs > sseApplyTotals.maxDispatchMs) sseApplyTotals.maxDispatchMs = dispatchMs
+  if (typeof ipcDelayMs === 'number' && Number.isFinite(ipcDelayMs)) {
+    const delay = Math.max(0, ipcDelayMs)
+    sseApplyTotals.ipcDelaySamples += 1
+    sseApplyTotals.totalIpcDelayMs += delay
+    if (delay > sseApplyTotals.maxIpcDelayMs) sseApplyTotals.maxIpcDelayMs = delay
+  }
+  if (import.meta.env.DEV && sseApplyReportTimer === null) {
+    sseApplyReportTimer = setInterval(() => {
+      if (sseApplyTotals.batches === 0) return
+      const avgDispatch = sseApplyTotals.totalDispatchMs / sseApplyTotals.batches
+      const avgIpcDelay =
+        sseApplyTotals.ipcDelaySamples > 0
+          ? sseApplyTotals.totalIpcDelayMs / sseApplyTotals.ipcDelaySamples
+          : 0
+      console.info(
+        `[perf:sse-apply] batches=${sseApplyTotals.batches} events=${sseApplyTotals.events} ` +
+          `avgDispatch=${avgDispatch.toFixed(1)}ms maxDispatch=${sseApplyTotals.maxDispatchMs.toFixed(1)}ms ` +
+          `avgIpcDelay=${avgIpcDelay.toFixed(1)}ms maxIpcDelay=${sseApplyTotals.maxIpcDelayMs.toFixed(1)}ms`
+      )
+    }, 60_000)
+  }
+}
+
 function readRuntimeError(body: string, fallback: string): RuntimeError {
   return parseRuntimeErrorBody(body, fallback)
 }
@@ -862,6 +909,7 @@ export class KunRuntimeProvider implements AgentProvider {
       }
       const offData = rendererRuntimeClient.onSseEvent((payload) => {
         if (payload.streamId !== streamId) return
+        const receivedAtMs = performance.now()
         // Older main processes (pre-batching) deliver a single event under
         // `data`; accept both shapes so a stale main/renderer pair during a
         // dev reload or partial update degrades gracefully instead of
@@ -876,6 +924,8 @@ export class KunRuntimeProvider implements AgentProvider {
           entry && typeof entry === 'object' ? (entry as CoreRuntimeEventJson) : {}
         )
         if (batch.length === 0) return
+        // main→renderer 转发延迟（envelope sentAt 为可选字段，旧 main 无此值）。
+        const ipcDelayMs = typeof payload.sentAt === 'number' ? Date.now() - payload.sentAt : undefined
         let maxSeq: number | null = null
         for (const event of batch) {
           if (typeof event.seq === 'number') {
@@ -889,6 +939,7 @@ export class KunRuntimeProvider implements AgentProvider {
           this.handleApprovalRequest(runtimeEvent, eventSink)
         ).finally(() => {
           pendingDispatches.delete(task)
+          noteSseBatchApplied(batch.length, performance.now() - receivedAtMs, ipcDelayMs)
         })
         pendingDispatches.add(task)
       })

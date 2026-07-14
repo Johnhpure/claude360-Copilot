@@ -83,6 +83,8 @@ export type KunUnexpectedExitInfo = {
   code: number | null
   signal: NodeJS.Signals | null
   stderrTail: string
+  /** spawn → exit 存活时长 ms（07-14-perf-baseline R11：崩溃记录的 uptime）。 */
+  uptimeMs: number
 }
 
 let onUnexpectedKunExit: ((info: KunUnexpectedExitInfo) => void) | null = null
@@ -451,6 +453,9 @@ async function startKunChildOnce(
   }
   if (!runAsElectron) childEnv.ELECTRON_RUN_AS_NODE = '1'
   else delete childEnv.ELECTRON_RUN_AS_NODE
+  // 崩溃 uptime 基准（07-14-perf-baseline R11）：spawn 时刻的闭包私有记录，
+  // 只随异常退出回调带出，不改任何公开签名。
+  const spawnedAtMs = Date.now()
   child = spawn(command, args, {
     env: childEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -482,7 +487,8 @@ async function startKunChildOnce(
       onUnexpectedKunExit?.({
         code: code ?? null,
         signal: signal ?? null,
-        stderrTail: childStderrTail
+        stderrTail: childStderrTail,
+        uptimeMs: Math.max(0, Date.now() - spawnedAtMs)
       })
     }
   })

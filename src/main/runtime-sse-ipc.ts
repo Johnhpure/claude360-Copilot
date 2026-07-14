@@ -16,6 +16,61 @@ const SSE_RECONNECT_BASE_MS = 750
 const SSE_RECONNECT_MAX_MS = 5_000
 const SSE_START_TIMEOUT_MS = 15_000
 
+// ---------------------------------------------------------------------------
+// SSE 转发批统计（07-14-perf-baseline R13/AC4）
+//
+// flushEvents 处 O(1) 累加（计数 + 两次 Date.now()），不逐事件打日志；输出
+// 节奏由 index.ts 控制（dev 每 60s console 一行 / before-quit 一条 logInfo）。
+// avgBatchWaitMs = 首事件入队 → 实际 send 的攒批等待均值（100ms 合帧的实测值）。
+// ---------------------------------------------------------------------------
+
+export interface SseForwardStatsSnapshot {
+  batches: number
+  events: number
+  maxBatchSize: number
+  avgBatchWaitMs: number
+  sendFailures: number
+}
+
+const sseForwardTotals = {
+  batches: 0,
+  events: 0,
+  maxBatchSize: 0,
+  totalBatchWaitMs: 0,
+  sendFailures: 0
+}
+
+function noteSseForwardBatch(batchSize: number, waitMs: number): void {
+  sseForwardTotals.batches += 1
+  sseForwardTotals.events += batchSize
+  if (batchSize > sseForwardTotals.maxBatchSize) sseForwardTotals.maxBatchSize = batchSize
+  if (waitMs > 0) sseForwardTotals.totalBatchWaitMs += waitMs
+}
+
+function noteSseForwardSendFailure(): void {
+  sseForwardTotals.sendFailures += 1
+}
+
+export function snapshotSseForwardStats(): SseForwardStatsSnapshot {
+  const { batches, events, maxBatchSize, totalBatchWaitMs, sendFailures } = sseForwardTotals
+  return {
+    batches,
+    events,
+    maxBatchSize,
+    avgBatchWaitMs: batches > 0 ? Math.round(totalBatchWaitMs / batches) : 0,
+    sendFailures
+  }
+}
+
+/** 测试用：清零模块级聚合器，保证用例间隔离。 */
+export function resetSseForwardStatsForTest(): void {
+  sseForwardTotals.batches = 0
+  sseForwardTotals.events = 0
+  sseForwardTotals.maxBatchSize = 0
+  sseForwardTotals.totalBatchWaitMs = 0
+  sseForwardTotals.sendFailures = 0
+}
+
 
 const sseControllers = new Map<string, SseControllerState>()
 
@@ -209,6 +264,8 @@ export function registerRuntimeSseIpc(options: {
 
             let pendingEvents: Record<string, unknown>[] = []
             let throttleTimer: any = null
+            // 当前攒批首事件入队时刻（0 = 空批）；仅用于统计攒批等待。
+            let pendingFirstQueuedAt = 0
 
             const flushEvents = (): boolean => {
               if (throttleTimer) {
@@ -217,6 +274,7 @@ export function registerRuntimeSseIpc(options: {
               }
               if (state.stoppedByClient || ac.signal.aborted) {
                 pendingEvents = []
+                pendingFirstQueuedAt = 0
                 return false
               }
               if (pendingEvents.length === 0) return true
@@ -230,11 +288,18 @@ export function registerRuntimeSseIpc(options: {
 
               const batch = pendingEvents
               pendingEvents = []
-              if (!sendSseMessage(wc, 'runtime:sse-event', { streamId: id, events: batch })) {
+              const sentAt = Date.now()
+              const batchWaitMs = pendingFirstQueuedAt > 0 ? sentAt - pendingFirstQueuedAt : 0
+              pendingFirstQueuedAt = 0
+              // envelope 的 sentAt（可选字段）供 renderer 计算 IPC 转发延迟
+              // （R13）；旧 renderer 只读 streamId/events，未知字段被忽略。
+              if (!sendSseMessage(wc, 'runtime:sse-event', { streamId: id, events: batch, sentAt })) {
+                noteSseForwardSendFailure()
                 state.stoppedByClient = true
                 ac.abort()
                 return false
               }
+              noteSseForwardBatch(batch.length, batchWaitMs)
               nextSinceSeq = batchMaxSeq
               return true
             }
@@ -253,6 +318,7 @@ export function registerRuntimeSseIpc(options: {
                   const parsed = parseSseData(block)
                   if (parsed !== null) {
                     const payload = coerceSsePayload(parsed)
+                    if (pendingEvents.length === 0) pendingFirstQueuedAt = Date.now()
                     pendingEvents.push(payload)
                     hasNewEvents = true
                   }
@@ -272,6 +338,7 @@ export function registerRuntimeSseIpc(options: {
                 const parsed = parseSseData(trailing)
                 if (parsed !== null) {
                   const payload = coerceSsePayload(parsed)
+                  if (pendingEvents.length === 0) pendingFirstQueuedAt = Date.now()
                   pendingEvents.push(payload)
                 }
               }

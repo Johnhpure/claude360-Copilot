@@ -50,6 +50,7 @@ import type {
   Claude360ImageGeneratePayload,
   Claude360ImageResult
 } from './claude360-canvas'
+import type { RendererStartupMarks } from './perf-baseline'
 import type {
   MediaAssetsDeletePayload,
   MediaAssetsDeleteResult,
@@ -292,7 +293,12 @@ export type LegacySessionImportResult =
   | ({ ok: true } & LegacySessionImportSummary)
   | { ok: false; message: string }
 /** One IPC message carries every SSE event parsed from a network chunk. */
-export type SseEventPayload = { streamId: string; events: unknown[] }
+export type SseEventPayload = {
+  streamId: string
+  events: unknown[]
+  /** main 侧 send 时刻 epoch ms（07-14-perf-baseline R13：renderer 计算转发延迟；可选，旧端忽略）。 */
+  sentAt?: number
+}
 export type SseEndPayload = { streamId: string }
 export type SseErrorPayload = { streamId: string; status?: number; message?: string }
 // —— Claude360 通用文本流式 chat（AI 写词助手）——
@@ -627,6 +633,10 @@ export type KunGuiApi = {
   logError: (category: string, message: string, detail?: unknown) => Promise<void>
   getLogPath: () => Promise<string>
   openLogDir: () => Promise<{ ok: boolean; message?: string }>
+  /** preload 模块求值首/末时刻（epoch ms）；启动基线 R4「preload 初始化耗时」的数据源。 */
+  perfPreloadTimestamps: { startedAtEpochMs: number; readyAtEpochMs: number }
+  /** 一次性上报 renderer 启动性能标记（fire-and-forget，ipcRenderer.send 单向）。 */
+  reportPerfMarks: (payload: RendererStartupMarks) => void
   createTerminal: (payload: TerminalCreatePayload) => Promise<TerminalCreateResult>
   writeToTerminal: (payload: TerminalWritePayload) => Promise<boolean>
   resizeTerminal: (payload: TerminalResizePayload) => Promise<boolean>

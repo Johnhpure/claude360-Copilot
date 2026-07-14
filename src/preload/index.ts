@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { KunGuiApi } from '../shared/kun-gui-api'
 
+// 07-14-perf-baseline：R4 preload 初始化耗时。模块求值首/末各记一次 epoch ms，
+// 随 renderer 启动标记上报 main 换算到统一时间轴（本文件无异步初始化，预期 ~0-5ms）。
+const preloadStartedAtEpochMs = Date.now()
+
 // The preload runs sandboxed (webPreferences.sandbox = true), so it cannot
 // require node built-ins like node:os. The home dir is passed in from the main
 // process via additionalArguments and read off process.argv instead.
@@ -377,6 +381,10 @@ const api = {
     ipcRenderer.invoke('log:error', { category, message, detail }),
   getLogPath: () => ipcRenderer.invoke('log:get-path'),
   openLogDir: () => ipcRenderer.invoke('log:open-dir'),
+  perfPreloadTimestamps: { startedAtEpochMs: preloadStartedAtEpochMs, readyAtEpochMs: 0 },
+  reportPerfMarks: (payload) => {
+    ipcRenderer.send('perf:renderer-marks', payload)
+  },
   createTerminal: (payload) => ipcRenderer.invoke('terminal:create', payload),
   writeToTerminal: (payload) => ipcRenderer.invoke('terminal:write', payload),
   resizeTerminal: (payload) => ipcRenderer.invoke('terminal:resize', payload),
@@ -398,5 +406,9 @@ const api = {
     return () => ipcRenderer.removeListener('terminal:exit', wrapped)
   }
 } satisfies KunGuiApi
+
+// preload 模块求值结束时刻：contextBridge 在 expose 时结构化克隆 api，
+// 必须在 expose 之前回填，renderer 侧才能读到真实值。
+api.perfPreloadTimestamps.readyAtEpochMs = Date.now()
 
 contextBridge.exposeInMainWorld('kunGui', api)

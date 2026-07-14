@@ -73,4 +73,15 @@ export class RestartBudget {
   reset(): void {
     this.attempts = []
   }
+
+  /**
+   * Read-only snapshot for crash reporting (07-14-perf-baseline R11):
+   * attempts used inside the current sliding window and whether the budget
+   * is already exhausted. Unlike note(), this never records an attempt.
+   */
+  peek(): { used: number; exhausted: boolean } {
+    const at = this.now()
+    const used = this.attempts.filter((t) => at - t < this.windowMs).length
+    return { used, exhausted: used >= this.maxRestarts }
+  }
 }

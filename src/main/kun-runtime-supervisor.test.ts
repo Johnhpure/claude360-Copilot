@@ -88,4 +88,21 @@ describe('RestartBudget', () => {
 
     expect(budget.note()).toEqual({ allowed: true, attempt: 1, delayMs: 1_000 })
   })
+
+  it('peek() reports window usage without recording an attempt', () => {
+    const clock = { value: 0 }
+    const budget = budgetAt(clock)
+
+    expect(budget.peek()).toEqual({ used: 0, exhausted: false })
+    budget.note()
+    budget.note()
+    expect(budget.peek()).toEqual({ used: 2, exhausted: false })
+    // peek 不记账：紧接着的 note() 仍是第 3 次尝试（窗口未被 peek 占用）。
+    expect(budget.note()).toEqual({ allowed: true, attempt: 3, delayMs: 9_000 })
+    expect(budget.peek()).toEqual({ used: 3, exhausted: true })
+
+    // 滑出窗口后 peek 归零。
+    clock.value = 60_001
+    expect(budget.peek()).toEqual({ used: 0, exhausted: false })
+  })
 })

@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { registerRuntimeSseIpc } from './runtime-sse-ipc'
+import {
+  registerRuntimeSseIpc,
+  resetSseForwardStatsForTest,
+  snapshotSseForwardStats
+} from './runtime-sse-ipc'
 import type { IpcMain } from 'electron'
 
 describe('runtime-sse-ipc', () => {
@@ -13,6 +17,7 @@ describe('runtime-sse-ipc', () => {
 
   beforeEach(() => {
     vi.useFakeTimers()
+    resetSseForwardStatsForTest()
     handlers = new Map()
     mockIpcMain = {
       handle: (channel: string, handler: any) => {
@@ -166,5 +171,17 @@ describe('runtime-sse-ipc', () => {
     expect(allEvents[1].text).toBe('world')
     expect(allEvents[2].seq).toBe(3)
     expect(allEvents[2].text).toBe('bye')
+
+    // envelope 带 sentAt（R13：renderer 用于计算 IPC 转发延迟）。
+    for (const msg of eventMessages) {
+      expect(typeof msg.sentAt).toBe('number')
+    }
+
+    // 转发批统计聚合（R13/AC4）：批数/事件总数/最大批，均在 flush 处 O(1) 累加。
+    const stats = snapshotSseForwardStats()
+    expect(stats.batches).toBe(eventMessages.length)
+    expect(stats.events).toBe(3)
+    expect(stats.maxBatchSize).toBeGreaterThanOrEqual(1)
+    expect(stats.sendFailures).toBe(0)
   })
 })

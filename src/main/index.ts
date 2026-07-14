@@ -88,7 +88,15 @@ import {
   type KunUnexpectedExitInfo
 } from './kun-process'
 import { RestartBudget, type KunRuntimeStatus } from './kun-runtime-supervisor'
-import { configureLogger, logError, logWarn, pruneOnStartup } from './logger'
+import { configureLogger, logError, logInfo, logWarn, pruneOnStartup } from './logger'
+import {
+  appendKunCrashHistory,
+  appendStartupHistory,
+  createStartupMetrics,
+  latestKunPhaseReached
+} from './perf-baseline'
+import { getSharedIpcStats, wrapIpcMainWithStats } from './perf-ipc-stats'
+import { startMemorySampler } from './perf-memory-sampler'
 import { cleanupUnusedGitCheckpointsIfDue } from './services/git-checkpoint-service'
 import { createClawRuntime, type ClawRuntime } from './claw-runtime'
 import { createScheduleRuntime, type ScheduleRuntime } from './schedule-runtime'
@@ -108,7 +116,7 @@ import {
   startFeishuInstallQrcode,
   startWeixinInstallQrcode
 } from './claw-platform-install'
-import { registerRuntimeSseIpc } from './runtime-sse-ipc'
+import { registerRuntimeSseIpc, snapshotSseForwardStats } from './runtime-sse-ipc'
 import { registerTerminalPtyIpc } from './terminal/terminal-pty-ipc'
 import {
   configureWeixinBridgeRuntimeContextProvider,
@@ -139,6 +147,52 @@ function traceStartup(label: string, detail?: unknown): void {
   }
 }
 
+// GUI schedule MCP server 模式（stdio JSON-RPC）：stdout 是协议通道，任何
+// 附加输出（含 perf-baseline dev 过程日志）都必须避开。需在下方采集器创建
+// 之前求值。
+const runningClawScheduleMcpServer =
+  process.argv.includes('--gui-schedule-mcp-server') || process.argv.includes('--claw-schedule-mcp-server')
+
+// 启动性能基线采集（07-14-perf-baseline）：T0 与 traceStartup 同刻度
+// （startupTraceStart），processStartOffsetMs 是 T0 相对进程真实创建时刻的
+// 修正值（R1）。updateChannel 在 whenReady 加载设置后回填，finalize 时读取。
+// 挂点均为 O(1) mark；落盘只发生在 finalize 一次（logInfo 汇总 + 历史文件）。
+// MCP server 模式下静默（isDev=false 关掉 console 过程输出；该模式不会走
+// whenReady/before-quit 的 finalize 路径，不产生任何 perf 日志或文件）。
+let perfBaselineUpdateChannel = ''
+const startupMetrics = createStartupMetrics({
+  t0EpochMs: startupTraceStart,
+  processStartOffsetMs: Math.round(process.uptime() * 1000),
+  isDev: !app.isPackaged && !runningClawScheduleMcpServer,
+  getEnvironment: () => ({
+    appVersion: app.getVersion(),
+    updateChannel: perfBaselineUpdateChannel,
+    platform: process.platform,
+    arch: process.arch,
+    packaged: app.isPackaged
+  }),
+  log: (message) => logInfo('perf-baseline', message),
+  persist: (record) =>
+    appendStartupHistory(join(app.getPath('userData'), 'perf', 'startup-history.json'), record)
+})
+startupMetrics.mark('main:module-eval', startupTraceStart)
+
+// 运行期统计退出快照（R12/R13/AC4）：before-quit 各写一条聚合日志（不逐事件），
+// 幂等一次（before-quit 会因 preventDefault + app.quit 触发两次）。
+let perfQuitStatsWritten = false
+function flushRunPerfStatsToLog(): void {
+  if (perfQuitStatsWritten) return
+  perfQuitStatsWritten = true
+  const ipcSnapshot = getSharedIpcStats().snapshot(20)
+  if (ipcSnapshot.length > 0) {
+    logInfo('perf-ipc', `ipc stats ${JSON.stringify(ipcSnapshot)}`)
+  }
+  const sseSnapshot = snapshotSseForwardStats()
+  if (sseSnapshot.batches > 0 || sseSnapshot.sendFailures > 0) {
+    logInfo('perf-sse', `sse forward stats ${JSON.stringify(sseSnapshot)}`)
+  }
+}
+
 function shouldStartWeixinBridgeRuntime(settings: AppSettingsV1): boolean {
   return settings.claw.enabled &&
     settings.claw.im.enabled &&
@@ -153,9 +207,6 @@ function syncWeixinBridgeRuntime(settings: AppSettingsV1): void {
     })
   })
 }
-
-const runningClawScheduleMcpServer =
-  process.argv.includes('--gui-schedule-mcp-server') || process.argv.includes('--claw-schedule-mcp-server')
 
 function getClawScheduleMcpLaunchConfig(): ClawScheduleMcpLaunchConfig {
   return {
@@ -845,6 +896,23 @@ function handleUnexpectedKunExit(info: KunUnexpectedExitInfo): void {
 async function superviseKunCrash(info: KunUnexpectedExitInfo): Promise<void> {
   if (managedRuntimesStoppedForQuit || isQuitting) return
   const exitLabel = info.signal ? `signal ${info.signal}` : `code ${info.code ?? 'unknown'}`
+  // kun 崩溃持久化（R11/AC5）：uptime 来自 kun-process 的 spawn 时刻；预算状态
+  // 用 peek 只读（note() 在下方重启循环里才记账）。fire-and-forget，写失败仅
+  // 告警，绝不阻塞自动重启。
+  const budgetAtCrash = runtimeRestartBudget.peek()
+  void appendKunCrashHistory(join(app.getPath('userData'), 'perf', 'kun-crash-history.json'), {
+    at: new Date().toISOString(),
+    code: info.code,
+    signal: info.signal,
+    uptimeMs: info.uptimeMs,
+    restartCount: budgetAtCrash.used,
+    budgetExhausted: budgetAtCrash.exhausted,
+    phaseReached: latestKunPhaseReached(startupMetrics.snapshotPhases())
+  }).catch((error: unknown) => {
+    logWarn('kun-supervisor', 'failed to persist crash record', {
+      message: error instanceof Error ? error.message : String(error)
+    })
+  })
   publishRuntimeStatus({
     state: 'crashed',
     source: 'supervisor',
@@ -1124,6 +1192,8 @@ async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1>
   const healthy = await waitForKunHealth(settings, 2_000)
   perfMark(healthy ? 'health-probe:healthy' : 'health-probe:offline')
   if (healthy) {
+    // 外部/已预热 kun：无 spawn 阶段，直接记录 health-ok（missing 列表会体现跳过 spawn）。
+    startupMetrics.mark('kun:health-ok')
     const threadApi = await probeThreadApi(settings)
     if (threadApi.ok) {
       noteRuntimeHealthy('ensure')
@@ -1175,6 +1245,7 @@ async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1>
 
   const launchSettings = await resolveManagedKunLaunchSettings(settings, 'runtime-start')
   const adapter = kunRuntimeAdapter
+  startupMetrics.mark('kun:spawn-start')
   try {
     await adapter.ensureRunning(launchSettings)
   } catch (e) {
@@ -1182,6 +1253,7 @@ async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1>
     throw e
   }
   perfMark('spawn:done')
+  startupMetrics.mark('kun:spawn-done')
   const started = await waitForKunHealth(launchSettings, 20_000)
   perfMark(started ? 'launch-health:ready' : 'launch-health:timeout')
   if (!started) {
@@ -1190,6 +1262,10 @@ async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1>
       'Claude360 Copilot runtime did not become healthy after launch.'
     )
   }
+  // ensureRunning 内部已等到 KUN_READY 握手 + /health 通过，此处是 main 侧
+  // 首次确认可服务的时刻（design §5：kun:ready / kun:health-ok 均取此点）。
+  startupMetrics.mark('kun:ready')
+  startupMetrics.mark('kun:health-ok')
 
   const threadApi = await probeThreadApi(launchSettings)
   if (!threadApi.ok) {
@@ -1279,6 +1355,7 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
       additionalArguments: [`--kun-home-dir=${homedir()}`]
     }
   })
+  startupMetrics.mark('main:window-created')
   if (usesDesktopTitleBar) {
     mainWindow.setMenu(null)
     mainWindow.setMenuBarVisibility(false)
@@ -1315,10 +1392,12 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
   }
   mainWindow.once('ready-to-show', () => {
     traceStartup('window:ready-to-show')
+    startupMetrics.mark('main:window-ready-to-show')
     showWindow()
   })
   mainWindow.webContents.once('did-finish-load', () => {
     traceStartup('window:did-finish-load')
+    startupMetrics.mark('main:window-did-finish-load')
     if (lastRuntimeStatus && mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('runtime:status', lastRuntimeStatus)
     }
@@ -1591,6 +1670,7 @@ if (runningClawScheduleMcpServer) {
 } else {
 app.whenReady().then(async () => {
   traceStartup('app.whenReady:start')
+  startupMetrics.mark('main:app-ready')
   if (!gotSingleInstanceLock) return
 
   traceStartup('install webview guards:start')
@@ -1606,6 +1686,8 @@ app.whenReady().then(async () => {
   traceStartup('settings load:start')
   const initial = await store.load()
   traceStartup('settings load:done')
+  startupMetrics.mark('main:settings-loaded')
+  perfBaselineUpdateChannel = initial.guiUpdate.channel
   setKunUnexpectedExitHandler(handleUnexpectedKunExit)
   appBehavior = initial.appBehavior
   syncLoginItemSettings(initial)
@@ -1824,6 +1906,7 @@ app.whenReady().then(async () => {
     loadGuiUpdaterModule,
     resolveLogDirectory: () => resolveLogDirectory(app),
     logError,
+    attachRendererPerfMarks: (payload) => startupMetrics.attachRendererMarks(payload),
     claude360AuthService,
     claude360TokenService,
     claude360ModelService,
@@ -1836,18 +1919,56 @@ app.whenReady().then(async () => {
     console.warn('[kun-gui updater] failed to initialize on startup:', error)
   })
 
-  registerRuntimeSseIpc({ ipcMain, store, ensureRuntime, logError })
-  registerClaude360ChatStreamIpc({ ipcMain, chatService: claude360ChatService, logError })
+  // IPC 调用统计（R12）：注入式 register* 传包装 ipcMain（仅 handle 加计时，
+  // 语义不变）；registerAppIpcHandlers 在其模块内做同款局部包装，两处共享
+  // getSharedIpcStats() 单例，合计覆盖全部 handle 通道。
+  const statsIpcMain = wrapIpcMainWithStats(ipcMain, getSharedIpcStats())
+  registerRuntimeSseIpc({ ipcMain: statsIpcMain, store, ensureRuntime, logError })
+  registerClaude360ChatStreamIpc({ ipcMain: statsIpcMain, chatService: claude360ChatService, logError })
   registerTerminalPtyIpc({
-    ipcMain,
+    ipcMain: statsIpcMain,
     getMainWindow: () => mainWindow,
     logError,
     getTerminalColorMode: async () => resolveTerminalColorMode(await store.load())
   })
   traceStartup('ipc registration:done')
+  startupMetrics.mark('main:ipc-registered')
 
   createWindow({ suppressInitialShow: shouldStartHidden(initial) })
   traceStartup('createWindow:returned')
+  // 启动基线 60s 兜底：kun 启动失败/renderer 未上报时也必出一条 partial 汇总
+  // （missing 列表标明卡住的阶段，AC2/R20）。unref 不阻止进程退出。
+  const perfFinalizeTimer = setTimeout(() => startupMetrics.finalizeNow('timeout'), 60_000)
+  perfFinalizeTimer.unref()
+
+  // dev 运行期统计节奏（AC4）：每 60s console 输出 IPC top10 与 SSE 转发聚合，
+  // 只读快照、无热路径开销；prod 不开定时器，仅 before-quit 落一条日志。
+  if (!app.isPackaged) {
+    const devPerfStatsTimer = setInterval(() => {
+      const ipcTop = getSharedIpcStats().snapshot(10)
+      if (ipcTop.length > 0) console.info(`[perf-ipc] top ${JSON.stringify(ipcTop)}`)
+      const sseSnapshot = snapshotSseForwardStats()
+      if (sseSnapshot.batches > 0) console.info(`[perf-sse] forward ${JSON.stringify(sseSnapshot)}`)
+    }, 60_000)
+    devPerfStatsTimer.unref()
+  }
+
+  // 常驻内存低频采样（R14）：dev 5min / prod 15min，首采延迟 60s 避开启动窗口。
+  // kun 子进程是独立 node 进程、不在 app.getAppMetrics 内，其内存经 kun 的
+  // GET /v1/runtime/info 按需查询（本批次不主动拉取）。
+  startMemorySampler({
+    intervalMs: app.isPackaged ? 15 * 60_000 : 5 * 60_000,
+    initialDelayMs: 60_000,
+    log: (message) => logInfo('perf-memory', message),
+    getMetrics: () => ({
+      mainRssBytes: process.memoryUsage.rss(),
+      processes: app.getAppMetrics().map((metric) => ({
+        type: metric.type,
+        pid: metric.pid,
+        workingSetKb: metric.memory.workingSetSize
+      }))
+    })
+  })
   void loadGuiUpdaterModule()
     .then((module) => module.showPostUpdateReleaseNotes())
     .catch((error) => {
@@ -1903,6 +2024,12 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', (event) => {
   isQuitting = true
+  // 启动基线兜底：未完成的启动在退出前也落一条 partial 汇总（幂等，MCP server 模式跳过）。
+  if (!runningClawScheduleMcpServer) {
+    startupMetrics.finalizeNow('quit')
+    // 运行期 IPC/SSE 聚合快照各一条（R12/R13/AC4），同样幂等一次。
+    flushRunPerfStatsToLog()
+  }
   stopRuntimeWatchdog()
   stopCheckpointCleanupTimer()
   if (managedRuntimesStoppedForQuit) return

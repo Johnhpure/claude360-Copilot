@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, shell, type BrowserWindow, type WebContents } from 'electron'
+import { app, dialog, ipcMain as electronIpcMain, shell, type BrowserWindow, type WebContents } from 'electron'
 import { watch, type FSWatcher } from 'node:fs'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
@@ -32,6 +32,10 @@ import type {
 } from '../../shared/kun-gui-api'
 import type { WorkspaceFileSaveAsResult } from '../../shared/workspace-file'
 import type { GuiUpdateDownloadResult, GuiUpdateInfo, GuiUpdateInstallResult, GuiUpdateState } from '../../shared/gui-update'
+import {
+  PERF_RENDERER_MARKS_CHANNEL,
+  type RendererStartupMarks
+} from '../../shared/perf-baseline'
 import {
   clawMirrorPayloadSchema,
   clawImInstallPollPayloadSchema,
@@ -223,6 +227,14 @@ import { importGithubSkillsToRoot } from '../services/github-skill-import-servic
 import { readLocalPdfText } from '../services/write-pdf-text-service'
 import { saveGuiSkillPackage } from '../services/skill-save-service'
 import { listGuiSkillRoots, listGuiSkills } from '../services/skill-service'
+import { getSharedIpcStats, wrapIpcMainWithStats } from '../perf-ipc-stats'
+
+// IPC 调用统计（07-14-perf-baseline R12）：局部包装 electron 的 ipcMain，本文件
+// 内 140+ 处 ipcMain.handle 调用点零改动即可全部计入统计（O(1) 计时、返回值
+// 透传、异常原样 rethrow，见 perf-ipc-stats.ts）。on 等其余成员直接转发。
+// index.ts 对注入式 register*（SSE/chat-stream/terminal）做同款包装，共享同一
+// 个 getSharedIpcStats() 单例。
+const ipcMain = wrapIpcMainWithStats(electronIpcMain, getSharedIpcStats())
 
 type GuiUpdaterModule = typeof import('../gui-updater')
 
@@ -263,6 +275,9 @@ type RegisterAppIpcHandlersOptions = {
   loadGuiUpdaterModule: () => Promise<GuiUpdaterModule>
   resolveLogDirectory: () => string
   logError: (category: string, message: string, detail?: unknown) => void
+  /** 启动基线：renderer 上报的性能标记并入 main 侧采集器（07-14-perf-baseline）。
+   *  可选（onKunMcpConfigWritten 同款惯例）：缺省时不注册接收通道。 */
+  attachRendererPerfMarks?: (payload: RendererStartupMarks) => void
   claude360AuthService: Claude360AuthService
   claude360TokenService: Claude360TokenService
   claude360ModelService: Claude360ModelService
@@ -277,6 +292,42 @@ function parseIpcPayload<T>(channel: string, schema: z.ZodType<T>, payload: unkn
   const issue = parsed.error.issues[0]
   throw new Error(`Invalid payload for ${channel}: ${issue?.message ?? 'Bad request.'}`)
 }
+
+// perf:renderer-marks 是 ipcRenderer.send 单向通道，schema 就近内联（其余 invoke
+// 通道的 schema 集中在 app-ipc-schemas.ts）。epoch/耗时均为非负数值。
+const perfRendererMarksPayloadSchema = z
+  .object({
+    epochMarks: z
+      .object({
+        'module-eval': z.number().min(0).optional(),
+        'first-frame': z.number().min(0).optional(),
+        interactive: z.number().min(0).optional()
+      })
+      .strict(),
+    preload: z
+      .object({
+        startedAtEpochMs: z.number().min(0),
+        readyAtEpochMs: z.number().min(0)
+      })
+      .strict(),
+    navTiming: z
+      .object({
+        domContentLoadedMs: z.number().min(0),
+        loadEventEndMs: z.number().min(0)
+      })
+      .strict()
+      .optional(),
+    scriptResources: z
+      .object({
+        count: z.number().int().min(0),
+        totalDurationMs: z.number().min(0),
+        maxDurationMs: z.number().min(0),
+        maxName: z.string().max(512)
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
 
 // node:fs/promises 没有内置 pathExists;用 access 实现。
 async function pathExists(target: string): Promise<boolean> {
@@ -454,6 +505,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     loadGuiUpdaterModule,
     resolveLogDirectory,
     logError,
+    attachRendererPerfMarks,
     claude360AuthService,
     claude360TokenService,
     claude360ModelService,
@@ -1885,4 +1937,18 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     if (error) return { ok: false, message: error }
     return { ok: true }
   })
+
+  // 启动基线（07-14-perf-baseline）：renderer 一次性上报的性能标记。
+  // fire-and-forget 事件通道；payload 非法时静默丢弃——埋点绝不产生用户可见错误。
+  if (attachRendererPerfMarks) {
+    ipcMain.on(PERF_RENDERER_MARKS_CHANNEL, (_event, payload: unknown) => {
+      try {
+        attachRendererPerfMarks(
+          parseIpcPayload(PERF_RENDERER_MARKS_CHANNEL, perfRendererMarksPayloadSchema, payload)
+        )
+      } catch {
+        // 忽略畸形 perf 上报。
+      }
+    })
+  }
 }

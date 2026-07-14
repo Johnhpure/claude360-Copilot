@@ -6,6 +6,10 @@ import { GroupKeyPromptModal } from './components/GroupKeyPromptModal'
 import { GuiUpdatePrompt } from './components/GuiUpdatePrompt'
 import { Toaster } from './components/ui'
 import { applyBlurPreference, readBlurPreference } from './lib/blur-preference'
+import {
+  markStartupFirstFrameAfterPaint,
+  markStartupInteractive
+} from './lib/startup-perf'
 import i18n from './i18n'
 
 const Workbench = lazy(() =>
@@ -42,13 +46,20 @@ export default function AppShell(): React.ReactElement {
   const platform = typeof window !== 'undefined' ? window.kunGui?.platform ?? 'unknown' : 'unknown'
   const hasDesktopTitleBar = supportsDesktopTitleBar(platform)
 
+  // 启动基线 R5：AppShell 挂载后双 rAF ≈ 首帧真正绘制（返回值即 cleanup）。
+  useEffect(() => markStartupFirstFrameAfterPaint(), [])
+
   useEffect(() => {
     // 浮层 blur 偏好（阶段2 降级开关）：启动时应用一次，设置 UI 入口在阶段5。
     applyBlurPreference(readBlurPreference())
     let frame = 0
     const timer = window.setTimeout(() => {
       frame = window.requestAnimationFrame(() => {
+        // 启动基线 R6：boot() resolve = 可交互（boot 内部已捕获自身错误，
+        // reject 属异常路径，静默跳过标记，由 main 侧 60s partial 汇总兜底）。
         void boot()
+          .then(() => markStartupInteractive())
+          .catch(() => {})
       })
     }, 0)
     return () => {
