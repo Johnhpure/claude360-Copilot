@@ -1,7 +1,11 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { setupI18nTestEnglish } from './test-support/i18n-en'
 import AppShell from './AppShell'
+
+// R1（07-14-renderer-lazy-loading）：本文件以英文文案断言 UI——en 资源已改动态加载，先恢复 en 测试环境。
+beforeAll(() => setupI18nTestEnglish())
 
 describe('AppShell', () => {
   afterEach(() => {

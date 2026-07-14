@@ -72,6 +72,7 @@ function buildHarness(fetchModelsResult: FetchModelsResult): {
       set,
       get,
       i18n: { t: (key: string) => key, changeLanguage: vi.fn(async () => undefined) } as unknown as typeof i18next,
+      ensureI18nResources: vi.fn(async () => true),
       persistComposerModel,
       persistComposerMode,
       rememberThreadComposerMode,
@@ -513,5 +514,107 @@ describe('chat-store app actions composer model loading', () => {
     expect(state.composerPickList).toEqual([])
     expect(state.composerModel).toBe('')
     expect(localStorage.getItem(COMPOSER_MODEL_STORAGE_KEY)).toBe('MiniMax-M2')
+  })
+})
+
+// R1（07-14-renderer-lazy-loading）：en 语言包为动态 chunk，
+// applyI18nFromSettings 必须先 await ensureI18nResources 再 changeLanguage。
+describe('applyI18nFromSettings resource loading order (R1)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function buildI18nHarness(ensureI18nResources: (locale: 'en' | 'zh') => Promise<boolean>): {
+    actions: ReturnType<typeof createAppActions>
+    changeLanguage: ReturnType<typeof vi.fn>
+    applyDocumentLocale: ReturnType<typeof vi.fn>
+  } {
+    const changeLanguage = vi.fn(async () => undefined)
+    const applyDocumentLocale = vi.fn()
+    const state = {} as unknown as ChatState
+    const actions = createAppActions({
+      set: () => undefined,
+      get: () => state,
+      i18n: { t: (key: string) => key, changeLanguage } as unknown as typeof i18next,
+      ensureI18nResources,
+      persistComposerModel,
+      persistComposerMode,
+      rememberThreadComposerMode,
+      readStoredComposerModel,
+      mergeComposerPickList,
+      fallbackComposerModel,
+      getComposerModelLoadPromise: () => null,
+      setComposerModelLoadPromise: () => undefined,
+      applyTheme: () => undefined,
+      applyUiFontScale: () => undefined,
+      applyChatContentMaxWidth: () => undefined,
+      applyCursorSpotlight: () => undefined,
+      applyCursorSpotlightColor: () => undefined,
+      applyWriteTypography: () => undefined,
+      applyDocumentLocale,
+      workspaceLabelFromPath: (workspaceRoot) => workspaceRoot,
+      normalizeWorkspaceRoot: (workspaceRoot) => workspaceRoot?.trim() ?? ''
+    })
+    return { actions, changeLanguage, applyDocumentLocale }
+  }
+
+  it('awaits ensureI18nResources before changeLanguage', async () => {
+    let resolveEnsure: (ready: boolean) => void = () => undefined
+    const ensure = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveEnsure = resolve
+        })
+    )
+    const { actions, changeLanguage, applyDocumentLocale } = buildI18nHarness(ensure)
+
+    const pending = actions.applyI18nFromSettings('en')
+    await Promise.resolve()
+    expect(ensure).toHaveBeenCalledWith('en')
+    expect(changeLanguage).not.toHaveBeenCalled()
+
+    resolveEnsure(true)
+    await pending
+    expect(changeLanguage).toHaveBeenCalledWith('en')
+    expect(applyDocumentLocale).toHaveBeenCalledWith('en')
+  })
+
+  it('still switches language when the en chunk fails to load (zh fallback keeps UI readable)', async () => {
+    const ensure = vi.fn(async () => false)
+    const { actions, changeLanguage, applyDocumentLocale } = buildI18nHarness(ensure)
+
+    await actions.applyI18nFromSettings('en')
+
+    expect(ensure).toHaveBeenCalledWith('en')
+    expect(changeLanguage).toHaveBeenCalledWith('en')
+    expect(applyDocumentLocale).toHaveBeenCalledWith('en')
+  })
+
+  it('drops a stale switch when a newer language request arrives while the chunk is loading', async () => {
+    // 竞态守卫（last-write-wins）：en 的 ensure 还在 await 时用户切回 zh——
+    // en 完成后不得再 changeLanguage('en') 把语言抢回去。
+    let resolveEnEnsure: (ready: boolean) => void = () => undefined
+    const ensure = vi.fn((locale: 'en' | 'zh') => {
+      if (locale === 'en') {
+        return new Promise<boolean>((resolve) => {
+          resolveEnEnsure = resolve
+        })
+      }
+      return Promise.resolve(true)
+    })
+    const { actions, changeLanguage, applyDocumentLocale } = buildI18nHarness(ensure)
+
+    const stale = actions.applyI18nFromSettings('en')
+    const latest = actions.applyI18nFromSettings('zh')
+    await latest
+    expect(changeLanguage).toHaveBeenCalledTimes(1)
+    expect(changeLanguage).toHaveBeenCalledWith('zh')
+
+    resolveEnEnsure(true)
+    await stale
+    // 过期请求被丢弃：不再有第二次 changeLanguage。
+    expect(changeLanguage).toHaveBeenCalledTimes(1)
+    expect(applyDocumentLocale).toHaveBeenCalledTimes(1)
+    expect(applyDocumentLocale).toHaveBeenCalledWith('zh')
   })
 })

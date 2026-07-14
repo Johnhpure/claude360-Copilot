@@ -24,6 +24,8 @@ type CreateAppActionsOptions = {
   set: ChatStoreSet
   get: ChatStoreGet
   i18n: typeof i18next
+  /** R1（07-14-renderer-lazy-loading）：en 资源为动态 chunk，changeLanguage 前先加载注册。 */
+  ensureI18nResources: (locale: AppSettingsV1['locale']) => Promise<boolean>
   persistComposerModel: (model: string) => void
   persistComposerMode: (mode: ComposerPlanMode) => void
   rememberThreadComposerMode: (threadId: string, mode: ComposerPlanMode) => void
@@ -67,6 +69,7 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
     set,
     get,
     i18n,
+    ensureI18nResources,
     persistComposerModel,
     persistComposerMode,
     rememberThreadComposerMode,
@@ -85,6 +88,11 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
     workspaceLabelFromPath,
     normalizeWorkspaceRoot
   } = options
+
+  // R1（07-14-renderer-lazy-loading）：applyI18nFromSettings 的 last-write-wins 守卫。
+  // ensureI18nResources('en') 在 chunk 加载 await 期间若又发起了新的语言切换，
+  // 旧请求完成后不得再 changeLanguage（避免后发先至把语言切回去）。
+  let i18nApplyGeneration = 0
 
   return {
     setError: (message) => set({ error: message }),
@@ -243,6 +251,12 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
     selectInspectorItem: (id) => set({ inspectorSelectedId: id }),
 
     applyI18nFromSettings: async (locale) => {
+      // en 资源是动态 chunk：changeLanguage 前先确保注册完成（避免文案闪 key）；
+      // 加载失败时仍切换语言，t() 由 fallbackLng=zh 兜底。
+      const generation = ++i18nApplyGeneration
+      await ensureI18nResources(locale)
+      // await 期间有更新的语言请求：放弃本次切换，由最新请求负责收尾。
+      if (generation !== i18nApplyGeneration) return
       await i18n.changeLanguage(locale)
       applyDocumentLocale(locale)
     },

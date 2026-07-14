@@ -18,6 +18,10 @@ import {
   type OnConnectEnd,
   type OnConnectStart
 } from '@xyflow/react'
+// R2（07-14-renderer-lazy-loading）：xyflow 全量样式与画布皮肤只在工作流场景需要，
+// 从 main.tsx 移到此懒 chunk 内（先 import 库样式再 import 皮肤，保持覆盖顺序）。
+import '@xyflow/react/dist/style.css'
+import '../../styles/workflow-canvas.css'
 import {
   ArrowLeft,
   ChevronLeft,

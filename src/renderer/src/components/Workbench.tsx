@@ -53,7 +53,6 @@ import {
   composerReasoningEffortRequestValue,
   type ComposerReasoningEffort
 } from './chat/FloatingComposerModelPicker'
-import { SideConversationPanel } from './chat/SideConversationPanel'
 import { SessionHeader } from './SessionHeader'
 import { SidebarTitlebarToggleButton } from './sidebar/SidebarPrimitives'
 import { composeWritePrompt } from '../write/quoted-selection'
@@ -168,6 +167,11 @@ const SddAssistantPanel = lazy(() =>
 )
 const SddDraftEditorView = lazy(() =>
   import('./sdd/SddDraftEditorView').then((module) => ({ default: module.SddDraftEditorView }))
+)
+// R3（07-14-renderer-lazy-loading）：SideConversationPanel 静态链把 react-markdown/
+// remark 生态拉进首屏 Workbench chunk——改懒边界后 markdown 生态随本 chunk 拆出。
+const SideConversationPanel = lazy(() =>
+  import('./chat/SideConversationPanel').then((module) => ({ default: module.SideConversationPanel }))
 )
 
 function WorkbenchPaneFallback(): ReactElement {
@@ -3008,9 +3012,12 @@ export function Workbench(): ReactElement {
           </div>
 
           {route === 'chat' && !activeSddDraft ? (
-            <SideConversationPanel
-              rightOffset={(rightPanelDockedVisible ? rightSidebarWidth + 24 : 24) + fileTreeSidePanelOffset}
-            />
+            /* 浮动 overlay（fixed 定位）：加载期间无占位不产生布局跳动，沿用隐藏面板 fallback=null 惯例。 */
+            <Suspense fallback={null}>
+              <SideConversationPanel
+                rightOffset={(rightPanelDockedVisible ? rightSidebarWidth + 24 : 24) + fileTreeSidePanelOffset}
+              />
+            </Suspense>
           ) : null}
 
           {renderRightPanel()}

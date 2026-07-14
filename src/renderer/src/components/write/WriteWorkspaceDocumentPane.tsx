@@ -1,4 +1,4 @@
-import { type MutableRefObject, type ReactElement, type RefObject } from 'react'
+import { lazy, Suspense, type MutableRefObject, type ReactElement, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { WriteInlineCompletionSettingsV1 } from '@shared/app-settings'
 import type { WriteRenderSafety } from '../../write/write-render-safety'
@@ -12,7 +12,12 @@ import { WriteMarkdownEditor } from './WriteMarkdownEditor'
 import { WriteMarkdownPreview } from './WriteMarkdownPreview'
 import { WriteWorkspaceStart } from './WriteWorkspaceStart'
 import { WriteImagePreview } from './WriteImagePreview'
-import { WritePdfViewer } from './WritePdfViewer'
+
+// R4（07-14-renderer-lazy-loading）：pdfjs-dist（约 900KB）只被 WritePdfViewer 消费，
+// 改懒边界后随独立 chunk 拆出 WriteWorkspaceView——打开 PDF 文档时才加载。
+const WritePdfViewer = lazy(() =>
+  import('./WritePdfViewer').then((module) => ({ default: module.WritePdfViewer }))
+)
 
 type Props = {
   activeFilePath: string | null
@@ -144,15 +149,24 @@ export function WriteWorkspaceDocumentPane({
 
   if (activeFileIsPdf) {
     return (
-      <WritePdfViewer
-        filePath={activeFilePath}
-        dataBase64={pdfDataBase64}
-        size={fileSize}
-        mtimeMs={pdfMtimeMs}
-        workspaceRoot={workspaceRoot}
-        viewerRef={editorPaneRef}
-        onSelectionChange={onSelectionChange}
-      />
+      /* fallback 与上方 fileLoading 分支同款文案与布局，PDF 引擎 chunk 加载期间无跳变。 */
+      <Suspense
+        fallback={
+          <div className="flex h-full min-h-[320px] items-center justify-center text-[14px] text-ds-muted">
+            {t('filePreviewLoading')}
+          </div>
+        }
+      >
+        <WritePdfViewer
+          filePath={activeFilePath}
+          dataBase64={pdfDataBase64}
+          size={fileSize}
+          mtimeMs={pdfMtimeMs}
+          workspaceRoot={workspaceRoot}
+          viewerRef={editorPaneRef}
+          onSelectionChange={onSelectionChange}
+        />
+      </Suspense>
     )
   }
 

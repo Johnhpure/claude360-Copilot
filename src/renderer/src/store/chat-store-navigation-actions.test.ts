@@ -358,6 +358,7 @@ function buildRouteHarness(initialRoute: AppRoute = 'chat'): {
       set,
       get,
       i18n: { t: (key: string) => key, changeLanguage: vi.fn(async () => undefined) } as unknown as typeof i18next,
+      ensureI18nResources: vi.fn(async () => true),
       persistComposerModel: () => undefined,
       persistComposerMode: () => undefined,
       rememberThreadComposerMode: () => undefined,

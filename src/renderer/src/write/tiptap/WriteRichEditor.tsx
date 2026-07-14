@@ -7,6 +7,10 @@ import {
   type ReactNode
 } from 'react'
 import { Editor, Extension, type AnyExtension } from '@tiptap/core'
+// R2（07-14-renderer-lazy-loading）：tiptap 皮肤（write-rich-*/sdd-req-* 类）只被
+// 本 chunk 及其静态依赖方（WriteWorkspaceView/PlanPanel/SddDraftEditorView）使用，
+// 从 main.tsx 移到此处随 WriteRichEditor chunk 拆分加载。
+import '../../styles/write-rich-editor.css'
 import { StarterKit } from '@tiptap/starter-kit'
 import { TableKit } from '@tiptap/extension-table'
 import { TaskItem, TaskList } from '@tiptap/extension-list'

@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setupI18nTestEnglish } from '../test-support/i18n-en'
 import type { ChatBlock, NormalizedThread, ThreadGoal, ThreadGoalStatus } from '../agent/types'
 import type { ChatState, ChatStoreGet, ChatStoreSet, SendMessageOverrides } from './chat-store-types'
 
@@ -148,6 +149,9 @@ function buildHarness(options: {
 
   return { actions, createThread, drainQueuedMessages, get, provider, recoverActiveTurn, refreshThreads, selectThread, sendMessage, state }
 }
+
+// R1（07-14-renderer-lazy-loading）：本文件以英文文案断言 UI——en 资源已改动态加载，先恢复 en 测试环境。
+beforeAll(() => setupI18nTestEnglish())
 
 describe('chat-store-maintenance-actions fork actions', () => {
   beforeEach(() => {

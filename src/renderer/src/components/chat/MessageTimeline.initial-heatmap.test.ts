@@ -1,6 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { setupI18nTestEnglish } from '../../test-support/i18n-en'
 import i18n from '../../i18n'
 import { MessageTimelineEmptyHero } from './message-timeline-empty'
 
@@ -33,6 +34,9 @@ function renderHero(options: {
     })
   )
 }
+
+// R1（07-14-renderer-lazy-loading）：本文件以英文文案断言 UI——en 资源已改动态加载，先恢复 en 测试环境。
+beforeAll(() => setupI18nTestEnglish())
 
 describe('MessageTimeline initial empty hero routing', () => {
   beforeEach(async () => {

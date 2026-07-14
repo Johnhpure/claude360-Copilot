@@ -1,11 +1,15 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { setupI18nTestEnglish } from '../test-support/i18n-en'
 import i18n from '../i18n'
 import { useChatStore } from '../store/chat-store'
 import { SessionHeader } from './SessionHeader'
 
 const initialChatState = useChatStore.getState()
+
+// R1（07-14-renderer-lazy-loading）：本文件以英文文案断言 UI——en 资源已改动态加载，先恢复 en 测试环境。
+beforeAll(() => setupI18nTestEnglish())
 
 describe('SessionHeader', () => {
   beforeEach(async () => {
@@ -34,6 +38,9 @@ describe('SessionHeader', () => {
 
     expect(html).toContain('session-header-compact flex')
     expect(html).not.toContain('session-header-compact ds-no-drag')
-    expect(html).toContain('Working directory')
+    // renderToStaticMarkup 下 zustand 读初始快照（setState 不生效），无 active 会话时
+    // 渲染的是 store 初始 workspaceLabel（模块求值语言下的 t('workingDirectory')）——
+    // 断言引用快照值本身，不与语言绑定（R1 后默认语言为 zh）。
+    expect(html).toContain(initialChatState.workspaceLabel)
   })
 })

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Clock3,
@@ -22,8 +22,6 @@ import {
   ClawSidebarContent
 } from './SidebarClaw'
 import type { ClawImDialogMode } from './SidebarClawDialogHelpers'
-import { ClawAddImDialog } from './SidebarClawDialog'
-import { ConnectPhoneSidebarPanel } from './ConnectPhoneView'
 import { SidebarProjectsSection } from './SidebarProjectsSection'
 import { SidebarConversationsSection } from './SidebarConversationsSection'
 import { FeatureSwitcher, type Feature } from '../shell/FeatureSwitcher'
@@ -38,6 +36,15 @@ import {
 } from '../sidebar/SidebarContextActions'
 import { SidebarThemeToggle } from '../sidebar/SidebarThemeToggle'
 import { SidebarFooterNav } from '../sidebar/SidebarFooterNav'
+
+// R3（07-14-renderer-lazy-loading）：二维码弹层/手机连接面板把 qrcode.react 拉进
+// 首屏 Workbench chunk——改懒边界，仅在面板/弹层显示时加载。
+const ClawAddImDialog = lazy(() =>
+  import('./SidebarClawDialog').then((module) => ({ default: module.ClawAddImDialog }))
+)
+const ConnectPhoneSidebarPanel = lazy(() =>
+  import('./ConnectPhoneView').then((module) => ({ default: module.ConnectPhoneSidebarPanel }))
+)
 
 type Props = {
   threads: NormalizedThread[]
@@ -293,15 +300,18 @@ export function Sidebar({
       <div className="ds-no-drag mx-1 my-1" />
 
       {connectPhoneSidebarOpen ? (
-        <ConnectPhoneSidebarPanel
-          channels={clawChannels}
-          onAddProvider={async (provider, agentProfile, platformCredential, options) => {
-            await addClawChannel(provider, agentProfile, platformCredential, options)
-            onToggleConnectPhone()
-          }}
-          onDisconnect={(channelId) => deleteClawChannel(channelId)}
-          onOpenSettings={() => onOpenSettings('claw')}
-        />
+        /* 懒 chunk 加载期间用 flex spacer 占位，防止 SidebarFrame footer 被顶上来（布局跳动）。 */
+        <Suspense fallback={<div aria-hidden className="ds-no-drag min-h-0 flex-1" />}>
+          <ConnectPhoneSidebarPanel
+            channels={clawChannels}
+            onAddProvider={async (provider, agentProfile, platformCredential, options) => {
+              await addClawChannel(provider, agentProfile, platformCredential, options)
+              onToggleConnectPhone()
+            }}
+            onDisconnect={(channelId) => deleteClawChannel(channelId)}
+            onOpenSettings={() => onOpenSettings('claw')}
+          />
+        </Suspense>
       ) : activeView === 'claw' ? (
         <ClawSidebarContent
           channels={clawChannels}
@@ -411,18 +421,21 @@ export function Sidebar({
     </SidebarFrame>
 
     {imDialogMode ? (
-      <ClawAddImDialog
-        mode={imDialogMode}
-        initialProvider={activeClawChannel?.provider}
-        initialChannelId={imDialogMode === 'edit' ? activeClawChannel?.id : undefined}
-        channels={clawChannels}
-        onClose={() => setImDialogMode(null)}
-        onAddProvider={(provider, agentProfile, platformCredential, options) =>
-          addClawChannel(provider, agentProfile, platformCredential, options)
-        }
-        onDeleteChannel={(channelId) => deleteClawChannel(channelId)}
-        t={t}
-      />
+      /* 隐藏弹层惯例 fallback=null：弹层加载为 ms 级本地 chunk，无布局占位需求。 */
+      <Suspense fallback={null}>
+        <ClawAddImDialog
+          mode={imDialogMode}
+          initialProvider={activeClawChannel?.provider}
+          initialChannelId={imDialogMode === 'edit' ? activeClawChannel?.id : undefined}
+          channels={clawChannels}
+          onClose={() => setImDialogMode(null)}
+          onAddProvider={(provider, agentProfile, platformCredential, options) =>
+            addClawChannel(provider, agentProfile, platformCredential, options)
+          }
+          onDeleteChannel={(channelId) => deleteClawChannel(channelId)}
+          t={t}
+        />
+      </Suspense>
     ) : null}
     </>
   )

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { NormalizedThread } from '../agent/types'
 import { getProvider } from '../agent/registry'
 import { rendererRuntimeClient } from '../agent/runtime-client'
-import i18n from '../i18n'
+import i18n, { ensureI18nResources } from '../i18n'
 import {
   applyChatContentMaxWidth,
   applyCursorSpotlight,
@@ -150,6 +150,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set,
     get,
     i18n,
+    ensureI18nResources,
     persistComposerModel,
     persistComposerMode,
     rememberThreadComposerMode,

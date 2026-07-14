@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Background, BackgroundVariant, ReactFlow, ReactFlowProvider } from '@xyflow/react'
+// R2（07-14-renderer-lazy-loading）：与 WorkflowEditorView 同款——xyflow 样式随懒 chunk 加载。
+import '@xyflow/react/dist/style.css'
+import '../../styles/workflow-canvas.css'
 import { Check, LayoutGrid, List as ListIcon, Loader2, UserCheck, X } from 'lucide-react'
 import {
   normalizeWorkflowSettings,

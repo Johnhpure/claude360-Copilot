@@ -1,6 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { setupI18nTestEnglish } from '../../test-support/i18n-en'
 import type { ClawImChannelV1 } from '@shared/app-settings'
 import i18n from '../../i18n'
 import {
@@ -38,6 +39,9 @@ function channel(enabled: boolean, provider: ClawImChannelV1['provider'] = 'feis
     updatedAt: '2026-06-03T00:00:00.000Z'
   }
 }
+
+// R1（07-14-renderer-lazy-loading）：本文件以英文文案断言 UI——en 资源已改动态加载，先恢复 en 测试环境。
+beforeAll(() => setupI18nTestEnglish())
 
 describe('ConnectPhoneView', () => {
   beforeEach(async () => {
