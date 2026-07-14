@@ -386,10 +386,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 async function loadDefaultSettings(): Promise<AppSettingsV1> {
   const defaults = normalizeStoredSettings(defaultSettings())
-  await ensureWorkspaceRootExists(defaults.workspaceRoot)
-  await ensureWriteWorkspaceRootsExist(defaults)
-  await ensureConversationWorkspaceRootExists(defaults)
-  await ensureClawChannelWorkspaceRootsExist(defaults)
+  // 与 load() 同款并行建目录（R5）：首次启动（无设置文件）也在关键路径上。
+  await Promise.all([
+    ensureWorkspaceRootExists(defaults.workspaceRoot),
+    ensureWriteWorkspaceRootsExist(defaults),
+    ensureConversationWorkspaceRootExists(defaults),
+    ensureClawChannelWorkspaceRootsExist(defaults)
+  ])
   return defaults
 }
 
@@ -512,10 +515,15 @@ export class JsonSettingsStore {
     }
 
     const normalized = normalizeStoredSettings(buildMergedSettings(parsed as Partial<AppSettingsV1>))
-    await ensureWorkspaceRootExists(normalized.workspaceRoot)
-    await ensureWriteWorkspaceRootsExist(normalized)
-    await ensureConversationWorkspaceRootExists(normalized)
-    await ensureClawChannelWorkspaceRootsExist(normalized)
+    // 建目录并行化（07-14-startup-optimization R5）：四组目录树相互无数据依赖
+    // （welcome.md 的独占写在 ensureWriteWorkspaceRootsExist 内部保证先 mkdir），
+    // mkdir recursive 并发安全；load 在启动关键路径上，串行 await 无必要。
+    await Promise.all([
+      ensureWorkspaceRootExists(normalized.workspaceRoot),
+      ensureWriteWorkspaceRootsExist(normalized),
+      ensureConversationWorkspaceRootExists(normalized),
+      ensureClawChannelWorkspaceRootsExist(normalized)
+    ])
     this.cache = normalized
     if (sourcePath !== this.path) {
       await this.save(normalized)

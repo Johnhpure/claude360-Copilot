@@ -101,7 +101,7 @@ import { cleanupUnusedGitCheckpointsIfDue } from './services/git-checkpoint-serv
 import { createClawRuntime, type ClawRuntime } from './claw-runtime'
 import { createScheduleRuntime, type ScheduleRuntime } from './schedule-runtime'
 import { createWorkflowRuntime, type WorkflowRuntime } from './workflow-runtime'
-import { runClawScheduleMcpServerFromArgv } from './claw-schedule-mcp-server'
+import { createPrewarmTrigger } from './startup-prewarm'
 import {
   clawScheduleMcpSettingsChanged,
   resolveKunMcpJsonPath,
@@ -1663,10 +1663,15 @@ async function runtimeRequest(
 }
 
 if (runningClawScheduleMcpServer) {
-  void runClawScheduleMcpServerFromArgv(process.argv).catch((error) => {
-    console.error('[claw-schedule-mcp] server failed:', error)
-    process.exit(1)
-  })
+  // MCP SDK chunk 懒加载（07-14-startup-optimization R1）：@modelcontextprotocol/sdk
+  // 仅该 stdio 模式需要，GUI 正常启动不再静态加载。此模式 stdout 是 JSON-RPC
+  // 通道，失败只写 stderr 后退出（行为与静态 import 版一致）。
+  void import('./claw-schedule-mcp-server')
+    .then((module) => module.runClawScheduleMcpServerFromArgv(process.argv))
+    .catch((error) => {
+      console.error('[claw-schedule-mcp] server failed:', error)
+      process.exit(1)
+    })
 } else {
 app.whenReady().then(async () => {
   traceStartup('app.whenReady:start')
@@ -1690,11 +1695,6 @@ app.whenReady().then(async () => {
   perfBaselineUpdateChannel = initial.guiUpdate.channel
   setKunUnexpectedExitHandler(handleUnexpectedKunExit)
   appBehavior = initial.appBehavior
-  syncLoginItemSettings(initial)
-  syncTray(initial)
-  await syncClawScheduleMcpConfig(initial, getClawScheduleMcpLaunchConfig()).catch((error) => {
-    console.error('[claw-schedule-mcp] failed to sync config on startup:', error)
-  })
 
   logDir = resolveLogDirectory(app)
   configureLogger({
@@ -1703,6 +1703,18 @@ app.whenReady().then(async () => {
     retentionDays: initial.log.retentionDays
   })
   traceStartup('logger configured')
+
+  // createWindow 提前（07-14-startup-optimization R2）：窗口创建 / renderer 加载
+  // 与下方 runtime 创建、服务实例化、IPC 注册并行。安全性：从这里到
+  // registerTerminalPtyIpc 之间全部是同步代码（无 await 让出点），首屏 handler
+  // （settings:get / claude360:session / perf:renderer-marks / skill:list）在同一
+  // 事件循环 tick 内注册完成，必然早于 renderer 首个 invoke（其最早发生在
+  // preload 求值 + React mount 之后，research/04）。
+  createWindow({ suppressInitialShow: shouldStartHidden(initial) })
+  traceStartup('createWindow:returned')
+
+  syncLoginItemSettings(initial)
+  syncTray(initial)
   syncCheckpointCleanupTimer(initial)
   scheduleRuntime = createScheduleRuntime({ store, runtimeRequest, logError, powerSaveBlocker })
   scheduleRuntime.sync(initial)
@@ -1915,10 +1927,6 @@ app.whenReady().then(async () => {
     claude360CanvasService
   })
 
-  void loadGuiUpdaterModule().catch((error) => {
-    console.warn('[kun-gui updater] failed to initialize on startup:', error)
-  })
-
   // IPC 调用统计（R12）：注入式 register* 传包装 ipcMain（仅 handle 加计时，
   // 语义不变）；registerAppIpcHandlers 在其模块内做同款局部包装，两处共享
   // getSharedIpcStats() 单例，合计覆盖全部 handle 通道。
@@ -1934,8 +1942,19 @@ app.whenReady().then(async () => {
   traceStartup('ipc registration:done')
   startupMetrics.mark('main:ipc-registered')
 
-  createWindow({ suppressInitialShow: shouldStartHidden(initial) })
-  traceStartup('createWindow:returned')
+  // MCP 工具配置同步改 fire-and-forget（R3）：research/01 确认其结果不被任何
+  // 后续启动步骤消费，失败仅记日志，不再阻塞启动链（原为 whenReady 内第二个
+  // await）。
+  void syncClawScheduleMcpConfig(initial, getClawScheduleMcpLaunchConfig()).catch((error) => {
+    logWarn('claw-schedule', 'mcp config sync failed on startup', {
+      message: error instanceof Error ? error.message : String(error)
+    })
+  })
+
+  void loadGuiUpdaterModule().catch((error) => {
+    console.warn('[kun-gui updater] failed to initialize on startup:', error)
+  })
+
   // 启动基线 60s 兜底：kun 启动失败/renderer 未上报时也必出一条 partial 汇总
   // （missing 列表标明卡住的阶段，AC2/R20）。unref 不阻止进程退出。
   const perfFinalizeTimer = setTimeout(() => startupMetrics.finalizeNow('timeout'), 60_000)
@@ -1982,20 +2001,34 @@ app.whenReady().then(async () => {
   // 分组模式：无「全局默认 API Key」也预热运行时，让首次调用更快。
   // 先解析二进制路径，随后直接后台预启动 Kun 子进程（07-05 首次对话慢修复）：
   // 否则子进程 spawn + 最多 20s 的就绪等待会全部落在用户第一条消息上。
+  // 触发时机（07-14-startup-optimization R4）：窗口 ready-to-show 后 setImmediate
+  // （首帧优先，取代固定 1500ms 延迟），另有 3s unref 兜底覆盖 ready-to-show
+  // 不触发的场景（隐藏启动 / 加载异常）；两路经 fired 标志幂等。与 renderer
+  // +900ms 探活并发时由 ensureRuntime 的 in-flight+fingerprint 去重防双 spawn。
   // fire-and-forget：失败仅告警，首次真实请求仍会走 ensureRuntime 的正常报错路径。
-  setTimeout(() => {
-    void kunRuntimeAdapter
-      .resolveExecutable(initial)
-      .then(() => {
-        console.info('[perf:runtime] prewarm:start')
-        return ensureRuntime(initial).then(() => {
-          console.info('[perf:runtime] prewarm:ready')
+  createPrewarmTrigger({
+    prewarm: () => {
+      void kunRuntimeAdapter
+        .resolveExecutable(initial)
+        .then(() => {
+          console.info('[perf:runtime] prewarm:start')
+          return ensureRuntime(initial).then(() => {
+            console.info('[perf:runtime] prewarm:ready')
+          })
         })
-      })
-      .catch((err) => {
-        console.warn('[kun-gui] prewarm Claude360 Copilot runtime:', err)
-      })
-  }, 1500)
+        .catch((err) => {
+          console.warn('[kun-gui] prewarm Claude360 Copilot runtime:', err)
+        })
+    },
+    registerReadyToShow: (listener) => {
+      // createWindow 在上方同 tick 内已执行，此处窗口必然存在；ready-to-show
+      // 也不可能在当前同步块结束前触发（事件循环尚未让出）。
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.once('ready-to-show', listener)
+      }
+    },
+    fallbackMs: 3000
+  })
 
   app.on('second-instance', () => {
     revealMainWindow()

@@ -222,12 +222,20 @@ import {
   getComputerUsePermissions,
   requestComputerUsePermission
 } from '../services/computer-use-permissions'
-import { copyWriteDocumentAsRichText, exportWriteDocument } from '../services/write-export-service'
 import { importGithubSkillsToRoot } from '../services/github-skill-import-service'
 import { readLocalPdfText } from '../services/write-pdf-text-service'
 import { saveGuiSkillPackage } from '../services/skill-save-service'
 import { listGuiSkillRoots, listGuiSkills } from '../services/skill-service'
 import { getSharedIpcStats, wrapIpcMainWithStats } from '../perf-ipc-stats'
+import { createLazyModule } from '../lazy-module'
+
+// Write 导出服务懒加载（07-14-startup-optimization R1）：该模块顶层拉起
+// react-dom/server + react-markdown + html-to-docx（含 JSZip）依赖链，改为
+// 首次导出 / 富文本复制时才 import，不再拖慢主进程模块求值。失败重置缓存
+// 允许重试，错误透传给 IPC 调用方（与静态 import 时的抛错语义一致）。
+const loadWriteExportService = createLazyModule(
+  () => import('../services/write-export-service')
+)
 
 // IPC 调用统计（07-14-perf-baseline R12）：局部包装 electron 的 ipcMain，本文件
 // 内 140+ 处 ipcMain.handle 调用点零改动即可全部计入统计（O(1) 计时、返回值
@@ -1776,17 +1784,16 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('file:unwatch-workspace', async (_, watchId: unknown) =>
     disposeWorkspaceFileWatch(parseIpcPayload('file:unwatch-workspace', streamIdSchema, watchId))
   )
-  ipcMain.handle('write:export', async (_, payload: unknown) =>
-    exportWriteDocument(
-      parseIpcPayload('write:export', writeExportPayloadSchema, payload),
-      { parentWindow: getMainWindow() }
-    )
-  )
-  ipcMain.handle('write:copy-rich-text', async (_, payload: unknown) =>
-    copyWriteDocumentAsRichText(
-      parseIpcPayload('write:copy-rich-text', writeRichClipboardPayloadSchema, payload)
-    )
-  )
+  ipcMain.handle('write:export', async (_, payload: unknown) => {
+    const parsed = parseIpcPayload('write:export', writeExportPayloadSchema, payload)
+    const { exportWriteDocument } = await loadWriteExportService()
+    return exportWriteDocument(parsed, { parentWindow: getMainWindow() })
+  })
+  ipcMain.handle('write:copy-rich-text', async (_, payload: unknown) => {
+    const parsed = parseIpcPayload('write:copy-rich-text', writeRichClipboardPayloadSchema, payload)
+    const { copyWriteDocumentAsRichText } = await loadWriteExportService()
+    return copyWriteDocumentAsRichText(parsed)
+  })
   ipcMain.handle('write:inline-completion', async (_, payload: unknown) =>
     requestWriteInlineCompletion(
       await store.load(),

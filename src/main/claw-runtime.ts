@@ -3,16 +3,14 @@ import { randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { URL } from 'node:url'
-import {
-  createLarkChannel,
-  Domain,
-  LoggerLevel,
-  type LarkChannel,
-  type NormalizedMessage,
-  type SendInput,
-  type SendOptions,
-  type SendResult
+import type {
+  LarkChannel,
+  NormalizedMessage,
+  SendInput,
+  SendOptions,
+  SendResult
 } from '@larksuiteoapi/node-sdk'
+import { createLazyModule } from './lazy-module'
 import type {
   AppSettingsV1,
   ClawGeneratedFileV1,
@@ -82,6 +80,12 @@ import type { TelegramInboundPayload } from './telegram-runtime'
 
 const MAX_IM_FILE_UPLOAD_BYTES = 50 * 1024 * 1024
 const CLAW_TELEGRAM_INBOUND_IMAGE_HEADING = '[Telegram inbound message]'
+
+// Feishu/Lark SDK 懒加载（07-14-startup-optimization R1）：SDK 及其 websocket
+// 依赖链较重，改为首次 syncFeishuChannels 需要建桥时才 import，未配置 feishu
+// channel 的启动不再在主进程模块求值期加载。加载失败由既有 claw-feishu
+// logError 捕获（syncFeishuChannels 的 try/catch），并允许下次 sync 重试。
+const loadLarkSdk = createLazyModule(() => import('@larksuiteoapi/node-sdk'))
 
 type FeishuClawChannel = ClawImChannelV1 & {
   platformCredential: ClawImFeishuPlatformCredentialV1
@@ -2220,6 +2224,7 @@ export class ClawRuntime {
       }
 
       try {
+        const { createLarkChannel, Domain, LoggerLevel } = await loadLarkSdk()
         const bridge = createLarkChannel({
           appId,
           appSecret,
