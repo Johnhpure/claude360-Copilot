@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import type { GuiUpdateChannel } from '@shared/gui-update'
-import { GuiUpdateControl } from './settings-gui-update'
+import { GuiUpdateControl, WindowsIa32DeprecationBanner } from './settings-gui-update'
 import { SettingsCard, SettingRow } from './settings-controls'
 
 export function UpdatesSettingsSection({ ctx }: { ctx: Record<string, any> }): ReactElement {
@@ -23,6 +23,12 @@ export function UpdatesSettingsSection({ ctx }: { ctx: Record<string, any> }): R
 
   return (
     <SettingsCard title={t('sectionUpdates')}>
+      {/* ia32 软废弃横幅（R2）：仅 win32+ia32 出现；arch 来自 preload 只读暴露。 */}
+      <WindowsIa32DeprecationBanner
+        platform={window.kunGui.platform}
+        arch={window.kunGui.arch}
+        t={t}
+      />
       <SettingRow
         title={t('guiUpdateChannel')}
         description={t('guiUpdateChannelDesc')}

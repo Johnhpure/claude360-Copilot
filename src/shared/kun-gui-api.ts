@@ -356,6 +356,8 @@ export type SdkDownloadState = {
 
 export type KunGuiApi = {
   platform: string
+  /** process.arch 只读暴露（ia32 软废弃横幅判定，07-14-win-ia32-assessment）。 */
+  arch: string
   homeDir: string
   getSettings: () => Promise<AppSettingsV1>
   /** Detect an existing local Claude Code login (subscription auth). */

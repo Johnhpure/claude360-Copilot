@@ -44,6 +44,9 @@ const subscribeWindowMaterialApplied =
 
 const api = {
   platform: process.platform,
+  // ia32 软废弃横幅判定用（07-14-win-ia32-assessment R3）：sandboxed preload 的
+  // 精简 process 对象仍暴露 arch 属性，直读即可，无需 IPC 往返。
+  arch: process.arch,
   homeDir: homeDirFromArgs,
   getSettings: () => ipcRenderer.invoke('settings:get'),
   claudeSubscriptionStatus: () => ipcRenderer.invoke('claude-subscription:status'),

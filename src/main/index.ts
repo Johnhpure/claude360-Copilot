@@ -109,6 +109,7 @@ import {
 } from './perf-baseline'
 import { getSharedIpcStats, wrapIpcMainWithStats } from './perf-ipc-stats'
 import { startMemorySampler } from './perf-memory-sampler'
+import { warnWindowsIa32Deprecation } from './win-ia32-deprecation'
 import { cleanupUnusedGitCheckpointsIfDue } from './services/git-checkpoint-service'
 import { createClawRuntime, type ClawRuntime } from './claw-runtime'
 import { createScheduleRuntime, type ScheduleRuntime } from './schedule-runtime'
@@ -2073,6 +2074,11 @@ app.whenReady().then(async () => {
   void pruneOnStartup().catch((err) => {
     console.warn('[kun-gui] prune logs:', err)
   })
+
+  // Windows ia32 软废弃告警（07-14-win-ia32-assessment R1）：win32+ia32 才发一条
+  // logWarn（能力限制 + 弃用计划 + x64 指引），其余平台/架构 no-op。同步调用、
+  // 无 await，留在 fire-and-forget 尾部区不触碰上方同 tick IPC 注册不变量。
+  warnWindowsIa32Deprecation({ platform: process.platform, arch: process.arch, warn: logWarn })
 
   // 分组模式：无「全局默认 API Key」也预热运行时，让首次调用更快。
   // 先解析二进制路径，随后直接后台预启动 Kun 子进程（07-05 首次对话慢修复）：

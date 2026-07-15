@@ -1,6 +1,53 @@
 import type { ReactElement } from 'react'
 import type { GuiUpdateInfo, GuiUpdateProgress } from '@shared/gui-update'
-import { AlertCircle, CheckCircle2, Download, Loader2, RefreshCw } from 'lucide-react'
+import {
+  isDeprecatedWindowsArch,
+  WINDOWS_X64_DOWNLOAD_URL
+} from '@shared/win-arch-deprecation'
+import { AlertCircle, AlertTriangle, CheckCircle2, Download, Loader2, RefreshCw } from 'lucide-react'
+
+/**
+ * Windows ia32 弃用横幅（07-14-win-ia32-assessment R2）：仅 win32+ia32 渲染，
+ * 其余平台/架构返回 null。platform/arch 由调用方传入（window.kunGui 直读），
+ * 便于单测注入两态（AC2）。样式复用更新卡 warn tone 的 ds-warning token 惯例。
+ */
+export function WindowsIa32DeprecationBanner({
+  platform,
+  arch,
+  t
+}: {
+  platform: string
+  arch: string
+  t: (key: string, values?: Record<string, unknown>) => string
+}): ReactElement | null {
+  if (!isDeprecatedWindowsArch(platform, arch)) return null
+  return (
+    <div className="px-3 py-3">
+      <div className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--ds-warning)_35%,transparent)] bg-ds-warning-soft px-3 py-2.5 text-ds-warning">
+        <div className="flex items-start gap-2">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
+          <div className="min-w-0">
+            <div className="break-words text-[13px] font-semibold">
+              {t('guiUpdateIa32DeprecatedTitle')}
+            </div>
+            <div className="mt-0.5 break-words text-[12px] leading-5 opacity-75">
+              {t('guiUpdateIa32DeprecatedDesc')}
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                void window.kunGui.openExternal(WINDOWS_X64_DOWNLOAD_URL).catch(() => undefined)
+              }
+              className="mt-1.5 text-[12px] font-medium underline underline-offset-2 transition hover:opacity-80"
+            >
+              {t('guiUpdateIa32DeprecatedAction')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
