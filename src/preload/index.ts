@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { KunGuiApi } from '../shared/kun-gui-api'
+import type {
+  KunGuiApi,
+  WindowMaterialAppliedPayload,
+  WindowMaximizedChangedPayload,
+  WorkspaceOpenRequestPayload
+} from '../shared/kun-gui-api'
+import { createReplayedChannelSubscriber } from '../shared/replayed-ipc-channel'
 
 // 07-14-perf-baseline：R4 preload 初始化耗时。模块求值首/末各记一次 epoch ms，
 // 随 renderer 启动标记上报 main 换算到统一时间轴（本文件无异步初始化，预期 ~0-5ms）。
@@ -11,6 +17,30 @@ const preloadStartedAtEpochMs = Date.now()
 const HOME_DIR_ARG = '--kun-home-dir='
 const homeDirFromArgs =
   process.argv.find((arg) => arg.startsWith(HOME_DIR_ARG))?.slice(HOME_DIR_ARG.length) ?? ''
+
+// —— Windows 原生体验（07-14-windows-native-polish）——
+// main 的这三条推送会在页面加载早期发出（冷启动 workspace:open-request 与
+// window:material-applied 在 did-finish-load，恢复最大化的 maximized-changed 在
+// ready-to-show 附近），而 renderer 的订阅要等 React mount + boot() 的多个 await
+// 之后才注册——先发后订必丢事件。preload 求值先于页面加载，这里在求值期就挂
+// 常驻缓存监听，订阅时重放最近载荷（状态通道 'latest'，命令通道 'once'）。
+const subscribeWindowMaximizedChanged =
+  createReplayedChannelSubscriber<WindowMaximizedChangedPayload>(
+    ipcRenderer,
+    'window:maximized-changed',
+    'latest'
+  )
+const subscribeWorkspaceOpenRequest = createReplayedChannelSubscriber<WorkspaceOpenRequestPayload>(
+  ipcRenderer,
+  'workspace:open-request',
+  'once'
+)
+const subscribeWindowMaterialApplied =
+  createReplayedChannelSubscriber<WindowMaterialAppliedPayload>(
+    ipcRenderer,
+    'window:material-applied',
+    'latest'
+  )
 
 const api = {
   platform: process.platform,
@@ -353,6 +383,20 @@ const api = {
     }),
   runDesktopCommand: (command) =>
     ipcRenderer.invoke('desktop:command', command),
+  reportRecentWorkspaces: (workspaceRoots) => {
+    ipcRenderer.send('workspace:report-recent', { workspaceRoots })
+  },
+  onWindowMaximizedChanged: (handler) => subscribeWindowMaximizedChanged(handler),
+  onThreadNavigateRequest: (handler) => {
+    const wrapped = (
+      _: Electron.IpcRendererEvent,
+      payload: Parameters<typeof handler>[0]
+    ) => handler(payload)
+    ipcRenderer.on('thread:navigate-request', wrapped)
+    return () => ipcRenderer.removeListener('thread:navigate-request', wrapped)
+  },
+  onWorkspaceOpenRequest: (handler) => subscribeWorkspaceOpenRequest(handler),
+  onWindowMaterialApplied: (handler) => subscribeWindowMaterialApplied(handler),
   openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
   getComputerUsePermissions: () => ipcRenderer.invoke('computer-use:permissions'),
   requestComputerUsePermission: (kind) =>

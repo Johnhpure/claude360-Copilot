@@ -5,8 +5,10 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  nativeTheme,
   Notification,
   powerSaveBlocker,
+  screen,
   Tray,
   type ContextMenuParams,
   type MenuItemConstructorOptions
@@ -26,6 +28,16 @@ import { buildTrayMenuTemplate, parseTrayThreads, type TrayThreadSummary } from 
 import { configureLinuxWaylandImeSwitches } from './app-command-line'
 import { configureAppIdentity, AUTO_IMPORT_LEGACY_DATA, APP_PRODUCT_NAME } from './app-identity'
 import { shouldStartHidden, syncLoginItemSettings } from './desktop-behavior'
+import {
+  WINDOW_STATE_FILE_NAME,
+  createWindowStateManager,
+  resolveWindowBackgroundColor,
+  syncNativeThemeSource,
+  type WindowStateManager
+} from './window-state'
+import { applyWindowMaterial, type WindowMaterialValue } from './win-platform'
+import { parseOpenWorkspaceArgv, updateRecentWorkspacesJumpList } from './win-jumplist'
+import { createTurnCompleteNotificationHandler } from './turn-complete-notification'
 import { resolveLogDirectory, resolvePreloadPath } from './main-paths'
 import { runLegacyKunDataMigration } from './legacy-data-migration'
 import {
@@ -313,6 +325,14 @@ let trayMenuOpenPromise: Promise<void> | null = null
 let isQuitting = false
 let closeWindowPromptOpen = false
 let checkpointCleanupTimer: ReturnType<typeof setInterval> | null = null
+// —— Windows 原生体验（07-14-windows-native-polish）——
+// 窗口状态记忆（R1）与主题底色（R2）：manager 在 whenReady 读设置后创建；
+// theme 偏好缓存一份供 createWindow 在重建窗口（tray/activate）时取底色。
+let windowStateManager: WindowStateManager | null = null
+let currentThemePreference: AppSettingsV1['theme'] = 'system'
+// Mica 实验位（R7）：requested 来自设置，applied 是实际生效值（失败静默回退 none）。
+let requestedWindowMaterial: WindowMaterialValue = 'none'
+let appliedWindowMaterial: WindowMaterialValue = 'none'
 
 type GuiUpdaterModule = typeof import('./gui-updater')
 
@@ -514,16 +534,36 @@ function revealMainWindow(): void {
 
 function dispatchTrayAction(action: TrayActionPayload): void {
   revealMainWindow()
+  sendToMainWindowWhenLoaded('tray:action', action)
+}
+
+/**
+ * 向主窗口发送单向事件；页面仍在加载时等 did-finish-load 再发（tray:action
+ * 的既有防丢语义，抽出来供通知跳转 / JumpList 打开工作区复用）。
+ */
+function sendToMainWindowWhenLoaded(channel: string, payload: unknown): void {
   const window = mainWindow
   if (!window || window.isDestroyed()) return
   const send = (): void => {
-    if (!window.isDestroyed()) window.webContents.send('tray:action', action)
+    if (!window.isDestroyed()) window.webContents.send(channel, payload)
   }
   if (window.webContents.isLoadingMainFrame()) {
     window.webContents.once('did-finish-load', send)
   } else {
     send()
   }
+}
+
+/** 标题栏最大化按钮的事件驱动状态（R6）：maximize/unmaximize → renderer。 */
+function sendWindowMaximizedChanged(maximized: boolean): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send('window:maximized-changed', { maximized })
+}
+
+/** 同步窗口材质生效状态到 renderer（挂/摘 html.native-mica，R7）。 */
+function sendWindowMaterialState(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send('window:material-applied', { material: appliedWindowMaterial })
 }
 
 function showRendererContextMenu(window: BrowserWindow, params: ContextMenuParams): void {
@@ -690,51 +730,18 @@ function handleMainWindowClose(window: BrowserWindow, event: Electron.Event): vo
   void promptWindowCloseAction(window)
 }
 
-function normalizeNotificationText(raw: string | undefined, fallback: string, maxLength: number): string {
-  const value = typeof raw === 'string' && raw.trim() ? raw.trim() : fallback
-  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value
-}
-
-type TurnCompleteNotificationPayload = {
-  threadId?: string
-  title?: string
-  body?: string
-}
-
-async function showTurnCompleteNotification(
-  payload: TurnCompleteNotificationPayload
-): Promise<{ ok: true; shown: boolean; reason?: string } | { ok: false; message: string }> {
-  const settings = await store.load()
-  if (!settings.notifications.turnComplete) {
-    return { ok: true, shown: false, reason: 'disabled' }
-  }
-  if (!Notification.isSupported()) {
-    return { ok: true, shown: false, reason: 'unsupported' }
-  }
-
-  const title = normalizeNotificationText(payload.title, APP_PRODUCT_NAME, 80)
-  const body = normalizeNotificationText(payload.body, 'Conversation complete.', 180)
-
-  try {
-    const notification = new Notification({
-      title,
-      body,
-      icon: appIcon.isEmpty() ? undefined : appIcon
-    })
-    notification.on('click', () => {
-      revealMainWindow()
-    })
-    notification.show()
-    return { ok: true, shown: true }
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    logError('notification', 'Failed to show turn completion notification', {
-      message,
-      threadId: payload.threadId
-    })
-    return { ok: false, message }
-  }
-}
+// turn 完成通知（提取到 turn-complete-notification.ts 以便单测，R5）：
+// 点击 = 聚焦主窗口 + 携 threadId 推 renderer 跳转对应会话。
+const showTurnCompleteNotification = createTurnCompleteNotificationHandler({
+  loadSettings: () => store.load(),
+  isSupported: () => Notification.isSupported(),
+  createNotification: (options) => new Notification(options),
+  getIcon: () => (appIcon.isEmpty() ? undefined : appIcon),
+  productName: APP_PRODUCT_NAME,
+  revealMainWindow,
+  navigateToThread: (threadId) => sendToMainWindowWhenLoaded('thread:navigate-request', { threadId }),
+  logError
+})
 
 async function probeThreadApi(settings: AppSettingsV1): Promise<
   | { ok: true }
@@ -1336,11 +1343,22 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
   traceStartup('createWindow:start')
   const preloadPath = resolvePreloadPath(__dirname)
   const usesDesktopTitleBar = process.platform === 'win32' || process.platform === 'linux'
+  // 窗口状态记忆（R1）：恢复上次 bounds；越界 / 显示器移除已在 manager 内
+  // 校验回落默认（无 x/y 时 Electron 默认居中）。
+  const restoredState = windowStateManager?.getRestoredState()
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 840,
+    width: restoredState?.width ?? 1280,
+    height: restoredState?.height ?? 840,
+    ...(restoredState?.x !== undefined && restoredState?.y !== undefined
+      ? { x: restoredState.x, y: restoredState.y }
+      : {}),
     minWidth: 960,
     minHeight: 640,
+    // 防深色主题冷启动首帧白闪（R2）：原生底色按持久化主题预置。
+    backgroundColor: resolveWindowBackgroundColor(
+      currentThemePreference,
+      nativeTheme.shouldUseDarkColors
+    ),
     icon: appIcon.isEmpty() ? undefined : appIcon,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : usesDesktopTitleBar ? 'hidden' : 'default',
     trafficLightPosition: process.platform === 'darwin' ? { x: 31, y: 22 } : undefined,
@@ -1356,6 +1374,16 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
     }
   })
   startupMetrics.mark('main:window-created')
+  windowStateManager?.attach(mainWindow)
+  // 标题栏最大化图标事件驱动（R6）：替换 renderer 侧启发式的更新来源。
+  mainWindow.on('maximize', () => sendWindowMaximizedChanged(true))
+  mainWindow.on('unmaximize', () => sendWindowMaximizedChanged(false))
+  // Mica 实验位（R7）：设置开启且 win32+build 门槛满足才生效，失败静默回退实色。
+  appliedWindowMaterial = applyWindowMaterial(mainWindow, requestedWindowMaterial)
+  mainWindow.webContents.on('did-finish-load', () => {
+    // 每次页面加载（含 reload）后同步材质状态，renderer 据此挂/摘 native-mica class。
+    sendWindowMaterialState()
+  })
   if (usesDesktopTitleBar) {
     mainWindow.setMenu(null)
     mainWindow.setMenuBarVisibility(false)
@@ -1371,11 +1399,25 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
     if (!window || window.isDestroyed()) return
     showRendererContextMenu(window, params)
   })
+  // maximized 的恢复放在首次显示时（隐藏窗口上 maximize 的显隐行为平台间不一致）。
+  let pendingRestoreMaximize = restoredState?.maximized === true
   const showWindow = (): void => {
     if (options.suppressInitialShow) return
     if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isVisible()) return
+    if (pendingRestoreMaximize) {
+      pendingRestoreMaximize = false
+      mainWindow.maximize()
+    }
     mainWindow.show()
   }
+  // suppressInitialShow（开机最小化到托盘）时 showWindow 直接返回——首次经
+  // revealMainWindow（托盘/second-instance）显示时在 'show' 事件里兜底恢复
+  // 最大化（pendingRestoreMaximize 消费后即失效，不影响后续显隐）。
+  mainWindow.on('show', () => {
+    if (!pendingRestoreMaximize || !mainWindow || mainWindow.isDestroyed()) return
+    pendingRestoreMaximize = false
+    mainWindow.maximize()
+  })
   mainWindow.on('close', (event) => {
     if (!mainWindow || mainWindow.isDestroyed()) return
     handleMainWindowClose(mainWindow, event)
@@ -1704,6 +1746,19 @@ app.whenReady().then(async () => {
   })
   traceStartup('logger configured')
 
+  // 原生主题联动（R2）：settings.theme 三态同步 nativeTheme.themeSource，
+  // createWindow 用它解析窗口原生底色（防深色首帧白闪）。
+  currentThemePreference = initial.theme
+  syncNativeThemeSource(initial.theme, nativeTheme)
+  requestedWindowMaterial = initial.appBehavior.windowMaterial
+  // 窗口状态记忆（R1）：同步读一条 <300B 的 JSON（选择理由见 window-state.ts），
+  // 不在 settings load 与 createWindow 之间引入 await（startup-sequence.md 不变量）。
+  windowStateManager = createWindowStateManager({
+    file: join(app.getPath('userData'), WINDOW_STATE_FILE_NAME),
+    getDisplays: () => screen.getAllDisplays(),
+    log: (message, detail) => logWarn('window-state', message, detail)
+  })
+
   // createWindow 提前（07-14-startup-optimization R2）：窗口创建 / renderer 加载
   // 与下方 runtime 创建、服务实例化、IPC 注册并行。安全性：从这里到
   // registerTerminalPtyIpc 之间全部是同步代码（无 await 让出点），首屏 handler
@@ -1712,6 +1767,13 @@ app.whenReady().then(async () => {
   // preload 求值 + React mount 之后，research/04）。
   createWindow({ suppressInitialShow: shouldStartHidden(initial) })
   traceStartup('createWindow:returned')
+
+  // JumpList 冷启动路径（R4）：进程 argv 带 --open-workspace= 时，页面加载完成
+  // 后推 renderer 打开对应工作区（与 second-instance 共用解析）。
+  const coldStartOpenWorkspaceRoot = parseOpenWorkspaceArgv(process.argv)
+  if (coldStartOpenWorkspaceRoot) {
+    sendToMainWindowWhenLoaded('workspace:open-request', { workspaceRoot: coldStartOpenWorkspaceRoot })
+  }
 
   syncLoginItemSettings(initial)
   syncTray(initial)
@@ -1814,6 +1876,19 @@ app.whenReady().then(async () => {
     syncLoginItemSettings(saved)
     syncTray(saved)
     syncCheckpointCleanupTimer(saved)
+    // 原生主题联动（R2）：theme 变化时同步 nativeTheme.themeSource 与底色缓存。
+    if (prev.theme !== saved.theme) {
+      currentThemePreference = saved.theme
+      syncNativeThemeSource(saved.theme, nativeTheme)
+    }
+    // Mica 实验位（R7）：windowMaterial 变化时对现有窗口重应用并通知 renderer。
+    if (prev.appBehavior.windowMaterial !== saved.appBehavior.windowMaterial) {
+      requestedWindowMaterial = saved.appBehavior.windowMaterial
+      appliedWindowMaterial = applyWindowMaterial(mainWindow, requestedWindowMaterial, {
+        previousApplied: appliedWindowMaterial
+      })
+      sendWindowMaterialState()
+    }
     return saved
   }
 
@@ -1913,6 +1988,7 @@ app.whenReady().then(async () => {
       queueRuntimeMcpConfigApply(settings)
     },
     showTurnCompleteNotification,
+    onRecentWorkspacesReported: (workspaceRoots) => updateRecentWorkspacesJumpList(workspaceRoots),
     getAppVersion: () => app.getVersion(),
     readGuiUpdateState,
     loadGuiUpdaterModule,
@@ -2030,8 +2106,14 @@ app.whenReady().then(async () => {
     fallbackMs: 3000
   })
 
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
     revealMainWindow()
+    // JumpList 项点击会带 --open-workspace= 启动新实例，单实例锁把 argv 转到
+    // 这里（R4）；与冷启动共用 parseOpenWorkspaceArgv。
+    const workspaceRoot = parseOpenWorkspaceArgv(argv)
+    if (workspaceRoot) {
+      sendToMainWindowWhenLoaded('workspace:open-request', { workspaceRoot })
+    }
   })
 
   app.on('activate', () => {

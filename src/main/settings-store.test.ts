@@ -27,7 +27,8 @@ describe('JsonSettingsStore', () => {
       openAtLogin: false,
       startMinimized: false,
       closeAction: 'ask',
-      closeToTray: false
+      closeToTray: false,
+      windowMaterial: 'none'
     })
   })
 
@@ -441,13 +442,15 @@ describe('JsonSettingsStore', () => {
       openAtLogin: true,
       startMinimized: true,
       closeAction: 'tray',
-      closeToTray: true
+      closeToTray: true,
+      windowMaterial: 'none'
     })
     expect(disabled.appBehavior).toEqual({
       openAtLogin: false,
       startMinimized: false,
       closeAction: 'quit',
-      closeToTray: false
+      closeToTray: false,
+      windowMaterial: 'none'
     })
   })
 

@@ -286,6 +286,8 @@ type RegisterAppIpcHandlersOptions = {
   /** 启动基线：renderer 上报的性能标记并入 main 侧采集器（07-14-perf-baseline）。
    *  可选（onKunMcpConfigWritten 同款惯例）：缺省时不注册接收通道。 */
   attachRendererPerfMarks?: (payload: RendererStartupMarks) => void
+  /** 最近工作区上报（07-14-windows-native-polish R4）：缺省时不注册接收通道。 */
+  onRecentWorkspacesReported?: (workspaceRoots: string[]) => void
   claude360AuthService: Claude360AuthService
   claude360TokenService: Claude360TokenService
   claude360ModelService: Claude360ModelService
@@ -334,6 +336,15 @@ const perfRendererMarksPayloadSchema = z
       })
       .strict()
       .optional()
+  })
+  .strict()
+
+// 最近工作区上报（workspace:report-recent，ipcRenderer.send 单向通道）：
+// schema 就近内联，同 perf:renderer-marks 惯例。renderer 侧列表上限 30。
+const RECENT_WORKSPACES_CHANNEL = 'workspace:report-recent'
+const recentWorkspacesPayloadSchema = z
+  .object({
+    workspaceRoots: z.array(z.string().max(1024)).max(30)
   })
   .strict()
 
@@ -514,6 +525,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     resolveLogDirectory,
     logError,
     attachRendererPerfMarks,
+    onRecentWorkspacesReported,
     claude360AuthService,
     claude360TokenService,
     claude360ModelService,
@@ -1955,6 +1967,21 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         )
       } catch {
         // 忽略畸形 perf 上报。
+      }
+    })
+  }
+
+  // 最近工作区上报（07-14-windows-native-polish R4）：renderer 防抖后单向上报，
+  // main 侧刷新 win32 JumpList。同 perf 通道：畸形 payload 静默丢弃。
+  if (onRecentWorkspacesReported) {
+    ipcMain.on(RECENT_WORKSPACES_CHANNEL, (_event, payload: unknown) => {
+      try {
+        onRecentWorkspacesReported(
+          parseIpcPayload(RECENT_WORKSPACES_CHANNEL, recentWorkspacesPayloadSchema, payload)
+            .workspaceRoots
+        )
+      } catch {
+        // 忽略畸形上报。
       }
     })
   }

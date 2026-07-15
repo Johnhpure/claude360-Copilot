@@ -317,6 +317,16 @@ export type TrayActionPayload =
   | { type: 'new-chat' }
   | { type: 'open-thread'; threadId: string }
 
+// —— Windows 原生体验（07-14-windows-native-polish）——
+/** main → renderer：窗口 maximize/unmaximize 事件驱动（替换 renderer 启发式）。 */
+export type WindowMaximizedChangedPayload = { maximized: boolean }
+/** main → renderer：通知点击跳转对应会话。 */
+export type ThreadNavigateRequestPayload = { threadId: string }
+/** main → renderer：JumpList / argv 请求打开某个工作区。 */
+export type WorkspaceOpenRequestPayload = { workspaceRoot: string }
+/** main → renderer：窗口材质实际生效值（renderer 据此挂/摘 html.native-mica）。 */
+export type WindowMaterialAppliedPayload = { material: 'mica' | 'none' }
+
 export type ComputerUsePermissionKind = 'accessibility' | 'screenRecording'
 export type ComputerUsePermissionState = 'granted' | 'denied' | 'unknown'
 export type ComputerUsePermissions = {
@@ -614,6 +624,12 @@ export type KunGuiApi = {
     options?: { workspaceRoot?: string; clawChannelId?: string; providerId?: string; modelHint?: string; reasoningEffort?: string; mode?: 'agent' | 'plan' }
   ) => Promise<ScheduleTaskFromTextResult>
   runDesktopCommand: (command: DesktopCommand) => Promise<void>
+  /** 单向上报最近工作区列表（renderer 防抖后调用；main 侧刷新 win32 JumpList）。 */
+  reportRecentWorkspaces: (workspaceRoots: string[]) => void
+  onWindowMaximizedChanged: (handler: (payload: WindowMaximizedChangedPayload) => void) => () => void
+  onThreadNavigateRequest: (handler: (payload: ThreadNavigateRequestPayload) => void) => () => void
+  onWorkspaceOpenRequest: (handler: (payload: WorkspaceOpenRequestPayload) => void) => () => void
+  onWindowMaterialApplied: (handler: (payload: WindowMaterialAppliedPayload) => void) => () => void
   openExternal: (url: string) => Promise<void>
   getComputerUsePermissions: () => Promise<ComputerUsePermissions>
   requestComputerUsePermission: (

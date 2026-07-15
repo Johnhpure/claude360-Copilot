@@ -65,7 +65,7 @@ function settings(): AppSettingsV1 {
     log: { enabled: false, retentionDays: 7 },
     checkpointCleanup: { enabled: false, intervalDays: 3 },
     notifications: { turnComplete: true },
-    appBehavior: { openAtLogin: false, startMinimized: false, closeToTray: false },
+    appBehavior: { openAtLogin: false, startMinimized: false, closeToTray: false, windowMaterial: 'none' },
     keyboardShortcuts: defaultKeyboardShortcuts(),
     write: defaultWriteSettings(),
     claw: defaultClawSettings(),
@@ -310,25 +310,28 @@ describe('app behavior settings', () => {
       openAtLogin: false,
       startMinimized: false,
       closeAction: 'ask',
-      closeToTray: false
+      closeToTray: false,
+      windowMaterial: 'none'
     })
   })
 
   it('only keeps start minimized when open at login is enabled', () => {
     const normalized = normalizeAppSettings({
       ...settings(),
+      // 旧版本设置没有 windowMaterial 字段——normalize 应注入默认值。
       appBehavior: {
         openAtLogin: false,
         startMinimized: true,
         closeToTray: true
-      }
+      } as AppSettingsV1['appBehavior']
     })
 
     expect(normalized.appBehavior).toEqual({
       openAtLogin: false,
       startMinimized: false,
       closeAction: 'tray',
-      closeToTray: true
+      closeToTray: true,
+      windowMaterial: 'none'
     })
   })
 
@@ -341,6 +344,24 @@ describe('app behavior settings', () => {
     expect(current.appBehavior.closeAction).toBe('ask')
     expect(mergeAppBehaviorSettings(current.appBehavior, { closeToTray: true }).closeAction).toBe('tray')
     expect(mergeAppBehaviorSettings(current.appBehavior, { closeToTray: false }).closeAction).toBe('quit')
+  })
+
+  it('normalizes the experimental window material with enum fallback', () => {
+    const current = normalizeAppSettings({
+      ...settings(),
+      appBehavior: undefined
+    } as unknown as AppSettingsV1)
+
+    expect(current.appBehavior.windowMaterial).toBe('none')
+    expect(mergeAppBehaviorSettings(current.appBehavior, { windowMaterial: 'mica' }).windowMaterial).toBe('mica')
+    expect(
+      mergeAppBehaviorSettings(current.appBehavior, {
+        windowMaterial: 'acrylic' as unknown as 'mica'
+      }).windowMaterial
+    ).toBe('none')
+    // patch 不带该字段时保留现值
+    const withMica = mergeAppBehaviorSettings(current.appBehavior, { windowMaterial: 'mica' })
+    expect(mergeAppBehaviorSettings(withMica, { openAtLogin: true }).windowMaterial).toBe('mica')
   })
 })
 

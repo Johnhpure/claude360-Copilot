@@ -392,10 +392,31 @@ export function readCodeWorkspaceRoots(): string[] {
 }
 
 export function saveCodeWorkspaceRoots(workspaceRoots: readonly string[]): void {
-  writeBrowserStorageItem(
-    CODE_WORKSPACE_ROOTS_STORAGE_KEY,
-    JSON.stringify(compactCodeWorkspaceRoots(workspaceRoots))
-  )
+  const compacted = compactCodeWorkspaceRoots(workspaceRoots)
+  writeBrowserStorageItem(CODE_WORKSPACE_ROOTS_STORAGE_KEY, JSON.stringify(compacted))
+  scheduleRecentWorkspacesReport(compacted)
+}
+
+// 最近工作区上报（07-14-windows-native-polish R4）：saveCodeWorkspaceRoots 是
+// 列表的唯一写入汇点（remember/forget/boot reconcile 都经过这里），在此防抖
+// 1s 单向上报 main（main 侧刷新 win32 JumpList）。失败静默——上报是尽力而为。
+const RECENT_WORKSPACES_REPORT_DEBOUNCE_MS = 1_000
+let recentWorkspacesReportTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleRecentWorkspacesReport(workspaceRoots: readonly string[]): void {
+  if (typeof window === 'undefined' || typeof window.kunGui?.reportRecentWorkspaces !== 'function') {
+    return
+  }
+  const snapshot = [...workspaceRoots]
+  if (recentWorkspacesReportTimer) clearTimeout(recentWorkspacesReportTimer)
+  recentWorkspacesReportTimer = setTimeout(() => {
+    recentWorkspacesReportTimer = null
+    try {
+      window.kunGui?.reportRecentWorkspaces?.(snapshot)
+    } catch {
+      // 单向上报失败静默。
+    }
+  }, RECENT_WORKSPACES_REPORT_DEBOUNCE_MS)
 }
 
 export function rememberCodeWorkspaceRoots(

@@ -18,6 +18,8 @@ import {
   type ScheduleSettingsPatchV1,
   WINDOW_CLOSE_ACTIONS,
   type WindowCloseAction,
+  WINDOW_MATERIALS,
+  type WindowMaterial,
   type WorkflowSettingsPatchV1,
   type WriteSettingsPatchV1
 } from './app-settings-types'
@@ -171,8 +173,15 @@ export function normalizeAppBehaviorSettings(
     openAtLogin,
     startMinimized: openAtLogin && settings?.startMinimized === true,
     closeAction,
-    closeToTray: closeAction === 'tray'
+    closeToTray: closeAction === 'tray',
+    windowMaterial: normalizeWindowMaterial(settings?.windowMaterial)
   }
+}
+
+export function normalizeWindowMaterial(value: unknown): WindowMaterial {
+  return typeof value === 'string' && WINDOW_MATERIALS.includes(value as WindowMaterial)
+    ? value as WindowMaterial
+    : 'none'
 }
 
 export function normalizeWindowCloseAction(value: unknown): WindowCloseAction | null {

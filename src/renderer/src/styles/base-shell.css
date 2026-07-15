@@ -380,6 +380,26 @@ html {
 }
 
 /*
+ * Windows Mica 实验位（07-14-windows-native-polish R7）：main 侧
+ * setBackgroundMaterial('mica') 成功应用后 renderer 才挂 html.native-mica。
+ * 默认（无该 class）零影响；挂上后仅把根壳背景链路（html/body 及其装饰
+ * ::before、app-frame）改为透明/半透明，让系统 Mica 材质透出，其余表面
+ * token 不动。仅 win32 + Win11 22H2 可能出现该 class。
+ */
+html.native-mica,
+html.native-mica body {
+  background: transparent;
+}
+
+html.native-mica body::before {
+  background: transparent;
+}
+
+html.native-mica .ds-windows-app-frame {
+  background: color-mix(in srgb, var(--ds-bg-main) 78%, transparent);
+}
+
+/*
  * Full-window `fixed inset-0` overlays (e.g. the workflow/Loop editor) must not
  * cover the real DOM titlebar that AppShell draws on Windows/Linux. The titlebar
  * height var is only set on those platforms, so this collapses to `top: 0` on

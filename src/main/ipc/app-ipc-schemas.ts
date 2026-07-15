@@ -54,7 +54,7 @@ import {
 } from '../../shared/app-settings'
 import { DESKTOP_COMMANDS } from '../../shared/kun-gui-api'
 import { GUI_UPDATE_CHANNELS } from '../../shared/gui-update'
-import { WINDOW_CLOSE_ACTIONS, CHAT_CONTENT_MAX_WIDTH_MIN, CHAT_CONTENT_MAX_WIDTH_MAX, UI_FONT_SCALE_MIN, UI_FONT_SCALE_MAX } from '../../shared/app-settings'
+import { WINDOW_CLOSE_ACTIONS, WINDOW_MATERIALS, CHAT_CONTENT_MAX_WIDTH_MIN, CHAT_CONTENT_MAX_WIDTH_MAX, UI_FONT_SCALE_MIN, UI_FONT_SCALE_MAX } from '../../shared/app-settings'
 import { KEYBOARD_SHORTCUT_COMMANDS } from '../../shared/keyboard-shortcuts'
 import { WRITE_EXPORT_FORMATS } from '../../shared/write-export'
 import { WRITE_INFOGRAPHIC_MAX_TEXT_CHARS } from '../../shared/write-infographic'
@@ -546,7 +546,8 @@ const appBehaviorPatchSchema = z.object({
   openAtLogin: z.boolean().optional(),
   startMinimized: z.boolean().optional(),
   closeAction: z.enum(WINDOW_CLOSE_ACTIONS).optional(),
-  closeToTray: z.boolean().optional()
+  closeToTray: z.boolean().optional(),
+  windowMaterial: z.enum(WINDOW_MATERIALS).optional()
 }).strict()
 
 const keyboardShortcutCommandIds = KEYBOARD_SHORTCUT_COMMANDS.map((command) => command.id) as [

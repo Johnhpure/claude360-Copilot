@@ -602,7 +602,7 @@ describe('chat-store-thread-actions createThread conversation mode', () => {
           log: { enabled: false, retentionDays: 7 },
           checkpointCleanup: { enabled: false, intervalDays: 3 },
           notifications: { turnComplete: true },
-          appBehavior: { openAtLogin: false, startMinimized: false, closeToTray: false },
+          appBehavior: { openAtLogin: false, startMinimized: false, closeToTray: false, windowMaterial: 'none' },
           keyboardShortcuts: { bindings: [] },
           write: { workspaces: [], defaultWorkspaceRoot: '', activeWorkspaceRoot: '' },
           claw: { channels: [], tasks: [], im: { workspaceRoot: '' }, enabled: false, skills: { extraDirs: [] } },

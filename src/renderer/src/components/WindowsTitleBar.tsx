@@ -9,6 +9,7 @@ import {
 } from '@shared/keyboard-shortcuts'
 import appLogo from '../../../asset/img/claude360.png'
 import { useKeyboardShortcutSettings } from '../lib/keyboard-shortcut-settings'
+import { bindWindowMaximizedState } from '../lib/window-maximized-state'
 import { useChatStore } from '../store/chat-store'
 
 type MenuAction = () => void | Promise<void>
@@ -237,23 +238,17 @@ export function WindowsTitleBar({ platform, actions }: Props): ReactElement | nu
     }
   }, [activeMenuId])
 
-  /* Listen for Electron maximize / unmaximize events via the
-     resize event to toggle the maximize/restore icon. */
+  /* Maximize/restore icon state: driven by main-process maximize/unmaximize
+     events (window:maximized-changed) when available; the old outerWidth
+     heuristic only seeds the initial value and serves as the fallback for
+     older preloads (see lib/window-maximized-state.ts). */
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const checkMaximized = (): void => {
-      // Heuristic: in Electron, when the window is maximized via `win.maximize()`,
-      // screenX/screenY are 0 (or -8 with shadow compensation on Windows)
-      // and outerWidth/outerHeight fill the screen.  This is the most
-      // reliable cross-platform signal available from the renderer.
-      const isMax =
-        window.outerWidth >= window.screen.availWidth &&
-        window.outerHeight >= window.screen.availHeight
-      setIsMaximized(isMax)
-    }
-    checkMaximized()
-    window.addEventListener('resize', checkMaximized)
-    return () => window.removeEventListener('resize', checkMaximized)
+    return bindWindowMaximizedState({
+      windowLike: window,
+      setMaximized: setIsMaximized,
+      subscribe: window.kunGui?.onWindowMaximizedChanged
+    })
   }, [])
 
 

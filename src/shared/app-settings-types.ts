@@ -651,12 +651,18 @@ export type NotificationConfigV1 = {
 export const WINDOW_CLOSE_ACTIONS = ['ask', 'tray', 'quit'] as const
 export type WindowCloseAction = typeof WINDOW_CLOSE_ACTIONS[number]
 
+/** Experimental Windows-only window material. 'mica' needs win32 + Win11 22H2 (build 22621+). */
+export const WINDOW_MATERIALS = ['none', 'mica'] as const
+export type WindowMaterial = typeof WINDOW_MATERIALS[number]
+
 export type AppBehaviorConfigV1 = {
   openAtLogin: boolean
   startMinimized: boolean
   closeAction?: WindowCloseAction
   /** Legacy compatibility field. New code should use closeAction. */
   closeToTray: boolean
+  /** Experimental (no settings UI yet — edit kun-settings.json directly). Default 'none'. */
+  windowMaterial: WindowMaterial
 }
 
 export type ScheduleSkillSettingsV1 = {

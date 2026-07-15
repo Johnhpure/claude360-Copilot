@@ -300,7 +300,7 @@ describe('skill-service', () => {
       log: { enabled: false, retentionDays: 7 },
       checkpointCleanup: { enabled: false, intervalDays: 3 },
       notifications: { turnComplete: true },
-      appBehavior: { openAtLogin: false, startMinimized: false, closeToTray: false },
+      appBehavior: { openAtLogin: false, startMinimized: false, closeToTray: false, windowMaterial: 'none' },
       keyboardShortcuts: defaultKeyboardShortcuts(),
       write: defaultWriteSettings(),
       claw: defaultClawSettings(),

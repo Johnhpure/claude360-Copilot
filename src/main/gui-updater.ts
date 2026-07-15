@@ -14,6 +14,7 @@ import type {
 } from '../shared/gui-update'
 import { nextGuiUpdateCheckDelay } from '../shared/gui-update-schedule'
 import { DEFAULT_GUI_UPDATE_CHANNEL, normalizeGuiUpdateChannel } from '../shared/gui-update'
+import { applyUpdateTaskbarProgress } from './win-taskbar-progress'
 
 // 应用内更新走 GitHub Releases(公开仓库,electron-updater 原生 github provider)。
 // KUN_UPDATE_URL* env 仍可覆盖为 generic 源,作为内部逃生舱保留。
@@ -396,7 +397,10 @@ function toGuiInfo(updateInfo: UpdateInfo, hasUpdate: boolean, manualOnly = fals
 
 function emitGuiUpdateState(state: GuiUpdateState): void {
   lastState = state
-  const win = getMainWindow?.()
+  const win = getMainWindow?.() ?? null
+  // 全部更新状态流经此处：downloading 驱动 win32 任务栏进度，其余状态清除
+  // （07-14-windows-native-polish R3；非 win32 内部 no-op）。
+  applyUpdateTaskbarProgress(win, state)
   if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return
   win.webContents.send('gui:update-state', state)
 }

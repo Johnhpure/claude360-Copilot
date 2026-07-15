@@ -111,6 +111,29 @@ let bootPromise: Promise<void> | null = null
 let clawChannelActivityUnsubscribe: (() => void) | null = null
 let runtimeStatusUnsubscribe: (() => void) | null = null
 let trayActionUnsubscribe: (() => void) | null = null
+let threadNavigateUnsubscribe: (() => void) | null = null
+let workspaceOpenRequestUnsubscribe: (() => void) | null = null
+let windowMaterialUnsubscribe: (() => void) | null = null
+
+// JumpList / argv 打开工作区（07-14-windows-native-polish R4）：冷启动时请求可能
+// 早于 runtime 就绪（selectWorkspaceRoot 有 ready 门槛），最多等 10s 再走既有链路。
+const WORKSPACE_OPEN_RETRY_INTERVAL_MS = 500
+const WORKSPACE_OPEN_RETRY_LIMIT = 20
+
+function openRequestedWorkspaceWhenReady(
+  get: ChatStoreGet,
+  workspaceRoot: string,
+  attempt = 0
+): void {
+  if (get().runtimeConnection === 'ready' || attempt >= WORKSPACE_OPEN_RETRY_LIMIT) {
+    void get().selectWorkspaceRoot(workspaceRoot)
+    return
+  }
+  setTimeout(
+    () => openRequestedWorkspaceWhenReady(get, workspaceRoot, attempt + 1),
+    WORKSPACE_OPEN_RETRY_INTERVAL_MS
+  )
+}
 
 export function createNavigationActions(
   { set, get, sseAbortRef }: StoreActionContext
@@ -421,6 +444,26 @@ export function createNavigationActions(
             } else {
               void get().createThread({ forceNew: true })
             }
+          })
+        }
+        // turn 完成通知点击跳转（07-14-windows-native-polish R5）：main 侧携
+        // threadId 推送，走既有 selectThread 链路（与托盘 open-thread 同款）。
+        if (!threadNavigateUnsubscribe && typeof window.kunGui.onThreadNavigateRequest === 'function') {
+          threadNavigateUnsubscribe = window.kunGui.onThreadNavigateRequest(({ threadId }) => {
+            set({ route: 'chat' })
+            void get().selectThread(threadId)
+          })
+        }
+        // JumpList / --open-workspace 打开工作区（R4）：走既有 selectWorkspaceRoot 链路。
+        if (!workspaceOpenRequestUnsubscribe && typeof window.kunGui.onWorkspaceOpenRequest === 'function') {
+          workspaceOpenRequestUnsubscribe = window.kunGui.onWorkspaceOpenRequest(({ workspaceRoot }) => {
+            openRequestedWorkspaceWhenReady(get, workspaceRoot)
+          })
+        }
+        // Mica 实验位（R7）：main 侧材质实际生效后才挂 html.native-mica class。
+        if (!windowMaterialUnsubscribe && typeof window.kunGui.onWindowMaterialApplied === 'function') {
+          windowMaterialUnsubscribe = window.kunGui.onWindowMaterialApplied(({ material }) => {
+            document.documentElement.classList.toggle('native-mica', material === 'mica')
           })
         }
         if (!clawChannelActivityUnsubscribe && typeof window.kunGui.onClawChannelActivity === 'function') {
