@@ -1077,9 +1077,9 @@ export function createThreadActions(
           }
           sink.onDeltas(deltas)
         },
-        onTurnComplete: () => {
+        onTurnComplete: (info) => {
           perf.done('turn-complete')
-          sink.onTurnComplete()
+          sink.onTurnComplete(info)
         }
       }
       subscribeThreadEventsWithRecovery(p, activeThreadId, seqAtSend, perfSink, ac.signal, get)

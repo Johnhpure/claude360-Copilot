@@ -175,6 +175,14 @@ export function providerIdForComposerModel(
   return modelGroups.find((group) => modelGroupHasModel(group, model))?.providerId ?? ''
 }
 
+function defaultModelForComposerGroup(group: ModelProviderModelGroup | undefined): string {
+  for (const modelId of group?.modelIds ?? []) {
+    const model = modelId.trim()
+    if (model && model.toLowerCase() !== 'auto') return model
+  }
+  return ''
+}
+
 /**
  * Validate a (model, providerId) pair right before sending (#codex-model).
  * A stale stored selection (e.g. the Write assistant remembering
@@ -184,8 +192,10 @@ export function providerIdForComposerModel(
  * - Pair matches a known group → send as-is.
  * - Stored group exists but doesn't serve the model → re-resolve the
  *   provider from the model's owning group.
- * - No known group serves the model → drop the model (`droppedModel: true`),
- *   letting the runtime's configured default model apply.
+ * - No known group serves the model → replace it with the selected known
+ *   group's default model (`droppedModel: true`).
+ * - Empty / `auto` in a known group → resolve that group's default model at
+ *   send time while keeping the stored Auto selection unchanged.
  * - Unknown provider ids (non-Claude360 custom providers) and an empty group
  *   list (not logged in / not synced) can't be validated → send as-is.
  */
@@ -197,7 +207,16 @@ export function resolveComposerSendSelection(
   const model = rawModel.trim()
   const providerId = rawProviderId.trim()
   if (!model || model.toLowerCase() === 'auto') {
-    return { model: '', providerId, droppedModel: false }
+    if (modelGroups.length === 0 || !providerId) {
+      return { model: '', providerId, droppedModel: false }
+    }
+    const storedGroup = modelGroups.find((group) => group.providerId === providerId)
+    if (!storedGroup) return { model: '', providerId, droppedModel: false }
+    return {
+      model: defaultModelForComposerGroup(storedGroup),
+      providerId,
+      droppedModel: false
+    }
   }
   if (modelGroups.length === 0) {
     return { model, providerId, droppedModel: false }
@@ -216,7 +235,11 @@ export function resolveComposerSendSelection(
   if (owningProviderId) {
     return { model, providerId: owningProviderId, droppedModel: false }
   }
-  return { model: '', providerId, droppedModel: true }
+  return {
+    model: defaultModelForComposerGroup(storedGroup),
+    providerId,
+    droppedModel: true
+  }
 }
 
 export function resolveComposerContextWindowTokens(

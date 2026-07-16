@@ -832,6 +832,7 @@ describe('syncGuiManagedKunConfig', () => {
       const parsed = JSON.parse(readFileSync(configPath, 'utf8')) as any
       // provider id 归一化 : → -；子进程 config 拿到的是解出的明文（main 侧解析）。
       expect(parsed.serve.providers['claude360-auto'].apiKey).toBe('sk-resolved-secret')
+      expect(parsed.serve.providers['claude360-auto'].model).toBe('claude-sonnet-4-6')
     } finally {
       module.setClaude360KeyResolver(null)
     }

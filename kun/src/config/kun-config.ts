@@ -221,6 +221,7 @@ export const ServeProviderConfigSchema = z
     kind: z.enum(['http', 'agent-sdk']).default('http').optional(),
     apiKey: z.string().default(''),
     baseUrl: z.string().min(1).optional(),
+    model: z.string().min(1).optional(),
     endpointFormat: z
       .preprocess(normalizeModelEndpointFormat, z.enum(MODEL_ENDPOINT_FORMATS))
       .default(DEFAULT_MODEL_ENDPOINT_FORMAT)

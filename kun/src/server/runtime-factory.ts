@@ -222,7 +222,7 @@ export async function createKunServeRuntime(
         apiKey: provider.apiKey,
         modelProxyUrl: provider.modelProxyUrl ?? options.modelProxyUrl,
         endpointFormat: provider.endpointFormat ?? options.endpointFormat ?? DEFAULT_MODEL_ENDPOINT_FORMAT,
-        model: options.model,
+        model: provider.model ?? options.model,
         modelCapabilities,
         debugSink: llmDebug,
         ...streamIdleOverride

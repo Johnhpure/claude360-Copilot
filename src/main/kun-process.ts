@@ -8,10 +8,13 @@ import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import {
   defaultKunTokenEconomySettings,
+  isComposerChatModelId,
   isKunRuntimeInsecure,
   getKunRuntimeSettings,
   getModelProviderSettings,
   normalizeModelProviderId,
+  modelProfileSupportsTextChat,
+  modelProviderModelProfile,
   resolveModelProviderProxyUrl,
   resolveKunRuntimeSettings,
   type ModelProviderModelProfileV1,
@@ -962,15 +965,27 @@ async function providersConfigForRuntime(
     if (id === runtimeProviderId && !isAgentSdk) continue
     // Resolve apiKeyRef → plaintext here (main side); the child process cannot.
     const apiKey = await resolveProfileApiKey(provider)
+    const model = defaultTextModelForProvider(provider)
     out[id] = {
       apiKey,
       ...(baseUrl ? { baseUrl } : {}),
+      ...(model ? { model } : {}),
       ...(provider.kind ? { kind: provider.kind } : {}),
       ...(provider.endpointFormat ? { endpointFormat: provider.endpointFormat } : {}),
       ...(proxyUrl ? { modelProxyUrl: proxyUrl } : {})
     }
   }
   return out
+}
+
+function defaultTextModelForProvider(provider: ModelProviderProfileV1): string {
+  for (const modelId of provider.models) {
+    const model = modelId.trim()
+    if (!model || !isComposerChatModelId(model)) continue
+    if (!modelProfileSupportsTextChat(modelProviderModelProfile(provider, model))) continue
+    return model
+  }
+  return ''
 }
 
 function tokenEconomyConfigForRuntime(

@@ -66,6 +66,7 @@ function buildHarness(): {
     sseAbortRef: { current: null }
   })
   state.sendMessage = actions.sendMessage
+  state.drainQueuedMessages = actions.drainQueuedMessages
   return { actions, state }
 }
 
@@ -247,6 +248,47 @@ describe('chat-store-thread-actions queued messages', () => {
       'make a prototype',
       expect.objectContaining({ model: 'MiniMax-M3' })
     )
+  })
+
+  it('forwards aborted settlement info through the normal send perf sink', async () => {
+    let capturedSink: ThreadEventSink | null = null
+    const provider = {
+      connect: vi.fn(async () => undefined),
+      sendUserMessage: vi.fn(async () => ({
+        threadId: 'thr_existing',
+        turnId: 'turn_abort',
+        userMessageItemId: 'user_abort'
+      })),
+      subscribeThreadEvents: vi.fn(
+        async (_threadId: string, _sinceSeq: number, sink: ThreadEventSink) => {
+          capturedSink = sink
+          return { streamId: 'stream_abort' }
+        }
+      )
+    }
+    registryMock.getProvider.mockReturnValue(provider)
+    const showTurnCompleteNotification = vi.fn(async () => ({ ok: true }))
+    vi.stubGlobal('window', {
+      kunGui: {
+        getSettings: vi.fn(async () => ({
+          agents: { kun: { providerId: 'deepseek', model: 'deepseek-v4-pro' } },
+          codePromptPrefix: ''
+        })),
+        showTurnCompleteNotification,
+        logError: vi.fn(async () => undefined)
+      }
+    })
+    const { actions, state } = buildHarness()
+    state.busy = false
+
+    await expect(actions.sendMessage('stop this turn', 'agent')).resolves.toBe(true)
+    const sink = expectSink(capturedSink)
+    sink.onDeltas([{ kind: 'agent_message', text: 'partial answer', seq: 1 }])
+    sink.onTurnComplete({ aborted: true })
+    await Promise.resolve()
+
+    expect(state.busy).toBe(false)
+    expect(showTurnCompleteNotification).not.toHaveBeenCalled()
   })
 })
 

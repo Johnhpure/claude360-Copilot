@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatBlock } from '../agent/types'
+
+const registryMock = vi.hoisted(() => ({
+  getProvider: vi.fn()
+}))
+
+vi.mock('../agent/registry', () => ({
+  getProvider: registryMock.getProvider
+}))
+
 import {
   armBusyWatchdog,
   buildThreadEventSink,
@@ -138,6 +147,76 @@ describe('thread event sink binding', () => {
     sink.onSeq(3)
 
     expect(getState().lastSeq).toBe(500)
+  })
+})
+
+describe('invisible completion recovery generation guard', () => {
+  afterEach(() => {
+    registryMock.getProvider.mockReset()
+    vi.unstubAllGlobals()
+  })
+
+  it('does not replace a newer completed turn with a delayed stale detail snapshot', async () => {
+    type ThreadDetail = {
+      blocks: ChatBlock[]
+      latestSeq: number
+      latestTurnId: string
+    }
+    let resolveDetail: (value: ThreadDetail) => void = () => {
+      throw new Error('deferred thread detail resolver not initialized')
+    }
+    const detailPromise = new Promise<ThreadDetail>((resolve) => {
+      resolveDetail = resolve
+    })
+    registryMock.getProvider.mockReturnValue({
+      getThreadDetail: vi.fn(() => detailPromise)
+    })
+    const showTurnCompleteNotification = vi.fn(async () => ({ ok: true }))
+    vi.stubGlobal('window', {
+      kunGui: {
+        showTurnCompleteNotification,
+        logError: vi.fn(async () => undefined)
+      }
+    })
+    const originalBlocks: ChatBlock[] = [
+      { kind: 'user', id: 'user-old', text: 'old question' }
+    ]
+    const newerBlocks: ChatBlock[] = [
+      ...originalBlocks,
+      { kind: 'user', id: 'user-new', text: 'new question' },
+      { kind: 'assistant', id: 'assistant-new', text: 'new answer' }
+    ]
+    const { getState, set, get } = makeSinkHarness({
+      blocks: originalBlocks,
+      busy: true,
+      lastSeq: 10,
+      currentTurnId: 'turn-old',
+      drainQueuedMessages: vi.fn(async () => undefined),
+      refreshThreads: vi.fn(async () => undefined)
+    })
+    const sink = buildThreadEventSink(set, get, { threadId: 'thread-current' })
+
+    sink.onTurnComplete()
+    set({
+      blocks: newerBlocks,
+      busy: false,
+      lastSeq: 20,
+      currentTurnId: null
+    })
+    resolveDetail({
+      blocks: [
+        ...originalBlocks,
+        { kind: 'assistant', id: 'assistant-old', text: 'old recovered answer' }
+      ],
+      latestSeq: 10,
+      latestTurnId: 'turn-old'
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(getState().blocks).toEqual(newerBlocks)
+    expect(getState().lastSeq).toBe(20)
+    expect(showTurnCompleteNotification).not.toHaveBeenCalled()
   })
 })
 

@@ -34,9 +34,15 @@ export function hasPendingRuntimeWork(block: ChatBlock): boolean {
   return false
 }
 
-function assistantBlockHasVisibleContent(block: Extract<ChatBlock, { kind: 'assistant' }>): boolean {
-  const withoutThink = block.text.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim()
+function assistantTextHasVisibleContent(text: string): boolean {
+  const withoutThink = text
+    .replace(/<think(?:ing)?>[\s\S]*?(?:<\/think(?:ing)?>|$)/gi, '')
+    .trim()
   return withoutThink.length > 0
+}
+
+function assistantBlockHasVisibleContent(block: Extract<ChatBlock, { kind: 'assistant' }>): boolean {
+  return assistantTextHasVisibleContent(block.text)
 }
 
 export function threadHasPendingRuntimeWork(blocks: ChatBlock[]): boolean {
@@ -108,7 +114,7 @@ export function latestTurnHasVisibleReply(
   liveAssistant = '',
   liveReasoning = ''
 ): boolean {
-  if (liveAssistant.trim() || liveReasoning.trim()) return true
+  if (assistantTextHasVisibleContent(liveAssistant) || liveReasoning.trim()) return true
   for (let index = blocks.length - 1; index >= 0; index -= 1) {
     const block = blocks[index]
     if (!block) continue

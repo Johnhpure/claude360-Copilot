@@ -36,4 +36,9 @@ describe('Workbench 订阅面（AC2）', () => {
     expect(WorkbenchSource).toContain('selectComposerChangeSummary(s.blocks')
     expect(WorkbenchSource).toContain('conversationHasVisionAttachmentsCached(s.blocks)')
   })
+
+  it('写作、常规 SDD 与 SDD 原型发送统一校验模型分组配对', () => {
+    const sendSelectionCalls = [...WorkbenchSource.matchAll(/resolveComposerSendSelection\(/g)]
+    expect(sendSelectionCalls).toHaveLength(3)
+  })
 })

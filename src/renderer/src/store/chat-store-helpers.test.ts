@@ -446,17 +446,25 @@ describe('resolveComposerSendSelection (#codex-model)', () => {
     })
   })
 
-  it('drops a model no group serves so the runtime default applies', () => {
+  it('drops an unavailable model and uses the selected group default', () => {
     expect(resolveComposerSendSelection(groups, 'ghost-model', 'claude360-codex')).toEqual({
-      model: '',
+      model: 'gpt-5.5',
       providerId: 'claude360-codex',
       droppedModel: true
     })
   })
 
-  it('treats empty and auto as "runtime default model"', () => {
-    expect(resolveComposerSendSelection(groups, '', 'claude360-codex').model).toBe('')
-    expect(resolveComposerSendSelection(groups, ' AUTO ', 'claude360-codex').model).toBe('')
+  it('resolves empty and auto to the selected known group default at send time', () => {
+    expect(resolveComposerSendSelection(groups, '', 'claude360-codex')).toEqual({
+      model: 'gpt-5.5',
+      providerId: 'claude360-codex',
+      droppedModel: false
+    })
+    expect(resolveComposerSendSelection(groups, ' AUTO ', 'claude360-codex')).toEqual({
+      model: 'gpt-5.5',
+      providerId: 'claude360-codex',
+      droppedModel: false
+    })
   })
 
   it('cannot validate unknown providers or an empty group list; sends as-is', () => {
@@ -467,6 +475,11 @@ describe('resolveComposerSendSelection (#codex-model)', () => {
     })
     expect(resolveComposerSendSelection([], 'deepseek-v4-pro', 'claude360-codex')).toEqual({
       model: 'deepseek-v4-pro',
+      providerId: 'claude360-codex',
+      droppedModel: false
+    })
+    expect(resolveComposerSendSelection([], 'auto', 'claude360-codex')).toEqual({
+      model: '',
       providerId: 'claude360-codex',
       droppedModel: false
     })

@@ -502,6 +502,23 @@ const GOAL_NO_TOOL_REPEAT_MAX_RECOVERY_STEPS = 3
 const EMPTY_POST_TOOL_MAX_RECOVERY_STEPS = 1
 const EMPTY_MODEL_RESPONSE_MAX_RECOVERY_STEPS = 1
 
+/**
+ * Some compatible providers expose hidden reasoning inside assistant text
+ * instead of the reasoning channel. Such markup is not a user-visible reply.
+ */
+function hasVisibleAssistantText(text: string): boolean {
+  return text
+    .replace(/<think(?:ing)?>[\s\S]*?(?:<\/think(?:ing)?>|$)/gi, '')
+    .trim()
+    .length > 0
+}
+
+function turnItemHasVisibleWork(item: TurnItem): boolean {
+  if (item.kind === 'assistant_text') return hasVisibleAssistantText(item.text)
+  if (item.kind === 'assistant_reasoning') return item.text.trim().length > 0
+  return item.kind === 'tool_call'
+}
+
 function goalNoToolRecoveryInstruction(recoveryStep: number): string {
   return [
     'Goal continuation recovery:',
@@ -1819,10 +1836,12 @@ export class AgentLoop {
     await persistAccumulatedResponse()
     if (stopReason === 'error') return 'failed'
     if (completedToolCalls.length === 0) {
+      const currentStepHasVisibleText = hasVisibleAssistantText(textAccumulator.value)
+      const currentStepHasReasoning = reasoningAccumulator.value.trim().length > 0
       if (request.requiredToolName) {
         if (
           request.requiredToolName === CREATE_PLAN_TOOL_NAME &&
-          textAccumulator.value.trim()
+          currentStepHasVisibleText
         ) {
           // The model asked the user to decide instead of producing a plan
           // (ambiguous request). Don't materialize a question into a bogus
@@ -1930,7 +1949,7 @@ export class AgentLoop {
       )
       if (
         stopReason === 'stop' &&
-        !textAccumulator.value.trim() &&
+        !currentStepHasVisibleText &&
         hasCurrentTurnFileChange
       ) {
         const recoverySteps = (this.emptyPostToolRecoveryStepsByTurn.get(turnId) ?? 0) + 1
@@ -1966,6 +1985,64 @@ export class AgentLoop {
           })
         )
         return 'failed'
+      }
+      // A clean 'stop' with no tool calls, visible text, or reasoning — on a
+      // turn that produced no visible work at all — must not settle as a
+      // successful turn: the GUI would fire a "reply complete" notification
+      // with nothing rendered (#reply-invisible). Retry once (some proxies
+      // return transient empty completions), then fail loudly. This precedes
+      // active-goal continuation so an empty provider cannot spin that loop.
+      if (
+        stopReason === 'stop' &&
+        !currentStepHasVisibleText &&
+        !currentStepHasReasoning
+      ) {
+        const turnProducedVisibleWork = historyItems.some(
+          (item) => item.turnId === turnId && turnItemHasVisibleWork(item)
+        )
+        if (!turnProducedVisibleWork) {
+          const recoverySteps = (this.emptyResponseRecoveryStepsByTurn.get(turnId) ?? 0) + 1
+          if (recoverySteps <= EMPTY_MODEL_RESPONSE_MAX_RECOVERY_STEPS) {
+            this.emptyResponseRecoveryStepsByTurn.set(turnId, recoverySteps)
+            return 'continue'
+          }
+          const diagnostics = this.modelClientDiagnostics(request.providerId)
+          console.warn('[kun:model] model returned an empty completion; failing the turn', {
+            threadId,
+            turnId,
+            model: request.model,
+            ...(request.providerId ? { providerId: request.providerId } : {}),
+            ...diagnostics
+          })
+          const message =
+            'The model returned an empty response (no visible text, reasoning, or tool calls), including after an automatic retry. ' +
+            'Check the model provider status or switch to another model, then resend the message.'
+          this.rememberTurnFailure(turnId, {
+            error: message,
+            code: 'empty_model_response',
+            severity: 'error'
+          })
+          await this.opts.events.record({
+            kind: 'error',
+            threadId,
+            turnId,
+            message,
+            code: 'empty_model_response',
+            severity: 'error'
+          })
+          await this.opts.turns.applyItem(
+            threadId,
+            makeErrorItem({
+              id: this.opts.ids.next('item_error'),
+              turnId,
+              threadId,
+              message,
+              code: 'empty_model_response',
+              severity: 'error'
+            })
+          )
+          return 'failed'
+        }
       }
       if (stopReason === 'stop' && activeGoalInstruction) {
         const previousText = this.lastNoToolTextByTurn.get(turnId)
@@ -2041,67 +2118,6 @@ export class AgentLoop {
           })
         )
         return 'stop'
-      }
-      // A clean 'stop' with no tool calls, no text, and no reasoning — on a
-      // turn that produced no visible work at all — must not settle as a
-      // successful turn: the GUI would fire a "reply complete" notification
-      // with nothing rendered (#reply-invisible). Retry once (some proxies
-      // return transient empty completions), then fail loudly.
-      if (
-        stopReason === 'stop' &&
-        !textAccumulator.value.trim() &&
-        !reasoningAccumulator.value.trim()
-      ) {
-        const turnProducedVisibleWork = historyItems.some(
-          (item) =>
-            item.turnId === turnId &&
-            (item.kind === 'assistant_text' ||
-              item.kind === 'assistant_reasoning' ||
-              item.kind === 'tool_call')
-        )
-        if (!turnProducedVisibleWork) {
-          const recoverySteps = (this.emptyResponseRecoveryStepsByTurn.get(turnId) ?? 0) + 1
-          if (recoverySteps <= EMPTY_MODEL_RESPONSE_MAX_RECOVERY_STEPS) {
-            this.emptyResponseRecoveryStepsByTurn.set(turnId, recoverySteps)
-            return 'continue'
-          }
-          const diagnostics = this.modelClientDiagnostics(request.providerId)
-          console.warn('[kun:model] model returned an empty completion; failing the turn', {
-            threadId,
-            turnId,
-            model: request.model,
-            ...(request.providerId ? { providerId: request.providerId } : {}),
-            ...diagnostics
-          })
-          const message =
-            'The model returned an empty response (no text, no tool calls), including after an automatic retry. ' +
-            'Check the model provider status or switch to another model, then resend the message.'
-          this.rememberTurnFailure(turnId, {
-            error: message,
-            code: 'empty_model_response',
-            severity: 'error'
-          })
-          await this.opts.events.record({
-            kind: 'error',
-            threadId,
-            turnId,
-            message,
-            code: 'empty_model_response',
-            severity: 'error'
-          })
-          await this.opts.turns.applyItem(
-            threadId,
-            makeErrorItem({
-              id: this.opts.ids.next('item_error'),
-              turnId,
-              threadId,
-              message,
-              code: 'empty_model_response',
-              severity: 'error'
-            })
-          )
-          return 'failed'
-        }
       }
       return 'stop'
     }
@@ -3027,7 +3043,7 @@ export class AgentLoop {
     const diagnostics = this.modelClientDiagnostics(input.providerId)
     if (!providerSupportsAutoModelRoute(diagnostics)) {
       const fallbackModel =
-        fixedModelFromCandidates(input.candidates) ?? diagnostics.configuredModel?.trim() ?? ''
+        diagnostics.configuredModel?.trim() ?? fixedModelFromCandidates(input.candidates) ?? ''
       if (fallbackModel) {
         console.warn('[kun:model] auto model route unavailable for this provider; using configured model', {
           threadId: input.threadId,

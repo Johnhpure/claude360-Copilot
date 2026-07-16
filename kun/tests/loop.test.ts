@@ -72,6 +72,68 @@ describe('AgentLoop', () => {
     expect(h.inflight.size()).toBe(0)
   })
 
+  it('fails an active-goal whole-turn empty completion after one retry', async () => {
+    let modelCalls = 0
+    const h = makeHarness({
+      provider: 'empty-goal-upstream',
+      model: 'empty-goal-upstream',
+      async *stream(): AsyncIterable<ModelStreamChunk> {
+        modelCalls += 1
+        yield { kind: 'completed', stopReason: 'stop' }
+      }
+    })
+    await bootstrapThread(h)
+    await h.threads.setGoal(h.threadId, {
+      objective: 'finish the active goal',
+      status: 'active'
+    })
+
+    const status = await h.loop.runTurn(h.threadId, h.turnId)
+
+    expect(modelCalls).toBe(2)
+    expect(status).toBe('failed')
+    const items = await h.sessionStore.loadItems(h.threadId)
+    expect(items.some((item) => item.kind === 'error' && item.code === 'empty_model_response')).toBe(true)
+  })
+
+  it('treats whitespace-only assistant deltas as an empty whole turn', async () => {
+    let modelCalls = 0
+    const h = makeHarness({
+      provider: 'whitespace-upstream',
+      model: 'whitespace-upstream',
+      async *stream(): AsyncIterable<ModelStreamChunk> {
+        modelCalls += 1
+        yield { kind: 'assistant_text_delta', text: '   ' }
+        yield { kind: 'completed', stopReason: 'stop' }
+      }
+    })
+    await bootstrapThread(h)
+
+    const status = await h.loop.runTurn(h.threadId, h.turnId)
+
+    expect(modelCalls).toBe(2)
+    expect(status).toBe('failed')
+  })
+
+  it('treats pure think markup as an empty whole turn', async () => {
+    let modelCalls = 0
+    const h = makeHarness({
+      provider: 'think-only-upstream',
+      model: 'think-only-upstream',
+      async *stream(): AsyncIterable<ModelStreamChunk> {
+        modelCalls += 1
+        yield { kind: 'assistant_text_delta', text: '<THINKING>internal only</THINKING>' }
+        yield { kind: 'completed', stopReason: 'stop' }
+      }
+    })
+    await bootstrapThread(h)
+
+    const status = await h.loop.runTurn(h.threadId, h.turnId)
+
+    expect(modelCalls).toBe(2)
+    expect(status).toBe('failed')
+  })
+
   it('falls back to the configured model when auto routing targets a non-DeepSeek provider (#codex-model)', async () => {
     const seenModels: string[] = []
     const h = makeHarness({
@@ -101,6 +163,50 @@ describe('AgentLoop', () => {
     const status = await h.loop.runTurn(h.threadId, turnId)
 
     // 不再调用 flash 路由器、不再产生 deepseek-v4-* 请求：直接用配置模型。
+    expect(status).toBe('completed')
+    expect(seenModels).toEqual(['gpt-5.6-terra'])
+  })
+
+  it('prefers the routed provider model over the process default for auto routing', async () => {
+    const seenModels: string[] = []
+    const h = makeHarness({
+      provider: 'compat-multi',
+      // MultiProviderModelClient.model is the process-wide default model.
+      model: 'deepseek-v4-pro',
+      configFor: (providerId?: string) =>
+        providerId === 'claude360-codex'
+          ? {
+              baseUrl: 'https://claude360.xyz',
+              endpointFormat: 'chat_completions',
+              model: 'gpt-5.6-terra'
+            }
+          : {
+              baseUrl: 'https://api.deepseek.com',
+              endpointFormat: 'chat_completions',
+              model: 'deepseek-v4-pro'
+            },
+      async *stream(request: ModelRequest): AsyncIterable<ModelStreamChunk> {
+        seenModels.push(request.model)
+        yield { kind: 'assistant_text_delta', text: 'ok' }
+        yield { kind: 'completed', stopReason: 'stop' }
+      }
+    } as unknown as ModelClient)
+    await h.threadStore.upsert(
+      createThreadRecord({
+        id: h.threadId,
+        title: 'demo',
+        workspace: '/tmp',
+        model: 'auto',
+        providerId: 'claude360-codex'
+      })
+    )
+    const { turnId } = await h.turns.startTurn({
+      threadId: h.threadId,
+      request: { prompt: 'hello', model: 'auto' }
+    })
+
+    const status = await h.loop.runTurn(h.threadId, turnId)
+
     expect(status).toBe('completed')
     expect(seenModels).toEqual(['gpt-5.6-terra'])
   })
@@ -146,7 +252,7 @@ describe('AgentLoop', () => {
     const goal = await h.threads.getGoal(h.threadId)
     const events = await h.sessionStore.loadEventsSince(h.threadId, 0)
 
-    expect(status).toBe('completed')
+    expect(status).toBe('failed')
     expect(goal?.timeUsedSeconds).toBe(3)
     expect(events.some((event) =>
       event.kind === 'goal_updated' && event.goal?.timeUsedSeconds === 3

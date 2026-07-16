@@ -1466,14 +1466,14 @@ export function Workbench(): ReactElement {
       })
       // #codex-model：发送前校验（模型, 分组）配对——过期的写作助手选择
       // （如分组已切到 Codex 但模型仍是 deepseek-v4-pro）会被上游以
-      // model_not_found 拒绝；不匹配时改用模型归属分组或回落运行时默认模型。
+      // model_not_found 拒绝；不匹配时改用模型归属分组或当前分组默认模型。
       const sendSelection = resolveComposerSendSelection(
         composerModelGroups,
         writeState.assistantModel,
         writeState.assistantProviderId
       )
       if (sendSelection.droppedModel) {
-        console.warn('[kun-gui] write assistant model is not served by any model group; using runtime default model', {
+        console.warn('[kun-gui] write assistant model is not served by any model group; using group default model', {
           model: writeState.assistantModel,
           providerId: writeState.assistantProviderId
         })
@@ -1825,8 +1825,19 @@ export function Workbench(): ReactElement {
       ...(frameworkId ? { frameworkIds: [frameworkId] } : {})
     })
     setInput('')
-    const model = writeAssistantModel.trim()
-    const providerId = resolvedWriteAssistantProviderId.trim()
+    const sddSendSelection = resolveComposerSendSelection(
+      composerModelGroups,
+      writeAssistantModel,
+      writeAssistantProviderId
+    )
+    if (sddSendSelection.droppedModel) {
+      console.warn('[kun-gui] SDD assistant model is not served by any model group; using group default model', {
+        model: writeAssistantModel,
+        providerId: writeAssistantProviderId
+      })
+    }
+    const model = sddSendSelection.model
+    const providerId = sddSendSelection.providerId
     const reasoningEffort = composerReasoningEffortRequestValue(composerReasoningEffort)
     const sent = await sendMessage(prompt, composerMode === 'plan' ? 'plan' : 'agent', {
       displayText: v || (documentAttachments.length > 0
@@ -1968,7 +1979,7 @@ export function Workbench(): ReactElement {
       assistantSelection.assistantProviderId
     )
     if (sddSendSelection.droppedModel) {
-      console.warn('[kun-gui] SDD assistant model is not served by any model group; using runtime default model', {
+      console.warn('[kun-gui] SDD assistant model is not served by any model group; using group default model', {
         model: assistantSelection.assistantModel,
         providerId: assistantSelection.assistantProviderId
       })

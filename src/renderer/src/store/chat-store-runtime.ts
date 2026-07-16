@@ -306,12 +306,13 @@ function logTurnCompleteAnomaly(message: string, detail: Record<string, unknown>
 async function recoverInvisibleCompletedTurn(input: {
   threadId: string | null
   turnId: string | null
+  completedSeq: number
   completedState: ChatState
   completedKey: string
   set: (partial: Partial<ChatState> | ((state: ChatState) => Partial<ChatState>)) => void
   get: () => ChatState
 }): Promise<void> {
-  const { threadId, turnId, completedState, completedKey, set, get } = input
+  const { threadId, turnId, completedSeq, completedState, completedKey, set, get } = input
   if (!threadId) return
   const logDetail: Record<string, unknown> = { threadId, ...(turnId ? { turnId } : {}) }
   try {
@@ -323,14 +324,51 @@ async function recoverInvisibleCompletedTurn(input: {
       )
       return
     }
+    if (turnId && detail.latestTurnId && detail.latestTurnId !== turnId) {
+      logTurnCompleteAnomaly(
+        'Invisible turn recovery skipped because a newer turn is now persisted',
+        {
+          ...logDetail,
+          completedSeq,
+          latestTurnId: detail.latestTurnId,
+          latestSeq: detail.latestSeq
+        }
+      )
+      return
+    }
     // The reply exists in the persisted thread but never reached the live
     // timeline — rehydrate the blocks (only while the thread is still the
     // active, idle one) and notify now that the content is on screen.
-    if (get().activeThreadId !== threadId || get().busy) return
-    set((s) => ({
-      blocks: detail.blocks,
-      lastSeq: Math.max(s.lastSeq, detail.latestSeq ?? 0)
-    }))
+    let recovered = false
+    set((s) => {
+      if (
+        s.activeThreadId !== threadId ||
+        s.busy ||
+        s.currentTurnId != null ||
+        s.lastSeq !== completedSeq
+      ) {
+        return {}
+      }
+      recovered = true
+      return {
+        blocks: detail.blocks,
+        lastSeq: Math.max(s.lastSeq, detail.latestSeq ?? 0)
+      }
+    })
+    if (!recovered) {
+      const current = get()
+      logTurnCompleteAnomaly(
+        'Invisible turn recovery skipped because the active turn generation changed',
+        {
+          ...logDetail,
+          completedSeq,
+          currentSeq: current.lastSeq,
+          currentTurnId: current.currentTurnId,
+          busy: current.busy
+        }
+      )
+      return
+    }
     logTurnCompleteAnomaly(
       'Turn completed but live blocks were missing; recovered the reply from thread detail',
       logDetail
@@ -1261,6 +1299,7 @@ export function buildThreadEventSink(
           void recoverInvisibleCompletedTurn({
             threadId: completedThreadId,
             turnId: completedTurnId,
+            completedSeq: completedState.lastSeq,
             completedState,
             completedKey,
             set,

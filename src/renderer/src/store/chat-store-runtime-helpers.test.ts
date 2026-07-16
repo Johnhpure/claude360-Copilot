@@ -79,12 +79,23 @@ describe('latestTurnHasVisibleReply (#reply-invisible)', () => {
     expect(latestTurnHasVisibleReply([user('u1')], '', 'thinking...')).toBe(true)
   })
 
+  it('does not treat pure live think markup as a visible final reply', () => {
+    expect(latestTurnHasVisibleReply([user('u1')], '<think>internal</think>', '')).toBe(false)
+    expect(
+      latestTurnHasVisibleReply([user('u1')], '<THINKING>internal</THINKING>', '')
+    ).toBe(false)
+    expect(
+      latestTurnHasVisibleReply([user('u1')], '<thinking>internal</thinking>final answer', '')
+    ).toBe(true)
+  })
+
   it('requires renderable output after the last user message', () => {
     expect(latestTurnHasVisibleReply([user('u1')])).toBe(false)
     expect(latestTurnHasVisibleReply([user('u1'), assistant('a1', 'hello there')])).toBe(true)
     // 空文本 / 纯 <think> 的 assistant 块不算可见回复。
     expect(latestTurnHasVisibleReply([user('u1'), assistant('a1', '  ')])).toBe(false)
     expect(latestTurnHasVisibleReply([user('u1'), assistant('a1', '<think>x</think>')])).toBe(false)
+    expect(latestTurnHasVisibleReply([user('u1'), assistant('a1', '<THINKING>x</THINKING>')])).toBe(false)
   })
 
   it('counts tool activity in the latest turn as visible output', () => {
