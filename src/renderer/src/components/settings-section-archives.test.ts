@@ -114,8 +114,8 @@ describe('ArchivedThreadsSettingsSection', () => {
     expect(permissionsIndex).toBe(-1)
     expect(archivesIndex).toBeGreaterThan(agentsIndex)
     // plan-04 Task7:隐藏手机连接(Claw)导航项后,可点击导航目标少一个(15→14);
-    // claude360 一期再隐藏媒体生成导航项(14→13)。
-    expect(html.match(/data-cursor-spotlight-target/g)?.length).toBe(13)
+    // claude360 一期再隐藏媒体生成导航项(14→13);Crash Recovery 新增帮助中心后为 14。
+    expect(html.match(/data-cursor-spotlight-target/g)?.length).toBe(14)
   })
 
   it('keeps settings tabs scrollable without pushing the footer away', () => {

@@ -57,7 +57,7 @@ import {
 } from './claw-schedule-mcp-config'
 import { defaultKunDataDir } from './runtime/kun-adapter'
 import { isKunHealthResponseBody } from './kun-health'
-import { resolveClaudeBinary } from './agent-sdk-installer'
+import { ensureAgentSdkBinary } from './agent-sdk-installer'
 import { appendManagedLogLine } from './logger'
 import {
   comparableSkillRootPath,
@@ -440,10 +440,18 @@ async function startKunChildOnce(
   // to runtime.apiKey for legacy/manual providers that still carry it inline.
   const runtimeApiKey =
     (activeProvider ? await resolveProfileApiKey(activeProvider) : '') || runtime.apiKey
-  // Point the runtime at the on-demand Claude Code binary (the ~222MB binary is
-  // not bundled; it's downloaded into userData). Absent in dev when it's still
-  // resolvable from kun/node_modules — the SDK auto-resolves it there.
-  const claudeBinary = resolveClaudeBinary(app.getPath('userData'), [join(appRoot(), 'kun')])
+  let claudeBinary: string | undefined
+  if (activeProviderKind === 'agent-sdk') {
+    const ensured = await ensureAgentSdkBinary({
+      userDataDir: app.getPath('userData'),
+      kunDirs: [join(appRoot(), 'kun')],
+      proxyUrl: resolveModelProviderProxyUrl(settings)
+    })
+    if (ensured.ok === false) {
+      throw new Error(`Agent SDK binary unavailable (${ensured.code}): ${ensured.message}`)
+    }
+    claudeBinary = ensured.path
+  }
   const childEnv: NodeJS.ProcessEnv = {
     ...process.env,
     KUN_RUNTIME_TOKEN: runtime.runtimeToken,

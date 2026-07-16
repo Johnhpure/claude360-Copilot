@@ -53,9 +53,32 @@ describe('createIpcStats', () => {
 
   it('reset clears every aggregate', () => {
     const stats = createIpcStats()
-    stats.record('a', 10, false)
+    stats.record('a', 10, false, 1_000)
     stats.reset()
     expect(stats.snapshot()).toEqual([])
+    expect(stats.recent()).toEqual([])
+  })
+
+  it('keeps only the 20 most recent safe operation summaries', () => {
+    const stats = createIpcStats()
+    for (let index = 0; index < 22; index += 1) {
+      stats.record(`channel-${index}`, index, index === 21, 1_000 + index)
+    }
+
+    const recent = stats.recent()
+    expect(recent).toHaveLength(20)
+    expect(recent[0]).toEqual({
+      channel: 'channel-2',
+      at: new Date(1_002).toISOString(),
+      durationMs: 2,
+      failed: false
+    })
+    expect(recent.at(-1)).toEqual({
+      channel: 'channel-21',
+      at: new Date(1_021).toISOString(),
+      durationMs: 21,
+      failed: true
+    })
   })
 })
 

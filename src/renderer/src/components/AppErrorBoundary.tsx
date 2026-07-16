@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import i18n from '../i18n'
+import { reportRendererError } from '../lib/global-error-reporter'
 
 type Props = {
   children: ReactNode
@@ -18,14 +19,10 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error('[AppErrorBoundary] uncaught render error:', error, info.componentStack)
-    if (typeof window !== 'undefined' && typeof window.kunGui?.logError === 'function') {
-      void window.kunGui.logError('renderer', 'Uncaught render error', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-        componentStack: info.componentStack
-      }).catch(() => undefined)
-    }
+    const errorWithComponentStack = new Error(error.message)
+    errorWithComponentStack.name = error.name
+    errorWithComponentStack.stack = [error.stack, info.componentStack].filter(Boolean).join('\n')
+    reportRendererError({ error: errorWithComponentStack }, 'Uncaught render error')
   }
 
   private handleReload = (): void => {

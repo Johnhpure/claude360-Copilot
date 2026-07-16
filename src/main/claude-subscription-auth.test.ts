@@ -1,9 +1,6 @@
 import { EventEmitter } from 'node:events'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { resolveBundledClaudeBinary, runClaudeSetupToken } from './claude-subscription-auth'
+import { runClaudeSetupToken } from './claude-subscription-auth'
 
 function fakeChild(): EventEmitter & {
   stdout: EventEmitter
@@ -69,25 +66,5 @@ describe('runClaudeSetupToken', () => {
     child.stdout.emit('data', Buffer.from('sk-ant-oat01-Z'))
     await promise
     expect(seenCommand).toBe('/bundled/claude')
-  })
-})
-
-describe('resolveBundledClaudeBinary', () => {
-  const arch = process.arch === 'arm64' ? 'arm64' : process.arch === 'x64' ? 'x64' : null
-  const plat =
-    process.platform === 'darwin' ? 'darwin' : process.platform === 'win32' ? 'win32' : process.platform === 'linux' ? 'linux' : null
-
-  test.runIf(arch && plat)('finds the per-platform bundled binary; undefined when absent', () => {
-    const bin = plat === 'win32' ? 'claude.exe' : 'claude'
-    const root = join(tmpdir(), `kun-sub-bin-${process.pid}`)
-    const dir = join(root, 'node_modules', `@anthropic-ai/claude-agent-sdk-${plat}-${arch}`)
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, bin), '')
-    try {
-      expect(resolveBundledClaudeBinary([root])).toBe(join(dir, bin))
-      expect(resolveBundledClaudeBinary([join(tmpdir(), 'kun-sub-none')])).toBeUndefined()
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
   })
 })

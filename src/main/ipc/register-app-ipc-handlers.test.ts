@@ -19,16 +19,51 @@ import {
 } from '../../shared/app-settings'
 
 const handlers = new Map<string, (event: unknown, payload?: unknown) => Promise<unknown>>()
+const eventHandlers = new Map<string, (event: unknown, payload?: unknown) => void>()
+
+const agentSdkIpcMocks = vi.hoisted(() => ({
+  agentSdkDownloadState: vi.fn(),
+  agentSdkStatus: vi.fn(),
+  ensureAgentSdkBinary: vi.fn(),
+  resolveClaudeBinary: vi.fn(),
+  startAgentSdkInstall: vi.fn(),
+  claudeSubscriptionStatus: vi.fn(),
+  runClaudeSetupToken: vi.fn(),
+  fetchSdkModels: vi.fn()
+}))
+
+vi.mock('../agent-sdk-installer', () => ({
+  agentSdkDownloadState: agentSdkIpcMocks.agentSdkDownloadState,
+  agentSdkStatus: agentSdkIpcMocks.agentSdkStatus,
+  ensureAgentSdkBinary: agentSdkIpcMocks.ensureAgentSdkBinary,
+  resolveClaudeBinary: agentSdkIpcMocks.resolveClaudeBinary,
+  startAgentSdkInstall: agentSdkIpcMocks.startAgentSdkInstall
+}))
+
+vi.mock('../claude-subscription-auth', () => ({
+  claudeSubscriptionStatus: agentSdkIpcMocks.claudeSubscriptionStatus,
+  runClaudeSetupToken: agentSdkIpcMocks.runClaudeSetupToken
+}))
+
+vi.mock('../claude-subscription-models', () => ({
+  fetchSdkModels: agentSdkIpcMocks.fetchSdkModels
+}))
 
 vi.mock('electron', () => ({
   app: {
-    quit: vi.fn()
+    quit: vi.fn(),
+    isPackaged: false,
+    getAppPath: () => '/tmp/claude360-test-app',
+    getPath: () => '/tmp/claude360-test-user-data'
   },
   dialog: {},
   shell: {},
   ipcMain: {
     handle: vi.fn((channel: string, handler: (event: unknown, payload?: unknown) => Promise<unknown>) => {
       handlers.set(channel, handler)
+    }),
+    on: vi.fn((channel: string, handler: (event: unknown, payload?: unknown) => void) => {
+      eventHandlers.set(channel, handler)
     })
   }
 }))
@@ -133,6 +168,191 @@ describe('registerAppIpcHandlers', () => {
 
   beforeEach(() => {
     handlers.clear()
+    eventHandlers.clear()
+    for (const mock of Object.values(agentSdkIpcMocks)) mock.mockReset()
+    agentSdkIpcMocks.agentSdkStatus.mockReturnValue({ installed: false })
+    agentSdkIpcMocks.agentSdkDownloadState.mockResolvedValue(null)
+    agentSdkIpcMocks.ensureAgentSdkBinary.mockResolvedValue({
+      ok: true,
+      path: '/tmp/managed-claude'
+    })
+    agentSdkIpcMocks.resolveClaudeBinary.mockReturnValue(undefined)
+    agentSdkIpcMocks.startAgentSdkInstall.mockResolvedValue({ status: 'resolving' })
+    agentSdkIpcMocks.claudeSubscriptionStatus.mockReturnValue({ loggedIn: false })
+    agentSdkIpcMocks.runClaudeSetupToken.mockResolvedValue({ ok: true, token: 'test-token' })
+    agentSdkIpcMocks.fetchSdkModels.mockResolvedValue(['claude-sonnet-4-6'])
+  })
+
+  it('awaits persisted Agent SDK state in the status handler', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const persisted = {
+      schemaVersion: 1,
+      status: 'interrupted',
+      packageName: '@anthropic-ai/claude-agent-sdk-linux-x64',
+      sdkVersion: '0.3.193',
+      platform: 'linux',
+      arch: 'x64',
+      attempt: 2,
+      receivedBytes: 1024,
+      totalBytes: 2048,
+      updatedAt: '2026-07-16T06:00:00.000Z'
+    }
+    agentSdkIpcMocks.agentSdkDownloadState.mockResolvedValue(persisted)
+    registerAppIpcHandlers(registerOptions())
+
+    await expect(handlers.get('claude-subscription:sdk-status')?.({})).resolves.toEqual({
+      installed: false,
+      download: persisted
+    })
+    expect(agentSdkIpcMocks.agentSdkDownloadState)
+      .toHaveBeenCalledWith('/tmp/claude360-test-user-data')
+  })
+
+  it('passes Kun roots to the manual Agent SDK install entry', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions())
+
+    await handlers.get('claude-subscription:sdk-install')?.({})
+
+    expect(agentSdkIpcMocks.startAgentSdkInstall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userDataDir: '/tmp/claude360-test-user-data',
+        kunDirs: expect.arrayContaining(['/tmp/claude360-test-app/kun'])
+      }),
+      expect.any(Function)
+    )
+  })
+
+  it('ensures one managed binary path before login and model discovery', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions())
+
+    await expect(handlers.get('claude-subscription:login')?.({})).resolves.toEqual({
+      ok: true,
+      token: 'test-token'
+    })
+    await expect(handlers.get('claude-subscription:models')?.({}, 'oauth-token')).resolves.toEqual([
+      'claude-sonnet-4-6'
+    ])
+
+    expect(agentSdkIpcMocks.ensureAgentSdkBinary).toHaveBeenCalledTimes(2)
+    expect(agentSdkIpcMocks.ensureAgentSdkBinary).toHaveBeenCalledWith(expect.objectContaining({
+      userDataDir: '/tmp/claude360-test-user-data',
+      kunDirs: expect.arrayContaining(['/tmp/claude360-test-app/kun'])
+    }))
+    expect(agentSdkIpcMocks.runClaudeSetupToken)
+      .toHaveBeenCalledWith({ binaryPath: '/tmp/managed-claude' })
+    expect(agentSdkIpcMocks.fetchSdkModels).toHaveBeenCalledWith(expect.objectContaining({
+      token: 'oauth-token',
+      binaryPath: '/tmp/managed-claude'
+    }))
+  })
+
+  it('does not fall back to PATH when the managed binary cannot be ensured', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    agentSdkIpcMocks.ensureAgentSdkBinary.mockResolvedValue({
+      ok: false,
+      code: 'network',
+      message: 'agent SDK download failed'
+    })
+    registerAppIpcHandlers(registerOptions())
+
+    await expect(handlers.get('claude-subscription:login')?.({})).resolves.toEqual({
+      ok: false,
+      message: 'agent SDK download failed'
+    })
+    await expect(handlers.get('claude-subscription:models')?.({})).resolves.toEqual([])
+    expect(agentSdkIpcMocks.runClaudeSetupToken).not.toHaveBeenCalled()
+    expect(agentSdkIpcMocks.fetchSdkModels).not.toHaveBeenCalled()
+  })
+
+  it('logs valid renderer crashes and forwards them to the crash recorder', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const logError = vi.fn()
+    const recordRendererCrash = vi.fn()
+    const detail = {
+      kind: 'error',
+      name: 'Error',
+      message: 'renderer boom',
+      stack: 'Error: renderer boom',
+      signature: 'abcd1234',
+      source: 'app.js',
+      line: 12,
+      column: 34
+    }
+    registerAppIpcHandlers(registerOptions({ logError, recordRendererCrash }))
+
+    await expect(
+      handlers.get('log:error')?.({}, {
+        category: 'renderer-crash',
+        message: 'Unhandled renderer error',
+        detail
+      })
+    ).resolves.toBeUndefined()
+
+    expect(logError).toHaveBeenCalledWith(
+      'renderer-crash',
+      'Unhandled renderer error',
+      detail
+    )
+    expect(recordRendererCrash).toHaveBeenCalledWith(detail)
+    expect(logError.mock.invocationCallOrder[0]).toBeLessThan(
+      recordRendererCrash.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
+    )
+  })
+
+  it('keeps runtime logging but drops malformed renderer crash details', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const logError = vi.fn()
+    const recordRendererCrash = vi.fn()
+    registerAppIpcHandlers(registerOptions({ logError, recordRendererCrash }))
+
+    await expect(
+      handlers.get('log:error')?.({}, {
+        category: 'renderer-crash',
+        message: 'Unhandled renderer error',
+        detail: { message: 'missing required fields' }
+      })
+    ).resolves.toBeUndefined()
+
+    expect(logError).toHaveBeenCalledTimes(1)
+    expect(recordRendererCrash).not.toHaveBeenCalled()
+  })
+
+  it('validates renderer crash context before updating the main snapshot', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const updateRendererCrashContext = vi.fn()
+    registerAppIpcHandlers(registerOptions({ updateRendererCrashContext }))
+    const listener = eventHandlers.get('crash:context:update')
+    const valid = {
+      route: '/chat',
+      workspaceRoot: '/home/alice/project',
+      activeThreadId: 'thread-1',
+      currentTurnId: 'turn-2',
+      busy: true,
+      task: null
+    }
+
+    listener?.({}, valid)
+    listener?.({}, { ...valid, prompt: 'must not cross the boundary' })
+
+    expect(updateRendererCrashContext).toHaveBeenCalledTimes(1)
+    expect(updateRendererCrashContext).toHaveBeenCalledWith(valid)
+  })
+
+  it('routes diagnostic exports through the injected service', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const exportDiagnostics = vi.fn(async () => ({
+      ok: true as const,
+      path: '/tmp/Claude360-Copilot-diagnostics.zip'
+    }))
+    registerAppIpcHandlers(registerOptions({ exportDiagnostics }))
+
+    await expect(handlers.get('diagnostics:export')?.({})).resolves.toEqual({
+      ok: true,
+      path: '/tmp/Claude360-Copilot-diagnostics.zip'
+    })
+    expect(exportDiagnostics).toHaveBeenCalledTimes(1)
   })
 
   it('rejects invalid settings patches at the handler boundary', async () => {

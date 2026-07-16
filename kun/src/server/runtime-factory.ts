@@ -8,6 +8,7 @@ import { InMemoryApprovalGate } from '../adapters/in-memory-approval-gate.js'
 import { InMemoryUserInputGate } from '../adapters/in-memory-user-input-gate.js'
 import { InMemoryEventBus } from '../adapters/in-memory-event-bus.js'
 import { FileSessionStore, FileThreadStore } from '../adapters/file/index.js'
+import { FileTaskStore } from '../adapters/file/file-task-store.js'
 import { HybridSessionStore, HybridThreadStore } from '../adapters/hybrid/index.js'
 import { CompatModelClient } from '../adapters/model/compat-model-client.js'
 import { MultiProviderModelClient } from '../adapters/model/multi-provider-model-client.js'
@@ -65,6 +66,7 @@ import { KUN_SYSTEM_PROMPT } from '../prompt/kun-system-prompt.js'
 import { RuntimeEventRecorder } from '../services/runtime-event-recorder.js'
 import { LlmDebugRecorder } from '../services/llm-debug-recorder.js'
 import { ThreadService } from '../services/thread-service.js'
+import { TaskService } from '../services/task-service.js'
 import { TurnService } from '../services/turn-service.js'
 import { ReviewService } from '../services/review-service.js'
 import { UsageService } from '../services/usage-service.js'
@@ -168,6 +170,14 @@ export async function createKunServeRuntime(
     ]
   })
   const threadService = new ThreadService({ threadStore, sessionStore, events, ids, nowIso })
+  const taskService = new TaskService({
+    store: new FileTaskStore({ rootDir: join(options.dataDir, 'tasks') }),
+    sessionStore,
+    events,
+    ids,
+    nowIso,
+    getThread: (threadId) => threadService.get(threadId)
+  })
   const modelProfiles = modelContextProfilesFromConfig({
     contextCompaction: options.contextCompaction,
     models: options.models
@@ -541,6 +551,7 @@ export async function createKunServeRuntime(
   const startedAt = options.startedAt ?? nowIso()
   return {
     threadService,
+    taskService,
     turnService,
     reviewService,
     usageService,
@@ -725,6 +736,18 @@ export async function startKunServe(
     })
     .catch((error) => {
       console.warn('[kun] orphaned turn reconciliation failed:', error)
+    })
+  void runtime.taskService?.reconcile()
+    .then((result) => {
+      if (result.acknowledged + result.published + result.interrupted > 0) {
+        console.warn(
+          `[kun] task reconciliation acknowledged=${result.acknowledged} ` +
+          `published=${result.published} interrupted=${result.interrupted}`
+        )
+      }
+    })
+    .catch((error) => {
+      console.warn('[kun] task reconciliation failed:', error)
     })
   // Settle subagent (child-run) records left 'queued'/'running' by the previous
   // process, so a restart doesn't leave them stuck in-flight forever (#621).

@@ -5,6 +5,7 @@ import { UsageSnapshotSchema } from './usage.js'
 import { RuntimeErrorSeverity } from './errors.js'
 import { ApprovalPolicySchema, SandboxModeSchema } from './policy.js'
 import { SubagentToolPolicy } from './capabilities.js'
+import { TaskEventSchema, TaskIdSchema } from './tasks.js'
 
 /**
  * Persisted runtime events. Every event has a per-thread `seq` so the
@@ -43,6 +44,7 @@ export const RuntimeEventKind = z.enum([
   'bash_session_updated',
   'bash_session_completed',
   'pipeline_stage',
+  'task_event',
   'usage',
   'error',
   'heartbeat'
@@ -264,6 +266,13 @@ export const PipelineStageEvent = RuntimeEventBase.extend({
 })
 export type PipelineStageEvent = z.infer<typeof PipelineStageEvent>
 
+export const TaskRuntimeEvent = RuntimeEventBase.extend({
+  kind: z.literal('task_event'),
+  taskId: TaskIdSchema,
+  event: TaskEventSchema
+})
+export type TaskRuntimeEvent = z.infer<typeof TaskRuntimeEvent>
+
 export const ErrorEvent = RuntimeEventBase.extend({
   kind: z.literal('error'),
   message: z.string(),
@@ -293,6 +302,7 @@ export const RuntimeEvent = z.discriminatedUnion('kind', [
   TodoEvent,
   BashSessionEvent,
   PipelineStageEvent,
+  TaskRuntimeEvent,
   UsageEvent,
   ErrorEvent,
   HeartbeatEvent

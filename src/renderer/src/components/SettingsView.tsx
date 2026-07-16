@@ -97,6 +97,9 @@ const TerminalSettingsSection = lazy(() =>
 const LlmDebugSettingsSection = lazy(() =>
   import('./settings-section-llm-debug').then((module) => ({ default: module.LlmDebugSettingsSection }))
 )
+const HelpSettingsSection = lazy(() =>
+  import('./settings-section-help').then((module) => ({ default: module.HelpSettingsSection }))
+)
 const WriteDebugLogModal = lazy(() =>
   import('./settings-debug-log').then((module) => ({ default: module.WriteDebugLogModal }))
 )
@@ -122,7 +125,7 @@ function SettingsSectionFallback(): ReactElement {
   )
 }
 
-type SettingsCategory = 'general' | 'providers' | 'write' | 'mediaGeneration' | 'speechToText' | 'agents' | 'archives' | 'permissions' | 'worktree' | 'memory' | 'shortcuts' | 'claw' | 'updates' | 'debug' | 'terminal'
+type SettingsCategory = 'general' | 'providers' | 'write' | 'mediaGeneration' | 'speechToText' | 'agents' | 'archives' | 'permissions' | 'worktree' | 'memory' | 'shortcuts' | 'claw' | 'updates' | 'debug' | 'terminal' | 'help'
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 type SettingsPatch = AppSettingsPatch
 type InlineNotice = {
@@ -370,6 +373,10 @@ export function SettingsView(): ReactElement {
       setCategory('terminal')
       return
     }
+    if (settingsSection === 'help') {
+      setCategory('help')
+      return
+    }
     setCategory('agents')
   }, [settingsSection])
 
@@ -387,13 +394,14 @@ export function SettingsView(): ReactElement {
       settingsSection === 'shortcuts' ||
       settingsSection === 'updates' ||
       settingsSection === 'terminal' ||
+      settingsSection === 'help' ||
       category !== 'agents'
     ) {
       return
     }
     if (!agentsSectionReady) return
     const refs: Record<
-      Exclude<SettingsRouteSection, 'general' | 'providers' | 'write' | 'imageGeneration' | 'mediaGeneration' | 'speechToText' | 'archives' | 'claw' | 'shortcuts' | 'updates' | 'terminal'>,
+      Exclude<SettingsRouteSection, 'general' | 'providers' | 'write' | 'imageGeneration' | 'mediaGeneration' | 'speechToText' | 'archives' | 'claw' | 'shortcuts' | 'updates' | 'terminal' | 'help'>,
       HTMLDivElement | null
     > = {
       agents: agentsSectionRef.current,
@@ -1105,31 +1113,33 @@ export function SettingsView(): ReactElement {
               <h1 className="text-2xl font-semibold tracking-tight text-ds-ink">{t('title')}</h1>
               <p className="mt-1 text-[14px] text-ds-muted">{t('subtitle')}</p>
             </div>
-            <span
-              title={saveStatus === 'error' && saveError ? saveError : undefined}
-              className={`shrink-0 rounded-[var(--radius-pill)] px-3 py-1 text-[12px] font-medium ${
-                portError
-                  ? 'bg-ds-warning-soft text-ds-warning'
-                  : saveStatus === 'saved'
-                    ? 'bg-ds-success-soft text-ds-success'
-                    : saveStatus === 'error'
-                      ? 'bg-ds-danger-soft text-ds-danger'
-                      : 'bg-ds-subtle text-ds-muted'
-              }`}
-            >
-              {portError
-                ? t('autoApplyBlocked')
-                : saveStatus === 'saving'
-                  ? t('applying')
-                  : saveStatus === 'saved'
-                    ? t('applied')
-                    : saveStatus === 'error'
-                      ? t('applyFailed')
-                      : t('autoApplyHint')}
-            </span>
+            {category !== 'help' ? (
+              <span
+                title={saveStatus === 'error' && saveError ? saveError : undefined}
+                className={`shrink-0 rounded-[var(--radius-pill)] px-3 py-1 text-[12px] font-medium ${
+                  portError
+                    ? 'bg-ds-warning-soft text-ds-warning'
+                    : saveStatus === 'saved'
+                      ? 'bg-ds-success-soft text-ds-success'
+                      : saveStatus === 'error'
+                        ? 'bg-ds-danger-soft text-ds-danger'
+                        : 'bg-ds-subtle text-ds-muted'
+                }`}
+              >
+                {portError
+                  ? t('autoApplyBlocked')
+                  : saveStatus === 'saving'
+                    ? t('applying')
+                    : saveStatus === 'saved'
+                      ? t('applied')
+                      : saveStatus === 'error'
+                        ? t('applyFailed')
+                        : t('autoApplyHint')}
+              </span>
+            ) : null}
           </div>
 
-          {saveStatus === 'error' && saveError ? (
+          {category !== 'help' && saveStatus === 'error' && saveError ? (
             <div
               role="alert"
               className="mb-5 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-danger-soft px-4 py-3 text-[13px] leading-5 text-ds-danger"
@@ -1155,10 +1165,11 @@ export function SettingsView(): ReactElement {
             {category === 'updates' ? <UpdatesSettingsSection ctx={settingsSectionContext} /> : null}
             {category === 'terminal' ? <TerminalSettingsSection ctx={settingsSectionContext} /> : null}
             {category === 'debug' ? <LlmDebugSettingsSection ctx={settingsSectionContext} /> : null}
+            {category === 'help' ? <HelpSettingsSection t={t} /> : null}
           </Suspense>
         </div>
       </div>
-      {saveStatus === 'error' && saveError ? (
+      {category !== 'help' && saveStatus === 'error' && saveError ? (
         <div
           role="alert"
           className="ds-no-drag fixed bottom-6 right-8 z-30 flex max-w-[min(560px,calc(100vw-3rem))] items-center gap-3 rounded-2xl border border-[color-mix(in_srgb,var(--ds-danger)_35%,transparent)] bg-ds-elevated px-4 py-3 shadow-[var(--c360-shadow-overlay)]"

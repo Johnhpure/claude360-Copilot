@@ -1,63 +1,147 @@
 /**
- * On-demand provisioning of the Agent SDK's Claude Code binary.
- *
- * The SDK ships a ~222MB per-platform binary as an optional dependency. We do
- * NOT bundle it into the installer (see electron-builder config — only the small
- * SDK JS is packaged). Instead it's downloaded on first use, straight from the
- * npm registry tarball (no `npm` needed on the user's machine), extracted into a
- * writable user-data dir, and the runtime is pointed at it via
- * `pathToClaudeCodeExecutable`.
+ * On-demand provisioning for the Agent SDK's platform Claude binary.
+ * Platform packages stay outside the application bundle and are installed into
+ * a versioned userData directory only after archive and executable validation.
  */
 import { spawn } from 'node:child_process'
-import { createWriteStream, existsSync, mkdirSync, rmSync, chmodSync, statSync } from 'node:fs'
-import { Readable, Transform } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { fetchWithOptionalProxy } from './proxy-fetch'
+import { createHash, randomUUID } from 'node:crypto'
+import { createReadStream, lstatSync, readFileSync } from 'node:fs'
+import { chmod, lstat, mkdir, rename, rm } from 'node:fs/promises'
+import { dirname, join, relative, resolve } from 'node:path'
+import {
+  AgentSdkInstalledManifestSchema,
+  type AgentSdkDownloadErrorCode,
+  type AgentSdkDownloadState,
+  type AgentSdkInstalledManifest
+} from '../shared/agent-sdk-download'
+import {
+  AgentSdkDownloadFailure,
+  downloadAgentSdkArchive,
+  type AgentSdkArchiveDownload,
+  type DownloadAgentSdkArchiveOptions
+} from './agent-sdk-download'
+import {
+  AgentSdkStateStore,
+  agentSdkInstalledManifestPath,
+  agentSdkRootDir
+} from './agent-sdk-state-store'
+import { logInfo, logWarn } from './logger'
 
 // Keep in sync with kun/package.json's @anthropic-ai/claude-agent-sdk version.
 export const AGENT_SDK_VERSION = '0.3.193'
-const REGISTRY = 'https://registry.npmjs.org'
+const DEFAULT_MIN_BINARY_BYTES = 1024 * 1024
+const MAX_BINARY_BYTES = 512 * 1024 * 1024
+const HEALTH_CHECK_TIMEOUT_MS = 10_000
+const PROCESS_OUTPUT_LIMIT = 64 * 1024
+const LOG_PROGRESS_BYTE_THRESHOLD = 8 * 1024 * 1024
+const LOG_PROGRESS_INTERVAL_MS = 10_000
 
-export function claudeBinaryName(): string {
-  return process.platform === 'win32' ? 'claude.exe' : 'claude'
+export type AgentSdkDownloadLogRecord = {
+  packageName: string
+  sdkVersion: string
+  platform: string
+  arch: string
+  phase: AgentSdkDownloadState['status']
+  attempt: number
+  receivedBytes: number
+  totalBytes: number | null
+  errorCode?: AgentSdkDownloadErrorCode
 }
 
-/** The per-platform binary package, e.g. @anthropic-ai/claude-agent-sdk-darwin-arm64. */
-export function platformBinaryPackage(): string | undefined {
-  const arch = process.arch === 'arm64' ? 'arm64' : process.arch === 'x64' ? 'x64' : undefined
-  const platform =
-    process.platform === 'darwin'
-      ? 'darwin'
-      : process.platform === 'win32'
-        ? 'win32'
-        : process.platform === 'linux'
-          ? 'linux'
-          : undefined
-  if (!arch || !platform) return undefined
-  return `@anthropic-ai/claude-agent-sdk-${platform}-${arch}`
+export function agentSdkDownloadLogRecord(
+  state: AgentSdkDownloadState
+): AgentSdkDownloadLogRecord {
+  return {
+    packageName: state.packageName,
+    sdkVersion: state.sdkVersion,
+    platform: state.platform,
+    arch: state.arch,
+    phase: state.status,
+    attempt: state.attempt,
+    receivedBytes: state.receivedBytes,
+    totalBytes: state.totalBytes,
+    ...(state.error ? { errorCode: state.error.code } : {})
+  }
 }
 
-/** Where the on-demand binary is downloaded to. */
-export function agentSdkBinaryPath(userDataDir: string): string {
-  return join(userDataDir, 'agent-sdk', claudeBinaryName())
+export function claudeBinaryName(platform: string = process.platform): string {
+  return platform === 'win32' ? 'claude.exe' : 'claude'
+}
+
+export function platformBinaryPackage(
+  platform: string = process.platform,
+  arch: string = process.arch
+): string | undefined {
+  const normalizedArch = arch === 'arm64' ? 'arm64' : arch === 'x64' ? 'x64' : undefined
+  const normalizedPlatform = platform === 'darwin'
+    ? 'darwin'
+    : platform === 'win32'
+      ? 'win32'
+      : platform === 'linux'
+        ? 'linux'
+        : undefined
+  if (!normalizedArch || !normalizedPlatform) return undefined
+  return `@anthropic-ai/claude-agent-sdk-${normalizedPlatform}-${normalizedArch}`
+}
+
+export function agentSdkBinaryPath(
+  userDataDir: string,
+  platform: string = process.platform
+): string {
+  return join(agentSdkRootDir(userDataDir), claudeBinaryName(platform))
+}
+
+export type ResolveClaudeBinaryOptions = {
+  platform?: string
+  arch?: string
+  version?: string
 }
 
 /**
- * Resolve the Claude Code binary: the on-demand download first, then a bundled
- * copy in kun's node_modules (present in dev / if ever bundled). Returns the
- * first that exists, or undefined → needs downloading.
+ * Synchronous launch-path resolver. UserData binaries require a matching
+ * installed manifest; bare legacy binaries are validated by ensureAgentSdkBinary.
  */
-export function resolveClaudeBinary(userDataDir: string, kunDirs: readonly string[]): string | undefined {
-  const downloaded = agentSdkBinaryPath(userDataDir)
-  if (existsSync(downloaded)) return downloaded
-  const pkg = platformBinaryPackage()
-  if (pkg) {
-    const bin = claudeBinaryName()
-    for (const dir of kunDirs) {
-      const candidate = join(dir, 'node_modules', pkg, bin)
-      if (existsSync(candidate)) return candidate
+export function resolveClaudeBinary(
+  userDataDir: string,
+  kunDirs: readonly string[],
+  options: ResolveClaudeBinaryOptions = {}
+): string | undefined {
+  const platform = options.platform ?? process.platform
+  const arch = options.arch ?? process.arch
+  const version = options.version ?? AGENT_SDK_VERSION
+  const packageName = platformBinaryPackage(platform, arch)
+  if (!packageName) return undefined
+  const root = agentSdkRootDir(userDataDir)
+  try {
+    const parsed = AgentSdkInstalledManifestSchema.safeParse(
+      JSON.parse(readFileSync(agentSdkInstalledManifestPath(userDataDir), 'utf8')) as unknown
+    )
+    if (parsed.success) {
+      const manifest = parsed.data
+      const expectedRelativePath = installedBinaryRelativePath(version, platform, arch)
+      const candidate = resolve(root, manifest.relativePath)
+      if (manifest.packageName === packageName
+        && manifest.sdkVersion === version
+        && manifest.platform === platform
+        && manifest.arch === arch
+        && manifest.relativePath === expectedRelativePath
+        && isPathInside(root, candidate)) {
+        const info = lstatSync(candidate)
+        if (info.isFile() && info.size === manifest.binarySize) return candidate
+      }
+    }
+  } catch {
+    // Missing, corrupt, or stale manifest: continue to the dev fallback.
+  }
+
+  for (const dir of kunDirs) {
+    for (const pkg of platformPackageCandidates(platform, arch)) {
+      const candidate = join(dir, 'node_modules', pkg, claudeBinaryName(platform))
+      try {
+        if (lstatSync(candidate).isFile()) return candidate
+      } catch {
+        // Keep searching.
+      }
     }
   }
   return undefined
@@ -71,124 +155,580 @@ export function agentSdkStatus(
   return path ? { installed: true, path } : { installed: false }
 }
 
-function runTar(args: string[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn('tar', args, { stdio: 'ignore' })
-    child.on('error', reject)
-    child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`tar exited ${code}`))))
-  })
-}
-
 export type AgentSdkInstallResult =
   | { ok: true; path: string }
-  | { ok: false; message: string }
+  | { ok: false; code: AgentSdkDownloadErrorCode; message: string }
 
-/**
- * Download the platform binary tarball from the npm registry and extract the
- * `claude` executable into the user-data dir. `proxyUrl` routes through the
- * model proxy (npm/registry is region-restricted for some users).
- */
+export type InstallAgentSdkArchiveOptions = {
+  userDataDir: string
+  platform: string
+  arch: string
+  download: AgentSdkArchiveDownload
+  stateStore: AgentSdkStateStore
+  nowIso?: () => string
+  minBinaryBytes?: number
+  extractArchive?: (archivePath: string, stagingDir: string, binaryName: string) => Promise<void>
+  healthCheck?: (binaryPath: string) => Promise<void>
+}
+
+export async function installAgentSdkArchive(
+  options: InstallAgentSdkArchiveOptions
+): Promise<{ path: string; manifest: AgentSdkInstalledManifest }> {
+  const nowIso = options.nowIso ?? (() => new Date().toISOString())
+  const root = agentSdkRootDir(options.userDataDir)
+  const binaryName = claudeBinaryName(options.platform)
+  const stagingDir = join(root, `staging-${randomUUID()}`)
+  const stagingBinary = join(stagingDir, binaryName)
+  const targetRelativeDir = join(
+    'versions',
+    options.download.metadata.version,
+    `${options.platform}-${options.arch}`
+  )
+  const targetDir = join(root, targetRelativeDir)
+  const targetBinary = join(targetDir, binaryName)
+  const backupDir = `${targetDir}.backup-${randomUUID()}`
+  const minBinaryBytes = Math.max(1, options.minBinaryBytes ?? DEFAULT_MIN_BINARY_BYTES)
+  const extractArchive = options.extractArchive ?? extractExpectedBinary
+  const healthCheck = options.healthCheck ?? checkBinaryHealth
+
+  await mkdir(stagingDir, { recursive: true })
+  try {
+    try {
+      await extractArchive(options.download.archivePath, stagingDir, binaryName)
+    } catch (error) {
+      throw new AgentSdkDownloadFailure('extract_failed', 'failed to extract agent SDK binary', {
+        cause: error
+      })
+    }
+    const info = await lstat(stagingBinary).catch((error) => {
+      throw new AgentSdkDownloadFailure('binary_invalid', 'agent SDK binary is missing', {
+        cause: error
+      })
+    })
+    if (!info.isFile() || info.size < minBinaryBytes || info.size > MAX_BINARY_BYTES) {
+      throw new AgentSdkDownloadFailure('binary_invalid', 'agent SDK binary has an invalid size')
+    }
+    if (options.platform !== 'win32') await chmod(stagingBinary, 0o755)
+    try {
+      await healthCheck(stagingBinary)
+    } catch (error) {
+      throw new AgentSdkDownloadFailure('binary_invalid', 'agent SDK binary health check failed', {
+        cause: error
+      })
+    }
+    const binarySha256 = await hashFile(stagingBinary, 'sha256')
+    const manifest: AgentSdkInstalledManifest = {
+      schemaVersion: 1,
+      packageName: options.download.metadata.packageName,
+      sdkVersion: options.download.metadata.version,
+      platform: options.platform,
+      arch: options.arch,
+      relativePath: installedBinaryRelativePath(
+        options.download.metadata.version,
+        options.platform,
+        options.arch
+      ),
+      binarySize: info.size,
+      binarySha256,
+      tarballIntegrity: options.download.metadata.integrity,
+      installedAt: nowIso()
+    }
+
+    await mkdir(dirname(targetDir), { recursive: true })
+    let movedPreviousTarget = false
+    let publishedReplacement = false
+    try {
+      try {
+        await rename(targetDir, backupDir)
+        movedPreviousTarget = true
+      } catch (error) {
+        if (!isMissingPathError(error)) throw error
+      }
+      await rename(stagingDir, targetDir)
+      publishedReplacement = true
+      await options.stateStore.writeInstalledManifest(manifest)
+    } catch (error) {
+      if (publishedReplacement) {
+        await rm(targetDir, { recursive: true, force: true }).catch(() => undefined)
+      }
+      if (movedPreviousTarget) await rename(backupDir, targetDir)
+      throw error
+    }
+    if (movedPreviousTarget) {
+      await rm(backupDir, { recursive: true, force: true }).catch(() => undefined)
+    }
+    return { path: targetBinary, manifest }
+  } finally {
+    await rm(stagingDir, { recursive: true, force: true }).catch(() => undefined)
+  }
+}
+
+export type EnsureAgentSdkBinaryDependencies = {
+  stateStore?: AgentSdkStateStore
+  downloadArchive?: (
+    options: DownloadAgentSdkArchiveOptions
+  ) => Promise<AgentSdkArchiveDownload>
+  installArchive?: (
+    options: InstallAgentSdkArchiveOptions
+  ) => Promise<{ path: string; manifest?: AgentSdkInstalledManifest }>
+  healthCheck?: (binaryPath: string) => Promise<void>
+  nowIso?: () => string
+}
+
+export type EnsureAgentSdkBinaryOptions = {
+  userDataDir: string
+  kunDirs: readonly string[]
+  proxyUrl?: string
+  version?: string
+  platform?: string
+  arch?: string
+  signal?: AbortSignal
+  onState?: (state: AgentSdkDownloadState) => void
+  dependencies?: EnsureAgentSdkBinaryDependencies
+}
+
+type ActiveAgentSdkEnsure = {
+  promise: Promise<AgentSdkInstallResult>
+  observers: Set<(state: AgentSdkDownloadState) => void>
+}
+
+const activeEnsures = new Map<string, ActiveAgentSdkEnsure>()
+const sharedStateStores = new Map<string, AgentSdkStateStore>()
+
+export function ensureAgentSdkBinary(
+  options: EnsureAgentSdkBinaryOptions
+): Promise<AgentSdkInstallResult> {
+  const platform = options.platform ?? process.platform
+  const arch = options.arch ?? process.arch
+  const version = options.version ?? AGENT_SDK_VERSION
+  const key = `${options.userDataDir}\u0000${platform}\u0000${arch}\u0000${version}`
+  const active = activeEnsures.get(key)
+  if (active) {
+    if (options.onState) active.observers.add(options.onState)
+    return active.promise
+  }
+
+  const observers = new Set<(state: AgentSdkDownloadState) => void>()
+  if (options.onState) observers.add(options.onState)
+  const notify = createAgentSdkStateObserver(observers)
+  const operation = runEnsureAgentSdkBinary({
+    ...options,
+    platform,
+    arch,
+    version,
+    onState: notify
+  }).catch((error: unknown): AgentSdkInstallResult => {
+    const failure = installerFailure(error)
+    logAgentSdkRecord({
+      packageName: platformBinaryPackage(platform, arch) ?? 'unsupported',
+      sdkVersion: version,
+      platform,
+      arch,
+      phase: 'failed',
+      attempt: 0,
+      receivedBytes: 0,
+      totalBytes: null,
+      errorCode: failure.code
+    }, true)
+    return { ok: false, code: failure.code, message: failure.message }
+  })
+  let entry: ActiveAgentSdkEnsure
+  const tracked = operation.finally(() => {
+    if (activeEnsures.get(key) === entry) activeEnsures.delete(key)
+  })
+  entry = { promise: tracked, observers }
+  activeEnsures.set(key, entry)
+  return tracked
+}
+
+async function runEnsureAgentSdkBinary(
+  options: EnsureAgentSdkBinaryOptions & { platform: string; arch: string; version: string }
+): Promise<AgentSdkInstallResult> {
+  const packageName = platformBinaryPackage(options.platform, options.arch)
+  const nowIso = options.dependencies?.nowIso ?? (() => new Date().toISOString())
+  const stateStore = options.dependencies?.stateStore ?? stateStoreFor(options.userDataDir, nowIso)
+  if (!packageName) {
+    const message = `unsupported platform: ${options.platform}/${options.arch}`
+    await saveAndEmit(stateStore, createDownloadState({
+      status: 'failed',
+      packageName: 'unsupported',
+      version: options.version,
+      platform: options.platform,
+      arch: options.arch,
+      updatedAt: nowIso(),
+      error: { code: 'unsupported', message, retriable: false }
+    }), options.onState)
+    return { ok: false, code: 'unsupported', message }
+  }
+
+  const existing = resolveClaudeBinary(options.userDataDir, options.kunDirs, {
+    platform: options.platform,
+    arch: options.arch,
+    version: options.version
+  })
+  if (existing) {
+    await saveAndEmit(stateStore, createDownloadState({
+      status: 'ready',
+      packageName,
+      version: options.version,
+      platform: options.platform,
+      arch: options.arch,
+      updatedAt: nowIso()
+    }), options.onState)
+    return { ok: true, path: existing }
+  }
+
+  const healthCheck = options.dependencies?.healthCheck ?? checkBinaryHealth
+  const legacy = agentSdkBinaryPath(options.userDataDir, options.platform)
+  try {
+    if ((await lstat(legacy)).isFile()) {
+      await healthCheck(legacy)
+      await saveAndEmit(stateStore, createDownloadState({
+        status: 'ready',
+        packageName,
+        version: options.version,
+        platform: options.platform,
+        arch: options.arch,
+        updatedAt: nowIso()
+      }), options.onState)
+      return { ok: true, path: legacy }
+    }
+  } catch {
+    await rename(legacy, `${legacy}.invalid-${Date.now()}`).catch(() => undefined)
+  }
+
+  try {
+    const downloadArchive = options.dependencies?.downloadArchive ?? downloadAgentSdkArchive
+    const download = await downloadArchive({
+      userDataDir: options.userDataDir,
+      packageName,
+      version: options.version,
+      platform: options.platform,
+      arch: options.arch,
+      stateStore,
+      proxyUrl: options.proxyUrl,
+      signal: options.signal,
+      nowIso,
+      onState: options.onState
+    })
+    await saveAndEmit(stateStore, {
+      ...(stateStore.state ?? createDownloadState({
+        status: 'installing',
+        packageName,
+        version: options.version,
+        platform: options.platform,
+        arch: options.arch,
+        updatedAt: nowIso()
+      })),
+      status: 'installing',
+      nextRetryAt: undefined,
+      error: undefined,
+      updatedAt: nowIso()
+    }, options.onState)
+    const installArchive = options.dependencies?.installArchive ?? installAgentSdkArchive
+    const installed = await installArchive({
+      userDataDir: options.userDataDir,
+      platform: options.platform,
+      arch: options.arch,
+      download,
+      stateStore,
+      nowIso
+    })
+    await saveAndEmit(stateStore, {
+      ...(stateStore.state ?? createDownloadState({
+        status: 'ready',
+        packageName,
+        version: options.version,
+        platform: options.platform,
+        arch: options.arch,
+        updatedAt: nowIso()
+      })),
+      status: 'ready',
+      nextRetryAt: undefined,
+      error: undefined,
+      updatedAt: nowIso()
+    }, options.onState)
+    await rm(download.archivePath, { force: true }).catch(() => undefined)
+    return { ok: true, path: installed.path }
+  } catch (error) {
+    const failure = installerFailure(error)
+    if (stateStore.state?.status !== 'failed' && stateStore.state?.status !== 'interrupted') {
+      await saveAndEmit(stateStore, {
+        ...(stateStore.state ?? createDownloadState({
+          status: 'failed',
+          packageName,
+          version: options.version,
+          platform: options.platform,
+          arch: options.arch,
+          updatedAt: nowIso()
+        })),
+        status: 'failed',
+        nextRetryAt: undefined,
+        error: { code: failure.code, message: failure.message, retriable: failure.retriable },
+        updatedAt: nowIso()
+      }, options.onState)
+    }
+    return { ok: false, code: failure.code, message: failure.message }
+  }
+}
+
 export async function installClaudeBinary(options: {
   userDataDir: string
   proxyUrl?: string
   version?: string
+  kunDirs?: readonly string[]
   onProgress?: (receivedBytes: number, totalBytes: number) => void
 }): Promise<AgentSdkInstallResult> {
-  const pkg = platformBinaryPackage()
-  if (!pkg) return { ok: false, message: `unsupported platform: ${process.platform}/${process.arch}` }
-  const version = options.version ?? AGENT_SDK_VERSION
-  const proxyUrl = options.proxyUrl ?? ''
-  const destDir = join(options.userDataDir, 'agent-sdk')
-  const binPath = join(destDir, claudeBinaryName())
-  const tgz = join(tmpdir(), `kun-agent-sdk-${process.pid}.tgz`)
-  try {
-    // 1. registry metadata → exact tarball url
-    const metaRes = await fetchWithOptionalProxy(`${REGISTRY}/${pkg}/${version}`, {}, proxyUrl)
-    if (!metaRes.ok) throw new Error(`registry ${pkg}@${version}: ${metaRes.status}`)
-    const meta = (await metaRes.json()) as { dist?: { tarball?: string } }
-    const tarball = meta.dist?.tarball
-    if (!tarball) throw new Error(`no tarball for ${pkg}@${version}`)
-
-    // 2. stream the (~222MB) tarball to a temp file, reporting progress
-    const res = await fetchWithOptionalProxy(tarball, {}, proxyUrl)
-    if (!res.ok || !res.body) throw new Error(`download ${tarball}: ${res.status}`)
-    const totalBytes = Number(res.headers.get('content-length')) || 0
-    let receivedBytes = 0
-    const counter = new Transform({
-      transform(chunk, _enc, cb) {
-        receivedBytes += chunk.length
-        options.onProgress?.(receivedBytes, totalBytes)
-        cb(null, chunk)
+  return ensureAgentSdkBinary({
+    userDataDir: options.userDataDir,
+    kunDirs: options.kunDirs ?? [],
+    proxyUrl: options.proxyUrl,
+    version: options.version,
+    onState: (state) => {
+      if (state.status === 'downloading') {
+        options.onProgress?.(state.receivedBytes, state.totalBytes ?? 0)
       }
-    })
-    mkdirSync(destDir, { recursive: true })
-    await pipeline(
-      Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]),
-      counter,
-      createWriteStream(tgz)
-    )
-
-    // 3. extract just the binary (tarball root is `package/`)
-    await runTar(['-xzf', tgz, '-C', destDir, '--strip-components=1', `package/${claudeBinaryName()}`])
-    if (!existsSync(binPath) || statSync(binPath).size === 0) {
-      throw new Error('binary not found in tarball')
     }
-    if (process.platform !== 'win32') chmodSync(binPath, 0o755)
-    return { ok: true, path: binPath }
-  } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) }
-  } finally {
-    rmSync(tgz, { force: true })
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Background download — a process-wide singleton so it keeps running even if the
-// user navigates away from the settings page; the UI re-reads its state on mount.
-// ---------------------------------------------------------------------------
-
-export type SdkDownloadState = {
-  status: 'downloading' | 'done' | 'error'
-  receivedBytes: number
-  totalBytes: number
-  message?: string
-}
-
-let activeState: SdkDownloadState | null = null
-let activePromise: Promise<AgentSdkInstallResult> | null = null
-
-/** Current background-download state, or null if none has run. */
-export function agentSdkDownloadState(): SdkDownloadState | null {
-  return activeState
-}
-
-/**
- * Start (or resume) the background download. Idempotent while one is in flight —
- * a second call returns the current state instead of starting another. Returns
- * immediately with the live state; `onState` is called on every update.
- */
-export function startAgentSdkInstall(
-  options: { userDataDir: string; proxyUrl?: string; version?: string },
-  onState?: (state: SdkDownloadState) => void
-): SdkDownloadState {
-  if (activeState?.status === 'downloading') return activeState
-  const emit = (state: SdkDownloadState): void => {
-    activeState = state
-    onState?.(state)
-  }
-  emit({ status: 'downloading', receivedBytes: 0, totalBytes: 0 })
-  activePromise = installClaudeBinary({
-    ...options,
-    onProgress: (receivedBytes, totalBytes) => emit({ status: 'downloading', receivedBytes, totalBytes })
-  }).then((result) => {
-    const received = activeState?.receivedBytes ?? 0
-    const total = activeState?.totalBytes ?? 0
-    emit(
-      result.ok
-        ? { status: 'done', receivedBytes: received, totalBytes: total }
-        : { status: 'error', receivedBytes: received, totalBytes: total, message: result.message }
-    )
-    return result
   })
-  return activeState as SdkDownloadState
+}
+
+export async function agentSdkDownloadState(
+  userDataDir: string
+): Promise<AgentSdkDownloadState | null> {
+  const store = stateStoreFor(userDataDir, () => new Date().toISOString())
+  const existing = store.state
+  if (existing) return existing
+  const packageName = platformBinaryPackage()
+  if (!packageName) return null
+  return store.loadState(createDownloadState({
+    status: 'idle',
+    packageName,
+    version: AGENT_SDK_VERSION,
+    platform: process.platform,
+    arch: process.arch,
+    updatedAt: new Date().toISOString()
+  }))
+}
+
+export async function startAgentSdkInstall(
+  options: { userDataDir: string; proxyUrl?: string; version?: string; kunDirs?: readonly string[] },
+  onState?: (state: AgentSdkDownloadState) => void
+): Promise<AgentSdkDownloadState> {
+  const store = stateStoreFor(options.userDataDir, () => new Date().toISOString())
+  const packageName = platformBinaryPackage() ?? 'unsupported'
+  const initial = await store.loadState(createDownloadState({
+    status: 'idle',
+    packageName,
+    version: options.version ?? AGENT_SDK_VERSION,
+    platform: process.platform,
+    arch: process.arch,
+    updatedAt: new Date().toISOString()
+  }))
+  void ensureAgentSdkBinary({
+    userDataDir: options.userDataDir,
+    kunDirs: options.kunDirs ?? [],
+    proxyUrl: options.proxyUrl,
+    version: options.version,
+    onState
+  })
+  return store.state ?? initial
+}
+
+function stateStoreFor(userDataDir: string, nowIso: () => string): AgentSdkStateStore {
+  const key = resolve(userDataDir)
+  const existing = sharedStateStores.get(key)
+  if (existing) return existing
+  const store = new AgentSdkStateStore({ userDataDir, nowIso })
+  sharedStateStores.set(key, store)
+  return store
+}
+
+function createAgentSdkStateObserver(
+  observers: Set<(state: AgentSdkDownloadState) => void>
+): (state: AgentSdkDownloadState) => void {
+  let lastLoggedStatus: AgentSdkDownloadState['status'] | null = null
+  let lastLoggedBytes = 0
+  let lastLoggedAt = 0
+  return (state) => {
+    for (const observer of observers) {
+      try {
+        observer(structuredClone(state))
+      } catch {
+        // Progress observers must never break the shared install operation.
+      }
+    }
+
+    const now = Date.now()
+    const shouldLog = state.status !== lastLoggedStatus
+      || (state.status === 'downloading'
+        && (state.receivedBytes - lastLoggedBytes >= LOG_PROGRESS_BYTE_THRESHOLD
+          || now - lastLoggedAt >= LOG_PROGRESS_INTERVAL_MS))
+    if (!shouldLog) return
+    lastLoggedStatus = state.status
+    lastLoggedBytes = state.receivedBytes
+    lastLoggedAt = now
+    logAgentSdkRecord(
+      agentSdkDownloadLogRecord(state),
+      state.status === 'retrying' || state.status === 'failed' || state.status === 'interrupted'
+    )
+  }
+}
+
+function logAgentSdkRecord(record: AgentSdkDownloadLogRecord, warn: boolean): void {
+  const message = JSON.stringify(record)
+  if (warn) logWarn('agent-sdk-download', message)
+  else logInfo('agent-sdk-download', message)
+}
+
+function createDownloadState(input: {
+  status: AgentSdkDownloadState['status']
+  packageName: string
+  version: string
+  platform: string
+  arch: string
+  updatedAt: string
+  error?: AgentSdkDownloadState['error']
+}): AgentSdkDownloadState {
+  return {
+    schemaVersion: 1,
+    status: input.status,
+    packageName: input.packageName,
+    sdkVersion: input.version,
+    platform: input.platform,
+    arch: input.arch,
+    attempt: 0,
+    receivedBytes: 0,
+    totalBytes: null,
+    ...(input.error ? { error: input.error } : {}),
+    updatedAt: input.updatedAt
+  }
+}
+
+async function saveAndEmit(
+  store: AgentSdkStateStore,
+  state: AgentSdkDownloadState,
+  onState: ((state: AgentSdkDownloadState) => void) | undefined
+): Promise<AgentSdkDownloadState> {
+  const saved = await store.saveState(state)
+  onState?.(saved)
+  return saved
+}
+
+function installedBinaryRelativePath(version: string, platform: string, arch: string): string {
+  return join('versions', version, `${platform}-${arch}`, claudeBinaryName(platform))
+    .replaceAll('\\', '/')
+}
+
+function platformPackageCandidates(platform: string, arch: string): string[] {
+  const primary = platformBinaryPackage(platform, arch)
+  if (!primary) return []
+  return platform === 'linux' ? [primary, `${primary}-musl`] : [primary]
+}
+
+function isPathInside(root: string, candidate: string): boolean {
+  const rel = relative(resolve(root), resolve(candidate))
+  return rel === '' || (!rel.startsWith('..') && !rel.startsWith('/') && !rel.startsWith('\\'))
+}
+
+function isMissingPathError(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException)?.code === 'ENOENT'
+}
+
+async function extractExpectedBinary(
+  archivePath: string,
+  stagingDir: string,
+  binaryName: string
+): Promise<void> {
+  const expected = `package/${binaryName}`
+  const listing = await runProcess('tar', ['-tzf', archivePath], {
+    timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
+    maxOutputBytes: PROCESS_OUTPUT_LIMIT
+  })
+  const entries = listing.stdout.split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean)
+  if (!entries.includes(expected)) throw new Error(`archive does not contain ${expected}`)
+  for (const entry of entries) {
+    const normalized = entry.replaceAll('\\', '/')
+    if (normalized.startsWith('/') || normalized.split('/').includes('..')) {
+      throw new Error('archive contains an unsafe path')
+    }
+  }
+  await runProcess(
+    'tar',
+    ['-xzf', archivePath, '-C', stagingDir, '--strip-components=1', expected],
+    { timeoutMs: HEALTH_CHECK_TIMEOUT_MS, maxOutputBytes: PROCESS_OUTPUT_LIMIT }
+  )
+}
+
+async function checkBinaryHealth(binaryPath: string): Promise<void> {
+  await runProcess(binaryPath, ['--version'], {
+    timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
+    maxOutputBytes: PROCESS_OUTPUT_LIMIT
+  })
+}
+
+async function hashFile(path: string, algorithm: 'sha256'): Promise<string> {
+  const hash = createHash(algorithm)
+  for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer)
+  return hash.digest('hex')
+}
+
+function runProcess(
+  command: string,
+  args: string[],
+  options: { timeoutMs: number; maxOutputBytes: number }
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = Buffer.alloc(0)
+    let stderr = Buffer.alloc(0)
+    let settled = false
+    const timer = setTimeout(() => {
+      child.kill()
+      finish(new Error(`${command} timed out`))
+    }, options.timeoutMs)
+    const finish = (error?: Error): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      if (error) reject(error)
+      else resolvePromise({ stdout: stdout.toString(), stderr: stderr.toString() })
+    }
+    const append = (target: 'stdout' | 'stderr', chunk: Buffer): void => {
+      if (settled) return
+      const next = target === 'stdout'
+        ? Buffer.concat([stdout, chunk])
+        : Buffer.concat([stderr, chunk])
+      if (next.byteLength > options.maxOutputBytes) {
+        child.kill()
+        finish(new Error(`${command} output exceeded limit`))
+        return
+      }
+      if (target === 'stdout') stdout = next
+      else stderr = next
+    }
+    child.stdout?.on('data', (chunk: Buffer) => append('stdout', chunk))
+    child.stderr?.on('data', (chunk: Buffer) => append('stderr', chunk))
+    child.on('error', (error) => finish(error))
+    child.on('exit', (code) => {
+      finish(code === 0 ? undefined : new Error(`${command} exited ${code}`))
+    })
+  })
+}
+
+function installerFailure(error: unknown): AgentSdkDownloadFailure {
+  if (error instanceof AgentSdkDownloadFailure) return error
+  const code = String((error as NodeJS.ErrnoException)?.code ?? '')
+  if (code === 'ENOSPC') {
+    return new AgentSdkDownloadFailure('disk_full', 'not enough disk space for agent SDK', {
+      cause: error
+    })
+  }
+  if (code === 'EACCES' || code === 'EPERM') {
+    return new AgentSdkDownloadFailure('permission', 'agent SDK storage is not writable', {
+      cause: error
+    })
+  }
+  return new AgentSdkDownloadFailure('binary_invalid', 'agent SDK installation failed', {
+    cause: error
+  })
 }

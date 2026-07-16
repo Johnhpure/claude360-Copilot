@@ -22,6 +22,13 @@ import {
   writeRichClipboardPayloadSchema,
   writeInlineCompletionPayloadSchema
 } from './app-ipc-schemas'
+import {
+  kunTaskEventsPath,
+  kunTaskPath,
+  kunTaskResumePath,
+  kunTaskStepsPath,
+  kunTaskTransitionPath
+} from '../../shared/kun-endpoints'
 
 describe('app-ipc-schemas', () => {
   it('normalizes runtime request paths', () => {
@@ -131,6 +138,46 @@ describe('app-ipc-schemas', () => {
       path: '/v1/threads/thr_1/goal',
       method: 'DELETE'
     }).path).toBe('/v1/threads/thr_1/goal')
+  })
+
+  it('accepts only the modeled Kun task endpoint methods', () => {
+    expect(runtimeRequestPayloadSchema.parse({
+      path: '/v1/tasks?limit=20',
+      method: 'GET'
+    }).path).toBe('/v1/tasks?limit=20')
+    expect(runtimeRequestPayloadSchema.parse({
+      path: '/v1/tasks',
+      method: 'POST',
+      body: '{}'
+    }).path).toBe('/v1/tasks')
+    expect(runtimeRequestPayloadSchema.parse({
+      path: kunTaskPath('task/1'),
+      method: 'GET'
+    }).path).toBe('/v1/tasks/task%2F1')
+    expect(runtimeRequestPayloadSchema.parse({
+      path: kunTaskTransitionPath('task_1'),
+      method: 'POST',
+      body: '{}'
+    }).path).toBe('/v1/tasks/task_1/transition')
+    expect(runtimeRequestPayloadSchema.parse({
+      path: kunTaskStepsPath('task_1'),
+      method: 'PATCH',
+      body: '{}'
+    }).path).toBe('/v1/tasks/task_1/steps')
+    expect(runtimeRequestPayloadSchema.parse({
+      path: kunTaskResumePath('task_1'),
+      method: 'POST',
+      body: '{}'
+    }).path).toBe('/v1/tasks/task_1/resume')
+    expect(kunTaskEventsPath('task_1')).toBe('/v1/tasks/task_1/events')
+    expect(() => runtimeRequestPayloadSchema.parse({
+      path: `${kunTaskEventsPath('task_1')}?since_seq=7`,
+      method: 'GET'
+    })).toThrow(/runtime request path is not allowed/)
+    expect(() => runtimeRequestPayloadSchema.parse({
+      path: kunTaskStepsPath('task_1'),
+      method: 'DELETE'
+    })).toThrow(/runtime request path is not allowed/)
   })
 
   it('accepts the Kun thread review endpoint', () => {

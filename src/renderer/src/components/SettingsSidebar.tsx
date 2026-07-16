@@ -1,8 +1,8 @@
 import type { Dispatch, ReactElement, SetStateAction } from 'react'
-import { Archive, AudioLines, Bot, BrainCircuit, GitBranch, Bug, ChevronLeft, Globe, Keyboard, Mic, PencilLine, RefreshCw, ServerCog, Settings, Smartphone, TerminalSquare } from 'lucide-react'
+import { Archive, AudioLines, Bot, BrainCircuit, GitBranch, Bug, ChevronLeft, Globe, Keyboard, LifeBuoy, Mic, PencilLine, RefreshCw, ServerCog, Settings, Smartphone, TerminalSquare } from 'lucide-react'
 import { isPrimaryRouteVisible, isSettingsCategoryVisible } from '../lib/feature-visibility'
 
-type SettingsCategory = 'general' | 'providers' | 'write' | 'mediaGeneration' | 'speechToText' | 'agents' | 'archives' | 'permissions' | 'worktree' | 'memory' | 'shortcuts' | 'claw' | 'updates' | 'debug' | 'terminal'
+type SettingsCategory = 'general' | 'providers' | 'write' | 'mediaGeneration' | 'speechToText' | 'agents' | 'archives' | 'permissions' | 'worktree' | 'memory' | 'shortcuts' | 'claw' | 'updates' | 'debug' | 'terminal' | 'help'
 
 export function SettingsSidebar({
   category,
@@ -171,6 +171,15 @@ export function SettingsSidebar({
         >
           <Bug className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
           {t('debug')}
+        </button>
+        <button
+          type="button"
+          data-cursor-spotlight-target
+          className={catCls('help')}
+          onClick={() => setCategory('help')}
+        >
+          <LifeBuoy className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
+          {t('helpCenter')}
         </button>
       </nav>
       <div className="ds-no-drag shrink-0 border-t border-ds-border p-3">

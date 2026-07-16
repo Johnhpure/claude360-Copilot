@@ -153,7 +153,9 @@ describe('Memory store and recall', () => {
 
     await h.loop.runTurn(h.threadId, h.turnId)
 
-    expect(seenRequests.at(-1)?.contextInstructions?.[0]).toContain(memory.id)
+    expect(
+      seenRequests.at(-1)?.contextInstructions?.some((instruction) => instruction.includes(memory.id))
+    ).toBe(true)
     expect((await h.turns.getTurn(h.threadId, h.turnId))?.injectedMemoryIds).toEqual([memory.id])
     expect((await store.diagnostics()).lastInjectedIds).toEqual([memory.id])
 

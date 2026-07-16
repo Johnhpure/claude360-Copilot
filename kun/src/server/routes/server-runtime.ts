@@ -31,6 +31,7 @@ import type { BackgroundShellRuntime } from '../../services/background-shell-run
 import type { ModelClient } from '../../ports/model-client.js'
 import type { RolesConfig } from '../../config/kun-config.js'
 import type { ImmutablePrefix } from '../../cache/immutable-prefix.js'
+import type { TaskService } from '../../services/task-service.js'
 
 export type RuntimeToolDiagnostics = {
   providers: ToolProviderPolicy[]
@@ -55,6 +56,8 @@ export type ServerRuntime = {
   threadService: ThreadService
   turnService: TurnService
   usageService: UsageService
+  /** Optional for lightweight embedders/tests; the production runtime always installs it. */
+  taskService?: TaskService
   reviewService?: ReviewService
   eventBus: EventBus
   sessionStore: SessionStore

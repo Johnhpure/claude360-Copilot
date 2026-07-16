@@ -32,10 +32,19 @@ import type {
 } from '../../shared/kun-gui-api'
 import type { WorkspaceFileSaveAsResult } from '../../shared/workspace-file'
 import type { GuiUpdateDownloadResult, GuiUpdateInfo, GuiUpdateInstallResult, GuiUpdateState } from '../../shared/gui-update'
+import type { DiagnosticsExportResult } from '../../shared/diagnostics'
+import type { AgentSdkDownloadState } from '../../shared/agent-sdk-download'
 import {
   PERF_RENDERER_MARKS_CHANNEL,
   type RendererStartupMarks
 } from '../../shared/perf-baseline'
+import {
+  CRASH_CONTEXT_UPDATE_CHANNEL,
+  rendererCrashContextPayloadSchema,
+  rendererCrashEventPayloadSchema,
+  type RendererCrashContextPayload,
+  type RendererCrashEventPayload
+} from '../../shared/crash-types'
 import {
   clawMirrorPayloadSchema,
   clawImInstallPollPayloadSchema,
@@ -133,8 +142,9 @@ import { fetchSdkModels } from '../claude-subscription-models'
 import {
   agentSdkDownloadState,
   agentSdkStatus,
-  resolveClaudeBinary,
-  startAgentSdkInstall
+  ensureAgentSdkBinary,
+  startAgentSdkInstall,
+  type AgentSdkInstallResult
 } from '../agent-sdk-installer'
 import type { JsonSettingsStore } from '../settings-store'
 import {
@@ -283,6 +293,9 @@ type RegisterAppIpcHandlersOptions = {
   loadGuiUpdaterModule: () => Promise<GuiUpdaterModule>
   resolveLogDirectory: () => string
   logError: (category: string, message: string, detail?: unknown) => void
+  recordRendererCrash?: (payload: RendererCrashEventPayload) => void
+  updateRendererCrashContext?: (payload: RendererCrashContextPayload) => void
+  exportDiagnostics?: () => Promise<DiagnosticsExportResult>
   /** 启动基线：renderer 上报的性能标记并入 main 侧采集器（07-14-perf-baseline）。
    *  可选（onKunMcpConfigWritten 同款惯例）：缺省时不注册接收通道。 */
   attachRendererPerfMarks?: (payload: RendererStartupMarks) => void
@@ -524,6 +537,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     loadGuiUpdaterModule,
     resolveLogDirectory,
     logError,
+    recordRendererCrash,
+    updateRendererCrashContext,
+    exportDiagnostics,
     attachRendererPerfMarks,
     onRecentWorkspacesReported,
     claude360AuthService,
@@ -743,28 +759,44 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       app.isPackaged ? app.getAppPath().replace(/app\.asar$/, 'app.asar.unpacked') : app.getAppPath(),
       process.cwd()
     ].map((root) => join(root, 'kun'))
-  const claudeSubBinary = (): string | undefined =>
-    resolveClaudeBinary(app.getPath('userData'), claudeSubKunDirs())
+  const emitClaudeSubSdkState = (state: AgentSdkDownloadState): void => {
+    getMainWindow()?.webContents.send('claude-subscription:sdk-progress', state)
+  }
+  const ensureClaudeSubBinary = async (): Promise<AgentSdkInstallResult> =>
+    ensureAgentSdkBinary({
+      userDataDir: app.getPath('userData'),
+      kunDirs: claudeSubKunDirs(),
+      proxyUrl: resolveModelProviderProxyUrl(await store.load()),
+      onState: emitClaudeSubSdkState
+    })
   ipcMain.handle('claude-subscription:sdk-status', async () => ({
     ...agentSdkStatus(app.getPath('userData'), claudeSubKunDirs()),
-    download: agentSdkDownloadState()
+    download: await agentSdkDownloadState(app.getPath('userData'))
   }))
   ipcMain.handle('claude-subscription:sdk-install', async () =>
     startAgentSdkInstall(
-      { userDataDir: app.getPath('userData'), proxyUrl: resolveModelProviderProxyUrl(await store.load()) },
-      (state) => getMainWindow()?.webContents.send('claude-subscription:sdk-progress', state)
+      {
+        userDataDir: app.getPath('userData'),
+        kunDirs: claudeSubKunDirs(),
+        proxyUrl: resolveModelProviderProxyUrl(await store.load())
+      },
+      emitClaudeSubSdkState
     )
   )
-  ipcMain.handle('claude-subscription:login', async () =>
-    runClaudeSetupToken({ binaryPath: claudeSubBinary() })
-  )
-  ipcMain.handle('claude-subscription:models', async (_event, token: unknown) =>
-    fetchSdkModels({
+  ipcMain.handle('claude-subscription:login', async () => {
+    const ensured = await ensureClaudeSubBinary()
+    if (ensured.ok === false) return { ok: false, message: ensured.message }
+    return runClaudeSetupToken({ binaryPath: ensured.path })
+  })
+  ipcMain.handle('claude-subscription:models', async (_event, token: unknown) => {
+    const ensured = await ensureClaudeSubBinary()
+    if (ensured.ok === false) return []
+    return fetchSdkModels({
       token: typeof token === 'string' ? token : undefined,
       kunRoots: claudeSubKunDirs(),
-      binaryPath: claudeSubBinary()
+      binaryPath: ensured.path
     })
-  )
+  })
   ipcMain.handle('settings:set', async (_, partial: unknown) =>
     applySettingsPatch(
       parseIpcPayload('settings:set', settingsPatchSchema, partial) as AppSettingsPatch
@@ -1942,6 +1974,16 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('log:error', async (_, payload: unknown) => {
     const request = parseIpcPayload('log:error', logErrorPayloadSchema, payload)
     logError(request.category, request.message, request.detail)
+    if (request.category === 'renderer-crash' && recordRendererCrash) {
+      const parsed = rendererCrashEventPayloadSchema.safeParse(request.detail)
+      if (parsed.success) {
+        try {
+          recordRendererCrash(parsed.data)
+        } catch {
+          // Runtime logging already succeeded; crash indexing remains best-effort.
+        }
+      }
+    }
   })
   ipcMain.handle('log:get-path', async () => resolveLogDirectory())
   ipcMain.handle('log:open-dir', async () => {
@@ -1956,6 +1998,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     if (error) return { ok: false, message: error }
     return { ok: true }
   })
+  if (exportDiagnostics) {
+    ipcMain.handle('diagnostics:export', async () => exportDiagnostics())
+  }
 
   // 启动基线（07-14-perf-baseline）：renderer 一次性上报的性能标记。
   // fire-and-forget 事件通道；payload 非法时静默丢弃——埋点绝不产生用户可见错误。
@@ -1967,6 +2012,18 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         )
       } catch {
         // 忽略畸形 perf 上报。
+      }
+    })
+  }
+
+  if (updateRendererCrashContext) {
+    ipcMain.on(CRASH_CONTEXT_UPDATE_CHANNEL, (_event, payload: unknown) => {
+      const parsed = rendererCrashContextPayloadSchema.safeParse(payload)
+      if (!parsed.success) return
+      try {
+        updateRendererCrashContext(parsed.data)
+      } catch {
+        // Context snapshots are diagnostic-only and must not affect the renderer.
       }
     })
   }

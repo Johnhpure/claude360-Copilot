@@ -51,6 +51,9 @@ import type {
   Claude360ImageResult
 } from './claude360-canvas'
 import type { RendererStartupMarks } from './perf-baseline'
+import type { RendererCrashContextPayload } from './crash-types'
+import type { DiagnosticsExportResult } from './diagnostics'
+import type { AgentSdkDownloadState } from './agent-sdk-download'
 import type {
   MediaAssetsDeletePayload,
   MediaAssetsDeleteResult,
@@ -347,13 +350,6 @@ export type ClaudeSubscriptionLoginResult =
   | { ok: true; token: string }
   | { ok: false; message: string }
 
-export type SdkDownloadState = {
-  status: 'downloading' | 'done' | 'error'
-  receivedBytes: number
-  totalBytes: number
-  message?: string
-}
-
 export type KunGuiApi = {
   platform: string
   /** process.arch 只读暴露（ia32 软废弃横幅判定，07-14-win-ia32-assessment）。 */
@@ -370,12 +366,14 @@ export type KunGuiApi = {
   claudeSubscriptionSdkStatus: () => Promise<{
     installed: boolean
     path?: string
-    download?: SdkDownloadState | null
+    download?: AgentSdkDownloadState | null
   }>
   /** Start (or resume) the background download; returns the live state immediately. */
-  claudeSubscriptionSdkInstall: () => Promise<SdkDownloadState>
+  claudeSubscriptionSdkInstall: () => Promise<AgentSdkDownloadState>
   /** Subscribe to background-download progress; returns an unsubscribe fn. */
-  onClaudeSubscriptionSdkProgress: (handler: (state: SdkDownloadState) => void) => () => void
+  onClaudeSubscriptionSdkProgress: (
+    handler: (state: AgentSdkDownloadState) => void
+  ) => () => void
   setSettings: (partial: AppSettingsPatch) => Promise<AppSettingsV1>
   saveSettingsSilent: (partial: AppSettingsPatch) => Promise<AppSettingsV1>
   runtimeRequest: (path: string, method?: string, body?: string) => Promise<RuntimeRequestResult>
@@ -649,6 +647,9 @@ export type KunGuiApi = {
   dismissGuiUpdateVersion: (version: string) => Promise<void>
   onGuiUpdateState: (handler: (payload: GuiUpdateState) => void) => () => void
   logError: (category: string, message: string, detail?: unknown) => Promise<void>
+  /** 单向上报安全崩溃上下文；main 在内存缓存前匿名化 workspace。 */
+  reportCrashContext: (payload: RendererCrashContextPayload) => void
+  exportDiagnostics: () => Promise<DiagnosticsExportResult>
   getLogPath: () => Promise<string>
   openLogDir: () => Promise<{ ok: boolean; message?: string }>
   /** preload 模块求值首/末时刻（epoch ms）；启动基线 R4「preload 初始化耗时」的数据源。 */

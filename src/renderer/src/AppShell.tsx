@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useMemo } from 'react'
 import { useChatStore } from './store/chat-store'
 import { supportsDesktopTitleBar, WindowsTitleBar } from './components/WindowsTitleBar'
 import { RuntimeStatusBanner } from './components/RuntimeStatusBanner'
@@ -6,6 +6,7 @@ import { GroupKeyPromptModal } from './components/GroupKeyPromptModal'
 import { GuiUpdatePrompt } from './components/GuiUpdatePrompt'
 import { Toaster } from './components/ui'
 import { applyBlurPreference, readBlurPreference } from './lib/blur-preference'
+import { useCrashContextReporter } from './lib/crash-context-reporter'
 import {
   markStartupFirstFrameAfterPaint,
   markStartupInteractive
@@ -41,10 +42,24 @@ function RouteFallback(): React.ReactElement {
 
 export default function AppShell(): React.ReactElement {
   const route = useChatStore((s) => s.route)
+  const workspaceRoot = useChatStore((s) => s.workspaceRoot)
+  const activeThreadId = useChatStore((s) => s.activeThreadId)
+  const currentTurnId = useChatStore((s) => s.currentTurnId)
+  const busy = useChatStore((s) => s.busy)
   const boot = useChatStore((s) => s.boot)
   const initialSetupOpen = useChatStore((s) => s.initialSetupOpen)
   const platform = typeof window !== 'undefined' ? window.kunGui?.platform ?? 'unknown' : 'unknown'
   const hasDesktopTitleBar = supportsDesktopTitleBar(platform)
+  const crashContext = useMemo(() => ({
+    route,
+    workspaceRoot,
+    activeThreadId,
+    currentTurnId,
+    busy,
+    task: null
+  }), [activeThreadId, busy, currentTurnId, route, workspaceRoot])
+
+  useCrashContextReporter(crashContext)
 
   // 启动基线 R5：AppShell 挂载后双 rAF ≈ 首帧真正绘制（返回值即 cleanup）。
   useEffect(() => markStartupFirstFrameAfterPaint(), [])

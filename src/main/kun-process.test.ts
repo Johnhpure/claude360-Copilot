@@ -1,4 +1,13 @@
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { createServer, type AddressInfo } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -19,6 +28,14 @@ import {
   type AppSettingsV1
 } from '../shared/app-settings'
 import { KunConfigSchema } from '../../kun/src/config/kun-config.js'
+
+const agentSdkRuntimeMocks = vi.hoisted(() => ({
+  ensureAgentSdkBinary: vi.fn()
+}))
+
+vi.mock('./agent-sdk-installer', () => ({
+  ensureAgentSdkBinary: agentSdkRuntimeMocks.ensureAgentSdkBinary
+}))
 
 vi.mock('electron', () => ({
   app: {
@@ -103,6 +120,11 @@ function canBindTestPort(port: number): Promise<boolean> {
 beforeEach(() => {
   tempRoot = mkdtempSync(join(tmpdir(), 'kun-process-'))
   configureLogger({ dir: tempRoot, enabled: true, retentionDays: 7 })
+  agentSdkRuntimeMocks.ensureAgentSdkBinary.mockReset()
+  agentSdkRuntimeMocks.ensureAgentSdkBinary.mockResolvedValue({
+    ok: true,
+    path: '/tmp/managed-claude'
+  })
 })
 
 afterEach(async () => {
@@ -137,10 +159,69 @@ describe('startKunChild', () => {
     const module = await import('./kun-process')
     await expect(module.startKunChild(createSettings(script))).resolves.toBeUndefined()
     expect(module.isKunChildRunning()).toBe(true)
+    expect(agentSdkRuntimeMocks.ensureAgentSdkBinary).not.toHaveBeenCalled()
     await module.stopKunChildAndWait()
     const logText = await readKunLog()
     expect(logText).toContain('KUN_READY')
     expect(logText).toContain('ready marker received on port 18899')
+  })
+
+  it('waits for the managed Agent SDK binary before spawning its provider runtime', async () => {
+    if (!tempRoot) throw new Error('temp root not initialized')
+    const environmentPath = join(tempRoot, 'agent-sdk-env.json')
+    const script = writeScript(
+      'agent-sdk-child.js',
+      [
+        "const fs = require('node:fs')",
+        "const http = require('node:http')",
+        `fs.writeFileSync(${JSON.stringify(environmentPath)}, JSON.stringify({ binary: process.env.KUN_CLAUDE_BINARY, kind: process.env.KUN_RUNTIME_PROVIDER_KIND }))`,
+        "const port = 18899",
+        "const server = http.createServer((req, res) => {",
+        "  res.setHeader('content-type', 'application/json')",
+        "  res.end(JSON.stringify({ service: 'kun', mode: 'serve', status: 'ok' }))",
+        "})",
+        "server.listen(port, '127.0.0.1', () => {",
+        "  process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port }) + '\\n')",
+        "})",
+        "setInterval(() => {}, 1_000)"
+      ].join('\n')
+    )
+    const settings = createSettings(script)
+    settings.provider = {
+      ...settings.provider,
+      providers: [
+        ...settings.provider.providers,
+        {
+          id: 'claude-subscription',
+          name: 'Claude subscription',
+          kind: 'agent-sdk',
+          apiKey: '',
+          baseUrl: 'https://api.anthropic.com',
+          endpointFormat: 'messages',
+          models: ['claude-sonnet-4-6'],
+          modelProfiles: {}
+        }
+      ]
+    }
+    settings.agents.kun.providerId = 'claude-subscription'
+    let releaseEnsure: (() => void) | undefined
+    const ensureGate = new Promise<void>((resolve) => { releaseEnsure = resolve })
+    agentSdkRuntimeMocks.ensureAgentSdkBinary.mockImplementation(async () => {
+      await ensureGate
+      return { ok: true, path: '/tmp/managed-claude' }
+    })
+    const module = await import('./kun-process')
+
+    const start = module.startKunChild(settings)
+    await vi.waitFor(() => expect(agentSdkRuntimeMocks.ensureAgentSdkBinary).toHaveBeenCalledTimes(1))
+    expect(existsSync(environmentPath)).toBe(false)
+    releaseEnsure?.()
+    await expect(start).resolves.toBeUndefined()
+
+    expect(JSON.parse(readFileSync(environmentPath, 'utf8'))).toEqual({
+      binary: '/tmp/managed-claude',
+      kind: 'agent-sdk'
+    })
   })
 
   it('does not settle on the ready marker until the /health endpoint responds', async () => {

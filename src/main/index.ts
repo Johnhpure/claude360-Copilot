@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  crashReporter,
   dialog,
   ipcMain,
   Menu,
@@ -101,6 +102,13 @@ import {
 } from './kun-process'
 import { RestartBudget, type KunRuntimeStatus } from './kun-runtime-supervisor'
 import { configureLogger, logError, logInfo, logWarn, pruneOnStartup } from './logger'
+import { createCrashContextRegistry, createCrashRecordFactory } from './crash-context'
+import { createCrashStore } from './crash-store'
+import {
+  createMainCrashHandlers,
+  initializeLocalCrashReporter,
+  installMainCrashGuard
+} from './crash-guard'
 import {
   appendKunCrashHistory,
   appendStartupHistory,
@@ -303,6 +311,36 @@ if (AUTO_IMPORT_LEGACY_DATA) {
     autoImportLegacyData: AUTO_IMPORT_LEGACY_DATA
   })
 }
+
+// Crash Recovery 必须在 app ready 前启用。此处位于最终 userData 决策之后，
+// 因而 native dump、结构化记录和后续诊断导出始终落在同一个应用目录。
+const localCrashReporter = initializeLocalCrashReporter({
+  userDataPath: app.getPath('userData'),
+  setCrashDumpsPath: (path) => app.setPath('crashDumps', path),
+  startCrashReporter: (options) => crashReporter.start(options)
+})
+const crashContextRegistry = createCrashContextRegistry()
+crashContextRegistry.registerProvider('startupPhases', () => startupMetrics.snapshotPhases())
+crashContextRegistry.registerProvider('recentIpc', () => getSharedIpcStats().recent())
+const crashStore = createCrashStore({ directory: localCrashReporter.crashDirectory })
+const createCrashRecord = createCrashRecordFactory({
+  context: crashContextRegistry,
+  getAppVersion: () => app.getVersion(),
+  getAppMetrics: () => app.getAppMetrics().map((metric) => ({
+    type: metric.type,
+    pid: metric.pid,
+    workingSetSizeKb: metric.memory.workingSetSize
+  })),
+  packaged: app.isPackaged
+})
+const mainCrashHandlers = createMainCrashHandlers({
+  createRecord: createCrashRecord,
+  writeFatal: (record) => crashStore.writeFatal(record),
+  enqueue: (record) => crashStore.enqueue(record),
+  exit: (code) => process.exit(code),
+  writeStderr: (message) => process.stderr.write(message)
+})
+installMainCrashGuard({ app, handlers: mainCrashHandlers })
 
 configureLinuxWaylandImeSwitches()
 
@@ -869,6 +907,15 @@ const RUNTIME_WATCHDOG_FAILURE_THRESHOLD = 3
 const RUNTIME_HUNG_CONFIRM_MS = 10_000
 const runtimeRestartBudget = new RestartBudget({ windowMs: 60_000, maxRestarts: 3 })
 let lastRuntimeStatus: KunRuntimeStatus | null = null
+crashContextRegistry.registerProvider('runtime', () =>
+  lastRuntimeStatus
+    ? {
+        state: lastRuntimeStatus.state,
+        source: lastRuntimeStatus.source,
+        at: lastRuntimeStatus.at
+      }
+    : null
+)
 let supervisedRestartInFlight = false
 let runtimeWatchdogTimer: NodeJS.Timeout | null = null
 let runtimeWatchdogFailures = 0
@@ -1995,6 +2042,46 @@ app.whenReady().then(async () => {
     loadGuiUpdaterModule,
     resolveLogDirectory: () => resolveLogDirectory(app),
     logError,
+    recordRendererCrash: (payload) => {
+      const error = new Error(payload.message)
+      error.name = payload.name
+      if (payload.stack) error.stack = payload.stack
+      const record = createCrashRecord({
+        kind: 'renderer-error',
+        severity: 'error',
+        error,
+        details: { renderer: payload }
+      })
+      void crashStore.enqueue(record).catch((crashError) => {
+        logWarn('crash-recovery', 'Failed to persist renderer crash.', {
+          message: crashError instanceof Error ? crashError.message : String(crashError)
+        })
+      })
+    },
+    updateRendererCrashContext: (payload) => {
+      crashContextRegistry.updateRenderer(payload)
+    },
+    exportDiagnostics: async () => {
+      const { exportDiagnostics: exportDiagnosticsToFile } = await import('./diagnostics-export')
+      return exportDiagnosticsToFile({
+        userDataPath: app.getPath('userData'),
+        appInfo: {
+          appVersion: app.getVersion(),
+          electronVersion: process.versions.electron ?? '',
+          nodeVersion: process.versions.node,
+          chromeVersion: process.versions.chrome,
+          platform: process.platform,
+          arch: process.arch,
+          packaged: app.isPackaged
+        },
+        showSaveDialog: async (options) => {
+          const window = mainWindow
+          return window && !window.isDestroyed()
+            ? dialog.showSaveDialog(window, options)
+            : dialog.showSaveDialog(options)
+        }
+      })
+    },
     attachRendererPerfMarks: (payload) => startupMetrics.attachRendererMarks(payload),
     claude360AuthService,
     claude360TokenService,
@@ -2018,6 +2105,13 @@ app.whenReady().then(async () => {
   })
   traceStartup('ipc registration:done')
   startupMetrics.mark('main:ipc-registered')
+
+  // 致命 handler 为保证退出前落盘只写独立记录；启动后在非关键路径补入索引。
+  void crashStore.reconcile().catch((error) => {
+    logWarn('crash-recovery', 'Failed to reconcile crash index.', {
+      message: error instanceof Error ? error.message : String(error)
+    })
+  })
 
   // MCP 工具配置同步改 fire-and-forget（R3）：research/01 确认其结果不被任何
   // 后续启动步骤消费，失败仅记日志，不再阻塞启动链（原为 whenReady 内第二个

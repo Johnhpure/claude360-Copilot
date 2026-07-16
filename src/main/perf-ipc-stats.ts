@@ -15,6 +15,7 @@
  * logInfo 快照），本模块自身不做任何日志或磁盘 I/O。
  */
 import type { IpcMain, IpcMainInvokeEvent } from 'electron'
+import type { RecentIpcOperation } from '../shared/crash-types'
 
 export interface IpcChannelStats {
   channel: string
@@ -26,18 +27,31 @@ export interface IpcChannelStats {
 
 export interface IpcStats {
   /** O(1)：累加一次调用耗时；failed=true 时 errors 计数 +1。 */
-  record(channel: string, durationMs: number, failed: boolean): void
+  record(channel: string, durationMs: number, failed: boolean, completedAtMs?: number): void
   /** 按 totalMs 降序输出前 topN 条（缺省全部）。排序仅发生在输出时。 */
   snapshot(topN?: number): IpcChannelStats[]
+  /** 最近 20 次安全摘要；不包含 handler 参数或返回值。 */
+  recent(): RecentIpcOperation[]
   reset(): void
 }
 
 type ChannelTotals = { count: number; totalMs: number; maxMs: number; errors: number }
+type RecentIpcEntry = {
+  channel: string
+  completedAtMs: number
+  durationMs: number
+  failed: boolean
+}
+
+const RECENT_IPC_LIMIT = 20
 
 export function createIpcStats(): IpcStats {
   const byChannel = new Map<string, ChannelTotals>()
+  const recentEntries = new Array<RecentIpcEntry | undefined>(RECENT_IPC_LIMIT)
+  let recentCount = 0
+  let recentCursor = 0
   return {
-    record(channel, durationMs, failed) {
+    record(channel, durationMs, failed, completedAtMs) {
       let entry = byChannel.get(channel)
       if (!entry) {
         entry = { count: 0, totalMs: 0, maxMs: 0, errors: 0 }
@@ -47,6 +61,15 @@ export function createIpcStats(): IpcStats {
       entry.totalMs += durationMs
       if (durationMs > entry.maxMs) entry.maxMs = durationMs
       if (failed) entry.errors += 1
+      const candidateTime = completedAtMs ?? Date.now()
+      recentEntries[recentCursor] = {
+        channel: channel.slice(0, 256),
+        completedAtMs: Number.isFinite(candidateTime) ? candidateTime : Date.now(),
+        durationMs: Math.max(0, durationMs),
+        failed
+      }
+      recentCursor = (recentCursor + 1) % RECENT_IPC_LIMIT
+      recentCount = Math.min(RECENT_IPC_LIMIT, recentCount + 1)
     },
     snapshot(topN) {
       const rows: IpcChannelStats[] = []
@@ -62,8 +85,26 @@ export function createIpcStats(): IpcStats {
       rows.sort((a, b) => b.totalMs - a.totalMs)
       return typeof topN === 'number' ? rows.slice(0, Math.max(0, topN)) : rows
     },
+    recent() {
+      const rows: RecentIpcOperation[] = []
+      const start = (recentCursor - recentCount + RECENT_IPC_LIMIT) % RECENT_IPC_LIMIT
+      for (let index = 0; index < recentCount; index += 1) {
+        const entry = recentEntries[(start + index) % RECENT_IPC_LIMIT]
+        if (!entry) continue
+        rows.push({
+          channel: entry.channel,
+          at: new Date(entry.completedAtMs).toISOString(),
+          durationMs: entry.durationMs,
+          failed: entry.failed
+        })
+      }
+      return rows
+    },
     reset() {
       byChannel.clear()
+      recentEntries.fill(undefined)
+      recentCount = 0
+      recentCursor = 0
     }
   }
 }
@@ -86,10 +127,12 @@ export function wrapIpcMainWithStats(
       const startedAt = now()
       try {
         const result = await listener(event, ...args)
-        stats.record(channel, now() - startedAt, false)
+        const completedAt = now()
+        stats.record(channel, completedAt - startedAt, false, completedAt)
         return result
       } catch (error) {
-        stats.record(channel, now() - startedAt, true)
+        const completedAt = now()
+        stats.record(channel, completedAt - startedAt, true, completedAt)
         throw error
       }
     })

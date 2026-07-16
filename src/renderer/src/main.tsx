@@ -21,7 +21,10 @@ import App from './App'
 import './i18n'
 import { applyCursorSpotlight } from './lib/apply-theme'
 import { installCursorSpotlightTracking } from './lib/cursor-spotlight'
+import { installGlobalErrorReporter } from './lib/global-error-reporter'
 import { installStartupPerfFallbackReport, markStartupModuleEval } from './lib/startup-perf'
+
+installGlobalErrorReporter()
 
 // 启动基线（07-14-perf-baseline）：入口模块求值标记 + 上报兜底定时器。
 markStartupModuleEval()

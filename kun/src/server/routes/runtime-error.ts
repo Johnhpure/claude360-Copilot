@@ -23,6 +23,8 @@ export const ERRORS = {
     errorResponse({ code: 'attachment_validation_failed', message, details: issues }, 400),
   conflict: (message: string) =>
     errorResponse({ code: 'conflict', message }, 409),
+  invalidTransition: (message: string) =>
+    errorResponse({ code: 'invalid_transition', message }, 409),
   notImplemented: (message: string) =>
     errorResponse({ code: 'not_implemented', message }, 501),
   unavailable: (message: string) =>

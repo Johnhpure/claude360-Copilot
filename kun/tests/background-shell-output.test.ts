@@ -44,7 +44,7 @@ describe('background-shell-output', () => {
     const writer = new BackgroundShellOutputWriter(tempDir, 'thr_1', 'sess1234')
     await writer.open()
     writer.append('hello\n')
-    writer.append('x'.repeat(DEFAULT_BACKGROUND_SHELL_OUTPUT_SUMMARY_MAX_CHARS + 50))
+    writer.append('x'.repeat(DEFAULT_BACKGROUND_SHELL_OUTPUT_SUMMARY_MAX_CHARS + 1024 * 1024))
     const live = await writer.buildReturnFields()
     expect(live.output_file).toContain('sess1234.output')
     expect(live.truncated).toBe(true)

@@ -42,6 +42,29 @@ export function kunMemoryRecordPath(memoryId: string): string {
   return `/v1/memory/${encodeURIComponent(memoryId)}`
 }
 
+export const KUN_TASKS_PATH = '/v1/tasks'
+export const KUN_TASKS_TEMPLATE = '/v1/tasks'
+export const KUN_TASK_TEMPLATE = '/v1/tasks/{id}'
+export function kunTaskPath(taskId: string): string {
+  return `/v1/tasks/${encodeURIComponent(taskId)}`
+}
+export const KUN_TASK_TRANSITION_TEMPLATE = '/v1/tasks/{id}/transition'
+export function kunTaskTransitionPath(taskId: string): string {
+  return `${kunTaskPath(taskId)}/transition`
+}
+export const KUN_TASK_STEPS_TEMPLATE = '/v1/tasks/{id}/steps'
+export function kunTaskStepsPath(taskId: string): string {
+  return `${kunTaskPath(taskId)}/steps`
+}
+export const KUN_TASK_RESUME_TEMPLATE = '/v1/tasks/{id}/resume'
+export function kunTaskResumePath(taskId: string): string {
+  return `${kunTaskPath(taskId)}/resume`
+}
+export const KUN_TASK_EVENTS_TEMPLATE = '/v1/tasks/{id}/events'
+export function kunTaskEventsPath(taskId: string): string {
+  return `${kunTaskPath(taskId)}/events`
+}
+
 export const KUN_THREADS_PATH = '/v1/threads'
 export const KUN_THREADS_TEMPLATE = '/v1/threads'
 

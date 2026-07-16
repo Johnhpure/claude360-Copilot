@@ -1,4 +1,5 @@
 export * from './thread-service.js'
+export * from './task-service.js'
 export * from './turn-service.js'
 export * from './usage-service.js'
 export * from './review-service.js'

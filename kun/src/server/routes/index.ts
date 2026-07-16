@@ -59,6 +59,15 @@ import {
 import { isAuthorized, bearerToken } from '../auth.js'
 import { ERRORS } from './runtime-error.js'
 import type { ServerRuntime } from './server-runtime.js'
+import {
+  createTask,
+  getTask,
+  listTasks,
+  resumeTask,
+  taskEvents,
+  transitionTask,
+  updateTaskStep
+} from './tasks.js'
 
 /**
  * Build the full router used by the HTTP server. The router exposes:
@@ -172,6 +181,47 @@ export function buildRouter(runtime: ServerRuntime): Router {
     const url = new URL(request.url)
     const path = url.searchParams.get('path')
     return buildWorkspaceStatusResponse({ inspector: runtime.workspaceInspector, path })
+  })
+  router.add('GET', '/v1/tasks', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.taskService) return ERRORS.unavailable('task runtime is not available')
+    return listTasks(runtime.taskService, request)
+  })
+  router.add('POST', '/v1/tasks', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.taskService) return ERRORS.unavailable('task runtime is not available')
+    return createTask(runtime.taskService, request)
+  })
+  router.add('GET', '/v1/tasks/:id/events', async (request, ctx) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.taskService) return ERRORS.unavailable('task runtime is not available')
+    return taskEvents(
+      runtime.taskService,
+      ctx.params.id,
+      request,
+      runtime.eventBus,
+      runtime.sessionStore
+    )
+  })
+  router.add('POST', '/v1/tasks/:id/transition', async (request, ctx) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.taskService) return ERRORS.unavailable('task runtime is not available')
+    return transitionTask(runtime.taskService, ctx.params.id, request)
+  })
+  router.add('PATCH', '/v1/tasks/:id/steps', async (request, ctx) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.taskService) return ERRORS.unavailable('task runtime is not available')
+    return updateTaskStep(runtime.taskService, ctx.params.id, request)
+  })
+  router.add('POST', '/v1/tasks/:id/resume', async (request, ctx) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.taskService) return ERRORS.unavailable('task runtime is not available')
+    return resumeTask(runtime.taskService, ctx.params.id, request)
+  })
+  router.add('GET', '/v1/tasks/:id', async (request, ctx) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.taskService) return ERRORS.unavailable('task runtime is not available')
+    return getTask(runtime.taskService, ctx.params.id)
   })
   router.add('GET', '/v1/threads', async (request) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()

@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { describe, expect, it, vi } from 'vitest'
 import { InMemorySessionStore } from '../src/adapters/in-memory-session-store.js'
 import { InMemoryThreadStore } from '../src/adapters/in-memory-thread-store.js'
@@ -95,5 +96,22 @@ describe('runtime factory usage carryover', () => {
       cacheMissTokens: 20,
       turns: 4
     })
+  })
+})
+
+describe('runtime factory task wiring', () => {
+  it('installs the file task runtime and reconciles only after HTTP listen', async () => {
+    const source = await readFile(
+      new URL('../src/server/runtime-factory.ts', import.meta.url),
+      'utf8'
+    )
+
+    expect(source).toContain("new FileTaskStore({ rootDir: join(options.dataDir, 'tasks') })")
+    expect(source).toContain('const taskService = new TaskService({')
+    expect(source).toMatch(/return \{\s*threadService,\s*taskService,/)
+    const listenIndex = source.indexOf('const server = await startNodeHttpServer')
+    const reconcileIndex = source.indexOf('void runtime.taskService?.reconcile()')
+    expect(listenIndex).toBeGreaterThan(-1)
+    expect(reconcileIndex).toBeGreaterThan(listenIndex)
   })
 })

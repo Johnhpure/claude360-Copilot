@@ -6,6 +6,7 @@ import type {
   WorkspaceOpenRequestPayload
 } from '../shared/kun-gui-api'
 import { createReplayedChannelSubscriber } from '../shared/replayed-ipc-channel'
+import { CRASH_CONTEXT_UPDATE_CHANNEL } from '../shared/crash-types'
 
 // 07-14-perf-baseline：R4 preload 初始化耗时。模块求值首/末各记一次 epoch ms，
 // 随 renderer 启动标记上报 main 换算到统一时间轴（本文件无异步初始化，预期 ~0-5ms）。
@@ -426,6 +427,10 @@ const api = {
   },
   logError: (category, message, detail) =>
     ipcRenderer.invoke('log:error', { category, message, detail }),
+  reportCrashContext: (payload) => {
+    ipcRenderer.send(CRASH_CONTEXT_UPDATE_CHANNEL, payload)
+  },
+  exportDiagnostics: () => ipcRenderer.invoke('diagnostics:export'),
   getLogPath: () => ipcRenderer.invoke('log:get-path'),
   openLogDir: () => ipcRenderer.invoke('log:open-dir'),
   perfPreloadTimestamps: { startedAtEpochMs: preloadStartedAtEpochMs, readyAtEpochMs: 0 },

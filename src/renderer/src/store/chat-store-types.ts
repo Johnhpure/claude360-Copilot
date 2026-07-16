@@ -95,6 +95,7 @@ export type SettingsRouteSection =
   | 'claw'
   | 'updates'
   | 'terminal'
+  | 'help'
 export type AppRoute = 'chat' | 'write' | 'settings' | 'plugins' | 'claw' | 'schedule' | 'workflow' | 'my' | 'music' | 'canvas'
 export type PluginHostRoute = 'chat' | 'claw'
 

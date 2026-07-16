@@ -352,7 +352,17 @@ describe('Kun built-in tools', () => {
       ls: { defaultLimit: 1 },
       bash: { defaultTimeoutSeconds: 5 }
     })
-    expect(Object.keys(toolRecord).sort()).toEqual(['bash', 'edit', 'find', 'grep', 'ls', 'lsp', 'read', 'write'])
+    expect(Object.keys(toolRecord).sort()).toEqual([
+      'bash',
+      'edit',
+      'find',
+      'grep',
+      'ls',
+      'lsp',
+      'read',
+      'verify_changes',
+      'write'
+    ])
 
     await writeFile(join(workspace, 'limited.txt'), 'one\ntwo\nthree\n', 'utf8')
     const customHost = new LocalToolHost({ tools: [toolRecord.read, toolRecord.ls] })
@@ -374,8 +384,19 @@ describe('Kun built-in tools', () => {
     expect(createReadOnlyToolDefinitions().map((tool) => tool.name)).toEqual(['read', 'grep', 'find', 'ls'])
     const allTools = createAllTools()
     const allDefinitions = createAllToolDefinitions()
-    expect(Object.keys(allTools).sort()).toEqual(['bash', 'edit', 'find', 'grep', 'ls', 'lsp', 'read', 'write'])
-    expect(Object.keys(allDefinitions).sort()).toEqual(['bash', 'edit', 'find', 'grep', 'ls', 'lsp', 'read', 'write'])
+    const expectedAllToolNames = [
+      'bash',
+      'edit',
+      'find',
+      'grep',
+      'ls',
+      'lsp',
+      'read',
+      'verify_changes',
+      'write'
+    ]
+    expect(Object.keys(allTools).sort()).toEqual(expectedAllToolNames)
+    expect(Object.keys(allDefinitions).sort()).toEqual(expectedAllToolNames)
     expect(createReadTool).toBe(createReadLocalTool)
     expect(createReadToolDefinition).toBe(createReadLocalTool)
     expect(createWriteTool).toBeTypeOf('function')
@@ -758,7 +779,12 @@ describe('Kun built-in tools', () => {
     const outputFile = String(payload.output_file)
     expect(outputFile).toContain('background-shells')
     expect(outputFile.endsWith(`${String(payload.session_id)}.output`)).toBe(true)
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    const completed = await executeTool(backgroundHost, workspace, 'background_shell', {
+      action: 'poll',
+      session_id: String(payload.session_id),
+      yield_seconds: 2
+    })
+    expect(completed.status).toBe('completed')
     const full = await readFile(outputFile, 'utf-8')
     expect(full.startsWith('line-one\n')).toBe(true)
     expect([...full].length).toBeGreaterThan(10_000)

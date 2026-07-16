@@ -128,10 +128,22 @@ export class BackgroundShellOutputWriter {
   async buildReturnFields(
     maxChars = DEFAULT_BACKGROUND_SHELL_OUTPUT_SUMMARY_MAX_CHARS
   ): Promise<BackgroundShellOutputSummary & { output_file: string }> {
+    await this.flushPendingWrites()
     const summary = await readBackgroundShellOutputSummary(this.paths.outputFilePath, maxChars)
     return {
       ...summary,
       output_file: this.paths.outputFilePath
     }
+  }
+
+  private async flushPendingWrites(): Promise<void> {
+    const stream = this.stream
+    if (!stream || this.closed) return
+    await new Promise<void>((resolvePromise, reject) => {
+      stream.write('', (error) => {
+        if (error) reject(error)
+        else resolvePromise()
+      })
+    })
   }
 }

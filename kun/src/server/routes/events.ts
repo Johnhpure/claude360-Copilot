@@ -28,6 +28,7 @@ export function buildEventStreamResponse(input: {
   threadId: string
   eventBus: EventBus
   sessionStore: SessionStore
+  predicate?: (event: RuntimeEvent) => boolean
 }): Response {
   const url = new URL(input.request.url)
   const sinceSeqFromQuery = Number(url.searchParams.get('since_seq') ?? '0') || 0
@@ -61,6 +62,7 @@ export function buildEventStreamResponse(input: {
             if (event.seq <= lastDeliveredSeq) return
             lastDeliveredSeq = event.seq
           }
+          if (input.predicate && !input.predicate(event)) return
           controller.enqueue(encoder.encode(encodeSseEvent(event)))
         }
         const highestSeq = await input.sessionStore.highestSeq(input.threadId).catch(() => 0)
