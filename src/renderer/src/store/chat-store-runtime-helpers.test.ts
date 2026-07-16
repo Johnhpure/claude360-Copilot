@@ -6,6 +6,7 @@ import {
 import type { ChatBlock } from '../agent/types'
 import {
   isOptimisticUserBlockId,
+  latestTurnHasVisibleReply,
   reconcileOptimisticUserBlock,
   upsertUserBlock
 } from './chat-store-runtime-helpers'
@@ -66,5 +67,44 @@ describe('chat store runtime helpers', () => {
       id: 'item_steered_notice',
       meta: { messageSource: 'background_shell' }
     })
+  })
+})
+
+describe('latestTurnHasVisibleReply (#reply-invisible)', () => {
+  const user = (id: string): ChatBlock => ({ kind: 'user', id, createdAt: 't', text: 'q' })
+  const assistant = (id: string, text: string): ChatBlock => ({ kind: 'assistant', id, createdAt: 't', text })
+
+  it('sees live stream buffers as visible content', () => {
+    expect(latestTurnHasVisibleReply([user('u1')], 'partial answer', '')).toBe(true)
+    expect(latestTurnHasVisibleReply([user('u1')], '', 'thinking...')).toBe(true)
+  })
+
+  it('requires renderable output after the last user message', () => {
+    expect(latestTurnHasVisibleReply([user('u1')])).toBe(false)
+    expect(latestTurnHasVisibleReply([user('u1'), assistant('a1', 'hello there')])).toBe(true)
+    // 空文本 / 纯 <think> 的 assistant 块不算可见回复。
+    expect(latestTurnHasVisibleReply([user('u1'), assistant('a1', '  ')])).toBe(false)
+    expect(latestTurnHasVisibleReply([user('u1'), assistant('a1', '<think>x</think>')])).toBe(false)
+  })
+
+  it('counts tool activity in the latest turn as visible output', () => {
+    const tool: ChatBlock = {
+      kind: 'tool',
+      id: 'tool1',
+      createdAt: 't',
+      toolName: 'bash',
+      status: 'completed'
+    } as unknown as ChatBlock
+    expect(latestTurnHasVisibleReply([user('u1'), tool])).toBe(true)
+  })
+
+  it('ignores replies that belong to an earlier turn', () => {
+    expect(
+      latestTurnHasVisibleReply([user('u1'), assistant('a1', 'earlier reply'), user('u2')])
+    ).toBe(false)
+  })
+
+  it('is false for an empty timeline', () => {
+    expect(latestTurnHasVisibleReply([])).toBe(false)
   })
 })

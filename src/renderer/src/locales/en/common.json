@@ -1855,6 +1855,7 @@
   "busyTimeout": "No response from the runtime after waiting {{minutes}} minutes. Deep-thinking tasks may take longer. If it stays stuck, you can cancel and retry.",
   "runtimeActionNeedsConnection": "Connect to the runtime before using AI actions.",
   "runtimeFetchFailed": "Could not reach Claude360 Copilot. Make sure the local runtime (`kun serve`) is running, or enable auto-start in Settings.",
+  "runtimeEmptyModelResponse": "The model returned an empty reply (still empty after an automatic retry). Check the current group/model availability or switch models, then resend.",
   "runtimeModelRequestFailed": "Claude360 Copilot could not reach the model provider. Check your network, proxy settings, and provider configuration (Base URL, Endpoint format).",
   "runtimeBinaryNotInstalled": "The local runtime executable was not found. Run `npm install` in the project folder to fetch the CLI, or set the runtime binary path in Settings.",
   "runtimeAutoStartDisabled": "Claude360 Copilot is offline. Enable automatic startup in Settings, or start the local runtime with `kun serve` manually.",

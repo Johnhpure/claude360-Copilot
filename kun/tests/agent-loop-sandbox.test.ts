@@ -10,6 +10,9 @@ describe('AgentLoop sandbox policy', () => {
       model: 'sandbox-observer',
       async *stream(request: ModelRequest): AsyncIterable<ModelStreamChunk> {
         observedRequest = request
+        // 空响应现在会触发重试并失败（empty_model_response）；给出最小文本
+        // 让 turn 正常完成——本测试只关心工具目录的沙箱过滤。
+        yield { kind: 'assistant_text_delta', text: 'ok' }
         yield { kind: 'completed', stopReason: 'stop' }
       }
     })

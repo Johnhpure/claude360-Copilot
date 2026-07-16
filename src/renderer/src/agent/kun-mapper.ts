@@ -1265,8 +1265,10 @@ export async function dispatchKunRuntimeEvent(
       })
       return
     case 'turn_completed':
-    case 'turn_aborted':
       sink.onTurnComplete()
+      return
+    case 'turn_aborted':
+      sink.onTurnComplete({ aborted: true })
       return
     case 'turn_failed': {
       const payload = runtimeErrorFromEvent(event, 'Claude360 Copilot turn failed')

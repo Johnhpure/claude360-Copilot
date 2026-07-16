@@ -95,6 +95,43 @@ export function threadSnapshotLooksRunning(blocks: ChatBlock[], threadStatus?: s
   return threadHasPendingRuntimeWork(blocks)
 }
 
+/**
+ * True when the latest turn (everything after the last real user message)
+ * contains renderable agent output — assistant text, reasoning, or tool/review
+ * activity. The "reply complete" notification must only fire when this holds:
+ * a turn that settled with nothing visible (empty upstream completion, lost
+ * SSE deltas, abort) would otherwise notify the user about a reply that does
+ * not exist on screen (#reply-invisible).
+ */
+export function latestTurnHasVisibleReply(
+  blocks: ChatBlock[],
+  liveAssistant = '',
+  liveReasoning = ''
+): boolean {
+  if (liveAssistant.trim() || liveReasoning.trim()) return true
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    const block = blocks[index]
+    if (!block) continue
+    if (block.kind === 'user') {
+      if (isBackgroundShellNoticeUserMessage(block)) continue
+      return false
+    }
+    if (block.kind === 'assistant') {
+      if (assistantBlockHasVisibleContent(block)) return true
+      continue
+    }
+    if (
+      block.kind === 'reasoning' ||
+      block.kind === 'tool' ||
+      block.kind === 'review' ||
+      block.kind === 'compaction'
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
 export function findLatestUserBlockId(blocks: ChatBlock[]): string | null {
   for (let idx = blocks.length - 1; idx >= 0; idx -= 1) {
     const block = blocks[idx]

@@ -22,6 +22,7 @@ import { isClawThread } from './chat-store-helpers'
 import {
   collectAssistantTextForTurn,
   isOptimisticUserBlockId,
+  latestTurnHasVisibleReply,
   reconcileOptimisticUserBlock,
   settlePendingRuntimeWorkAfterInterrupt,
   threadSnapshotLooksRunning,
@@ -285,6 +286,62 @@ function notifyTurnComplete(threadId: string | null, state: ChatState, dedupeKey
         threadId
       }).catch(() => undefined)
     })
+}
+
+function logTurnCompleteAnomaly(message: string, detail: Record<string, unknown>): void {
+  if (typeof window.kunGui?.logError !== 'function') return
+  void window.kunGui.logError('turn-complete', message, detail).catch(() => undefined)
+}
+
+/**
+ * Self-heal for a turn that completed without any visible reply
+ * (#reply-invisible): the runtime persists assistant items at turn
+ * boundaries, so when the live SSE deltas were lost (stream terminated by a
+ * runtime restart, dropped seq window, …) the authoritative content is still
+ * in the thread detail. Re-fetch it, swap the blocks in, and only then fire
+ * the completion notification. If even the persisted detail has no reply,
+ * log loudly and stay silent — never notify "reply complete" for content the
+ * user cannot see.
+ */
+async function recoverInvisibleCompletedTurn(input: {
+  threadId: string | null
+  turnId: string | null
+  completedState: ChatState
+  completedKey: string
+  set: (partial: Partial<ChatState> | ((state: ChatState) => Partial<ChatState>)) => void
+  get: () => ChatState
+}): Promise<void> {
+  const { threadId, turnId, completedState, completedKey, set, get } = input
+  if (!threadId) return
+  const logDetail: Record<string, unknown> = { threadId, ...(turnId ? { turnId } : {}) }
+  try {
+    const detail = await getProvider().getThreadDetail(threadId)
+    if (!latestTurnHasVisibleReply(detail.blocks)) {
+      logTurnCompleteAnomaly(
+        'Turn completed without any visible assistant content; completion notification suppressed',
+        logDetail
+      )
+      return
+    }
+    // The reply exists in the persisted thread but never reached the live
+    // timeline — rehydrate the blocks (only while the thread is still the
+    // active, idle one) and notify now that the content is on screen.
+    if (get().activeThreadId !== threadId || get().busy) return
+    set((s) => ({
+      blocks: detail.blocks,
+      lastSeq: Math.max(s.lastSeq, detail.latestSeq ?? 0)
+    }))
+    logTurnCompleteAnomaly(
+      'Turn completed but live blocks were missing; recovered the reply from thread detail',
+      logDetail
+    )
+    notifyTurnComplete(threadId, completedState, completedKey)
+  } catch (error) {
+    logTurnCompleteAnomaly('Failed to recover thread detail after an invisible turn completion', {
+      ...logDetail,
+      message: error instanceof Error ? error.message : String(error)
+    })
+  }
 }
 
 /**
@@ -560,21 +617,32 @@ export function syncTurnCompletionPoll(
       return provider.getThreadDetail(threadId)
     },
     threadLooksRunning: threadSnapshotLooksRunning,
-    onCompletedThreads: async (doneIds, state, setState, getState) => {
-      for (const id of doneIds) {
-        notifyTurnComplete(
-          id,
-          state,
-          completionNotificationDedupeKeyForWatchedThread(id)
-        )
-        clearWatchedCompletionNotification(id)
+    onCompletedThreads: async (done, state, setState, getState) => {
+      for (const { threadId, blocks } of done) {
+        // Same gate as the live path (#reply-invisible): a background thread
+        // whose turn settled without any visible reply (aborted by a runtime
+        // restart, empty completion, failure) must not announce "reply
+        // complete" — it is still marked unread so the user can inspect it.
+        if (latestTurnHasVisibleReply(blocks)) {
+          notifyTurnComplete(
+            threadId,
+            state,
+            completionNotificationDedupeKeyForWatchedThread(threadId)
+          )
+        } else {
+          logTurnCompleteAnomaly(
+            'Watched thread settled without visible assistant content; completion notification suppressed',
+            { threadId }
+          )
+        }
+        clearWatchedCompletionNotification(threadId)
       }
       setState((snapshot) => {
         const watchTurnCompletion = { ...snapshot.watchTurnCompletion }
         const unreadThreadIds = { ...snapshot.unreadThreadIds }
-        for (const id of doneIds) {
-          delete watchTurnCompletion[id]
-          unreadThreadIds[id] = true
+        for (const { threadId } of done) {
+          delete watchTurnCompletion[threadId]
+          unreadThreadIds[threadId] = true
         }
         return { watchTurnCompletion, unreadThreadIds }
       })
@@ -1132,7 +1200,7 @@ export function buildThreadEventSink(
         )
       }))
     },
-    onTurnComplete: () => {
+    onTurnComplete: (info) => {
       if (!isCurrentStream()) return
       resetBusyRecoveryAttempts()
       clearBusyWatchdog()
@@ -1142,6 +1210,15 @@ export function buildThreadEventSink(
       const completedKey = completedState.currentTurnId
         ? `turn:${completedState.currentTurnId}`
         : `active:${completedThreadId ?? 'unknown'}:${completedState.lastSeq}`
+      // Notification gate (#reply-invisible): "reply complete" may only fire
+      // when the finished turn actually has renderable output on screen.
+      // Aborted turns never notify; a completed turn with nothing visible
+      // first tries to recover the persisted reply from the thread detail.
+      const turnHasVisibleReply = latestTurnHasVisibleReply(
+        completedState.blocks,
+        completedState.liveAssistant,
+        completedState.liveReasoning
+      )
       const pendingMirror = takePendingClawFeishuMirror(completedTurnId)
       const assistantMirrorText =
         pendingMirror
@@ -1177,7 +1254,20 @@ export function buildThreadEventSink(
           'assistant'
         ).catch(() => undefined)
       }
-      notifyTurnComplete(completedThreadId, completedState, completedKey)
+      if (!info?.aborted) {
+        if (turnHasVisibleReply) {
+          notifyTurnComplete(completedThreadId, completedState, completedKey)
+        } else {
+          void recoverInvisibleCompletedTurn({
+            threadId: completedThreadId,
+            turnId: completedTurnId,
+            completedState,
+            completedKey,
+            set,
+            get
+          })
+        }
+      }
       notifyWriteWorkspaceFileRefresh(get)
       notifySddChatTranscriptMirror(get)
       syncTurnCompletionPoll(set, get)

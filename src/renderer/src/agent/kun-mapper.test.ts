@@ -1102,3 +1102,28 @@ describe('tool presentation inference', () => {
     })
   })
 })
+
+describe('turn settlement mapping (#reply-invisible)', () => {
+  it('marks turn_completed as a real completion and turn_aborted as aborted', async () => {
+    const calls: Array<{ aborted?: boolean } | undefined> = []
+    const sink: ThreadEventSink = {
+      ...makeSink(),
+      onTurnComplete: (info) => {
+        calls.push(info)
+      }
+    }
+
+    await dispatchKunRuntimeEvent(
+      { kind: 'turn_completed', seq: 1, threadId: 'thr_1', turnId: 'turn_1' } as CoreRuntimeEventJson,
+      sink,
+      async () => undefined
+    )
+    await dispatchKunRuntimeEvent(
+      { kind: 'turn_aborted', seq: 2, threadId: 'thr_1', turnId: 'turn_1' } as CoreRuntimeEventJson,
+      sink,
+      async () => undefined
+    )
+
+    expect(calls).toEqual([undefined, { aborted: true }])
+  })
+})

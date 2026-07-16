@@ -189,6 +189,7 @@ describe('Attachment store and multimodal input', () => {
       model: 'fake',
       async *stream(request) {
         seenRequests.push(request)
+        yield { kind: 'assistant_text_delta', text: 'ok' }
         yield { kind: 'completed', stopReason: 'stop' }
       }
     }
@@ -250,6 +251,7 @@ describe('Attachment store and multimodal input', () => {
       model: 'fake',
       async *stream(request) {
         seenRequests.push(request)
+        yield { kind: 'assistant_text_delta', text: 'ok' }
         yield { kind: 'completed', stopReason: 'stop' }
       }
     }
@@ -284,6 +286,7 @@ describe('Attachment store and multimodal input', () => {
       model: 'fake',
       async *stream(request) {
         seenRequests.push(request)
+        yield { kind: 'assistant_text_delta', text: 'ok' }
         yield { kind: 'completed', stopReason: 'stop' }
       }
     }
@@ -339,6 +342,7 @@ describe('Attachment store and multimodal input', () => {
       provider: 'fake',
       model: 'fake',
       async *stream() {
+        yield { kind: 'assistant_text_delta', text: 'ok' }
         yield { kind: 'completed', stopReason: 'stop' }
       }
     }

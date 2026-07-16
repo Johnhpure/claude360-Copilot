@@ -26,7 +26,8 @@ import {
   readThreadComposerMode,
   rememberThreadComposerSelection,
   rememberTurnModel,
-  resolveComposerContextWindowTokens
+  resolveComposerContextWindowTokens,
+  resolveComposerSendSelection
 } from './chat-store-helpers'
 
 const TURN_MODEL_STORAGE_KEY = 'kun.turnModelLabel'
@@ -419,5 +420,63 @@ describe('conversationHasVisionAttachments', () => {
       { kind: 'user', id: 'u1', text: 'check', meta: { attachmentIds: ['att-1'] } }
     ]
     expect(conversationHasVisionAttachments(blocks)).toBe(true)
+  })
+})
+
+describe('resolveComposerSendSelection (#codex-model)', () => {
+  const groups: ModelProviderModelGroup[] = [
+    { providerId: 'claude360-codex', label: 'Codex', modelIds: ['gpt-5.5', 'gpt-5.6-terra'] },
+    { providerId: 'claude360-full', label: '满血模型', modelIds: ['deepseek-v4-pro'] }
+  ]
+
+  it('keeps a matching (model, provider) pair', () => {
+    expect(resolveComposerSendSelection(groups, 'gpt-5.6-terra', 'claude360-codex')).toEqual({
+      model: 'gpt-5.6-terra',
+      providerId: 'claude360-codex',
+      droppedModel: false
+    })
+  })
+
+  it('re-resolves the provider when the stored group does not serve the model', () => {
+    // Codex 分组不提供 deepseek-v4-pro：改用模型归属分组，而不是打出 model_not_found。
+    expect(resolveComposerSendSelection(groups, 'deepseek-v4-pro', 'claude360-codex')).toEqual({
+      model: 'deepseek-v4-pro',
+      providerId: 'claude360-full',
+      droppedModel: false
+    })
+  })
+
+  it('drops a model no group serves so the runtime default applies', () => {
+    expect(resolveComposerSendSelection(groups, 'ghost-model', 'claude360-codex')).toEqual({
+      model: '',
+      providerId: 'claude360-codex',
+      droppedModel: true
+    })
+  })
+
+  it('treats empty and auto as "runtime default model"', () => {
+    expect(resolveComposerSendSelection(groups, '', 'claude360-codex').model).toBe('')
+    expect(resolveComposerSendSelection(groups, ' AUTO ', 'claude360-codex').model).toBe('')
+  })
+
+  it('cannot validate unknown providers or an empty group list; sends as-is', () => {
+    expect(resolveComposerSendSelection(groups, 'deepseek-v4-pro', 'my-custom-provider')).toEqual({
+      model: 'deepseek-v4-pro',
+      providerId: 'my-custom-provider',
+      droppedModel: false
+    })
+    expect(resolveComposerSendSelection([], 'deepseek-v4-pro', 'claude360-codex')).toEqual({
+      model: 'deepseek-v4-pro',
+      providerId: 'claude360-codex',
+      droppedModel: false
+    })
+  })
+
+  it('resolves the owning provider when none is stored', () => {
+    expect(resolveComposerSendSelection(groups, 'deepseek-v4-pro', '')).toEqual({
+      model: 'deepseek-v4-pro',
+      providerId: 'claude360-full',
+      droppedModel: false
+    })
   })
 })

@@ -38,7 +38,8 @@ import {
   conversationHasVisionAttachmentsCached,
   isClawThread,
   providerIdForComposerModel,
-  resolveComposerContextWindowTokens
+  resolveComposerContextWindowTokens,
+  resolveComposerSendSelection
 } from '../store/chat-store-helpers'
 import { threadHasPendingRuntimeWork } from '../store/chat-store-runtime-helpers'
 import {
@@ -1463,9 +1464,22 @@ export function Workbench(): ReactElement {
         retrieval,
         ...(agentPersona ? { agentPersona } : {})
       })
-      const model = writeState.assistantModel.trim()
-      const providerId =
-        writeState.assistantProviderId.trim() || providerIdForComposerModel(composerModelGroups, model)
+      // #codex-model：发送前校验（模型, 分组）配对——过期的写作助手选择
+      // （如分组已切到 Codex 但模型仍是 deepseek-v4-pro）会被上游以
+      // model_not_found 拒绝；不匹配时改用模型归属分组或回落运行时默认模型。
+      const sendSelection = resolveComposerSendSelection(
+        composerModelGroups,
+        writeState.assistantModel,
+        writeState.assistantProviderId
+      )
+      if (sendSelection.droppedModel) {
+        console.warn('[kun-gui] write assistant model is not served by any model group; using runtime default model', {
+          model: writeState.assistantModel,
+          providerId: writeState.assistantProviderId
+        })
+      }
+      const model = sendSelection.model
+      const providerId = sendSelection.providerId
       const reasoningEffort = composerReasoningEffortRequestValue(composerReasoningEffort)
       const sent = await sendMessage(prompt, composerMode === 'plan' ? 'plan' : 'agent', {
         ...(!v && documentAttachments.length > 0
@@ -1946,9 +1960,21 @@ export function Workbench(): ReactElement {
     }
 
     const assistantSelection = useWriteWorkspaceStore.getState()
-    const model = assistantSelection.assistantModel.trim()
-    const providerId =
-      assistantSelection.assistantProviderId.trim() || providerIdForComposerModel(composerModelGroups, model)
+    // #codex-model：与写作助手发送路径同一套配对校验，防止过期模型选择打到
+    // 不服务该模型的分组。
+    const sddSendSelection = resolveComposerSendSelection(
+      composerModelGroups,
+      assistantSelection.assistantModel,
+      assistantSelection.assistantProviderId
+    )
+    if (sddSendSelection.droppedModel) {
+      console.warn('[kun-gui] SDD assistant model is not served by any model group; using runtime default model', {
+        model: assistantSelection.assistantModel,
+        providerId: assistantSelection.assistantProviderId
+      })
+    }
+    const model = sddSendSelection.model
+    const providerId = sddSendSelection.providerId
     return sendMessage(payload.prompt, 'agent', {
       displayText: payload.displayText,
       ...(model ? { model } : {}),

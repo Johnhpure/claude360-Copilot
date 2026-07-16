@@ -5,7 +5,12 @@ describe('main window controls wiring', () => {
   it('wires the Windows native controls overlay into BrowserWindow creation', async () => {
     const source = await readFile(new URL('./index.ts', import.meta.url), 'utf8')
 
-    expect(source).toContain("titleBarOverlay: resolveWindowControlsOverlay(process.platform)")
+    expect(source).toContain(
+      'titleBarOverlay: resolveWindowControlsOverlay(process.platform, prefersDarkWindowChrome())'
+    )
+    // 主题切换与系统深浅变化都必须重应用 overlay 配色（#win-controls-theme）。
+    expect(source).toContain('applyWindowControlsOverlayTheme(mainWindow, prefersDarkWindowChrome())')
+    expect(source).toContain("nativeTheme.on('updated'")
   })
 
   it('reserves the Window Controls Overlay area with a stable fallback width', async () => {

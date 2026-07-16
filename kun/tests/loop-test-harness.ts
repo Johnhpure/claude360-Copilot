@@ -64,6 +64,11 @@ export function makeSilentModel(): ModelClient {
     provider: 'silent',
     model: 'silent',
     async *stream(): AsyncIterable<ModelStreamChunk> {
+      // "Silent" = no tool calls / no reasoning. A minimal text delta is
+      // still required: a whole-turn empty completion now fails the turn
+      // with `empty_model_response` (#reply-invisible) instead of settling
+      // as a bogus success.
+      yield { kind: 'assistant_text_delta', text: 'ok' }
       yield { kind: 'completed', stopReason: 'stop' }
     }
   }

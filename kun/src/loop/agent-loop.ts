@@ -78,6 +78,8 @@ import { applyRequestHistoryHygiene } from './request-history-hygiene.js'
 import { capToolResultImages } from './tool-result-image.js'
 import { estimateModelRequestInputTokens, estimateRequestOverheadTokens } from './model-request-estimator.js'
 import {
+  fixedModelFromCandidates,
+  providerSupportsAutoModelRoute,
   recentAutoRouterContext,
   resolveAutoModelRoute,
   type AutoModelRouteSelection
@@ -498,6 +500,7 @@ const GOAL_NO_TOOL_REPEAT_SIMILARITY = 0.85
 const GOAL_NO_TOOL_REPEAT_MIN_LENGTH = 12
 const GOAL_NO_TOOL_REPEAT_MAX_RECOVERY_STEPS = 3
 const EMPTY_POST_TOOL_MAX_RECOVERY_STEPS = 1
+const EMPTY_MODEL_RESPONSE_MAX_RECOVERY_STEPS = 1
 
 function goalNoToolRecoveryInstruction(recoveryStep: number): string {
   return [
@@ -516,6 +519,15 @@ function emptyPostToolRecoveryInstruction(): string {
     '- The previous model response ended without a final answer after tool execution.',
     '- Continue the task now: inspect the tool result, call additional tools if needed, or provide a clear final answer.',
     '- Do not stop with an empty response.'
+  ].join('\n')
+}
+
+function emptyModelResponseRecoveryInstruction(): string {
+  return [
+    'Empty response recovery:',
+    '- Your previous response was completely empty (no text, no tool calls).',
+    '- Answer the user request now with a substantive reply.',
+    '- Do not return an empty response again.'
   ].join('\n')
 }
 
@@ -770,6 +782,7 @@ export class AgentLoop {
   private readonly lastNoToolTextByTurn = new Map<string, string>()
   private readonly goalNoToolRecoveryStepsByTurn = new Map<string, number>()
   private readonly emptyPostToolRecoveryStepsByTurn = new Map<string, number>()
+  private readonly emptyResponseRecoveryStepsByTurn = new Map<string, number>()
   private readonly turnFailures = new Map<string, TurnFailure>()
   /** Turns that executed at least one real (non-goal-status) tool call. */
   private readonly turnMadeProgress = new Set<string>()
@@ -932,6 +945,7 @@ export class AgentLoop {
       this.turnMadeProgress.delete(turnId)
       this.goalResumeSuppressedByTurn.delete(turnId)
       this.emptyPostToolRecoveryStepsByTurn.delete(turnId)
+      this.emptyResponseRecoveryStepsByTurn.delete(turnId)
       this.turnFailures.delete(turnId)
       await this.runTurnEndHooks(threadId, turnId, finalStatus ?? 'failed', finalError)
     }
@@ -1376,6 +1390,7 @@ export class AgentLoop {
       items,
       signal,
       reasoningEffort: turn?.reasoningEffort,
+      ...(thread?.providerId?.trim() ? { providerId: thread.providerId.trim() } : {}),
       candidates: [turn?.model, thread?.model, this.opts.model.model]
     })
     await this.recordPipelineStage(threadId, turnId, 'input_routed', {
@@ -1543,6 +1558,9 @@ export class AgentLoop {
       ...(activeTodoInstruction ? [activeTodoInstruction] : []),
       ...((this.emptyPostToolRecoveryStepsByTurn.get(turnId) ?? 0) > 0
         ? [emptyPostToolRecoveryInstruction()]
+        : []),
+      ...((this.emptyResponseRecoveryStepsByTurn.get(turnId) ?? 0) > 0
+        ? [emptyModelResponseRecoveryInstruction()]
         : []),
       ...imageGenerationReferenceInstructions({
         imageAttachments: attachments.imageAttachments,
@@ -2024,6 +2042,67 @@ export class AgentLoop {
         )
         return 'stop'
       }
+      // A clean 'stop' with no tool calls, no text, and no reasoning — on a
+      // turn that produced no visible work at all — must not settle as a
+      // successful turn: the GUI would fire a "reply complete" notification
+      // with nothing rendered (#reply-invisible). Retry once (some proxies
+      // return transient empty completions), then fail loudly.
+      if (
+        stopReason === 'stop' &&
+        !textAccumulator.value.trim() &&
+        !reasoningAccumulator.value.trim()
+      ) {
+        const turnProducedVisibleWork = historyItems.some(
+          (item) =>
+            item.turnId === turnId &&
+            (item.kind === 'assistant_text' ||
+              item.kind === 'assistant_reasoning' ||
+              item.kind === 'tool_call')
+        )
+        if (!turnProducedVisibleWork) {
+          const recoverySteps = (this.emptyResponseRecoveryStepsByTurn.get(turnId) ?? 0) + 1
+          if (recoverySteps <= EMPTY_MODEL_RESPONSE_MAX_RECOVERY_STEPS) {
+            this.emptyResponseRecoveryStepsByTurn.set(turnId, recoverySteps)
+            return 'continue'
+          }
+          const diagnostics = this.modelClientDiagnostics(request.providerId)
+          console.warn('[kun:model] model returned an empty completion; failing the turn', {
+            threadId,
+            turnId,
+            model: request.model,
+            ...(request.providerId ? { providerId: request.providerId } : {}),
+            ...diagnostics
+          })
+          const message =
+            'The model returned an empty response (no text, no tool calls), including after an automatic retry. ' +
+            'Check the model provider status or switch to another model, then resend the message.'
+          this.rememberTurnFailure(turnId, {
+            error: message,
+            code: 'empty_model_response',
+            severity: 'error'
+          })
+          await this.opts.events.record({
+            kind: 'error',
+            threadId,
+            turnId,
+            message,
+            code: 'empty_model_response',
+            severity: 'error'
+          })
+          await this.opts.turns.applyItem(
+            threadId,
+            makeErrorItem({
+              id: this.opts.ids.next('item_error'),
+              turnId,
+              threadId,
+              message,
+              code: 'empty_model_response',
+              severity: 'error'
+            })
+          )
+          return 'failed'
+        }
+      }
       return 'stop'
     }
     // Tool calls mean the turn is making progress again; reset the no-tool
@@ -2031,6 +2110,7 @@ export class AgentLoop {
     this.lastNoToolTextByTurn.delete(turnId)
     this.goalNoToolRecoveryStepsByTurn.delete(turnId)
     this.emptyPostToolRecoveryStepsByTurn.delete(turnId)
+    this.emptyResponseRecoveryStepsByTurn.delete(turnId)
     const dispatched = await this.dispatchToolCalls({
       calls: completedToolCalls,
       threadId,
@@ -2929,6 +3009,7 @@ export class AgentLoop {
     items: readonly TurnItem[]
     signal: AbortSignal
     reasoningEffort?: string
+    providerId?: string
     candidates: Array<string | undefined>
   }): Promise<{ model: string; reasoningEffort?: string }> {
     const requestedReasoningEffort = normalizeRequestedReasoningEffort(input.reasoningEffort)
@@ -2937,6 +3018,28 @@ export class AgentLoop {
       return {
         model: resolved.model,
         ...(requestedReasoningEffort ? { reasoningEffort: requestedReasoningEffort } : {})
+      }
+    }
+    // 'auto' can only route to the hardcoded DeepSeek pair. When the client
+    // that will serve this turn is not DeepSeek-capable (e.g. a Claude360
+    // group), routing would guarantee a `model_not_found` upstream failure —
+    // fall back to the provider's own configured model instead.
+    const diagnostics = this.modelClientDiagnostics(input.providerId)
+    if (!providerSupportsAutoModelRoute(diagnostics)) {
+      const fallbackModel =
+        fixedModelFromCandidates(input.candidates) ?? diagnostics.configuredModel?.trim() ?? ''
+      if (fallbackModel) {
+        console.warn('[kun:model] auto model route unavailable for this provider; using configured model', {
+          threadId: input.threadId,
+          turnId: input.turnId,
+          ...(input.providerId ? { providerId: input.providerId } : {}),
+          fallbackModel,
+          ...diagnostics
+        })
+        return {
+          model: fallbackModel,
+          ...(requestedReasoningEffort ? { reasoningEffort: requestedReasoningEffort } : {})
+        }
       }
     }
     const key = autoModelRouteKey(input.threadId, input.turnId)

@@ -30,7 +30,7 @@ import { SteeringQueue } from '../src/loop/steering-queue.js'
 import { SequentialIdGenerator } from '../src/ports/id-generator.js'
 import { TurnService } from '../src/services/turn-service.js'
 import type { TurnItem } from '../src/contracts/items.js'
-import type { ModelRequest, ModelStreamChunk } from '../src/ports/model-client.js'
+import type { ModelClient, ModelRequest, ModelStreamChunk } from '../src/ports/model-client.js'
 import {
   bootstrapThread,
   makeFakeModel,
@@ -46,6 +46,63 @@ describe('AgentLoop', () => {
     const status = await h.loop.runTurn(h.threadId, h.turnId)
     expect(status).toBe('completed')
     expect(h.inflight.size()).toBe(0)
+  })
+
+  it('fails a whole-turn empty completion after one automatic retry (#reply-invisible)', async () => {
+    let modelCalls = 0
+    const h = makeHarness({
+      provider: 'empty-upstream',
+      model: 'empty-upstream',
+      async *stream(): AsyncIterable<ModelStreamChunk> {
+        modelCalls += 1
+        yield { kind: 'completed', stopReason: 'stop' }
+      }
+    })
+    await bootstrapThread(h)
+    const status = await h.loop.runTurn(h.threadId, h.turnId)
+
+    // 一次原始请求 + 一次自动重试，仍为空 → turn 失败并留下可见错误项，
+    // 而不是"成功完成"后弹出无内容的回复完成通知。
+    expect(modelCalls).toBe(2)
+    expect(status).toBe('failed')
+    const items = await h.sessionStore.loadItems(h.threadId)
+    expect(items.some((item) => item.kind === 'error' && item.code === 'empty_model_response')).toBe(true)
+    const events = await h.sessionStore.loadEventsSince(h.threadId, 0)
+    expect(events.some((event) => event.kind === 'error' && event.code === 'empty_model_response')).toBe(true)
+    expect(h.inflight.size()).toBe(0)
+  })
+
+  it('falls back to the configured model when auto routing targets a non-DeepSeek provider (#codex-model)', async () => {
+    const seenModels: string[] = []
+    const h = makeHarness({
+      provider: 'claude360-group',
+      model: 'gpt-5.6-terra',
+      // modelClientDiagnostics 读取 client.config —— 模拟真实 CompatModelClient
+      // 暴露的 HTTP 配置（Claude360 分组不提供 deepseek 模型）。
+      config: {
+        baseUrl: 'https://claude360.xyz',
+        endpointFormat: 'chat_completions',
+        model: 'gpt-5.6-terra'
+      },
+      async *stream(request: ModelRequest): AsyncIterable<ModelStreamChunk> {
+        seenModels.push(request.model)
+        yield { kind: 'assistant_text_delta', text: 'ok' }
+        yield { kind: 'completed', stopReason: 'stop' }
+      }
+    } as unknown as ModelClient)
+    await h.threadStore.upsert(
+      createThreadRecord({ id: h.threadId, title: 'demo', workspace: '/tmp', model: 'auto' })
+    )
+    const { turnId } = await h.turns.startTurn({
+      threadId: h.threadId,
+      request: { prompt: 'hello', model: 'auto' }
+    })
+
+    const status = await h.loop.runTurn(h.threadId, turnId)
+
+    // 不再调用 flash 路由器、不再产生 deepseek-v4-* 请求：直接用配置模型。
+    expect(status).toBe('completed')
+    expect(seenModels).toEqual(['gpt-5.6-terra'])
   })
 
   it('injects the current shell runtime when bash is available', async () => {
@@ -1137,6 +1194,7 @@ describe('AgentLoop', () => {
       model: 'fallback',
       async *stream({ model }: ModelRequest): AsyncIterable<ModelStreamChunk> {
         seenModel = model
+        yield { kind: 'assistant_text_delta', text: 'ok' }
         yield { kind: 'completed', stopReason: 'stop' }
       }
     })
@@ -2370,6 +2428,7 @@ describe('AgentLoop', () => {
             yield { kind: 'completed', stopReason: 'stop' }
             return
           }
+          yield { kind: 'assistant_text_delta', text: 'ok' }
           yield { kind: 'completed', stopReason: 'stop' }
         }
       },
@@ -2438,6 +2497,7 @@ describe('AgentLoop', () => {
             yield { kind: 'error', message: 'summary model unavailable', code: 'summary_down' }
             return
           }
+          yield { kind: 'assistant_text_delta', text: 'ok' }
           yield { kind: 'completed', stopReason: 'stop' }
         }
       },
@@ -2556,6 +2616,7 @@ describe('AgentLoop', () => {
       model: 'budget',
       async *stream(): AsyncIterable<ModelStreamChunk> {
         modelCalls += 1
+        yield { kind: 'assistant_text_delta', text: 'ok' }
         yield { kind: 'completed', stopReason: 'stop' }
       }
     })
@@ -2632,6 +2693,7 @@ describe('AgentLoop', () => {
           return
         }
         expect(request.reasoningEffort).toBe('max')
+        yield { kind: 'assistant_text_delta', text: 'ok' }
         yield { kind: 'completed', stopReason: 'stop' }
       }
     })
@@ -2666,6 +2728,7 @@ describe('AgentLoop', () => {
           return
         }
         expect(request.reasoningEffort).toBe('low')
+        yield { kind: 'assistant_text_delta', text: 'ok' }
         yield { kind: 'completed', stopReason: 'stop' }
       }
     })

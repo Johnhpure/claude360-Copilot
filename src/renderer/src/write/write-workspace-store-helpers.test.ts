@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { DEFAULT_KUN_MODEL } from '@shared/app-settings'
 import {
   WRITE_ASSISTANT_MODEL_KEY,
   normalizeWriteAssistantModel,
@@ -42,18 +41,18 @@ afterEach(() => {
 })
 
 describe('write workspace assistant model helpers', () => {
-  it('normalizes empty and legacy auto assistant models to the default Kun model', () => {
-    expect(normalizeWriteAssistantModel('')).toBe(DEFAULT_KUN_MODEL)
-    expect(normalizeWriteAssistantModel('auto')).toBe(DEFAULT_KUN_MODEL)
-    expect(normalizeWriteAssistantModel(' AUTO ')).toBe(DEFAULT_KUN_MODEL)
+  it('normalizes empty and legacy auto assistant models to "" (runtime default model)', () => {
+    expect(normalizeWriteAssistantModel('')).toBe('')
+    expect(normalizeWriteAssistantModel('auto')).toBe('')
+    expect(normalizeWriteAssistantModel(' AUTO ')).toBe('')
     expect(normalizeWriteAssistantModel('custom-model')).toBe('custom-model')
   })
 
-  it('migrates the stored legacy auto assistant model', () => {
+  it('migrates the stored legacy auto assistant model to "" (runtime default model)', () => {
     const storage = installStorage()
     storage.setItem(WRITE_ASSISTANT_MODEL_KEY, 'auto')
 
-    expect(readStoredAssistantModel()).toBe(DEFAULT_KUN_MODEL)
-    expect(storage.getItem(WRITE_ASSISTANT_MODEL_KEY)).toBe(DEFAULT_KUN_MODEL)
+    expect(readStoredAssistantModel()).toBe('')
+    expect(storage.getItem(WRITE_ASSISTANT_MODEL_KEY)).toBe('')
   })
 })

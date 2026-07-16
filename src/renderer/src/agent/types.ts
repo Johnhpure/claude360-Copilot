@@ -438,7 +438,13 @@ export type ThreadEventSink = {
   onTodos?(ev: { threadId: string; todos: ThreadTodoList | null; cleared?: boolean; createdAt?: string }): void
   /** Thread metadata changed out-of-band (e.g. the backend LLM titler upgraded the title). */
   onThreadUpdated?(ev: { threadId: string; title?: string; titleAuto?: boolean; status?: string }): void
-  onTurnComplete(): void
+  /**
+   * Turn settled without a runtime failure. `aborted` marks turns ended by
+   * an interrupt/orphan-reconcile rather than a real completion — the UI
+   * must settle busy state for both, but only real completions may fire the
+   * "reply complete" notification.
+   */
+  onTurnComplete(info?: { aborted?: boolean }): void
   onError(err: Error, options?: ThreadErrorOptions): void
   /** Optional: cumulative usage update for the thread. */
   onUsage?(usage: ThreadUsageSnapshot): void

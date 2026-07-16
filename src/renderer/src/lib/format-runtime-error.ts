@@ -85,6 +85,10 @@ function localizedRuntimeSummary(code: string | null, text: string): string | nu
     return i18n.t('common:runtimeModelRequestFailed')
   }
 
+  if (code === 'empty_model_response' || lowered.includes('the model returned an empty response')) {
+    return i18n.t('common:runtimeEmptyModelResponse')
+  }
+
   if (code === 'fetch_failed' || lowered.includes('fetch failed')) {
     return i18n.t('common:runtimeFetchFailed')
   }

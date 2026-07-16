@@ -80,6 +80,45 @@ export async function resolveAutoModelRoute(input: {
   }
 }
 
+/**
+ * The auto route can only ever pick the two DeepSeek models above, so it is
+ * only usable when the client that will serve the turn actually exposes
+ * them. A provider is considered DeepSeek-capable when its configured
+ * default model is a DeepSeek model or its base URL points at a DeepSeek
+ * host; anything else (e.g. a Claude360 group like `claude360-codex`) would
+ * 404/503 with `model_not_found`, so the caller must fall back to the
+ * provider's own configured model instead of routing.
+ */
+export function providerSupportsAutoModelRoute(input: {
+  configuredModel?: string
+  providerBaseUrl?: string
+}): boolean {
+  const model = input.configuredModel?.trim().toLowerCase() ?? ''
+  const base = input.providerBaseUrl?.trim().toLowerCase() ?? ''
+  // No config signal at all (in-memory/test clients without an HTTP config):
+  // don't interfere — keep the historical routing behavior.
+  if (!model && !base) return true
+  if (model.startsWith('deepseek-')) return true
+  if (!base) return false
+  try {
+    const host = new URL(base.includes('://') ? base : `https://${base}`).hostname
+    return host === 'deepseek.com' || host.endsWith('.deepseek.com')
+  } catch {
+    return false
+  }
+}
+
+/** First explicit (non-empty, non-'auto') model among the mode candidates. */
+export function fixedModelFromCandidates(
+  candidates: ReadonlyArray<string | undefined>
+): string | null {
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim()
+    if (trimmed && trimmed.toLowerCase() !== 'auto') return trimmed
+  }
+  return null
+}
+
 export function autoModelHeuristic(input: string, _currentModel = ''): typeof AUTO_MODEL_FLASH | typeof AUTO_MODEL_PRO {
   const len = [...input].length
   const lower = input.toLowerCase()

@@ -37,6 +37,7 @@ import {
   type WindowStateManager
 } from './window-state'
 import {
+  applyWindowControlsOverlayTheme,
   applyWindowMaterial,
   resolveWindowControlsOverlay,
   type WindowMaterialValue
@@ -376,6 +377,13 @@ let currentThemePreference: AppSettingsV1['theme'] = 'system'
 // Mica 实验位（R7）：requested 来自设置，applied 是实际生效值（失败静默回退 none）。
 let requestedWindowMaterial: WindowMaterialValue = 'none'
 let appliedWindowMaterial: WindowMaterialValue = 'none'
+
+/** 窗口原生 chrome（底色 / Windows overlay 按钮）当前应使用深色吗。 */
+function prefersDarkWindowChrome(): boolean {
+  if (currentThemePreference === 'dark') return true
+  if (currentThemePreference === 'light') return false
+  return nativeTheme.shouldUseDarkColors
+}
 
 type GuiUpdaterModule = typeof import('./gui-updater')
 
@@ -1413,7 +1421,9 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
     ),
     icon: appIcon.isEmpty() ? undefined : appIcon,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : usesDesktopTitleBar ? 'hidden' : 'default',
-    titleBarOverlay: resolveWindowControlsOverlay(process.platform),
+    // 窗口按钮配色随主题（浅/深）对齐 renderer 标题栏；主题切换时由
+    // applyWindowControlsOverlayTheme 对已存在窗口重应用。
+    titleBarOverlay: resolveWindowControlsOverlay(process.platform, prefersDarkWindowChrome()),
     trafficLightPosition: process.platform === 'darwin' ? { x: 31, y: 22 } : undefined,
     autoHideMenuBar: usesDesktopTitleBar,
     show: false,
@@ -1803,6 +1813,11 @@ app.whenReady().then(async () => {
   // createWindow 用它解析窗口原生底色（防深色首帧白闪）。
   currentThemePreference = initial.theme
   syncNativeThemeSource(initial.theme, nativeTheme)
+  // theme=system 时系统深浅切换 → Windows overlay 按钮配色跟随（dark/light
+  // 偏好下 shouldUseDarkColors 也随 themeSource 变化触发，重应用是幂等的）。
+  nativeTheme.on('updated', () => {
+    applyWindowControlsOverlayTheme(mainWindow, prefersDarkWindowChrome())
+  })
   requestedWindowMaterial = initial.appBehavior.windowMaterial
   // 窗口状态记忆（R1）：同步读一条 <300B 的 JSON（选择理由见 window-state.ts），
   // 不在 settings load 与 createWindow 之间引入 await（startup-sequence.md 不变量）。
@@ -1933,6 +1948,9 @@ app.whenReady().then(async () => {
     if (prev.theme !== saved.theme) {
       currentThemePreference = saved.theme
       syncNativeThemeSource(saved.theme, nativeTheme)
+      // Windows overlay 按钮配色随主题重应用（system 模式的系统级切换由
+      // nativeTheme 'updated' 监听覆盖）。
+      applyWindowControlsOverlayTheme(mainWindow, prefersDarkWindowChrome())
     }
     // Mica 实验位（R7）：windowMaterial 变化时对现有窗口重应用并通知 renderer。
     if (prev.appBehavior.windowMaterial !== saved.appBehavior.windowMaterial) {

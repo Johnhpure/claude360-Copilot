@@ -57,6 +57,7 @@ describe('agent loop: disableUserInput turns (IM bridges)', () => {
       model: 'gui-model',
       async *stream(request: ModelRequest): AsyncIterable<ModelStreamChunk> {
         seenRequests.push(request)
+        yield { kind: 'assistant_text_delta', text: 'ok' }
         yield { kind: 'completed', stopReason: 'stop' }
       }
     })

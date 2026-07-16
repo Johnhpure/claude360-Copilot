@@ -1,5 +1,4 @@
 import {
-  DEFAULT_KUN_MODEL,
   DEFAULT_WRITE_INLINE_COMPLETION_DEBOUNCE_MS,
   DEFAULT_WRITE_INLINE_COMPLETION_MAX_TOKENS,
   DEFAULT_WRITE_INLINE_COMPLETION_MIN_ACCEPT_SCORE,
@@ -35,7 +34,6 @@ export const WRITE_PREVIEW_MODE_KEY = 'kun.write.preview-mode'
 export const WRITE_ASSISTANT_OPEN_KEY = 'kun.write.assistant-open'
 export const WRITE_ASSISTANT_MODEL_KEY = 'kun.write.assistant-model'
 export const WRITE_ASSISTANT_PROVIDER_KEY = 'kun.write.assistant-provider'
-const DEFAULT_WRITE_ASSISTANT_MODEL = DEFAULT_KUN_MODEL
 
 export function readStoredPreviewMode(): WritePreviewMode {
   const raw = readBrowserStorageItem(WRITE_PREVIEW_MODE_KEY)
@@ -63,9 +61,10 @@ export function readStoredAssistantProviderId(): string {
 
 export function normalizeWriteAssistantModel(model: string | null | undefined): string {
   const normalized = model?.trim() ?? ''
-  return !normalized || normalized.toLowerCase() === 'auto'
-    ? DEFAULT_WRITE_ASSISTANT_MODEL
-    : normalized
+  // 空/'auto' → 空串 = 跟随运行时默认模型（选择器显示「自动」）。不得回退
+  // hardcode 默认模型（07-10 收口）：固定的 deepseek 兜底在运行时分组切到
+  // Claude360 分组后会打出 model_not_found（#codex-model）。
+  return normalized.toLowerCase() === 'auto' ? '' : normalized
 }
 
 export function normalizePath(value: string): string {

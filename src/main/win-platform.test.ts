@@ -5,10 +5,14 @@ vi.mock('./logger', () => ({
 }))
 
 import {
+  applyWindowControlsOverlayTheme,
   applyWindowMaterial,
   isWin11MicaCapable,
   parseWindowsBuildNumber,
   resolveWindowControlsOverlay,
+  WINDOW_CONTROLS_OVERLAY_DARK,
+  WINDOW_CONTROLS_OVERLAY_LIGHT,
+  type WindowControlsOverlayTarget,
   type WindowMaterialTarget
 } from './win-platform'
 
@@ -51,9 +55,71 @@ describe('isWin11MicaCapable', () => {
 
 describe('resolveWindowControlsOverlay', () => {
   it('uses native caption controls on Windows only', () => {
-    expect(resolveWindowControlsOverlay('win32')).toEqual({ height: 40 })
+    expect(resolveWindowControlsOverlay('win32')).toEqual({
+      height: 40,
+      ...WINDOW_CONTROLS_OVERLAY_LIGHT
+    })
     expect(resolveWindowControlsOverlay('linux')).toBe(false)
     expect(resolveWindowControlsOverlay('darwin')).toBe(false)
+  })
+
+  it('themes the overlay colors to match the renderer titlebar', () => {
+    expect(resolveWindowControlsOverlay('win32', true)).toEqual({
+      height: 40,
+      ...WINDOW_CONTROLS_OVERLAY_DARK
+    })
+    expect(resolveWindowControlsOverlay('win32', false)).toEqual({
+      height: 40,
+      ...WINDOW_CONTROLS_OVERLAY_LIGHT
+    })
+    expect(resolveWindowControlsOverlay('darwin', true)).toBe(false)
+  })
+})
+
+describe('applyWindowControlsOverlayTheme', () => {
+  function overlayWindow(options: { throws?: boolean } = {}): WindowControlsOverlayTarget & {
+    setTitleBarOverlay: ReturnType<typeof vi.fn>
+  } {
+    const setTitleBarOverlay = vi.fn(() => {
+      if (options.throws) throw new Error('unsupported')
+    })
+    return {
+      setTitleBarOverlay,
+      isDestroyed: () => false
+    } as unknown as WindowControlsOverlayTarget & { setTitleBarOverlay: ReturnType<typeof vi.fn> }
+  }
+
+  it('re-applies themed colors on win32', () => {
+    const win = overlayWindow()
+    applyWindowControlsOverlayTheme(win, true, { platform: 'win32' })
+    expect(win.setTitleBarOverlay).toHaveBeenCalledWith({
+      height: 40,
+      ...WINDOW_CONTROLS_OVERLAY_DARK
+    })
+    applyWindowControlsOverlayTheme(win, false, { platform: 'win32' })
+    expect(win.setTitleBarOverlay).toHaveBeenLastCalledWith({
+      height: 40,
+      ...WINDOW_CONTROLS_OVERLAY_LIGHT
+    })
+  })
+
+  it('never touches the window on non-win32 platforms', () => {
+    for (const platform of ['darwin', 'linux'] as const) {
+      const win = overlayWindow()
+      applyWindowControlsOverlayTheme(win, true, { platform })
+      expect(win.setTitleBarOverlay).not.toHaveBeenCalled()
+    }
+  })
+
+  it('silently logs when setTitleBarOverlay throws', () => {
+    const log = vi.fn()
+    const win = overlayWindow({ throws: true })
+    applyWindowControlsOverlayTheme(win, true, { platform: 'win32', log })
+    expect(log).toHaveBeenCalledTimes(1)
+  })
+
+  it('handles a missing window', () => {
+    expect(() => applyWindowControlsOverlayTheme(null, true, { platform: 'win32' })).not.toThrow()
   })
 })
 

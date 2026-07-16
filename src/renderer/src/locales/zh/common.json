@@ -1855,6 +1855,7 @@
   "busyTimeout": "已等待 {{minutes}} 分钟仍未收到运行时完成事件。深度思考任务可能需要更长时间,如果仍然卡住可中断后重试。",
   "runtimeActionNeedsConnection": "请先连接运行时后再使用 AI。",
   "runtimeFetchFailed": "无法连接到 Claude360 Copilot。请确认本地运行时（`kun serve`）已启动，或在设置中开启自动启动。",
+  "runtimeEmptyModelResponse": "模型返回了空回复（自动重试一次后仍为空）。请检查当前分组/模型的服务状态，或切换其他模型后重新发送。",
   "runtimeModelRequestFailed": "Claude360 Copilot 无法连接到模型供应商。请检查网络、代理设置以及供应商配置（Base URL、Endpoint format）。",
   "runtimeBinaryNotInstalled": "未找到本地运行时可执行文件。请在项目目录运行 npm install 以下载 CLI，或在设置中填写运行时二进制路径。",
   "runtimeAutoStartDisabled": "Claude360 Copilot 当前未启动。请在设置中开启自动启动，或手动执行本地运行时命令 `kun serve`。",
