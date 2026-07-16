@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -12,10 +13,14 @@ import { AgentSdkDownloadFailure } from './agent-sdk-download'
 import {
   AGENT_SDK_VERSION,
   agentSdkDownloadLogRecord,
+  agentSdkStatus,
+  claudeBinaryName,
   ensureAgentSdkBinary,
   isAgentSdkPlatformSupported,
   installAgentSdkArchive,
-  resolveClaudeBinary
+  resolveClaudeBinary,
+  RunProcessError,
+  startAgentSdkInstall
 } from './agent-sdk-installer'
 import { AgentSdkStateStore } from './agent-sdk-state-store'
 
@@ -364,5 +369,166 @@ describe('ensureAgentSdkBinary', () => {
 
     expect(result).toMatchObject({ ok: false, code: 'unsupported' })
     expect(downloads).toBe(0)
+  })
+})
+
+describe('legacy binary handling', () => {
+  async function seedLegacyBinary(userDataDir: string, name = 'claude'): Promise<string> {
+    const legacyPath = join(userDataDir, 'agent-sdk', name)
+    await mkdir(join(userDataDir, 'agent-sdk'), { recursive: true })
+    await writeFile(legacyPath, 'legacy-binary-bytes')
+    return legacyPath
+  }
+
+  it('keeps the legacy binary when its health check fails transiently', async () => {
+    const userDataDir = await makeUserData()
+    const legacyPath = await seedLegacyBinary(userDataDir)
+
+    const result = await ensureAgentSdkBinary({
+      userDataDir,
+      kunDirs: [],
+      platform: 'linux',
+      arch: 'x64',
+      dependencies: {
+        healthCheck: async () => {
+          throw new RunProcessError('claude timed out', 'timeout')
+        },
+        downloadArchive: async () => {
+          throw new AgentSdkDownloadFailure('network', 'offline')
+        }
+      }
+    })
+
+    expect(result).toMatchObject({ ok: false, code: 'network' })
+    expect(existsSync(legacyPath)).toBe(true)
+  })
+
+  it('quarantines the legacy binary when it runs and exits non-zero', async () => {
+    const userDataDir = await makeUserData()
+    const legacyPath = await seedLegacyBinary(userDataDir)
+
+    const result = await ensureAgentSdkBinary({
+      userDataDir,
+      kunDirs: [],
+      platform: 'linux',
+      arch: 'x64',
+      dependencies: {
+        healthCheck: async () => {
+          throw new RunProcessError('claude exited 1', 'exit', 1)
+        },
+        downloadArchive: async () => {
+          throw new AgentSdkDownloadFailure('network', 'offline')
+        }
+      }
+    })
+
+    expect(result).toMatchObject({ ok: false, code: 'network' })
+    expect(existsSync(legacyPath)).toBe(false)
+    const entries = await readdir(join(userDataDir, 'agent-sdk'))
+    expect(entries.some((entry) => entry.startsWith('claude.invalid-'))).toBe(true)
+  })
+
+  it('migrates a version-matching legacy binary into the manifest layout', async () => {
+    const userDataDir = await makeUserData()
+    const legacyPath = await seedLegacyBinary(userDataDir)
+
+    const result = await ensureAgentSdkBinary({
+      userDataDir,
+      kunDirs: [],
+      platform: 'linux',
+      arch: 'x64',
+      dependencies: {
+        healthCheck: async () => `${AGENT_SDK_VERSION} (Claude Code)`
+      }
+    })
+
+    const migratedPath = join(
+      userDataDir,
+      'agent-sdk',
+      'versions',
+      AGENT_SDK_VERSION,
+      'linux-x64',
+      'claude'
+    )
+    expect(result).toEqual({ ok: true, path: migratedPath })
+    expect(existsSync(legacyPath)).toBe(false)
+    expect(resolveClaudeBinary(userDataDir, [], { platform: 'linux', arch: 'x64' }))
+      .toBe(migratedPath)
+    const manifest = JSON.parse(
+      await readFile(join(userDataDir, 'agent-sdk', 'installed.json'), 'utf8')
+    ) as AgentSdkInstalledManifest
+    expect(manifest).toMatchObject({
+      sdkVersion: AGENT_SDK_VERSION,
+      relativePath: `versions/${AGENT_SDK_VERSION}/linux-x64/claude`,
+      binarySha256: createHash('sha256').update('legacy-binary-bytes').digest('hex')
+    })
+    expect(manifest.tarballIntegrity).toBeUndefined()
+  })
+
+  it('keeps a healthy legacy binary in place when its version differs', async () => {
+    const userDataDir = await makeUserData()
+    const legacyPath = await seedLegacyBinary(userDataDir)
+
+    const result = await ensureAgentSdkBinary({
+      userDataDir,
+      kunDirs: [],
+      platform: 'linux',
+      arch: 'x64',
+      dependencies: {
+        healthCheck: async () => '0.0.1 (Claude Code)'
+      }
+    })
+
+    expect(result).toEqual({ ok: true, path: legacyPath })
+    expect(existsSync(legacyPath)).toBe(true)
+    expect(existsSync(join(userDataDir, 'agent-sdk', 'installed.json'))).toBe(false)
+  })
+
+  it('reports a bare legacy binary as installed', async () => {
+    const userDataDir = await makeUserData()
+    const legacyPath = await seedLegacyBinary(userDataDir, claudeBinaryName())
+
+    expect(agentSdkStatus(userDataDir, [])).toEqual({ installed: true, path: legacyPath })
+  })
+})
+
+describe('startAgentSdkInstall', () => {
+  it('does not flip a live install to interrupted when triggered twice', async () => {
+    const userDataDir = await makeUserData()
+    let release: (() => void) | undefined
+    let savedDownloadingState = false
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const downloading: AgentSdkDownloadState = {
+      schemaVersion: 1,
+      status: 'downloading',
+      packageName: PACKAGE_NAME,
+      sdkVersion: AGENT_SDK_VERSION,
+      platform: process.platform,
+      arch: process.arch,
+      attempt: 1,
+      receivedBytes: 1024,
+      totalBytes: 4096,
+      updatedAt: NOW
+    }
+
+    const ensurePromise = ensureAgentSdkBinary({
+      userDataDir,
+      kunDirs: [],
+      dependencies: {
+        downloadArchive: async (downloadOptions) => {
+          await downloadOptions.stateStore.saveState(downloading)
+          savedDownloadingState = true
+          await gate
+          throw new AgentSdkDownloadFailure('network', 'aborted by test')
+        }
+      }
+    })
+    await vi.waitFor(() => expect(savedDownloadingState).toBe(true))
+
+    const state = await startAgentSdkInstall({ userDataDir })
+
+    expect(state.status).toBe('downloading')
+    release?.()
+    await expect(ensurePromise).resolves.toMatchObject({ ok: false, code: 'network' })
   })
 })

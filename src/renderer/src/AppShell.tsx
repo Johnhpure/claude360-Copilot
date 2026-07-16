@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo } from 'react'
 import { useChatStore } from './store/chat-store'
-import { supportsDesktopTitleBar, WindowsTitleBar } from './components/WindowsTitleBar'
+import { supportsDesktopTitleBar, isWindowControlsOverlayVisible, WindowsTitleBar } from './components/WindowsTitleBar'
 import { RuntimeStatusBanner } from './components/RuntimeStatusBanner'
 import { GroupKeyPromptModal } from './components/GroupKeyPromptModal'
 import { GuiUpdatePrompt } from './components/GuiUpdatePrompt'
@@ -49,7 +49,11 @@ export default function AppShell(): React.ReactElement {
   const boot = useChatStore((s) => s.boot)
   const initialSetupOpen = useChatStore((s) => s.initialSetupOpen)
   const platform = typeof window !== 'undefined' ? window.kunGui?.platform ?? 'unknown' : 'unknown'
-  const hasDesktopTitleBar = supportsDesktopTitleBar(platform)
+  // Overlay fallback: even when the preload bridge is unavailable (platform
+  // 'unknown'), the native Windows control buttons still float over the
+  // top-right — keep rendering the titlebar band so they never cover the
+  // app's own controls.
+  const hasDesktopTitleBar = supportsDesktopTitleBar(platform) || isWindowControlsOverlayVisible()
   const crashContext = useMemo(() => ({
     route,
     workspaceRoot,

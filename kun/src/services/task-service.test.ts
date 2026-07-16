@@ -69,6 +69,26 @@ class FailOnceSessionStore extends InMemorySessionStore {
   }
 }
 
+class RacingSessionStore extends InMemorySessionStore {
+  failNextAppend = false
+  slowNextAppend = false
+
+  override async appendEvent(
+    threadId: string,
+    event: Parameters<InMemorySessionStore['appendEvent']>[1]
+  ): Promise<void> {
+    if (this.failNextAppend) {
+      this.failNextAppend = false
+      throw new Error('event persistence interrupted')
+    }
+    if (this.slowNextAppend) {
+      this.slowNextAppend = false
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    }
+    return super.appendEvent(threadId, event)
+  }
+}
+
 class AcknowledgementBlockingStore implements TaskStore {
   blockAcknowledgements = true
 
@@ -483,5 +503,38 @@ describe('TaskService state machine', () => {
       status: 'failed',
       expectedUpdatedAt: failed.updatedAt
     })).rejects.toMatchObject({ code: 'invalid_transition' })
+  })
+
+  it('publishes a pending event exactly once when reconcile races a flush', async () => {
+    const sessionStore = new RacingSessionStore()
+    // Leave the 'created' event unpublished, as after a crash between the
+    // record write and its runtime-stream publication.
+    sessionStore.failNextAppend = true
+    const { service } = createHarness({ sessionStore })
+    const created = await createTask(service)
+    expect(created.events[0]?.runtimeSeq).toBeUndefined()
+    const step = created.steps[0]
+    if (!step) throw new Error('expected a seeded step')
+
+    // Widen the race window: whichever publisher reaches the runtime stream
+    // first stalls inside events.record() while the other checks the same
+    // pending id.
+    sessionStore.slowNextAppend = true
+    await Promise.all([
+      service.reconcile(),
+      service.updateStep(created.id, {
+        stepId: step.id,
+        status: 'running',
+        expectedUpdatedAt: created.updatedAt
+      })
+    ])
+
+    const runtimeEvents = await sessionStore.loadEventsSince('thr_1', 0)
+    const createdPublications = runtimeEvents.filter(
+      (event) => event.kind === 'task_event' && event.event.type === 'created'
+    )
+    expect(createdPublications).toHaveLength(1)
+    const task = await service.get(created.id)
+    expect(task?.events.every((event) => event.runtimeSeq !== undefined)).toBe(true)
   })
 })

@@ -3,7 +3,9 @@ import { z } from 'zod'
 export const CRASH_ERROR_MESSAGE_MAX_LENGTH = 2_048
 export const CRASH_ERROR_STACK_MAX_LENGTH = 8_192
 export const CRASH_RECENT_IPC_MAX_RECORDS = 20
-export const CRASH_CONTEXT_UPDATE_CHANNEL = 'crash:context:update'
+// Kept in the zod-free crash-channel module so the sandboxed preload can
+// import it without dragging zod into the preload bundle.
+export { CRASH_CONTEXT_UPDATE_CHANNEL } from './crash-channel'
 
 const MAX_ID_LENGTH = 256
 const MAX_PATH_LENGTH = 4_096

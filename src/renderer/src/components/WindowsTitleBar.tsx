@@ -70,6 +70,23 @@ export function supportsDesktopTitleBar(platform: string): boolean {
   return platform === 'win32' || platform === 'linux'
 }
 
+type WindowControlsOverlayLike = { visible?: boolean }
+
+/**
+ * True when the native Window Controls Overlay is drawn over the web content
+ * (main enables it via BrowserWindow titleBarOverlay on Windows). Read from
+ * the platform API, NOT from window.kunGui: if the preload ever fails to
+ * load, platform detection degrades to 'unknown' while the overlay buttons
+ * are still floating over the top-right — the layout must keep reserving the
+ * titlebar band for them or they cover the app's own controls.
+ */
+export function isWindowControlsOverlayVisible(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const overlay = (navigator as { windowControlsOverlay?: WindowControlsOverlayLike })
+    .windowControlsOverlay
+  return overlay?.visible === true
+}
+
 export function buildWindowsTitleBarMenuSections(
   t: TitleBarTranslate,
   actions: WindowsTitleBarActions,
@@ -264,8 +281,9 @@ export function WindowsTitleBar({ platform, actions }: Props): ReactElement | nu
     void resolvedActions.runDesktopCommand('close')
   }, [resolvedActions])
 
-  if (!supportsDesktopTitleBar(resolvedPlatform)) return null
-  const usesNativeWindowControls = resolvedPlatform === 'win32'
+  const overlayVisible = isWindowControlsOverlayVisible()
+  if (!supportsDesktopTitleBar(resolvedPlatform) && !overlayVisible) return null
+  const usesNativeWindowControls = resolvedPlatform === 'win32' || overlayVisible
 
   const runMenuAction = (item: Exclude<WindowsTitleBarMenuItem, { kind: 'separator' }>): void => {
     setActiveMenuId(null)

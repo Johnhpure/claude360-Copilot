@@ -17,7 +17,7 @@ describe('createCrashContextReporter', () => {
     vi.useRealTimers()
   })
 
-  it('sends only the latest context after a 250ms trailing delay', () => {
+  it('sends only the latest context once per 250ms window', () => {
     vi.useFakeTimers()
     const send = vi.fn()
     const reporter = createCrashContextReporter({ send })
@@ -31,7 +31,10 @@ describe('createCrashContextReporter', () => {
     reporter.update(firstContext)
     vi.advanceTimersByTime(200)
     reporter.update(latestContext)
-    vi.advanceTimersByTime(249)
+    // Trailing throttle: the window opened by the FIRST update closes at
+    // t=250 and delivers the latest snapshot; later updates do not push the
+    // deadline out (that debounce behaviour starved delivery under bursts).
+    vi.advanceTimersByTime(49)
     expect(send).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
 
@@ -39,19 +42,45 @@ describe('createCrashContextReporter', () => {
     expect(send).toHaveBeenCalledWith(latestContext)
   })
 
-  it('cancels pending work on dispose and isolates bridge failures', () => {
+  it('keeps delivering under continuous updates instead of starving', () => {
     vi.useFakeTimers()
-    const reporter = createCrashContextReporter({
-      send: () => {
-        throw new Error('bridge unavailable')
-      }
+    const send = vi.fn()
+    const reporter = createCrashContextReporter({ send })
+
+    for (let tick = 0; tick < 10; tick += 1) {
+      reporter.update({ ...firstContext, activeThreadId: `thread-${tick}` })
+      vi.advanceTimersByTime(100)
+    }
+
+    // Windows close at t=250/550/850 with the latest snapshot each time; a
+    // timer-resetting debounce would still be waiting with zero deliveries.
+    expect(send).toHaveBeenCalledTimes(3)
+    expect(send).toHaveBeenLastCalledWith(
+      expect.objectContaining({ activeThreadId: 'thread-8' })
+    )
+  })
+
+  it('flushes pending context on dispose and isolates bridge failures', () => {
+    vi.useFakeTimers()
+    const send = vi.fn(() => {
+      throw new Error('bridge unavailable')
     })
+    const reporter = createCrashContextReporter({ send })
 
     reporter.update(firstContext)
     expect(() => vi.advanceTimersByTime(250)).not.toThrow()
+    expect(send).toHaveBeenCalledTimes(1)
+
     reporter.update(firstContext)
-    reporter.dispose()
+    expect(() => reporter.dispose()).not.toThrow()
+    // dispose delivers the pending snapshot immediately: the payload-keyed
+    // effect recreates the reporter on every context change, and dropping
+    // the snapshot would leave main holding stale crash context.
+    expect(send).toHaveBeenCalledTimes(2)
+
+    reporter.update(firstContext)
     vi.advanceTimersByTime(250)
+    expect(send).toHaveBeenCalledTimes(2)
   })
 })
 

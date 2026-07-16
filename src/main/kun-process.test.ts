@@ -295,7 +295,44 @@ describe('startKunChild', () => {
     expect(JSON.parse(readFileSync(environmentPath, 'utf8'))).toEqual({})
   })
 
-  it('returns an actionable recovery error for a non-default Agent SDK provider before spawning', async () => {
+  it('keeps the runtime bootable when a non-default Agent SDK provider cannot be provisioned', async () => {
+    if (!tempRoot) throw new Error('temp root not initialized')
+    const environmentPath = join(tempRoot, 'degraded-agent-sdk-env.json')
+    const script = writeScript(
+      'degraded-agent-sdk-child.js',
+      [
+        "const fs = require('node:fs')",
+        "const http = require('node:http')",
+        `fs.writeFileSync(${JSON.stringify(environmentPath)}, JSON.stringify({ binary: process.env.KUN_CLAUDE_BINARY, kind: process.env.KUN_RUNTIME_PROVIDER_KIND }))`,
+        'const port = 18899',
+        "const server = http.createServer((req, res) => {",
+        "  res.setHeader('content-type', 'application/json')",
+        "  res.end(JSON.stringify({ service: 'kun', mode: 'serve', status: 'ok' }))",
+        '})',
+        "server.listen(port, '127.0.0.1', () => {",
+        "  process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port }) + '\\n')",
+        '})',
+        'setInterval(() => {}, 1_000)'
+      ].join('\n')
+    )
+    const settings = createSettings(script)
+    registerAgentSdkProvider(settings)
+    agentSdkRuntimeMocks.ensureAgentSdkBinary.mockResolvedValue({
+      ok: false,
+      code: 'network',
+      message: '{"errno":-4058,"code":"ENOENT"}'
+    })
+    const module = await import('./kun-process')
+
+    // The default HTTP provider must keep working: spawn proceeds, only the
+    // subscription profile is degraded (no KUN_CLAUDE_BINARY injected).
+    await expect(module.startKunChild(settings)).resolves.toBeUndefined()
+
+    expect(agentSdkRuntimeMocks.ensureAgentSdkBinary).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(readFileSync(environmentPath, 'utf8'))).toEqual({})
+  })
+
+  it('returns an actionable recovery error when the default Agent SDK provider cannot be provisioned', async () => {
     if (!tempRoot) throw new Error('temp root not initialized')
     const spawnMarker = join(tempRoot, 'agent-sdk-spawned')
     const script = writeScript(
@@ -304,6 +341,7 @@ describe('startKunChild', () => {
     )
     const settings = createSettings(script)
     registerAgentSdkProvider(settings)
+    settings.agents.kun.providerId = 'claude-subscription'
     agentSdkRuntimeMocks.ensureAgentSdkBinary.mockResolvedValue({
       ok: false,
       code: 'network',

@@ -22,7 +22,10 @@ export class AppErrorBoundary extends Component<Props, State> {
     const errorWithComponentStack = new Error(error.message)
     errorWithComponentStack.name = error.name
     errorWithComponentStack.stack = [error.stack, info.componentStack].filter(Boolean).join('\n')
-    reportRendererError({ error: errorWithComponentStack }, 'Uncaught render error')
+    // force: boundary reports carry the only componentStack; a same-signature
+    // report inside the dedupe window (e.g. reload hitting the same render
+    // error) must still reach the crash store.
+    reportRendererError({ error: errorWithComponentStack }, 'Uncaught render error', { force: true })
   }
 
   private handleReload = (): void => {

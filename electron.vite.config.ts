@@ -15,7 +15,11 @@ export default defineConfig({
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    // The preload runs sandboxed: its require() can only load 'electron', so
+    // every real dependency must be bundled. zod is excluded from
+    // externalization as a safety net — an accidental value-import then costs
+    // bundle size instead of failing the whole preload at runtime.
+    plugins: [externalizeDepsPlugin({ exclude: ['zod'] })],
     build: {
       rollupOptions: {
         output: {

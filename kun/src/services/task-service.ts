@@ -81,6 +81,10 @@ export class TaskService {
   private readonly nowIso: () => string
   private readonly getThreadReference: TaskServiceOptions['getThread']
   private reconcileInFlight: Promise<TaskReconcileResult> | null = null
+  // Publication must be serialized per task: the startup reconcile pass and a
+  // mutation-triggered flush can otherwise both observe the same pending event
+  // id and record it twice into the runtime event stream (duplicate seqs).
+  private readonly publicationQueues = new Map<string, Promise<void>>()
 
   constructor(options: TaskServiceOptions) {
     this.store = options.store
@@ -390,7 +394,33 @@ export class TaskService {
     throw new TaskServiceError('conflict', `task recovery conflicted: ${taskId}`)
   }
 
-  private async publishPendingEvent(taskId: string, eventId: string): Promise<TaskRecord> {
+  private publishPendingEvent(taskId: string, eventId: string): Promise<TaskRecord> {
+    return this.enqueuePublication(
+      taskId,
+      () => this.publishPendingEventExclusive(taskId, eventId)
+    )
+  }
+
+  /**
+   * Runs `work` after every previously enqueued publication for the task has
+   * settled, so the pending-id check, events.record(), and acknowledgement
+   * behave as one critical section within this process.
+   */
+  private enqueuePublication<T>(taskId: string, work: () => Promise<T>): Promise<T> {
+    const previous = this.publicationQueues.get(taskId) ?? Promise.resolve()
+    const operation = previous.then(work)
+    const settled = operation.then(() => undefined, () => undefined)
+    this.publicationQueues.set(taskId, settled)
+    void settled.then(() => {
+      if (this.publicationQueues.get(taskId) === settled) this.publicationQueues.delete(taskId)
+    })
+    return operation
+  }
+
+  private async publishPendingEventExclusive(
+    taskId: string,
+    eventId: string
+  ): Promise<TaskRecord> {
     const current = await this.requireRecord(taskId)
     if (!current.pendingPublicationEventIds.includes(eventId)) return current
     const event = current.events.find((candidate) => candidate.id === eventId)

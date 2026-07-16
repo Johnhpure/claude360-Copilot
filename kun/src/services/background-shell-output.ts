@@ -98,6 +98,10 @@ export class BackgroundShellOutputWriter {
     await mkdir(this.paths.outputDir, { recursive: true })
     await writeFile(this.paths.outputFilePath, '', 'utf-8')
     this.stream = createWriteStream(this.paths.outputFilePath, { flags: 'a' })
+    // fs.WriteStream auto-destroys on error; without a listener the 'error'
+    // event escalates to uncaughtException and takes the runtime down. The
+    // flushed prefix of the file stays readable for summaries either way.
+    this.stream.on('error', () => undefined)
   }
 
   append(chunk: Buffer | string): void {
@@ -105,6 +109,7 @@ export class BackgroundShellOutputWriter {
     if (!this.stream) {
       throw new Error('background shell output writer is not open')
     }
+    if (this.stream.destroyed) return
     this.stream.write(chunk)
   }
 
@@ -118,6 +123,8 @@ export class BackgroundShellOutputWriter {
     }
     const stream = this.stream
     this.stream = undefined
+    // An errored stream is already destroyed: 'finish' would never fire.
+    if (stream.destroyed) return
     await new Promise<void>((resolvePromise, reject) => {
       stream.once('finish', resolvePromise)
       stream.once('error', reject)
@@ -138,12 +145,12 @@ export class BackgroundShellOutputWriter {
 
   private async flushPendingWrites(): Promise<void> {
     const stream = this.stream
-    if (!stream || this.closed) return
-    await new Promise<void>((resolvePromise, reject) => {
-      stream.write('', (error) => {
-        if (error) reject(error)
-        else resolvePromise()
-      })
+    if (!stream || this.closed || stream.destroyed) return
+    await new Promise<void>((resolvePromise) => {
+      // Resolve even when the sentinel write reports a destroyed/errored
+      // stream: whatever already reached the file is the caller's answer, and
+      // rejecting here would turn a readable partial log into a tool error.
+      stream.write('', () => resolvePromise())
     })
   }
 }

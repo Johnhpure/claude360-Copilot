@@ -155,7 +155,8 @@ describe('buildDiagnosticsArchive', () => {
     ].join('\n')
     record.context.details = {
       prompt: 'private crash prompt',
-      nested: { content: 'private crash content' }
+      nested: { content: 'private crash content' },
+      workspacePath: 'C:\\Program Files\\Private Workspace\\resources'
     }
     record.context.renderer = { route: '/chat/thread-1' }
     await mkdir(crashDirectory, { recursive: true })
@@ -187,9 +188,30 @@ describe('buildDiagnosticsArchive', () => {
     expect(structuredText).not.toContain('private crash content')
     expect(structuredText).not.toContain('private startup prompt')
     expect(structuredText).not.toContain('private startup content')
+    expect(structuredText).not.toContain('Private Workspace')
     expect(structuredText).toContain('/chat/thread-1')
     expect(structuredText).toContain('<path-redacted>')
     expect(structuredText).toContain('<redacted>')
+  })
+
+  it('keeps multi-line runtime logs that start with a path instead of wiping them', async () => {
+    const userDataPath = makeUserDataDirectory()
+    const runtimeDirectory = join(userDataPath, 'logs')
+    await mkdir(runtimeDirectory, { recursive: true })
+    await writeFile(
+      join(runtimeDirectory, 'kun-2026-07-15.log'),
+      '/home/alice/private-project/src/main.ts:1 boot failed\n[INFO] runtime recovered keep-me\n',
+      'utf8'
+    )
+
+    const archive = await buildDiagnosticsArchive(exporterOptions(userDataPath))
+    const zip = await JSZip.loadAsync(archive.data)
+    const logText = await zipText(zip, 'runtime/kun-2026-07-15.log')
+
+    expect(logText.trim()).not.toBe('<path-redacted>')
+    expect(logText).toContain('[INFO] runtime recovered keep-me')
+    expect(logText).toContain('<path-redacted>')
+    expect(logText).not.toContain('/home/alice/private-project')
   })
 
   it('applies the aggregate limit to serialized archive input bytes', async () => {

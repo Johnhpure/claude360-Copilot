@@ -66,6 +66,27 @@ describe('background-shell-output', () => {
     expect(summarizeBackgroundShellOutput('').truncated).toBe(false)
   })
 
+  it('returns the flushed partial output when the stream is destroyed mid-session', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'kun-bg-shell-output-'))
+    const writer = new BackgroundShellOutputWriter(tempDir, 'thr_1', 'destroy1')
+    await writer.open()
+    writer.append('partial output\n')
+    const before = await writer.buildReturnFields()
+    expect(before.summary).toBe('partial output\n')
+
+    // Simulate an ENOSPC/EBADF-style failure: fs.WriteStream auto-destroys.
+    const internal = writer as unknown as { stream?: { destroy(error?: Error): void } }
+    internal.stream?.destroy(new Error('simulated stream failure'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(() => writer.append('dropped after failure\n')).not.toThrow()
+    // The partial log already on disk stays readable instead of surfacing a
+    // tool error, and closing the failed writer must not hang or reject.
+    const fields = await writer.buildReturnFields()
+    expect(fields.summary).toBe('partial output\n')
+    await expect(writer.close()).resolves.toBeUndefined()
+  })
+
   it('recognizes background shell output paths for sandbox read bypass', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'kun-bg-shell-output-'))
     const { outputFilePath } = resolveBackgroundShellOutputPaths(tempDir, 'thr_1', 'sess1234')

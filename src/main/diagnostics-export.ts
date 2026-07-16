@@ -134,7 +134,14 @@ function redactDiagnosticText(value: string): string {
     (_match, key: string) => `${key}=<redacted>`
   )
   const trimmed = withoutContent.trim()
-  if (/^(?:file:\/\/|[A-Za-z]:[\\/]|\\\\|\/)/i.test(trimmed)) return '<path-redacted>'
+  // Wholly redact only a single-line value that *is* a path (covers paths
+  // containing spaces, which the inline token rule below cannot). Multi-line
+  // text — e.g. a whole runtime-log tail that merely starts with a path —
+  // must fall through to the inline rules; a bare prefix match here used to
+  // replace the entire document with '<path-redacted>'.
+  if (!trimmed.includes('\n') && /^(?:file:\/\/|[A-Za-z]:[\\/]|\\\\|\/)/i.test(trimmed)) {
+    return '<path-redacted>'
+  }
   const withoutFileUrls = withoutContent.replace(
     /\bfile:\/\/[^\s"',;)\]}]+/gi,
     '<path-redacted>'

@@ -32,6 +32,9 @@ export const AGENT_SDK_VERSION = '0.3.193'
 const DEFAULT_MIN_BINARY_BYTES = 1024 * 1024
 const MAX_BINARY_BYTES = 512 * 1024 * 1024
 const HEALTH_CHECK_TIMEOUT_MS = 10_000
+// Extracting the ~222MB archive on an HDD or under antivirus scanning easily
+// exceeds the health-check budget; give tar its own generous ceiling.
+const EXTRACT_TIMEOUT_MS = 5 * 60_000
 const PROCESS_OUTPUT_LIMIT = 64 * 1024
 const LOG_PROGRESS_BYTE_THRESHOLD = 8 * 1024 * 1024
 const LOG_PROGRESS_INTERVAL_MS = 10_000
@@ -159,7 +162,16 @@ export function agentSdkStatus(
   kunDirs: readonly string[]
 ): { installed: boolean; path?: string } {
   const path = resolveClaudeBinary(userDataDir, kunDirs)
-  return path ? { installed: true, path } : { installed: false }
+  if (path) return { installed: true, path }
+  // A bare legacy binary (pre-manifest release) is a working install; report
+  // it instead of prompting the user to re-download ~222MB.
+  const legacy = agentSdkBinaryPath(userDataDir)
+  try {
+    if (lstatSync(legacy).isFile()) return { installed: true, path: legacy }
+  } catch {
+    // Not installed.
+  }
+  return { installed: false }
 }
 
 export type AgentSdkInstallResult =
@@ -175,7 +187,7 @@ export type InstallAgentSdkArchiveOptions = {
   nowIso?: () => string
   minBinaryBytes?: number
   extractArchive?: (archivePath: string, stagingDir: string, binaryName: string) => Promise<void>
-  healthCheck?: (binaryPath: string) => Promise<void>
+  healthCheck?: (binaryPath: string) => Promise<string | void>
 }
 
 export async function installAgentSdkArchive(
@@ -278,7 +290,7 @@ export type EnsureAgentSdkBinaryDependencies = {
   installArchive?: (
     options: InstallAgentSdkArchiveOptions
   ) => Promise<{ path: string; manifest?: AgentSdkInstalledManifest }>
-  healthCheck?: (binaryPath: string) => Promise<void>
+  healthCheck?: (binaryPath: string) => Promise<string | void>
   nowIso?: () => string
 }
 
@@ -302,13 +314,22 @@ type ActiveAgentSdkEnsure = {
 const activeEnsures = new Map<string, ActiveAgentSdkEnsure>()
 const sharedStateStores = new Map<string, AgentSdkStateStore>()
 
+function ensureKey(
+  userDataDir: string,
+  platform: string,
+  arch: string,
+  version: string
+): string {
+  return `${userDataDir}\u0000${platform}\u0000${arch}\u0000${version}`
+}
+
 export function ensureAgentSdkBinary(
   options: EnsureAgentSdkBinaryOptions
 ): Promise<AgentSdkInstallResult> {
   const platform = options.platform ?? process.platform
   const arch = options.arch ?? process.arch
   const version = options.version ?? AGENT_SDK_VERSION
-  const key = `${options.userDataDir}\u0000${platform}\u0000${arch}\u0000${version}`
+  const key = ensureKey(options.userDataDir, platform, arch, version)
   const active = activeEnsures.get(key)
   if (active) {
     if (options.onState) active.observers.add(options.onState)
@@ -368,6 +389,26 @@ async function runEnsureAgentSdkBinary(
     return { ok: false, code: 'unsupported', message }
   }
 
+  // Status transitions spread the current state when one exists so progress
+  // metadata (bytes, attempt, etag) survives, and reset retry/error fields.
+  const emitStatus = (
+    status: AgentSdkDownloadState['status'],
+    error?: AgentSdkDownloadState['error']
+  ): Promise<AgentSdkDownloadState> => saveAndEmit(stateStore, {
+    ...(stateStore.state ?? createDownloadState({
+      status,
+      packageName,
+      version: options.version,
+      platform: options.platform,
+      arch: options.arch,
+      updatedAt: nowIso()
+    })),
+    status,
+    nextRetryAt: undefined,
+    error,
+    updatedAt: nowIso()
+  }, options.onState)
+
   const existing = resolveClaudeBinary(options.userDataDir, options.kunDirs, {
     platform: options.platform,
     arch: options.arch,
@@ -387,21 +428,51 @@ async function runEnsureAgentSdkBinary(
 
   const healthCheck = options.dependencies?.healthCheck ?? checkBinaryHealth
   const legacy = agentSdkBinaryPath(options.userDataDir, options.platform)
+  let legacyHealthOutput: string | undefined
   try {
     if ((await lstat(legacy)).isFile()) {
-      await healthCheck(legacy)
-      await saveAndEmit(stateStore, createDownloadState({
-        status: 'ready',
-        packageName,
-        version: options.version,
-        platform: options.platform,
-        arch: options.arch,
-        updatedAt: nowIso()
-      }), options.onState)
-      return { ok: true, path: legacy }
+      legacyHealthOutput = (await healthCheck(legacy)) ?? ''
     }
-  } catch {
-    await rename(legacy, `${legacy}.invalid-${Date.now()}`).catch(() => undefined)
+  } catch (error) {
+    if (shouldQuarantineLegacyBinary(error)) {
+      // The binary ran and failed (or is not executable): it is genuinely
+      // broken, so move it aside and fall through to a fresh download.
+      await rename(legacy, `${legacy}.invalid-${Date.now()}`).catch(() => undefined)
+      logWarn('agent-sdk-download', `legacy binary failed health check; quarantined: ${String(error)}`)
+    } else if (!isMissingPathError(error)) {
+      // Transient failure (timeout under AV scan, EBUSY, ...): keep the file.
+      // Destroying a possibly working install would force a ~222MB re-download
+      // and brick offline machines; the next attempt re-checks it.
+      logWarn('agent-sdk-download', `legacy binary health check inconclusive; keeping file: ${String(error)}`)
+    }
+  }
+  if (legacyHealthOutput !== undefined) {
+    // Migrate a version-matching legacy binary into the manifest layout so
+    // later launches take the fast manifest path instead of re-running the
+    // health check. Best-effort: on any failure keep using the legacy path.
+    const migrated = await migrateLegacyBinary({
+      userDataDir: options.userDataDir,
+      platform: options.platform,
+      arch: options.arch,
+      version: options.version,
+      packageName,
+      legacyPath: legacy,
+      healthOutput: legacyHealthOutput,
+      stateStore,
+      nowIso
+    }).catch((error: unknown) => {
+      logWarn('agent-sdk-download', `legacy binary migration failed; keeping flat layout: ${String(error)}`)
+      return undefined
+    })
+    await saveAndEmit(stateStore, createDownloadState({
+      status: 'ready',
+      packageName,
+      version: options.version,
+      platform: options.platform,
+      arch: options.arch,
+      updatedAt: nowIso()
+    }), options.onState)
+    return { ok: true, path: migrated ?? legacy }
   }
 
   try {
@@ -418,20 +489,7 @@ async function runEnsureAgentSdkBinary(
       nowIso,
       onState: options.onState
     })
-    await saveAndEmit(stateStore, {
-      ...(stateStore.state ?? createDownloadState({
-        status: 'installing',
-        packageName,
-        version: options.version,
-        platform: options.platform,
-        arch: options.arch,
-        updatedAt: nowIso()
-      })),
-      status: 'installing',
-      nextRetryAt: undefined,
-      error: undefined,
-      updatedAt: nowIso()
-    }, options.onState)
+    await emitStatus('installing')
     const installArchive = options.dependencies?.installArchive ?? installAgentSdkArchive
     const installed = await installArchive({
       userDataDir: options.userDataDir,
@@ -441,62 +499,20 @@ async function runEnsureAgentSdkBinary(
       stateStore,
       nowIso
     })
-    await saveAndEmit(stateStore, {
-      ...(stateStore.state ?? createDownloadState({
-        status: 'ready',
-        packageName,
-        version: options.version,
-        platform: options.platform,
-        arch: options.arch,
-        updatedAt: nowIso()
-      })),
-      status: 'ready',
-      nextRetryAt: undefined,
-      error: undefined,
-      updatedAt: nowIso()
-    }, options.onState)
+    await emitStatus('ready')
     await rm(download.archivePath, { force: true }).catch(() => undefined)
     return { ok: true, path: installed.path }
   } catch (error) {
     const failure = installerFailure(error)
     if (stateStore.state?.status !== 'failed' && stateStore.state?.status !== 'interrupted') {
-      await saveAndEmit(stateStore, {
-        ...(stateStore.state ?? createDownloadState({
-          status: 'failed',
-          packageName,
-          version: options.version,
-          platform: options.platform,
-          arch: options.arch,
-          updatedAt: nowIso()
-        })),
-        status: 'failed',
-        nextRetryAt: undefined,
-        error: { code: failure.code, message: failure.message, retriable: failure.retriable },
-        updatedAt: nowIso()
-      }, options.onState)
+      await emitStatus('failed', {
+        code: failure.code,
+        message: failure.message,
+        retriable: failure.retriable
+      })
     }
     return { ok: false, code: failure.code, message: failure.message }
   }
-}
-
-export async function installClaudeBinary(options: {
-  userDataDir: string
-  proxyUrl?: string
-  version?: string
-  kunDirs?: readonly string[]
-  onProgress?: (receivedBytes: number, totalBytes: number) => void
-}): Promise<AgentSdkInstallResult> {
-  return ensureAgentSdkBinary({
-    userDataDir: options.userDataDir,
-    kunDirs: options.kunDirs ?? [],
-    proxyUrl: options.proxyUrl,
-    version: options.version,
-    onState: (state) => {
-      if (state.status === 'downloading') {
-        options.onProgress?.(state.receivedBytes, state.totalBytes ?? 0)
-      }
-    }
-  })
 }
 
 export async function agentSdkDownloadState(
@@ -523,14 +539,21 @@ export async function startAgentSdkInstall(
 ): Promise<AgentSdkDownloadState> {
   const store = stateStoreFor(options.userDataDir, () => new Date().toISOString())
   const packageName = platformBinaryPackage() ?? 'unsupported'
-  const initial = await store.loadState(createDownloadState({
-    status: 'idle',
-    packageName,
-    version: options.version ?? AGENT_SDK_VERSION,
-    platform: process.platform,
-    arch: process.arch,
-    updatedAt: new Date().toISOString()
-  }))
+  const version = options.version ?? AGENT_SDK_VERSION
+  // While an ensure is live in this process, its in-memory state is the source
+  // of truth. loadState would re-read the disk snapshot and flip the running
+  // 'downloading'/'installing' status to 'interrupted' out from under it.
+  const activeKey = ensureKey(options.userDataDir, process.platform, process.arch, version)
+  const initial = activeEnsures.has(activeKey) && store.state
+    ? store.state
+    : await store.loadState(createDownloadState({
+      status: 'idle',
+      packageName,
+      version,
+      platform: process.platform,
+      arch: process.arch,
+      updatedAt: new Date().toISOString()
+    }))
   void ensureAgentSdkBinary({
     userDataDir: options.userDataDir,
     kunDirs: options.kunDirs ?? [],
@@ -648,7 +671,7 @@ async function extractExpectedBinary(
 ): Promise<void> {
   const expected = `package/${binaryName}`
   const listing = await runProcess('tar', ['-tzf', archivePath], {
-    timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
+    timeoutMs: EXTRACT_TIMEOUT_MS,
     maxOutputBytes: PROCESS_OUTPUT_LIMIT
   })
   const entries = listing.stdout.split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean)
@@ -662,21 +685,93 @@ async function extractExpectedBinary(
   await runProcess(
     'tar',
     ['-xzf', archivePath, '-C', stagingDir, '--strip-components=1', expected],
-    { timeoutMs: HEALTH_CHECK_TIMEOUT_MS, maxOutputBytes: PROCESS_OUTPUT_LIMIT }
+    { timeoutMs: EXTRACT_TIMEOUT_MS, maxOutputBytes: PROCESS_OUTPUT_LIMIT }
   )
 }
 
-async function checkBinaryHealth(binaryPath: string): Promise<void> {
-  await runProcess(binaryPath, ['--version'], {
+async function checkBinaryHealth(binaryPath: string): Promise<string> {
+  const { stdout } = await runProcess(binaryPath, ['--version'], {
     timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
     maxOutputBytes: PROCESS_OUTPUT_LIMIT
   })
+  return stdout
+}
+
+/**
+ * Quarantine only on definitive evidence the binary itself is broken: it ran
+ * and exited non-zero, or the OS refused to execute it. Timeouts, output
+ * overflows, and transient FS/permission errors keep the file in place.
+ */
+export function shouldQuarantineLegacyBinary(error: unknown): boolean {
+  if (error instanceof RunProcessError) return error.kind === 'exit'
+  return (error as NodeJS.ErrnoException)?.code === 'ENOEXEC'
+}
+
+/**
+ * Move a healthy legacy flat binary into the versioned manifest layout when
+ * its reported version matches the pinned SDK version, so later launches use
+ * the fast manifest resolution path. Returns the new path, or undefined when
+ * the version differs or cannot be parsed.
+ */
+async function migrateLegacyBinary(input: {
+  userDataDir: string
+  platform: string
+  arch: string
+  version: string
+  packageName: string
+  legacyPath: string
+  healthOutput: string
+  stateStore: AgentSdkStateStore
+  nowIso: () => string
+}): Promise<string | undefined> {
+  const reported = /(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/.exec(input.healthOutput)?.[1]
+  if (reported !== input.version) return undefined
+  const info = await lstat(input.legacyPath)
+  if (!info.isFile()) return undefined
+  const relativePath = installedBinaryRelativePath(input.version, input.platform, input.arch)
+  const target = join(agentSdkRootDir(input.userDataDir), relativePath)
+  const binarySha256 = await hashFile(input.legacyPath, 'sha256')
+  await mkdir(dirname(target), { recursive: true })
+  await rm(target, { force: true }).catch(() => undefined)
+  await rename(input.legacyPath, target)
+  try {
+    await input.stateStore.writeInstalledManifest({
+      schemaVersion: 1,
+      packageName: input.packageName,
+      sdkVersion: input.version,
+      platform: input.platform,
+      arch: input.arch,
+      relativePath,
+      binarySize: info.size,
+      binarySha256,
+      installedAt: input.nowIso()
+    })
+  } catch (error) {
+    // Restore the flat layout so the binary keeps working without a manifest.
+    await rename(target, input.legacyPath).catch(() => undefined)
+    throw error
+  }
+  return target
 }
 
 async function hashFile(path: string, algorithm: 'sha256'): Promise<string> {
   const hash = createHash(algorithm)
   for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer)
   return hash.digest('hex')
+}
+
+export type RunProcessErrorKind = 'timeout' | 'exit' | 'output-limit'
+
+export class RunProcessError extends Error {
+  readonly kind: RunProcessErrorKind
+  readonly exitCode: number | null
+
+  constructor(message: string, kind: RunProcessErrorKind, exitCode: number | null = null) {
+    super(message)
+    this.name = 'RunProcessError'
+    this.kind = kind
+    this.exitCode = exitCode
+  }
 }
 
 function runProcess(
@@ -691,7 +786,7 @@ function runProcess(
     let settled = false
     const timer = setTimeout(() => {
       child.kill()
-      finish(new Error(`${command} timed out`))
+      finish(new RunProcessError(`${command} timed out`, 'timeout'))
     }, options.timeoutMs)
     const finish = (error?: Error): void => {
       if (settled) return
@@ -707,7 +802,7 @@ function runProcess(
         : Buffer.concat([stderr, chunk])
       if (next.byteLength > options.maxOutputBytes) {
         child.kill()
-        finish(new Error(`${command} output exceeded limit`))
+        finish(new RunProcessError(`${command} output exceeded limit`, 'output-limit'))
         return
       }
       if (target === 'stdout') stdout = next
@@ -717,7 +812,7 @@ function runProcess(
     child.stderr?.on('data', (chunk: Buffer) => append('stderr', chunk))
     child.on('error', (error) => finish(error))
     child.on('exit', (code) => {
-      finish(code === 0 ? undefined : new Error(`${command} exited ${code}`))
+      finish(code === 0 ? undefined : new RunProcessError(`${command} exited ${code}`, 'exit', code))
     })
   })
 }

@@ -82,7 +82,9 @@ export const AgentSdkInstalledManifestSchema = z
     relativePath: RelativeBinaryPathSchema,
     binarySize: z.number().int().positive(),
     binarySha256: Sha256HexSchema,
-    tarballIntegrity: SriSha512Schema,
+    // Absent when the manifest records a migrated legacy binary, whose source
+    // tarball is unknown.
+    tarballIntegrity: SriSha512Schema.optional(),
     installedAt: IsoTimestampSchema
   })
   .strict()

@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "npm run build:kun && electron-vite dev",
-    "build": "npm run build:kun && electron-vite build",
+    "build": "npm run build:kun && electron-vite build && node ./scripts/check-preload-sandbox.mjs",
     "build:kun": "node ./scripts/ensure-kun-install.cjs && npm --prefix kun run build",
     "lint": "eslint . && npm run lint:tokens",
     "lint:tokens": "node ./scripts/check-design-tokens.mjs",

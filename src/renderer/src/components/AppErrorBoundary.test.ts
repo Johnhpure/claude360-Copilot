@@ -44,7 +44,7 @@ describe('AppErrorBoundary', () => {
     )
   })
 
-  it('shares global reporter deduplication with the React error boundary', () => {
+  it('boundary reports bypass window-error deduplication to keep componentStack', () => {
     const logError = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('window', { kunGui: { logError } })
     const listeners = new Map<string, EventListener>()
@@ -63,7 +63,19 @@ describe('AppErrorBoundary', () => {
     listeners.get('error')?.({ error, message: error.message } as ErrorEvent)
     boundary.componentDidCatch(error, { componentStack: '\n    at Child' } as ErrorInfo)
 
-    expect(logError).toHaveBeenCalledTimes(1)
+    // The boundary report is the only one carrying the componentStack: it
+    // must reach the log even though the window listener just reported the
+    // same signature.
+    expect(logError).toHaveBeenCalledTimes(2)
+    expect(logError).toHaveBeenLastCalledWith(
+      'renderer-crash',
+      'Uncaught render error',
+      expect.objectContaining({ stack: expect.stringContaining('at Child') })
+    )
+
+    // Plain window errors keep deduplicating against the forced report.
+    listeners.get('error')?.({ error, message: error.message } as ErrorEvent)
+    expect(logError).toHaveBeenCalledTimes(2)
     dispose()
   })
 })

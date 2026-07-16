@@ -456,12 +456,27 @@ async function startKunChildOnce(
       proxyUrl: resolveModelProviderProxyUrl(settings)
     })
     if (ensured.ok === false) {
-      throw new Error(
-        `Claude Agent SDK automatic recovery failed (${ensured.code}). ` +
-        'Check your network or proxy, then retry.'
-      )
+      // Only the default provider hard-depends on the binary. When a secondary
+      // subscription profile cannot be provisioned (offline, proxy down), keep
+      // the runtime bootable on the default HTTP provider instead of blocking
+      // every feature behind a ~222MB download.
+      if (activeProviderKind === 'agent-sdk') {
+        throw new Error(
+          `Claude Agent SDK automatic recovery failed (${ensured.code}). ` +
+          'Check your network or proxy, then retry.'
+        )
+      }
+      appendManagedLogLine(
+        'kun',
+        formatKunLogLine(
+          'lifecycle',
+          undefined,
+          `agent SDK binary unavailable for secondary provider (${ensured.code}): ${ensured.message}`
+        )
+      ).catch(() => undefined)
+    } else {
+      claudeBinary = ensured.path
     }
-    claudeBinary = ensured.path
   }
   const childEnv: NodeJS.ProcessEnv = {
     ...process.env,

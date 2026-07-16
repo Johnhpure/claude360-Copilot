@@ -6,7 +6,10 @@ import type {
   WorkspaceOpenRequestPayload
 } from '../shared/kun-gui-api'
 import { createReplayedChannelSubscriber } from '../shared/replayed-ipc-channel'
-import { CRASH_CONTEXT_UPDATE_CHANNEL } from '../shared/crash-types'
+// IMPORTANT: only import zod-free shared modules by value here. The sandboxed
+// preload cannot require node_modules at runtime; '../shared/crash-types'
+// pulls in zod and would fail the whole preload (v0.2.12/13 regression).
+import { CRASH_CONTEXT_UPDATE_CHANNEL } from '../shared/crash-channel'
 
 // 07-14-perf-baseline：R4 preload 初始化耗时。模块求值首/末各记一次 epoch ms，
 // 随 renderer 启动标记上报 main 换算到统一时间轴（本文件无异步初始化，预期 ~0-5ms）。

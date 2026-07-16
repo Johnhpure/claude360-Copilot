@@ -59,6 +59,21 @@ describe('createGlobalErrorReporter', () => {
     expect(report).toHaveBeenCalledTimes(2)
   })
 
+  it('forced reports bypass the dedupe window and refresh it', () => {
+    let clock = 1_000
+    const report = vi.fn()
+    const reporter = createGlobalErrorReporter({ report, now: () => clock })
+
+    reporter.reportError({ message: 'same failure' })
+    clock += 10
+    reporter.reportError({ message: 'same failure' }, undefined, { force: true })
+    expect(report).toHaveBeenCalledTimes(2)
+
+    clock += 10
+    reporter.reportError({ message: 'same failure' })
+    expect(report).toHaveBeenCalledTimes(2)
+  })
+
   it('evicts the least-recently-reported signature when the cache is full', () => {
     const report = vi.fn()
     const reporter = createGlobalErrorReporter({

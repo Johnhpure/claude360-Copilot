@@ -20,8 +20,21 @@ export interface RendererRejectionEventLike {
   reason?: unknown
 }
 
+export interface RendererErrorReportOptions {
+  /**
+   * Bypass the dedupe window. Error-boundary reports carry the only copy of
+   * the React componentStack, so a repeat of the same error within the window
+   * must still reach the crash store.
+   */
+  force?: boolean
+}
+
 export interface GlobalErrorReporter {
-  reportError(event: RendererErrorEventLike, message?: string): void
+  reportError(
+    event: RendererErrorEventLike,
+    message?: string,
+    reportOptions?: RendererErrorReportOptions
+  ): void
   reportUnhandledRejection(event: RendererRejectionEventLike): void
 }
 
@@ -126,13 +139,14 @@ export function createGlobalErrorReporter(
     kind: RendererCrashEventPayload['kind'],
     reason: unknown,
     location: RendererCrashLocation = {},
-    message?: string
+    message?: string,
+    force = false
   ): void => {
     const detail = createRendererCrashEventPayload(kind, reason, location)
     const signature = detail.signature
     const currentTime = now()
     const previousTime = reportedAtBySignature.get(signature)
-    if (previousTime !== undefined && currentTime - previousTime < dedupeWindowMs) return
+    if (!force && previousTime !== undefined && currentTime - previousTime < dedupeWindowMs) return
 
     reportedAtBySignature.delete(signature)
     reportedAtBySignature.set(signature, currentTime)
@@ -155,7 +169,7 @@ export function createGlobalErrorReporter(
   }
 
   return {
-    reportError(event, message) {
+    reportError(event, message, reportOptions) {
       const reason = event.error ?? event.message ?? 'Unknown renderer error'
       report('error', reason, {
         ...(event.filename ? { source: safeText(event.filename, 2_048) } : {}),
@@ -165,7 +179,7 @@ export function createGlobalErrorReporter(
         ...(Number.isSafeInteger(event.colno) && (event.colno ?? -1) >= 0
           ? { column: event.colno }
           : {})
-      }, message)
+      }, message, reportOptions?.force === true)
     },
     reportUnhandledRejection(event) {
       report('unhandledrejection', event.reason ?? 'Unknown renderer rejection')
@@ -183,9 +197,10 @@ let activeGlobalErrorReporter = fallbackGlobalErrorReporter
 
 export function reportRendererError(
   event: RendererErrorEventLike,
-  message?: string
+  message?: string,
+  reportOptions?: RendererErrorReportOptions
 ): void {
-  activeGlobalErrorReporter.reportError(event, message)
+  activeGlobalErrorReporter.reportError(event, message, reportOptions)
 }
 
 export function installGlobalErrorReporter(
