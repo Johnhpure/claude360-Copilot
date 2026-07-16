@@ -57,7 +57,7 @@ import {
 } from './claw-schedule-mcp-config'
 import { defaultKunDataDir } from './runtime/kun-adapter'
 import { isKunHealthResponseBody } from './kun-health'
-import { ensureAgentSdkBinary } from './agent-sdk-installer'
+import { ensureAgentSdkBinary, isAgentSdkPlatformSupported } from './agent-sdk-installer'
 import { appendManagedLogLine } from './logger'
 import {
   comparableSkillRootPath,
@@ -404,10 +404,12 @@ async function startKunChildOnce(
   // Match provider ids after settings normalization, so `claude360:Codex` and
   // `claude360-codex` describe the same selected runtime provider.
   const runtimeProviderId = normalizeModelProviderId(getKunRuntimeSettings(settings).providerId)
-  const activeProvider = (getModelProviderSettings(settings).providers as ModelProviderProfileV1[]).find(
+  const providerProfiles = getModelProviderSettings(settings).providers as ModelProviderProfileV1[]
+  const activeProvider = providerProfiles.find(
     (provider) => normalizeModelProviderId(provider.id) === runtimeProviderId
   )
   const activeProviderKind = activeProvider?.kind
+  const hasAgentSdkProvider = providerProfiles.some((provider) => provider.kind === 'agent-sdk')
   const args = buildKunServeArgs({
     resolution,
     host: '127.0.0.1',
@@ -441,14 +443,23 @@ async function startKunChildOnce(
   const runtimeApiKey =
     (activeProvider ? await resolveProfileApiKey(activeProvider) : '') || runtime.apiKey
   let claudeBinary: string | undefined
-  if (activeProviderKind === 'agent-sdk') {
+  // Kun registers every provider mirrored into serve.providers, not only the
+  // default provider. Any supported Agent SDK profile therefore needs the
+  // managed executable path before spawn; otherwise background/non-default
+  // turns fall back to the platform package that production builds exclude.
+  const shouldProvisionAgentSdk = activeProviderKind === 'agent-sdk'
+    || (hasAgentSdkProvider && isAgentSdkPlatformSupported())
+  if (shouldProvisionAgentSdk) {
     const ensured = await ensureAgentSdkBinary({
       userDataDir: app.getPath('userData'),
       kunDirs: [join(appRoot(), 'kun')],
       proxyUrl: resolveModelProviderProxyUrl(settings)
     })
     if (ensured.ok === false) {
-      throw new Error(`Agent SDK binary unavailable (${ensured.code}): ${ensured.message}`)
+      throw new Error(
+        `Claude Agent SDK automatic recovery failed (${ensured.code}). ` +
+        'Check your network or proxy, then retry.'
+      )
     }
     claudeBinary = ensured.path
   }

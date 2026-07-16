@@ -29,6 +29,16 @@ export type WindowMaterialValue = 'none' | 'mica'
 export type WindowMaterialTarget = Pick<BrowserWindow, 'setBackgroundMaterial' | 'isDestroyed'>
 
 /**
+ * Windows 使用原生标题栏按钮，确保 renderer 尚未挂载或崩溃时仍可最小化、
+ * 最大化和关闭窗口；其他平台保持既有标题栏行为。
+ */
+export function resolveWindowControlsOverlay(
+  platform: NodeJS.Platform = process.platform
+): Electron.TitleBarOverlay | false {
+  return platform === 'win32' ? { height: 40 } : false
+}
+
+/**
  * 按设置应用窗口材质，返回实际生效值。任何失败 / 门槛不满足都静默回退实色
  * （'none'）——实验性能力绝不影响窗口可用性。仅在需要变更时才调用
  * setBackgroundMaterial：非 win32、或「请求 none 且此前也未开」时零 API 调用。

@@ -13,6 +13,7 @@ import {
   AGENT_SDK_VERSION,
   agentSdkDownloadLogRecord,
   ensureAgentSdkBinary,
+  isAgentSdkPlatformSupported,
   installAgentSdkArchive,
   resolveClaudeBinary
 } from './agent-sdk-installer'
@@ -49,6 +50,15 @@ afterEach(async () => {
 })
 
 describe('agent SDK atomic installer', () => {
+  it('supports only platform and architecture pairs published by the SDK', () => {
+    expect(isAgentSdkPlatformSupported('win32', 'x64')).toBe(true)
+    expect(isAgentSdkPlatformSupported('win32', 'arm64')).toBe(true)
+    expect(isAgentSdkPlatformSupported('win32', 'ia32')).toBe(false)
+    expect(isAgentSdkPlatformSupported('linux', 'x64')).toBe(true)
+    expect(isAgentSdkPlatformSupported('darwin', 'arm64')).toBe(true)
+    expect(isAgentSdkPlatformSupported('freebsd', 'x64')).toBe(false)
+  })
+
   it('publishes a validated version directory before updating installed.json', async () => {
     const userDataDir = await makeUserData()
     const archivePath = join(userDataDir, 'fixture.tgz')

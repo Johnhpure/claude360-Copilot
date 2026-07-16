@@ -8,6 +8,7 @@ import {
   applyWindowMaterial,
   isWin11MicaCapable,
   parseWindowsBuildNumber,
+  resolveWindowControlsOverlay,
   type WindowMaterialTarget
 } from './win-platform'
 
@@ -45,6 +46,14 @@ describe('isWin11MicaCapable', () => {
     expect(isWin11MicaCapable('win32', '10.0.19045')).toBe(false)
     expect(isWin11MicaCapable('darwin', '10.0.26100')).toBe(false)
     expect(isWin11MicaCapable('linux', '10.0.26100')).toBe(false)
+  })
+})
+
+describe('resolveWindowControlsOverlay', () => {
+  it('uses native caption controls on Windows only', () => {
+    expect(resolveWindowControlsOverlay('win32')).toEqual({ height: 40 })
+    expect(resolveWindowControlsOverlay('linux')).toBe(false)
+    expect(resolveWindowControlsOverlay('darwin')).toBe(false)
   })
 })
 

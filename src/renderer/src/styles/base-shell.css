@@ -436,6 +436,12 @@ html.native-mica .ds-windows-app-frame {
   padding-right: 12px;
 }
 
+.ds-windows-titlebar--native-controls .ds-windows-titlebar-content {
+  width: env(titlebar-area-width, calc(100% - 138px));
+  max-width: env(titlebar-area-width, calc(100% - 138px));
+  flex: 0 1 env(titlebar-area-width, calc(100% - 138px));
+}
+
 .ds-windows-titlebar-icon {
   width: 18px;
   height: 18px;

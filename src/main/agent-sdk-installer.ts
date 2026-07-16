@@ -84,6 +84,13 @@ export function platformBinaryPackage(
   return `@anthropic-ai/claude-agent-sdk-${normalizedPlatform}-${normalizedArch}`
 }
 
+export function isAgentSdkPlatformSupported(
+  platform: string = process.platform,
+  arch: string = process.arch
+): boolean {
+  return platformBinaryPackage(platform, arch) !== undefined
+}
+
 export function agentSdkBinaryPath(
   userDataDir: string,
   platform: string = process.platform

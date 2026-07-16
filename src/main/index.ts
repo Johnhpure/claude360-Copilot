@@ -36,7 +36,11 @@ import {
   syncNativeThemeSource,
   type WindowStateManager
 } from './window-state'
-import { applyWindowMaterial, type WindowMaterialValue } from './win-platform'
+import {
+  applyWindowMaterial,
+  resolveWindowControlsOverlay,
+  type WindowMaterialValue
+} from './win-platform'
 import { parseOpenWorkspaceArgv, updateRecentWorkspacesJumpList } from './win-jumplist'
 import { createTurnCompleteNotificationHandler } from './turn-complete-notification'
 import { resolveLogDirectory, resolvePreloadPath } from './main-paths'
@@ -1409,6 +1413,7 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
     ),
     icon: appIcon.isEmpty() ? undefined : appIcon,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : usesDesktopTitleBar ? 'hidden' : 'default',
+    titleBarOverlay: resolveWindowControlsOverlay(process.platform),
     trafficLightPosition: process.platform === 'darwin' ? { x: 31, y: 22 } : undefined,
     autoHideMenuBar: usesDesktopTitleBar,
     show: false,

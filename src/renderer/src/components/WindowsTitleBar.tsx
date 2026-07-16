@@ -265,6 +265,7 @@ export function WindowsTitleBar({ platform, actions }: Props): ReactElement | nu
   }, [resolvedActions])
 
   if (!supportsDesktopTitleBar(resolvedPlatform)) return null
+  const usesNativeWindowControls = resolvedPlatform === 'win32'
 
   const runMenuAction = (item: Exclude<WindowsTitleBarMenuItem, { kind: 'separator' }>): void => {
     setActiveMenuId(null)
@@ -272,7 +273,11 @@ export function WindowsTitleBar({ platform, actions }: Props): ReactElement | nu
   }
 
   return (
-    <div ref={rootRef} data-cursor-spotlight-target className="ds-windows-titlebar ds-drag">
+    <div
+      ref={rootRef}
+      data-cursor-spotlight-target
+      className={`ds-windows-titlebar ds-drag${usesNativeWindowControls ? ' ds-windows-titlebar--native-controls' : ''}`}
+    >
       <div className="ds-windows-titlebar-content">
         <img src={appLogo} alt="" aria-hidden="true" className="ds-windows-titlebar-icon" />
         <nav className="ds-windows-menu ds-no-drag" aria-label={t('windowsMenuAriaLabel')}>
@@ -320,35 +325,37 @@ export function WindowsTitleBar({ platform, actions }: Props): ReactElement | nu
           })}
         </nav>
       </div>
-      <div className="ds-window-controls ds-no-drag">
-        <button
-          type="button"
-          data-cursor-spotlight-target
-          className="ds-window-control-btn"
-          aria-label={t('windowsMenuMinimize')}
-          onClick={handleMinimize}
-        >
-          <MinimizeIcon />
-        </button>
-        <button
-          type="button"
-          data-cursor-spotlight-target
-          className="ds-window-control-btn"
-          aria-label={t('windowsMenuToggleMaximize')}
-          onClick={handleToggleMaximize}
-        >
-          {isMaximized ? <RestoreIcon /> : <MaximizeIcon />}
-        </button>
-        <button
-          type="button"
-          data-cursor-spotlight-target
-          className="ds-window-control-btn ds-window-control-btn--close"
-          aria-label={t('windowsMenuClose')}
-          onClick={handleClose}
-        >
-          <CloseIcon />
-        </button>
-      </div>
+      {usesNativeWindowControls ? null : (
+        <div className="ds-window-controls ds-no-drag">
+          <button
+            type="button"
+            data-cursor-spotlight-target
+            className="ds-window-control-btn"
+            aria-label={t('windowsMenuMinimize')}
+            onClick={handleMinimize}
+          >
+            <MinimizeIcon />
+          </button>
+          <button
+            type="button"
+            data-cursor-spotlight-target
+            className="ds-window-control-btn"
+            aria-label={t('windowsMenuToggleMaximize')}
+            onClick={handleToggleMaximize}
+          >
+            {isMaximized ? <RestoreIcon /> : <MaximizeIcon />}
+          </button>
+          <button
+            type="button"
+            data-cursor-spotlight-target
+            className="ds-window-control-btn ds-window-control-btn--close"
+            aria-label={t('windowsMenuClose')}
+            onClick={handleClose}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

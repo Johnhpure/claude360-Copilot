@@ -199,6 +199,9 @@ describe('electron-builder Claude360 Copilot packaging', () => {
     expect(builderConfig.files).toEqual(expect.arrayContaining([
       '!node_modules/@napi-rs/**'
     ]))
+    expect(builderConfig.files).toEqual(expect.arrayContaining([
+      '!kun/node_modules/@anthropic-ai/claude-agent-sdk-*/**'
+    ]))
   })
 
   it('validates the unpacked Kun runtime before release artifacts are created', () => {

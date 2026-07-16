@@ -30,11 +30,13 @@ import {
 import { KunConfigSchema } from '../../kun/src/config/kun-config.js'
 
 const agentSdkRuntimeMocks = vi.hoisted(() => ({
-  ensureAgentSdkBinary: vi.fn()
+  ensureAgentSdkBinary: vi.fn(),
+  isAgentSdkPlatformSupported: vi.fn(() => true)
 }))
 
 vi.mock('./agent-sdk-installer', () => ({
-  ensureAgentSdkBinary: agentSdkRuntimeMocks.ensureAgentSdkBinary
+  ensureAgentSdkBinary: agentSdkRuntimeMocks.ensureAgentSdkBinary,
+  isAgentSdkPlatformSupported: agentSdkRuntimeMocks.isAgentSdkPlatformSupported
 }))
 
 vi.mock('electron', () => ({
@@ -82,6 +84,25 @@ function createSettings(binaryPath: string): AppSettingsV1 {
   }
 }
 
+function registerAgentSdkProvider(settings: AppSettingsV1): void {
+  settings.provider = {
+    ...settings.provider,
+    providers: [
+      ...settings.provider.providers,
+      {
+        id: 'claude-subscription',
+        name: 'Claude subscription',
+        kind: 'agent-sdk',
+        apiKey: '',
+        baseUrl: 'https://api.anthropic.com',
+        endpointFormat: 'messages',
+        models: ['claude-sonnet-4-6'],
+        modelProfiles: {}
+      }
+    ]
+  }
+}
+
 function writeScript(name: string, content: string): string {
   if (!tempRoot) throw new Error('temp root not initialized')
   const path = join(tempRoot, name)
@@ -121,6 +142,8 @@ beforeEach(() => {
   tempRoot = mkdtempSync(join(tmpdir(), 'kun-process-'))
   configureLogger({ dir: tempRoot, enabled: true, retentionDays: 7 })
   agentSdkRuntimeMocks.ensureAgentSdkBinary.mockReset()
+  agentSdkRuntimeMocks.isAgentSdkPlatformSupported.mockReset()
+  agentSdkRuntimeMocks.isAgentSdkPlatformSupported.mockReturnValue(true)
   agentSdkRuntimeMocks.ensureAgentSdkBinary.mockResolvedValue({
     ok: true,
     path: '/tmp/managed-claude'
@@ -187,22 +210,7 @@ describe('startKunChild', () => {
       ].join('\n')
     )
     const settings = createSettings(script)
-    settings.provider = {
-      ...settings.provider,
-      providers: [
-        ...settings.provider.providers,
-        {
-          id: 'claude-subscription',
-          name: 'Claude subscription',
-          kind: 'agent-sdk',
-          apiKey: '',
-          baseUrl: 'https://api.anthropic.com',
-          endpointFormat: 'messages',
-          models: ['claude-sonnet-4-6'],
-          modelProfiles: {}
-        }
-      ]
-    }
+    registerAgentSdkProvider(settings)
     settings.agents.kun.providerId = 'claude-subscription'
     let releaseEnsure: (() => void) | undefined
     const ensureGate = new Promise<void>((resolve) => { releaseEnsure = resolve })
@@ -222,6 +230,91 @@ describe('startKunChild', () => {
       binary: '/tmp/managed-claude',
       kind: 'agent-sdk'
     })
+  })
+
+  it('injects the managed binary when a non-default Agent SDK provider is registered', async () => {
+    if (!tempRoot) throw new Error('temp root not initialized')
+    const environmentPath = join(tempRoot, 'non-default-agent-sdk-env.json')
+    const script = writeScript(
+      'non-default-agent-sdk-child.js',
+      [
+        "const fs = require('node:fs')",
+        "const http = require('node:http')",
+        `fs.writeFileSync(${JSON.stringify(environmentPath)}, JSON.stringify({ binary: process.env.KUN_CLAUDE_BINARY, kind: process.env.KUN_RUNTIME_PROVIDER_KIND }))`,
+        'const port = 18899',
+        "const server = http.createServer((req, res) => {",
+        "  res.setHeader('content-type', 'application/json')",
+        "  res.end(JSON.stringify({ service: 'kun', mode: 'serve', status: 'ok' }))",
+        '})',
+        "server.listen(port, '127.0.0.1', () => {",
+        "  process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port }) + '\\n')",
+        '})',
+        'setInterval(() => {}, 1_000)'
+      ].join('\n')
+    )
+    const settings = createSettings(script)
+    registerAgentSdkProvider(settings)
+    const module = await import('./kun-process')
+
+    await expect(module.startKunChild(settings)).resolves.toBeUndefined()
+
+    expect(agentSdkRuntimeMocks.ensureAgentSdkBinary).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(readFileSync(environmentPath, 'utf8'))).toEqual({
+      binary: '/tmp/managed-claude'
+    })
+  })
+
+  it('does not provision an unsupported non-default Agent SDK provider', async () => {
+    if (!tempRoot) throw new Error('temp root not initialized')
+    const environmentPath = join(tempRoot, 'unsupported-agent-sdk-env.json')
+    const script = writeScript(
+      'unsupported-agent-sdk-child.js',
+      [
+        "const fs = require('node:fs')",
+        "const http = require('node:http')",
+        `fs.writeFileSync(${JSON.stringify(environmentPath)}, JSON.stringify({ binary: process.env.KUN_CLAUDE_BINARY, kind: process.env.KUN_RUNTIME_PROVIDER_KIND }))`,
+        'const port = 18899',
+        "const server = http.createServer((req, res) => {",
+        "  res.setHeader('content-type', 'application/json')",
+        "  res.end(JSON.stringify({ service: 'kun', mode: 'serve', status: 'ok' }))",
+        '})',
+        "server.listen(port, '127.0.0.1', () => {",
+        "  process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port }) + '\\n')",
+        '})',
+        'setInterval(() => {}, 1_000)'
+      ].join('\n')
+    )
+    const settings = createSettings(script)
+    registerAgentSdkProvider(settings)
+    agentSdkRuntimeMocks.isAgentSdkPlatformSupported.mockReturnValue(false)
+    const module = await import('./kun-process')
+
+    await expect(module.startKunChild(settings)).resolves.toBeUndefined()
+
+    expect(agentSdkRuntimeMocks.ensureAgentSdkBinary).not.toHaveBeenCalled()
+    expect(JSON.parse(readFileSync(environmentPath, 'utf8'))).toEqual({})
+  })
+
+  it('returns an actionable recovery error for a non-default Agent SDK provider before spawning', async () => {
+    if (!tempRoot) throw new Error('temp root not initialized')
+    const spawnMarker = join(tempRoot, 'agent-sdk-spawned')
+    const script = writeScript(
+      'agent-sdk-must-not-spawn.js',
+      `require('node:fs').writeFileSync(${JSON.stringify(spawnMarker)}, 'spawned')`
+    )
+    const settings = createSettings(script)
+    registerAgentSdkProvider(settings)
+    agentSdkRuntimeMocks.ensureAgentSdkBinary.mockResolvedValue({
+      ok: false,
+      code: 'network',
+      message: '{"errno":-4058,"code":"ENOENT"}'
+    })
+    const module = await import('./kun-process')
+
+    await expect(module.startKunChild(settings)).rejects.toThrow(
+      'Claude Agent SDK automatic recovery failed (network). Check your network or proxy, then retry.'
+    )
+    expect(existsSync(spawnMarker)).toBe(false)
   })
 
   it('does not settle on the ready marker until the /health endpoint responds', async () => {
