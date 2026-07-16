@@ -157,6 +157,38 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
     )
   })
 
+  // 07-17 国模分组事故回归：仅出现在全量接口的纯中文分组必须归入 text，
+  // 且生成的 provider id 要能在 settings 归一化后仍被识别（不塌缩成裸 claude360）。
+  it('classifies full-list-only Chinese-named groups as text with a normalization-safe id', async () => {
+    const service = new Claude360ModelService({
+      apiClient: fakeApi({
+        '/api/cli/groups?tool=codex': () => [{ name: 'Codex', recommended: true }],
+        '/api/cli/groups?tool=image': () => [],
+        '/api/cli/groups?tool=music': () => [],
+        '/api/cli/groups': () => [
+          { name: 'Codex', recommended: true },
+          { name: '国模分组', recommended: false, ratio: 1, desc: '国产模型' }
+        ],
+        '/api/cli/models?group=Codex': () => ({ models: [{ id: 'gpt-5.5' }] }),
+        '/api/cli/models?group=%E5%9B%BD%E6%A8%A1%E5%88%86%E7%BB%84': () => ({
+          models: [{ id: 'qwen3.7-max' }, { id: 'kimi-k2.7-code' }]
+        })
+      }),
+      secretStore: fakeSecretStore()
+    })
+
+    const result = await service.refreshGroupsAndModels()
+
+    expect(result.groupsByPurpose.text.map((g) => g.name)).toEqual(['Codex', '国模分组'])
+    expect(result.modelCache.groups).toEqual(expect.arrayContaining(['国模分组']))
+    expect(result.modelCache.models).toEqual(expect.arrayContaining(['qwen3.7-max', 'kimi-k2.7-code']))
+
+    const guomo = result.providerProfiles.find((p) => p.name === '国模分组')!
+    expect(guomo.models).toEqual(['qwen3.7-max', 'kimi-k2.7-code'])
+    // id 归一化安全性（isClaude360ProviderId 往返）由 shared 层
+    // app-settings-provider.test.ts 的 buildClaude360ProviderProfiles 用例统一覆盖。
+  })
+
   it('throws when not logged in', async () => {
     const service = new Claude360ModelService({
       apiClient: fakeApi({}),

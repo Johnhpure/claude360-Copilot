@@ -5,7 +5,7 @@ import i18n from '../i18n'
 import { applyTheme, applyUiFontScale } from '../lib/apply-theme'
 import { formatWorkspacePickerError } from '../lib/format-workspace-picker-error'
 import { formatRuntimeError, getRuntimeErrorCode } from '../lib/format-runtime-error'
-import { ensureGroupKeyForSelection, groupNameFromProviderId } from '../lib/group-key-ensure'
+import { claude360GroupForSelection, ensureGroupKeyForSelection } from '../lib/group-key-ensure'
 import { createPerfTrace } from '../lib/perf-trace'
 import { useGroupKeyPromptStore } from './group-key-prompt-store'
 import {
@@ -809,7 +809,9 @@ export function createThreadActions(
     // 07-05 重排：检测从入口移到乐观 UI 之后——keyList/ensure 的网络往返不再挡住首帧
     // 反馈；同分组短 TTL 缓存进一步跳过重复检测（见 group-key-ensure.ts）。
     // provider 解析必须与实际发送一致（queued 优先），否则 drain 队列时会检测错分组。
-    const groupForKey = groupNameFromProviderId(composerProviderId)
+    // 分组名优先取分组清单里的 label（服务端原始名）：中文分组的 providerId 带指纹，
+    // 从 id 反解会失配（见 claude360GroupForSelection）。
+    const groupForKey = claude360GroupForSelection(get().composerModelGroups, composerProviderId)
     if (groupForKey && typeof window.kunGui?.claude360TokensList === 'function') {
       const keyReady = await ensureGroupKeyForSelection(
         groupForKey,

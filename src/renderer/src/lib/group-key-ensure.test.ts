@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   GROUP_KEY_CACHE_TTL_MS,
+  claude360GroupForSelection,
   ensureGroupKeyForSelection,
   groupNameFromProviderId,
   invalidateGroupKeyCache
@@ -22,6 +23,35 @@ describe('groupNameFromProviderId', () => {
     expect(groupNameFromProviderId('deepseek')).toBeNull()
     expect(groupNameFromProviderId(undefined)).toBeNull()
     expect(groupNameFromProviderId('  ')).toBeNull()
+  })
+})
+
+describe('claude360GroupForSelection', () => {
+  // 中文分组的 providerId 是带指纹的归一化形态，只有分组清单里的 label
+  // 才是服务端原始分组名；名称配对必须优先取 label（07-17 国模分组事故）。
+  it('prefers the group label from composerModelGroups over id-derived fragments', () => {
+    const groups = [
+      { providerId: 'claude360-x1a2b3c4d', label: '国模分组' },
+      { providerId: 'claude360-codex', label: 'Codex' }
+    ]
+    expect(claude360GroupForSelection(groups, 'claude360-x1a2b3c4d')).toBe('国模分组')
+    expect(claude360GroupForSelection(groups, 'claude360-codex')).toBe('Codex')
+  })
+
+  it('falls back to prefix-derived group when the provider is missing from groups', () => {
+    expect(claude360GroupForSelection([], 'claude360-vip')).toBe('vip')
+  })
+
+  // 指纹形态的 id 反解不出真实分组名：分组清单缺失时必须返回 null（fail-open），
+  // 绝不能把 'x1a2b3c4d' 这类片段当分组名去弹「创建 Key」或调后端。
+  it('returns null instead of a fingerprint fragment when the provider is missing from groups', () => {
+    expect(claude360GroupForSelection([], 'claude360-x1a2b3c4d')).toBeNull()
+    expect(claude360GroupForSelection([], 'claude360-glm-x6b38884e')).toBeNull()
+  })
+
+  it('returns null for non-claude360 providers regardless of groups', () => {
+    expect(claude360GroupForSelection([{ providerId: 'deepseek', label: 'DeepSeek' }], 'deepseek')).toBeNull()
+    expect(claude360GroupForSelection([], undefined)).toBeNull()
   })
 })
 

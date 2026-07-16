@@ -1256,6 +1256,55 @@ describe('buildClaude360ProviderProfiles', () => {
     expect(profiles[0].apiKey).toBe('')
     expect(profiles[0].apiKeyRef).toBeUndefined()
   })
+
+  // 07-17 国模分组事故：纯中文分组 id 归一化后塌缩成裸 claude360，
+  // 过不了 isClaude360ProviderId，整组从 Code/写作/对话选择器消失；
+  // 多个纯中文分组还会在 providersById 里互相覆盖。
+  it('keeps non-ASCII group profiles recognizable and collision-free after settings normalization', async () => {
+    const {
+      buildClaude360ProviderProfiles,
+      isClaude360ProviderId,
+      normalizeModelProviderSettings
+    } = await import('./app-settings-provider')
+    const profiles = buildClaude360ProviderProfiles(
+      [
+        { group: '国模分组', models: [{ id: 'qwen3.7-max' }, { id: 'kimi-k2.7-code' }] },
+        { group: '测试专用分组', models: [{ id: 'claude-opus-4-8' }] },
+        { group: 'Codex', models: [{ id: 'gpt-5.5' }] }
+      ],
+      {}
+    )
+    // ASCII 安全分组沿用既有 id 形态（存量存盘选择兼容）。
+    expect(profiles.map((p) => p.id)).toContain('claude360:Codex')
+    // 归一化落盘往返后：三个分组都保留、都仍被识别为 Claude360 profile。
+    const normalized = normalizeModelProviderSettings({ providers: profiles })
+    const claude360Profiles = normalized.providers.filter((p) => isClaude360ProviderId(p.id))
+    expect(claude360Profiles).toHaveLength(3)
+    expect(claude360Profiles.map((p) => p.name)).toEqual(
+      expect.arrayContaining(['国模分组', '测试专用分组', 'Codex'])
+    )
+    // 归一化后 id 互不碰撞。
+    expect(new Set(claude360Profiles.map((p) => p.id)).size).toBe(3)
+  })
+
+  it('derives a stable, distinct provider id per non-ASCII group name', async () => {
+    const { claude360ProviderIdForGroup, isClaude360ProviderId, normalizeModelProviderId } =
+      await import('./app-settings-provider')
+    expect(claude360ProviderIdForGroup('Codex')).toBe('claude360:Codex')
+    expect(claude360ProviderIdForGroup('国模分组')).toBe(claude360ProviderIdForGroup('国模分组'))
+    expect(claude360ProviderIdForGroup('国模分组')).not.toBe(claude360ProviderIdForGroup('测试专用分组'))
+    // 含 ASCII 残片的混合名保留可读片段，仍附指纹防碰撞（GLM专属 vs GLM特惠）。
+    expect(claude360ProviderIdForGroup('GLM专属')).toMatch(/^claude360:glm-/)
+    expect(claude360ProviderIdForGroup('GLM专属')).not.toBe(claude360ProviderIdForGroup('GLM特惠'))
+    // 连字符边缘名（'-'、'vip-'）归一化仍会裁剪：不得走快速路径塌缩/碰撞。
+    for (const edge of ['-', 'vip-']) {
+      const id = claude360ProviderIdForGroup(edge)
+      expect(isClaude360ProviderId(normalizeModelProviderId(id))).toBe(true)
+    }
+    expect(normalizeModelProviderId(claude360ProviderIdForGroup('vip-'))).not.toBe(
+      normalizeModelProviderId(claude360ProviderIdForGroup('vip'))
+    )
+  })
 })
 
 describe('resolveClaude360SelectedGroup', () => {

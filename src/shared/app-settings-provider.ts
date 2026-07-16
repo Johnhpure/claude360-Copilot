@@ -1305,6 +1305,44 @@ export function isClaude360ProviderId(id: string | undefined | null): boolean {
 }
 
 /**
+ * 由分组名构造 Claude360 provider profile id。
+ *
+ * 分组名仅含归一化保留字符（字母/数字/./_/-）时沿用 `claude360:<group>`，
+ * 与既有存盘 id / 用户已保存的选择保持兼容。含会被 normalizeModelProviderId
+ * 压掉的字符（中文/空格等）时，`claude360:<group>` 归一化后会塌缩成裸
+ * `claude360`（纯中文分组名，如「国模分组」）或有损片段（多个分组互相覆盖），
+ * 导致 isClaude360ProviderId 失配、分组从 Code/写作/对话选择器整组消失。
+ * 此时改用 `claude360:<ascii残片->x<utf8-fnv1a指纹>`：归一化后仍以
+ * `claude360-` 开头、不同分组不碰撞、同分组跨会话稳定；服务端原始分组名
+ * 始终存于 profile.name，Key 配对一律按 name 走 sameClaude360Group。
+ */
+export function claude360ProviderIdForGroup(group: string): string {
+  const trimmed = group.trim()
+  // 快速路径仅当 id 能无损通过 normalizeModelProviderId 往返（除既定的
+  // lowercase 与 ':'→'-'）——排除纯 '-'、首尾 '-' 等仍会被裁剪/碰撞的形态。
+  const fastPath = `claude360:${trimmed}`
+  if (
+    /^[A-Za-z0-9._-]+$/.test(trimmed) &&
+    normalizeModelProviderId(fastPath) === `claude360-${trimmed.toLowerCase()}`
+  ) {
+    return fastPath
+  }
+  const remnant = normalizeModelProviderId(trimmed).slice(0, 40)
+  return `claude360:${remnant ? `${remnant}-` : ''}x${fnv1aHex(trimmed)}`
+}
+
+// FNV-1a 32 位（UTF-8 字节流）：无依赖、main/renderer 结果一致。仅用作
+// 分组名 → provider id 的稳定指纹，非安全用途。
+function fnv1aHex(value: string): string {
+  let hash = 0x811c9dc5
+  for (const byte of new TextEncoder().encode(value)) {
+    hash ^= byte
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return hash.toString(16).padStart(8, '0')
+}
+
+/**
  * 后端 `/api/cli/groups` 返回的单个分组形态。name/recommended 用于选默认分组；
  * ratio(分组倍率)/desc(分组描述) 供「分组及Key」页展示（后端已返回，此前被丢弃）。
  */
@@ -1393,7 +1431,7 @@ export function buildClaude360ProviderProfiles(
     // main 进程在 spawn/写子进程 config 前用 apiKeyRef 解出真 Key 注入运行时。
     const apiKeyRef = refsByGroup[group.group]?.trim() ?? ''
     const profile: ModelProviderProfileV1 = {
-      id: `claude360:${group.group}`,
+      id: claude360ProviderIdForGroup(group.group),
       name: group.group,
       apiKey: '',
       ...(apiKeyRef ? { apiKeyRef } : {}),

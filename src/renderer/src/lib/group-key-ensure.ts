@@ -18,6 +18,9 @@ import { sameClaude360Group } from '@shared/claude360'
  * 为 `claude360-<group>`（且整体 lowercase），两种都兼容；非 claude360 返回 null。
  * 注意：返回值可能与服务端原始分组名大小写不同，只能配合 sameClaude360Group 使用，
  * 权威形态由 main 侧 tokens:ensure 按 profile.name 还原。
+ * ⚠️ 含中文/空格的分组 id 是带指纹的归一化形态（如 claude360-glm-x1a2b3c4d），
+ * 本函数只能反解出指纹片段而非真实分组名——发送链路请改用
+ * claude360GroupForSelection（优先取分组清单 label）。
  */
 export function groupNameFromProviderId(providerId: string | undefined): string | null {
   const id = (providerId ?? '').trim()
@@ -27,6 +30,31 @@ export function groupNameFromProviderId(providerId: string | undefined): string 
     return id.slice('claude360:'.length) || null
   }
   return null
+}
+
+/** claude360ProviderIdForGroup 为含中文/空格的分组生成的指纹后缀形态（x+8位hex 结尾）。 */
+const FINGERPRINTED_GROUP_FRAGMENT_RE = /(?:^|-)x[0-9a-f]{8}$/
+
+/**
+ * 解析当前选择对应的 Claude360 分组名（发送前 Key 检测用）。
+ * 优先取 composerModelGroups 中该 provider 的 label（= profile.name，服务端
+ * 原始分组名）：分组名含中文/空格时 providerId 是带指纹的归一化形态，
+ * 从 id 反解只能得到指纹片段，按名称匹配服务端 token 必然失配并误弹「创建 Key」。
+ * 分组清单里找不到该 provider 时：指纹形态返回 null（fail-open 放行，由服务端
+ * 返回可见错误，绝不把指纹片段当分组名弹窗/建 Key）；普通 ASCII 形态退回前缀
+ * 反解（兼容陈旧缓存）。非 claude360 provider 返回 null。
+ */
+export function claude360GroupForSelection(
+  groups: readonly { providerId: string; label: string }[],
+  providerId: string | undefined
+): string | null {
+  const id = (providerId ?? '').trim()
+  const derived = groupNameFromProviderId(id)
+  if (!derived) return null
+  const matched = groups.find((group) => sameClaude360Group(group.providerId, id))
+  const label = matched?.label.trim()
+  if (label) return label
+  return FINGERPRINTED_GROUP_FRAGMENT_RE.test(derived.toLowerCase()) ? null : derived
 }
 
 /** 调试日志上下文：功能入口 + 当前选择，用于排查「分组明明有 Key 却弹创建」类误判。 */

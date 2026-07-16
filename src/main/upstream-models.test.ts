@@ -11,6 +11,7 @@ import {
   defaultWriteSettings,
   defaultTerminalSettings,
   defaultClaude360Settings,
+  isClaude360ProviderId,
   type AppSettingsV1
 } from '../shared/app-settings'
 import { fetchUpstreamModelIds } from './upstream-models'
@@ -153,6 +154,44 @@ describe('upstream model picker list (Claude360 source)', () => {
           modelIds: ['gpt-5.5']
         })
       ])
+    }
+  })
+
+  // 07-17 国模分组事故回归：纯中文分组（仅出现在全量分组接口）此前经 settings
+  // 归一化后 id 塌缩成裸 claude360，被 isClaude360ProviderId 过滤，三个文本
+  // 选择器整组拉不到。现在必须以原始分组名为 label 完整出现。
+  it('offers Chinese-named groups with their text models and keeps non-text groups out', async () => {
+    const providers = buildClaude360ProviderProfiles(
+      [
+        {
+          group: '国模分组',
+          models: [
+            { id: 'deepseek-v4-pro' },
+            { id: 'qwen3.7-max' },
+            { id: 'kimi-k2.7-code' },
+            { id: 'glm-5.1' }
+          ]
+        },
+        { group: 'image-大香蕉', models: [{ id: 'gemini-3-pro-image', isImage: true }] },
+        { group: 'Suno-音乐生成', models: [{ id: 'gpt-5.5' }, { id: 'suno_music' }] }
+      ],
+      {}
+    )
+
+    const result = await fetchUpstreamModelIds(settings({ providers, runtimeModel: '' }))
+
+    expect(result).toMatchObject({ ok: true })
+    if (result.ok) {
+      const guomo = result.modelGroups?.find((group) => group.label === '国模分组')
+      expect(guomo).toBeDefined()
+      expect(guomo?.modelIds).toEqual(['deepseek-v4-pro', 'glm-5.1', 'kimi-k2.7-code', 'qwen3.7-max'])
+      // providerId 归一化后仍可被识别为 Claude360 provider，选择配对不回退默认分组。
+      expect(guomo && isClaude360ProviderId(guomo.providerId)).toBe(true)
+      // 纯图片分组不进文本选择器。
+      expect(result.modelGroups?.some((group) => group.label === 'image-大香蕉')).toBe(false)
+      // 混合分组只保留通过 capability 判定的文本模型。
+      const suno = result.modelGroups?.find((group) => group.label === 'Suno-音乐生成')
+      expect(suno?.modelIds).toEqual(['gpt-5.5'])
     }
   })
 })
