@@ -81,6 +81,26 @@ function detailString(value: unknown): string {
 function localizedRuntimeSummary(code: string | null, text: string): string | null {
   const lowered = text.toLowerCase()
 
+  // Classified transport failures from the runtime's model client. These must
+  // be checked before the generic model_request_failed branch below: their
+  // messages also start with "model request failed:" and would otherwise be
+  // swallowed by the prefix match.
+  if (code === 'model_fetch_dns_failed') {
+    return i18n.t('common:runtimeModelFetchDnsFailed')
+  }
+
+  if (code === 'model_fetch_connect_failed') {
+    return i18n.t('common:runtimeModelFetchConnectFailed')
+  }
+
+  if (code === 'model_fetch_tls_failed') {
+    return i18n.t('common:runtimeModelFetchTlsFailed')
+  }
+
+  if (code === 'model_fetch_failed') {
+    return i18n.t('common:runtimeModelFetchFailed')
+  }
+
   if (code === 'model_request_failed' || lowered.includes('model request failed:')) {
     return i18n.t('common:runtimeModelRequestFailed')
   }

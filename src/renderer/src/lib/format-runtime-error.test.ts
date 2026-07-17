@@ -47,6 +47,29 @@ describe('format runtime error', () => {
     expect(formatRuntimeError(error)).not.toBe(i18n.t('common:runtimeFetchFailed'))
   })
 
+  it('maps classified model fetch codes to their actionable summaries', () => {
+    const cases = [
+      ['model_fetch_dns_failed', 'runtimeModelFetchDnsFailed'],
+      ['model_fetch_connect_failed', 'runtimeModelFetchConnectFailed'],
+      ['model_fetch_tls_failed', 'runtimeModelFetchTlsFailed'],
+      ['model_fetch_failed', 'runtimeModelFetchFailed']
+    ] as const
+
+    for (const [code, key] of cases) {
+      const message = 'model request failed: fetch failed: getaddrinfo ENOTFOUND api.example.test'
+      const error = new Error(JSON.stringify({ code, message, severity: 'error' }))
+      const view = describeRuntimeError(error)
+
+      expect(getRuntimeErrorCode(error)).toBe(code)
+      // The classified code must win over the "model request failed:" prefix
+      // inference that serves legacy runtimes without a code.
+      expect(view.summary).toBe(i18n.t(`common:${key}`))
+      expect(view.summary).not.toBe(i18n.t('common:runtimeModelRequestFailed'))
+      expect(view.detail).toContain(`Code: ${code}`)
+      expect(view.detail).toContain(`Message:\n${message}`)
+    }
+  })
+
   it('keeps raw provider messages visible in details even when the summary is the same text', () => {
     const message = `model request failed with status 400: ${JSON.stringify({
       error: {

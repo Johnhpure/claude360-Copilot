@@ -2142,7 +2142,8 @@ describe('CompatModelClient', () => {
 
     expect(chunks[0]).toMatchObject({
       kind: 'error',
-      message: 'model request failed: connect ETIMEDOUT. Check the configured model-request proxy in Settings > Providers.'
+      message: 'model request failed: connect ETIMEDOUT. Check the configured model-request proxy.',
+      code: 'model_fetch_connect_failed'
     })
   })
 

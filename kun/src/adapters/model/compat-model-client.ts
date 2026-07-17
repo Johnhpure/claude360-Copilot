@@ -19,6 +19,7 @@ import {
   type ModelEndpointFormat
 } from '../../contracts/model-endpoint-format.js'
 import { createProxyFetch } from './proxy-fetch.js'
+import { classifyModelFetchError, describeNetworkError } from '../network-error.js'
 
 /**
  * Configuration for the compatible HTTP model client. Chat
@@ -281,16 +282,23 @@ export class CompatModelClient implements ModelClient {
       return
     }
     let result = await this.postChatCompletion(url, headers, body, request.abortSignal)
-    // Retry transient gateway failures (502/503/504) a few times before giving
-    // up. These are upstream load-balancer hiccups (e.g. an ALB returning
-    // "502 Bad Gateway"), not request errors — failing the whole turn on the
-    // first blip is needlessly fragile, especially for flaky providers. No
-    // response body has been streamed yet, so re-POSTing the same request is
-    // safe. Aborts short-circuit the backoff.
+    // Retry transient failures a few times before giving up:
+    // - 502/503/504 gateway responses are upstream load-balancer hiccups
+    //   (e.g. an ALB returning "502 Bad Gateway"), not request errors.
+    // - Connection-establishment fetch failures (DNS resolution, refused or
+    //   timed-out connects) provably happen before the request reaches the
+    //   server, so re-POSTing cannot duplicate work.
+    // In both cases no response body has been streamed yet, so re-POSTing the
+    // same request is safe. TLS failures are configuration errors worth
+    // failing fast on, and reset/socket errors may have already delivered the
+    // request body — those never retry. Aborts short-circuit the backoff.
     for (let attempt = 0; attempt < MAX_TRANSIENT_RETRIES; attempt += 1) {
-      if (result.kind === 'error') break
-      if (result.response.ok || !TRANSIENT_RETRY_STATUSES.has(result.response.status)) break
-      await result.response.body?.cancel().catch(() => {})
+      if (result.kind === 'error') {
+        if (result.retriable !== true) break
+      } else {
+        if (result.response.ok || !TRANSIENT_RETRY_STATUSES.has(result.response.status)) break
+        await result.response.body?.cancel().catch(() => {})
+      }
       const aborted = await sleepWithAbort(TRANSIENT_RETRY_BASE_MS * 2 ** attempt, request.abortSignal)
       if (aborted || request.abortSignal.aborted) {
         yield { kind: 'error', message: 'request was aborted during retry backoff' }
@@ -299,7 +307,7 @@ export class CompatModelClient implements ModelClient {
       result = await this.postChatCompletion(url, headers, body, request.abortSignal)
     }
     if (result.kind === 'error') {
-      yield { kind: 'error', message: result.message }
+      yield { kind: 'error', message: result.message, ...(result.code ? { code: result.code } : {}) }
       return
     }
     let response = result.response
@@ -310,7 +318,7 @@ export class CompatModelClient implements ModelClient {
         if (round) round.requestBody = retryBody
         const retry = await this.postChatCompletion(url, headers, retryBody, request.abortSignal)
         if (retry.kind === 'error') {
-          yield { kind: 'error', message: retry.message }
+          yield { kind: 'error', message: retry.message, ...(retry.code ? { code: retry.code } : {}) }
           return
         }
         response = retry.response
@@ -417,7 +425,10 @@ export class CompatModelClient implements ModelClient {
     headers: Record<string, string>,
     body: Record<string, unknown>,
     signal: AbortSignal
-  ): Promise<{ kind: 'response'; response: Response } | { kind: 'error'; message: string }> {
+  ): Promise<
+    | { kind: 'response'; response: Response }
+    | { kind: 'error'; message: string; code?: string; retriable?: boolean }
+  > {
     try {
       const response = await this.fetchImpl(url, {
         method: 'POST',
@@ -427,16 +438,26 @@ export class CompatModelClient implements ModelClient {
       })
       return { kind: 'response', response }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      // Only blame the proxy for genuine transport failures. A user-initiated
-      // abort (turn cancelled, idle-timeout watchdog) also surfaces here as an
-      // AbortError but has nothing to do with the proxy — don't send the user
-      // chasing a proxy that is working fine.
-      const aborted = error instanceof Error && error.name === 'AbortError'
-      const proxyHint = !aborted && this.config.modelProxyUrl?.trim()
-        ? '. Check the configured model-request proxy in Settings > Providers.'
+      // A user-initiated abort (turn cancelled, idle-timeout watchdog) also
+      // surfaces here but is not a transport failure — keep it verbatim with
+      // no classification code, no proxy hint, and no retry. Don't send the
+      // user chasing a proxy that is working fine.
+      if (error instanceof Error && error.name === 'AbortError') {
+        return { kind: 'error', message: `model request failed: ${error.message}` }
+      }
+      // Undici hides the actionable detail (DNS, refused connection, TLS, …)
+      // behind a bare `TypeError: fetch failed`. Unwrap the cause chain into
+      // the message and classify it for the GUI + the transient-retry loop.
+      const classified = classifyModelFetchError(error)
+      const proxyHint = this.config.modelProxyUrl?.trim()
+        ? '. Check the configured model-request proxy.'
         : ''
-      return { kind: 'error', message: `model request failed: ${message}${proxyHint}` }
+      return {
+        kind: 'error',
+        message: `model request failed: ${classified.detail}${proxyHint}`,
+        code: classified.code,
+        retriable: classified.retriable
+      }
     }
   }
 
@@ -2640,8 +2661,9 @@ async function readStreamChunk(
     .then((result): StreamReadResult => ({ kind: 'chunk', ...result }))
     .catch((error): StreamReadResult => {
       if (signal.aborted) return { kind: 'aborted' }
-      const message = error instanceof Error ? error.message : String(error)
-      return { kind: 'error', message: `model stream read failed: ${message}` }
+      // Undici stream failures (e.g. "terminated") bury the errno in the
+      // cause chain — expand it so the surfaced message is actionable.
+      return { kind: 'error', message: `model stream read failed: ${describeNetworkError(error)}` }
     })
   const abortPromise = new Promise<StreamReadResult>((resolve) => {
     const onAbort = (): void => resolve({ kind: 'aborted' })

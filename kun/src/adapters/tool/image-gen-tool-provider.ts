@@ -6,6 +6,7 @@ import type { AttachmentStore } from '../../attachments/attachment-store.js'
 import { detectImage } from '../../attachments/attachment-store.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
 import { LocalToolHost } from './local-tool-host.js'
+import { describeNetworkError } from '../network-error.js'
 
 const GENERATED_IMAGE_DIR = '.deepseekgui-images'
 const MAX_REFERENCE_IMAGE_BYTES = 10 * 1024 * 1024
@@ -38,36 +39,10 @@ export class ImageGenHttpError extends Error {
   }
 }
 
-/**
- * Node's fetch reports every network failure as a bare `TypeError: fetch
- * failed`, hiding the actionable detail (DNS, refused connection, TLS, …)
- * in the `cause` chain. Flatten that chain into one readable message.
- */
-export function describeNetworkError(error: unknown): string {
-  const parts: string[] = []
-  let current: unknown = error
-  for (let depth = 0; depth < 5 && current != null; depth += 1) {
-    if (current instanceof AggregateError && current.errors.length > 0) {
-      current = current.errors[0]
-      continue
-    }
-    if (!(current instanceof Error)) {
-      parts.push(String(current))
-      break
-    }
-    const code = (current as { code?: unknown }).code
-    const codeText = typeof code === 'string' ? code : ''
-    const message = current.message.trim()
-    if (message) {
-      parts.push(codeText && !message.includes(codeText) ? `${message} (${codeText})` : message)
-    } else if (codeText) {
-      parts.push(codeText)
-    }
-    current = current.cause
-  }
-  const unique = parts.filter((part, index) => parts.indexOf(part) === index)
-  return unique.join(': ') || 'unknown network error'
-}
+// Moved to ../network-error.ts so the model client can reuse the cause-chain
+// expansion; re-exported here for existing consumers (media-gen,
+// speech-to-text, tests).
+export { describeNetworkError }
 
 function imageFetchFailure(
   url: string,
