@@ -11,9 +11,14 @@ import type {
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { Button } from '../ui'
 import { MyAccountOverview } from './MyAccountOverview'
+import { MyLogsPanel } from './MyLogsPanel'
+import { MySegTabs } from './MySegTabs'
 import { MyTopupModal } from './MyTopupModal'
 import { MyUsagePanel } from './MyUsagePanel'
 import { pollTopupOrderUntilComplete, type BillingPollPhase } from './my-page-actions'
+
+/** 账户卡下方的分段 Tab(07-17 my-newapi-call-logs,方案 B)。 */
+export type MyPageTab = 'usage' | 'logs'
 
 type Props = {
   leftSidebarCollapsed: boolean
@@ -21,21 +26,25 @@ type Props = {
   onBack: () => void
   /** 退出登录（清账号态并回登录框）。由容器注入，MyPage 只负责触发。 */
   onLogout: () => void
+  /** 初始激活 Tab,默认「用量统计」(首屏与改造前一致);测试/深链可指定。 */
+  initialTab?: MyPageTab
 }
 
 // 「我的」页容器:账号 / 余额 / 今日用量概览 + 充值弹窗 + 退出登录。
 // API Key 的分组管理已归口到「设置 → 分组及 Key」，本页不再展示 Key 分组表。
 // 所有 window.kunGui 调用都做存在性守卫。
-// 布局（07-07-my-page-redesign-topup-modal design §1）:
-// 账户卡（常驻充值主按钮）→ 用量卡（总览行 + 紧凑表格,唯一强色区域）;
-// 充值全流程收进 MyTopupModal,页面底部不再有充值卡片。
+// 布局（07-17 my-newapi-call-logs design §5.1，方案 B）:
+// 账户卡常驻 → [用量统计 | 调用日志] 分段 Tab;两个面板常挂载、非激活者 hidden
+// （display:none）——切 Tab 不丢筛选/结果/滚动,也不重发请求;充值全流程仍在 MyTopupModal。
 export function MyPage({
   leftSidebarCollapsed,
   onToggleLeftSidebar,
   onBack,
-  onLogout
+  onLogout,
+  initialTab = 'usage'
 }: Props): ReactElement {
   const { t } = useTranslation('common')
+  const [activeTab, setActiveTab] = useState<MyPageTab>(initialTab)
   const [me, setMe] = useState<Claude360Me | null>(null)
   const [usageStats, setUsageStats] = useState<Claude360TokenStat[]>([])
 
@@ -167,6 +176,14 @@ export function MyPage({
     [leftSidebarCollapsed]
   )
 
+  const segTabs = useMemo(
+    () => [
+      { key: 'usage' as const, label: t('myTabUsage') },
+      { key: 'logs' as const, label: t('myTabLogs') }
+    ],
+    [t]
+  )
+
   return (
     <div className="ds-drag flex h-full min-h-0 flex-col bg-ds-main">
       <div className="ds-stage-inset shrink-0">
@@ -213,7 +230,16 @@ export function MyPage({
 
           <MyAccountOverview me={me} onTopup={handleOpenTopup} t={t} />
 
-          <MyUsagePanel stats={usageStats} t={t} />
+          {/* 方案 B:用量卡整体移入「用量统计」Tab(行为不变);两面板常挂载,
+              hidden 切换保住调用日志的筛选/结果态,MyLogsPanel 由 active 懒发首查。 */}
+          <MySegTabs tabs={segTabs} active={activeTab} onChange={setActiveTab} ariaLabel={t('myTabsAria')} />
+
+          <div data-testid="my-tab-panel-usage" hidden={activeTab !== 'usage'}>
+            <MyUsagePanel stats={usageStats} t={t} />
+          </div>
+          <div data-testid="my-tab-panel-logs" hidden={activeTab !== 'logs'}>
+            <MyLogsPanel active={activeTab === 'logs'} t={t} />
+          </div>
         </div>
       </main>
 

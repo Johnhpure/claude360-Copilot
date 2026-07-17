@@ -732,6 +732,20 @@ export const claude360TokenStatsPayloadSchema = z.object({
   endTimestamp: z.number().int().nonnegative().optional()
 }).strict()
 
+// 调用日志查询（07-17「我的」页 · 调用日志）。字符串过滤项上限对齐后端口径：
+// request_id 后端列宽 varchar(64)，其余 128 与分组/令牌名一致；pageSize 后端上限 100。
+export const claude360LogsQuerySchema = z.object({
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1).max(100),
+  type: z.number().int().nonnegative().optional(),
+  startTimestamp: z.number().int().nonnegative().optional(),
+  endTimestamp: z.number().int().nonnegative().optional(),
+  tokenName: z.string().max(128).optional(),
+  modelName: z.string().max(128).optional(),
+  group: z.string().max(128).optional(),
+  requestId: z.string().max(64).optional()
+}).strict()
+
 // Claude360 原生音乐工作台 IPC payload（plan-05 Task 3）。
 // 约束来自 music-web：prompt(=歌词/描述) 或 instrumental 至少满足其一；
 // custom_mode 显式布尔；style/title/negative_tags 长度有界（描述框 maxLength=500，

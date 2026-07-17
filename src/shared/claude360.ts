@@ -201,6 +201,70 @@ export type Claude360TokenStatsQuery = {
   endTimestamp?: number
 }
 
+// ── 调用日志（07-17「我的」页 · NewAPI 调用日志） ──
+
+/**
+ * 日志查询条件（renderer → main，全 camelCase）。
+ * 匹配语义随后端：tokenName/group/requestId 精确匹配，modelName 为 LIKE 模糊；
+ * 「全部」语义靠**不携带**参数表达（type=0 / 空串由构建方剔除，main 侧再兜底）。
+ */
+export type Claude360LogsQuery = {
+  /** ≥1。 */
+  page: number
+  /** 10|20|50|100（后端上限 100）。 */
+  pageSize: number
+  /** 1充值 2消费 3管理 4系统 5错误 6退款；缺省=全部。 */
+  type?: number
+  /** unix 秒。 */
+  startTimestamp?: number
+  endTimestamp?: number
+  tokenName?: string
+  modelName?: string
+  group?: string
+  requestId?: string
+}
+
+/** 单条日志展示模型。other 内部 JSON 只在 main 解析出 frt，不透传原文。 */
+export type Claude360LogItem = {
+  /** unix 秒。 */
+  createdAt: number
+  type: number
+  /** 详情文本（倍率说明/错误信息等）。 */
+  content: string
+  tokenName: string
+  modelName: string
+  group: string
+  ip: string
+  requestId: string
+  quota: number
+  promptTokens: number
+  completionTokens: number
+  /** 总用时（秒，后端为整数）。 */
+  useTimeSeconds: number
+  isStream: boolean
+  /** 首字耗时毫秒（other JSON 的 frt）；缺失/非法为 null。 */
+  firstTokenMs: number | null
+  /** 后端 "¥%.6f" 人民币展示串；缺省 ''。 */
+  costDisplay: string
+}
+
+export type Claude360LogsPage = {
+  items: Claude360LogItem[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+/**
+ * 范围统计（/api/log/self/stat）。quotaCny 依赖 /api/status 价格折算，
+ * 价格拿不到时为 null（UI 显示「—」，不造假数据）。
+ */
+export type Claude360LogsStat = {
+  quotaCny: number | null
+  rpm: number
+  tpm: number
+}
+
 // 原始响应（main 进程内部映射用）
 export type Claude360MeRawResponse = {
   username?: string
@@ -256,4 +320,39 @@ export type Claude360TokenStatRawResponse = {
 export type Claude360StatusRawResponse = {
   quota_per_unit?: unknown
   price?: unknown
+}
+
+/** `/api/cli/logs` 单条原始响应（model.Log 平铺 + cost_display），字段可缺省。 */
+export type Claude360LogItemRawResponse = {
+  created_at?: number
+  type?: number
+  content?: string
+  token_name?: string
+  model_name?: string
+  quota?: number
+  prompt_tokens?: number
+  completion_tokens?: number
+  use_time?: number
+  is_stream?: boolean
+  group?: string
+  ip?: string
+  request_id?: string
+  /** 后端内部 JSON 串（含 frt 首字毫秒），格式不受本端控制。 */
+  other?: string
+  cost_display?: string
+}
+
+/** `/api/cli/logs` 响应 data = newapi PageInfo `{page, page_size, total, items}`。 */
+export type Claude360LogsPageRawResponse = {
+  page?: number
+  page_size?: number
+  total?: number
+  items?: Claude360LogItemRawResponse[]
+}
+
+/** `/api/log/self/stat` 响应 data；数值类型不受本端控制，按 unknown 解析。 */
+export type Claude360LogsStatRawResponse = {
+  quota?: unknown
+  rpm?: unknown
+  tpm?: unknown
 }

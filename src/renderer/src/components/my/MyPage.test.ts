@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type {
+  Claude360LogItem,
   Claude360Me,
   Claude360TokenListItem,
   Claude360TokenStat,
@@ -10,9 +11,14 @@ import type {
   Claude360TopupOrderStatus
 } from '@shared/claude360'
 import type { Claude360TokenRef } from '@shared/app-settings-claude360'
+import { setupI18nTestEnglish } from '../../test-support/i18n-en'
 import { MyAccountOverview } from './MyAccountOverview'
+import { MyLogsPanel, MyLogsTable } from './MyLogsPanel'
+import { MyPage } from './MyPage'
+import { MySegTabs } from './MySegTabs'
 import { MyTopupModalContent, type MyTopupModalContentProps } from './MyTopupModal'
 import { MyUsagePanel } from './MyUsagePanel'
+import { defaultLogColumnPrefs } from './my-logs-actions'
 import {
   buildUsageView,
   classifyQrPayload,
@@ -60,7 +66,21 @@ const labels: Record<string, string> = {
   myUsageShare: 'Share',
   myUsageSearchPlaceholder: 'Search group name',
   myUsageShowMore: 'Show more',
-  myUsageShowLess: 'Show less'
+  myUsageShowLess: 'Show less',
+  myLogsTitle: 'Call logs',
+  myLogsColumns: 'Columns',
+  myLogsColTime: 'Time',
+  myLogsColRequestId: 'Request ID',
+  myLogsTypeTopup: 'Top-up',
+  myLogsTypeConsume: 'Consume',
+  myLogsTypeError: 'Error',
+  myLogsFirstTokenPrefix: 'first ',
+  myLogsDetailExpand: 'Expand detail',
+  myLogsDetailCollapse: 'Collapse detail',
+  myLogsDetailContent: 'Content',
+  myLogsDetailFirstToken: 'First token',
+  myLogsDetailFirstTokenNone: '— (no stream)',
+  myLogsDetailCopy: 'Copy details'
 }
 
 function t(key: string): string {
@@ -107,6 +127,28 @@ function usageStatsFixture(count: number): Claude360TokenStat[] {
 
 function topupOptionsFixture(): Claude360TopupOptions {
   return { wechatEnabled: true, amountOptions: [10, 30, 50], minTopup: 10, payUrl: '' }
+}
+
+/** 消费型流式日志行基准;局部覆盖构造错误/充值等变体。 */
+function logItemFixture(overrides: Partial<Claude360LogItem> = {}): Claude360LogItem {
+  return {
+    createdAt: Math.floor(new Date(2026, 6, 17, 20, 41, 52).getTime() / 1000),
+    type: 2,
+    content: '模型倍率 3.0，分组倍率 1.0',
+    tokenName: 'Claude360 CLI',
+    modelName: 'claude-sonnet-4-5',
+    group: 'vip-group',
+    ip: '203.0.113.24',
+    requestId: 'req_1c8a4f92db306e71',
+    quota: 69100,
+    promptTokens: 12480,
+    completionTokens: 1536,
+    useTimeSeconds: 3,
+    isStream: true,
+    firstTokenMs: 800,
+    costDisplay: '¥0.138200',
+    ...overrides
+  }
 }
 
 function modalContentProps(overrides: Partial<MyTopupModalContentProps> = {}): MyTopupModalContentProps {
@@ -488,5 +530,194 @@ describe('MyPage orchestration', () => {
       expect(refreshed.balanceDisplay).toBe('¥188.50')
     }
     expect(calls.me).toHaveBeenCalled()
+  })
+})
+
+describe('MySegTabs', () => {
+  const tabs = [
+    { key: 'usage' as const, label: 'Usage stats' },
+    { key: 'logs' as const, label: 'Call logs' }
+  ]
+
+  it('marks exactly the active tab as selected', () => {
+    const usageActive = renderToStaticMarkup(
+      createElement(MySegTabs, { tabs, active: 'usage' as const, onChange: () => undefined, ariaLabel: 'tabs' })
+    )
+    expect(usageActive).toContain('role="tablist"')
+    expect(usageActive).toContain('aria-selected="true" data-testid="my-tab-usage"')
+    expect(usageActive).toContain('aria-selected="false" data-testid="my-tab-logs"')
+    // 选中项 = accent-soft 底 + accent 字(确认稿 .seg-tabs.on)。
+    expect(usageActive).toContain('bg-accent-soft')
+
+    const logsActive = renderToStaticMarkup(
+      createElement(MySegTabs, { tabs, active: 'logs' as const, onChange: () => undefined, ariaLabel: 'tabs' })
+    )
+    expect(logsActive).toContain('aria-selected="false" data-testid="my-tab-usage"')
+    expect(logsActive).toContain('aria-selected="true" data-testid="my-tab-logs"')
+  })
+})
+
+describe('MyLogsTable', () => {
+  const noop = (): void => undefined
+
+  function tableHtml(
+    items: Claude360LogItem[],
+    columns = defaultLogColumnPrefs(),
+    expandedRows: ReadonlySet<number> = new Set<number>()
+  ): string {
+    return renderToStaticMarkup(
+      createElement(MyLogsTable, {
+        items,
+        columns,
+        expandedRows,
+        onToggleRow: noop,
+        onCopyDetail: noop,
+        t
+      })
+    )
+  }
+
+  it('renders consume rows with pills, stream duration badge and formatted numbers', () => {
+    const html = tableHtml([logItemFixture()])
+    expect(html).toContain('07-17')
+    expect(html).toContain('20:41:52')
+    expect(html).toContain('Claude360 CLI')
+    expect(html).toContain('vip-group')
+    expect(html).toContain('Consume')
+    expect(html).toContain('bg-accent-soft') // 消费徽章 accent
+    expect(html).toContain('claude-sonnet-4-5')
+    expect(html).toContain('3s · first 0.8s') // 流式:总用时 + 首字耗时
+    expect(html).toContain('bg-ds-success-soft') // ≤10s success
+    expect(html).toContain('12,480')
+    expect(html).toContain('1,536')
+    expect(html).toContain('¥0.138200')
+    expect(html).toContain('203.0.113.24')
+    // Request ID 列默认隐藏,且未展开详情 → 全文不含 request id。
+    expect(html).not.toContain('req_1c8a4f92db306e71')
+    expect(html).toContain('Expand detail')
+  })
+
+  it('keeps model/duration/tokens/ip on error rows (mockup parity) and dashes non-call rows', () => {
+    // 错误行(type=5)是 API 调用:确认稿照常展示模型/用时/输入输出/IP。
+    const errorHtml = tableHtml([
+      logItemFixture({
+        type: 5,
+        isStream: false,
+        firstTokenMs: null,
+        useTimeSeconds: 28,
+        completionTokens: 0,
+        costDisplay: '¥0.000000'
+      })
+    ])
+    expect(errorHtml).toContain('Error')
+    expect(errorHtml).toContain('bg-ds-danger-soft')
+    expect(errorHtml).toContain('claude-sonnet-4-5')
+    expect(errorHtml).toContain('28s')
+    expect(errorHtml).toContain('bg-ds-warning-soft') // >10s warning
+    expect(errorHtml).not.toContain('· first') // 非流式不展示首字
+
+    // 充值行(type=1)不适用的列显示「—」,花费为 success 色 + 前缀 +。
+    const topupHtml = tableHtml([
+      logItemFixture({
+        type: 1,
+        tokenName: '',
+        modelName: '',
+        group: '',
+        ip: '',
+        requestId: '',
+        promptTokens: 0,
+        completionTokens: 0,
+        useTimeSeconds: 0,
+        isStream: false,
+        firstTokenMs: null,
+        costDisplay: '¥50.000000'
+      })
+    ])
+    expect(topupHtml).toContain('Top-up')
+    expect(topupHtml).toContain('+¥50.000000')
+    expect(topupHtml).toContain('text-ds-success')
+    expect(topupHtml).toContain('—')
+    expect(topupHtml).not.toContain('claude-sonnet-4-5')
+  })
+
+  it('honors column prefs: toggleable columns hide and the request id column can be enabled', () => {
+    const minimal = tableHtml([logItemFixture()], {
+      group: false,
+      duration: false,
+      ip: false,
+      requestId: false
+    })
+    expect(minimal).not.toContain('vip-group')
+    expect(minimal).not.toContain('· first')
+    expect(minimal).not.toContain('203.0.113.24')
+    // 固定列不受影响。
+    expect(minimal).toContain('claude-sonnet-4-5')
+    expect(minimal).toContain('¥0.138200')
+
+    const withReqId = tableHtml([logItemFixture()], { ...defaultLogColumnPrefs(), requestId: true })
+    expect(withReqId).toContain('Request ID') // 表头
+    expect(withReqId).toContain('req_1c8a4f92db306e71')
+  })
+
+  it('expands an inline detail row with full content, request id, first-token time and copy action', () => {
+    const html = tableHtml(
+      [logItemFixture({ content: '上游响应超时（read timeout after 28s），本次请求未计费。' })],
+      defaultLogColumnPrefs(),
+      new Set([0])
+    )
+    expect(html).toContain('上游响应超时（read timeout after 28s），本次请求未计费。')
+    expect(html).toContain('req_1c8a4f92db306e71')
+    expect(html).toContain('First token')
+    expect(html).toContain('0.8s')
+    expect(html).toContain('Copy details')
+    expect(html).toContain('Collapse detail')
+    // colspan = 可见列数(8 固定 + 分组/用时/IP;Request ID 默认隐藏)。
+    expect(html).toContain('colSpan="11"')
+  })
+})
+
+describe('MyPage tab shell (方案 B)', () => {
+  // MyPage 直接消费 useTranslation:注册 en 资源以英文文案断言(AppShell.test 惯例)。
+  beforeAll(() => setupI18nTestEnglish())
+
+  const pageProps = {
+    leftSidebarCollapsed: false,
+    onToggleLeftSidebar: (): void => undefined,
+    onBack: (): void => undefined,
+    onLogout: (): void => undefined
+  }
+
+  it('defaults to the usage tab and keeps the logs panel mounted but hidden', () => {
+    const html = renderToStaticMarkup(createElement(MyPage, pageProps))
+    expect(html).toContain('role="tablist"')
+    expect(html).toContain('aria-selected="true" data-testid="my-tab-usage"')
+    expect(html).toContain('aria-selected="false" data-testid="my-tab-logs"')
+    // 面板常挂载:日志面板 hidden,用量面板可见。
+    expect(html).toContain('data-testid="my-tab-panel-logs" hidden=""')
+    expect(html).not.toContain('data-testid="my-tab-panel-usage" hidden=""')
+    // 用量面板照常渲染(迁移进 Tab 后行为不变;无数据时为空态文案)。
+    expect(html).toContain('Token usage')
+    // 日志面板筛选骨架已在 DOM(hidden 而非卸载)。
+    expect(html).toContain('Start time')
+  })
+
+  it('activates the logs tab via initialTab and hides the usage panel', () => {
+    const html = renderToStaticMarkup(createElement(MyPage, { ...pageProps, initialTab: 'logs' as const }))
+    expect(html).toContain('aria-selected="true" data-testid="my-tab-logs"')
+    expect(html).toContain('data-testid="my-tab-panel-usage" hidden=""')
+    expect(html).not.toContain('data-testid="my-tab-panel-logs" hidden=""')
+    // 筛选区关键控件在位:今天预设选中 / 类型下拉 / 查询与重置按钮。
+    expect(html).toContain('aria-pressed="true"')
+    expect(html).toContain('All types')
+    expect(html).toContain('data-testid="my-logs-search"')
+    expect(html).toContain('data-testid="my-logs-reset"')
+  })
+
+  it('renders the logs panel filter skeleton standalone without issuing queries at render time', () => {
+    // 静态渲染不跑 effect:面板只出筛选区(idle),无表格/分页/统计。
+    const html = renderToStaticMarkup(createElement(MyLogsPanel, { active: false, t }))
+    expect(html).toContain('Call logs')
+    expect(html).toContain('Columns')
+    expect(html).not.toContain('<table')
   })
 })

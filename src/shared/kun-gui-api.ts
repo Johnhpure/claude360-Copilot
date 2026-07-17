@@ -22,6 +22,9 @@ import type {
   Claude360DeviceAuthStartResult,
   Claude360LoginResult,
   Claude360LogoutResult,
+  Claude360LogsPage,
+  Claude360LogsQuery,
+  Claude360LogsStat,
   Claude360Me,
   Claude360PasswordLogin2FAPayload,
   Claude360PasswordLoginPayload,
@@ -446,6 +449,10 @@ export type KunGuiApi = {
   claude360BillingTopupWechat: (payload: { amount: number; discountCode?: string }) => Promise<Claude360TopupOrder>
   claude360BillingTopupOrder: (payload: { orderId: string }) => Promise<Claude360TopupOrderStatus>
   claude360BillingTokenStats: (payload: { startTimestamp?: number; endTimestamp?: number }) => Promise<Claude360TokenStat[]>
+  /** 分页查询本人调用日志（main 用 CLI token 调 /api/cli/logs；服务端已按用户视角脱敏）。 */
+  claude360BillingLogs: (payload: Claude360LogsQuery) => Promise<Claude360LogsPage>
+  /** 调用日志范围统计（main 调 /api/log/self/stat；quota 按 /api/status 价格折算人民币）。 */
+  claude360BillingLogsStat: (payload: Claude360LogsQuery) => Promise<Claude360LogsStat>
   /** 提交音乐生成任务（main 用 music 分组 Key 调 /suno/submit/music；不下发 Key）。 */
   claude360MusicSubmit: (payload: Claude360MusicSubmitPayload) => Promise<Claude360MusicSubmitResult>
   /** 查询音乐任务状态（main 调 /suno/fetch；taskId 非空）。 */

@@ -1264,6 +1264,35 @@ describe('claude360 token/model/billing IPC handlers', () => {
     await handler?.({}, { startTimestamp: 100, endTimestamp: 200 })
     expect(getTokenStats).toHaveBeenCalledWith({ startTimestamp: 100, endTimestamp: 200 })
   })
+
+  it('validates the logs query and forwards it to the billing service', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const listLogs = vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 20 }))
+    registerAppIpcHandlers(
+      registerOptions({ claude360BillingService: { listLogs } as never })
+    )
+    const handler = handlers.get('claude360:billing:logs')
+    expect(handler).toBeTypeOf('function')
+    // page ≥1、pageSize ≤100 由 schema 边界拦截，非法请求不触达 service。
+    await expect(handler?.({}, { page: 0, pageSize: 20 })).rejects.toThrow(/Invalid payload/)
+    await expect(handler?.({}, { page: 1, pageSize: 101 })).rejects.toThrow(/Invalid payload/)
+    expect(listLogs).not.toHaveBeenCalled()
+    await handler?.({}, { page: 1, pageSize: 20, type: 2, tokenName: 'cli', requestId: 'req_1' })
+    expect(listLogs).toHaveBeenCalledWith({ page: 1, pageSize: 20, type: 2, tokenName: 'cli', requestId: 'req_1' })
+  })
+
+  it('forwards the logs stat query to the billing service', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const getLogsStat = vi.fn(async () => ({ quotaCny: 1.5, rpm: 2, tpm: 3 }))
+    registerAppIpcHandlers(
+      registerOptions({ claude360BillingService: { getLogsStat } as never })
+    )
+    const handler = handlers.get('claude360:billing:logs-stat')
+    await expect(handler?.({}, { pageSize: 20 })).rejects.toThrow(/Invalid payload/)
+    expect(getLogsStat).not.toHaveBeenCalled()
+    await expect(handler?.({}, { page: 1, pageSize: 20, group: 'default' })).resolves.toMatchObject({ quotaCny: 1.5 })
+    expect(getLogsStat).toHaveBeenCalledWith({ page: 1, pageSize: 20, group: 'default' })
+  })
 })
 
 describe('claude360 music IPC handlers', () => {

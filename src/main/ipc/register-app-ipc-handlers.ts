@@ -91,6 +91,7 @@ import {
   claude360TopupWechatPayloadSchema,
   claude360TopupOrderPayloadSchema,
   claude360TokenStatsPayloadSchema,
+  claude360LogsQuerySchema,
   claude360MusicSubmitPayloadSchema,
   claude360MusicFetchPayloadSchema,
   claude360MusicMediaBlobPayloadSchema,
@@ -955,6 +956,14 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('claude360:billing:token-stats', async (_, payload: unknown) => {
     const req = parseIpcPayload('claude360:billing:token-stats', claude360TokenStatsPayloadSchema, payload)
     return claude360BillingService.getTokenStats(req)
+  })
+  ipcMain.handle('claude360:billing:logs', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:billing:logs', claude360LogsQuerySchema, payload)
+    return claude360BillingService.listLogs(req)
+  })
+  ipcMain.handle('claude360:billing:logs-stat', async (_, payload: unknown) => {
+    const req = parseIpcPayload('claude360:billing:logs-stat', claude360LogsQuerySchema, payload)
+    return claude360BillingService.getLogsStat(req)
   })
 
   // Claude360 原生音乐工作台 IPC（plan-05 Task 3）。API Key 全程只在 main 使用。
