@@ -335,7 +335,14 @@ export function MessageTimeline({
       <div className={`ds-message-timeline-content ds-chat-column-inset ds-chat-content-max-width mx-auto flex w-full min-w-0 flex-col gap-8 pt-8 ${
         goalTimelinePaddingClass(heroRoute, Boolean(activeThreadGoal))
       }`}>
-        {!hasContent || !activeThreadId ? (
+        {/* Empty-hero gate (07-17-empty-state-dismiss-delay): `currentTurnUserId`
+            flips in the same optimistic set as the user bubble/busy flag, while
+            `activeThreadId` only lands seconds later (key-ensure → createThread).
+            Gating on it dismisses the hero the moment a send starts. Keep the
+            `||` shape — an empty but SELECTED thread must still show the hero —
+            and never gate on `busy` (claw live prefetch sets busy with empty
+            blocks and would lose its hero). */}
+        {(!hasContent || !activeThreadId) && !currentTurnUserId ? (
           <MessageTimelineEmptyHero
             route={heroRoute}
             ready={runtimeConnection === 'ready'}
