@@ -1020,15 +1020,6 @@ export function getActiveAgentApiKey(settings: AppSettingsV1): string {
   return resolveKunRuntimeSettings(settings).apiKey?.trim() ?? ''
 }
 
-export function mergeAgentRuntimeSettings(
-  defaults: KunSettingsEnvelopeV1,
-  patch: KunSettingsEnvelopePatchV1 | undefined
-): KunSettingsEnvelopeV1 {
-  return kunSettingsEnvelope(
-    mergeKunRuntimeSettings(defaults.kun, patch?.kun)
-  )
-}
-
 type LegacyAgentsSettingsShape = {
   kun?: Partial<KunRuntimeSettingsV1>
   codewhale?: Partial<LegacyLocalHttpRuntimeSettingsV1>

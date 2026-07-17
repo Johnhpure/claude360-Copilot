@@ -70,11 +70,11 @@ describe('MessageTimelineEmptyHero — runtime offline hero (issue #78)', () => 
 
   it('renders the animated text brand instead of a Logo image stage while offline/waking', () => {
     // 需求二：启动/未就绪画面以动态文字品牌「Claude360 Copilot」(BrandHero) 取代原
-    // KunHeroStage 图片舞台。断言文字品牌出现、且旧图片舞台的唤醒动效不再渲染。
+    // 图片舞台。断言文字品牌出现、且旧图片舞台的唤醒动效不再渲染。
     const waking = renderOfflineHero(null)
     expect(waking).toContain('brand-hero')
     expect(waking).toContain('Copilot')
-    // 旧图片舞台（KunHeroStage）的唤醒动效 class 不应再出现
+    // 旧图片舞台的唤醒动效 class 不应再出现
     expect(waking).not.toContain('ds-runtime-wake-zzz')
     expect(waking).not.toContain('ds-runtime-wake-sonar')
     expect(waking).not.toContain('ds-runtime-wake-caret')

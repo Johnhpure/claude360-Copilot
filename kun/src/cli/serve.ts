@@ -161,7 +161,7 @@ export function parseServeOptions(
 
 /**
  * Validate a pre-constructed options object. Used by tests and by the
- * main process when Kun is started programmatically.
+ * main process when the runtime is started programmatically.
  */
 export function validateServeOptions(input: unknown): ServeOptions {
   return ServeOptionsSchema.parse(input)

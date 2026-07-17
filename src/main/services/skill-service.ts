@@ -77,7 +77,7 @@ export async function guiSkillRootsForRuntime(
   const candidates = buildSkillRootCandidates(settings, workspaceRootOverride).filter((candidate) => {
     if (isCandidateDisabled(candidate, disabled)) return false
     // Configured extra dirs are passed through even when absent (the user set
-    // them deliberately and Kun tolerates missing roots); common conventions
+    // them deliberately and the runtime tolerates missing roots); common conventions
     // are only included once they actually exist on disk.
     return candidate.source === 'extra' || existsSync(candidate.path)
   })

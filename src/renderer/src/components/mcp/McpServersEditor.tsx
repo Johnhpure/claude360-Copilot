@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
+// P3（07-17）：懒链注册 zh settings ns（副作用 import；见 i18n-settings.ts）。
+import '../../i18n-settings'
 import { Code2, Plus, Trash2 } from 'lucide-react'
 import {
   createBlankMcpServer,

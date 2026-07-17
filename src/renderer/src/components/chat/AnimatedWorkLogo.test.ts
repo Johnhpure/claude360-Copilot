@@ -10,14 +10,6 @@ import {
 import { WorkMetaRow } from './message-timeline-cards'
 
 describe('AnimatedWorkLogo', () => {
-  it('ships the Kun bird asset used as the default work mark', async () => {
-    const nodeFs = 'node:fs/promises'
-    const { readFile } = await import(/* @vite-ignore */ nodeFs)
-    const birdFigure = await readFile(new URL('../../../../asset/img/kun_bird.png', import.meta.url))
-
-    expect(pngDimensions(birdFigure)).toEqual({ width: 751, height: 512 })
-  })
-
   it('renders layered logo markup for swim animation', () => {
     const html = renderToStaticMarkup(
       createElement(AnimatedWorkLogo, { active: true, className: 'extra-class', size: 'md' })
@@ -175,50 +167,4 @@ describe('AnimatedWorkLogo', () => {
     expect(baseShellCss).not.toContain('ds-sidebar-mascot')
     expect(baseShellCss).not.toContain('ds-ikun-cameo')
   })
-
-  it('keeps generated Kun PNG icon dimensions stable for packaging', async () => {
-    const nodeFs = 'node:fs/promises'
-    const { readFile } = await import(/* @vite-ignore */ nodeFs)
-    const appIcon = await readFile(new URL('../../../../asset/img/kun.png', import.meta.url))
-    const macIcon = await readFile(new URL('../../../../asset/img/kun_mac.png', import.meta.url))
-    const trayIcon = await readFile(new URL('../../../../asset/img/kun_tray.png', import.meta.url))
-
-    expect(pngDimensions(appIcon)).toEqual({ width: 1254, height: 1254 })
-    expect(pngDimensions(macIcon)).toEqual({ width: 1024, height: 1024 })
-    expect(pngDimensions(trayIcon)).toEqual({ width: 954, height: 994 })
-  })
-
-  it('ships the Kun state figure assets', async () => {
-    const nodeFs = 'node:fs/promises'
-    const { readFile } = await import(/* @vite-ignore */ nodeFs)
-    const expected: Record<string, { width: number; height: number }> = {
-      kun_greet: { width: 512, height: 460 },
-      kun_sleep: { width: 512, height: 390 },
-      kun_surf: { width: 512, height: 479 },
-      kun_sit: { width: 512, height: 493 }
-    }
-
-    for (const [name, dimensions] of Object.entries(expected)) {
-      const figure = await readFile(new URL(`../../../../asset/img/${name}.png`, import.meta.url))
-      expect(pngDimensions(figure)).toEqual(dimensions)
-    }
-  })
 })
-
-function pngDimensions(buffer: Uint8Array): { width: number; height: number } {
-  const signature = [...buffer.slice(0, 8)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
-  expect(signature).toBe('89504e470d0a1a0a')
-  return {
-    width: readUint32BE(buffer, 16),
-    height: readUint32BE(buffer, 20)
-  }
-}
-
-function readUint32BE(buffer: Uint8Array, offset: number): number {
-  return (
-    buffer[offset] * 16_777_216 +
-    buffer[offset + 1] * 65_536 +
-    buffer[offset + 2] * 256 +
-    buffer[offset + 3]
-  )
-}

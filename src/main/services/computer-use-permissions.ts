@@ -26,7 +26,7 @@ export type ComputerUsePermissions = {
  * Its `askFor*` calls use the canonical TCC registration APIs
  * (AXIsProcessTrustedWithOptions / CGRequestScreenCaptureAccess) which
  * proactively add the app to the Accessibility / Screen Recording lists —
- * so the user only has to flip the toggle rather than add Kun by hand.
+ * so the user only has to flip the toggle rather than add the app by hand.
  */
 type MacPermissions = {
   getAuthStatus(type: 'accessibility' | 'screen'): string
@@ -114,7 +114,7 @@ export async function getComputerUsePermissions(): Promise<ComputerUsePermission
 }
 
 /**
- * Proactively enroll Kun in the relevant macOS permission list and open
+ * Proactively enroll the app in the relevant macOS permission list and open
  * the settings pane. Prefers the native node-mac-permissions APIs (which
  * register the app in the list so the user just toggles it on); falls
  * back to Electron primitives if the native module is unavailable.
@@ -130,7 +130,7 @@ export async function requestComputerUsePermission(
   try {
     if (kind === 'accessibility') {
       if (native?.askForAccessibilityAccess) {
-        // Registers Kun in the Accessibility list + opens the pane.
+        // Registers the app in the Accessibility list + opens the pane.
         native.askForAccessibilityAccess()
       } else {
         // Fallback: prompt adds the app to the Accessibility list.
@@ -138,7 +138,7 @@ export async function requestComputerUsePermission(
       }
     } else {
       if (native?.askForScreenCaptureAccess) {
-        // CGRequestScreenCaptureAccess: registers Kun in the Screen
+        // CGRequestScreenCaptureAccess: registers the app in the Screen
         // Recording list, then open the pane so the user can enable it.
         native.askForScreenCaptureAccess(true)
       } else {

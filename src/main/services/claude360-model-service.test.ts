@@ -27,6 +27,46 @@ function fakeApi(routes: Record<string, () => unknown>): Claude360ApiClientPort 
   }
 }
 
+// 保序回归专用：可为每个路由配置延迟，令响应乱序 resolve；并统计分组/模型两阶段
+// 的并发在飞峰值（串行实现恒为 1，并行实现 >1），以断言并行化生效且输出仍保序。
+function fakeApiWithDelays(
+  routes: Record<string, () => unknown>,
+  delays: Record<string, number>
+): {
+  client: Claude360ApiClientPort
+  maxGroupsInFlight: () => number
+  maxModelsInFlight: () => number
+} {
+  let groupsInFlight = 0
+  let modelsInFlight = 0
+  let maxGroups = 0
+  let maxModels = 0
+  const client: Claude360ApiClientPort = {
+    get: async <T>(path: string) => {
+      const key = Object.keys(routes).find((r) => path === r || path.startsWith(`${r}&`) || path.startsWith(`${r}`))
+      if (!key) throw new Error(`no route ${path}`)
+      const isModels = path.startsWith('/api/cli/models')
+      if (isModels) {
+        modelsInFlight++
+        maxModels = Math.max(maxModels, modelsInFlight)
+      } else {
+        groupsInFlight++
+        maxGroups = Math.max(maxGroups, groupsInFlight)
+      }
+      // 恒 await 一次（含 delay=0），确保并发峰值可被准确观测。
+      await new Promise((resolve) => setTimeout(resolve, delays[key] ?? 0))
+      if (isModels) modelsInFlight--
+      else groupsInFlight--
+      return routes[key]() as T
+    }
+  }
+  return {
+    client,
+    maxGroupsInFlight: () => maxGroups,
+    maxModelsInFlight: () => maxModels
+  }
+}
+
 describe('Claude360ModelService.refreshGroupsAndModels', () => {
   it('builds claude360:<group> profiles and never creates keys while refreshing models', async () => {
     let ensureCalls = 0
@@ -183,10 +223,62 @@ describe('Claude360ModelService.refreshGroupsAndModels', () => {
     expect(result.modelCache.groups).toEqual(expect.arrayContaining(['国模分组']))
     expect(result.modelCache.models).toEqual(expect.arrayContaining(['qwen3.7-max', 'kimi-k2.7-code']))
 
-    const guomo = result.providerProfiles.find((p) => p.name === '国模分组')!
-    expect(guomo.models).toEqual(['qwen3.7-max', 'kimi-k2.7-code'])
+    const guomo = result.providerProfiles.find((p) => p.name === '国模分组')
+    expect(guomo).toBeDefined()
+    expect(guomo?.models).toEqual(['qwen3.7-max', 'kimi-k2.7-code'])
     // id 归一化安全性（isClaude360ProviderId 往返）由 shared 层
     // app-settings-provider.test.ts 的 buildClaude360ProviderProfiles 用例统一覆盖。
+  })
+
+  // 07-17 并行化回归：分组阶段（4 请求）与模型阶段（每分组一请求）改为 Promise.all
+  // 并发发起。必须保证——即便响应乱序 resolve——groupInputs / provider / allModels /
+  // modelCache 的顺序仍与串行版字节一致（provider id/指纹依赖发起顺序，禁止先完成先处理）。
+  it('parallelizes group+model fetches yet preserves serial byte-order under out-of-order resolution', async () => {
+    const encoded = encodeURIComponent('国模分组')
+    const api = fakeApiWithDelays(
+      {
+        // tool 键须先于全量 /api/cli/groups，避免 startsWith 误配（沿用既有 fakeApi 约定）。
+        '/api/cli/groups?tool=codex': () => [{ name: 'alpha' }, { name: '国模分组' }, { name: 'zeta' }],
+        '/api/cli/groups?tool=image': () => [],
+        '/api/cli/groups?tool=music': () => [],
+        // 全量返回额外 omega（tool 未命中）→ 归 text 并追加在 tool 组之后。
+        '/api/cli/groups': () => [{ name: 'alpha' }, { name: '国模分组' }, { name: 'zeta' }, { name: 'omega' }],
+        '/api/cli/models?group=alpha': () => ({ models: [{ id: 'm-alpha' }, { id: 'shared' }] }),
+        [`/api/cli/models?group=${encoded}`]: () => ({ models: [{ id: 'shared' }, { id: 'm-guomo' }] }),
+        '/api/cli/models?group=zeta': () => ({ models: [{ id: 'm-zeta' }] }),
+        '/api/cli/models?group=omega': () => ({ models: [{ id: 'm-omega' }, { id: 'm-alpha' }] })
+      },
+      {
+        '/api/cli/groups?tool=codex': 5,
+        '/api/cli/groups?tool=image': 5,
+        '/api/cli/groups?tool=music': 5,
+        '/api/cli/groups': 5,
+        // 模型响应刻意乱序：resolve 顺序 zeta(5) < omega(15) < 国模(20) < alpha(40)，
+        // 与发起顺序 alpha,国模,zeta,omega 完全相反交错。
+        '/api/cli/models?group=alpha': 40,
+        [`/api/cli/models?group=${encoded}`]: 20,
+        '/api/cli/models?group=zeta': 5,
+        '/api/cli/models?group=omega': 15
+      }
+    )
+    const service = new Claude360ModelService({ apiClient: api.client, secretStore: fakeSecretStore() })
+
+    const result = await service.refreshGroupsAndModels()
+
+    // 保序：输出严格按发起顺序（= purposeByGroup 插入顺序），不受 resolve 时序影响。
+    expect(result.providerProfiles.map((p) => p.name)).toEqual(['alpha', '国模分组', 'zeta', 'omega'])
+    expect(result.modelCache.groups).toEqual(['alpha', '国模分组', 'zeta', 'omega'])
+    // allModels 去重顺序：alpha[m-alpha,shared] → 国模[+m-guomo] → zeta[+m-zeta] → omega[+m-omega]。
+    expect(result.modelCache.models).toEqual(['m-alpha', 'shared', 'm-guomo', 'm-zeta', 'm-omega'])
+
+    // 中文分组指纹回归护栏：国模分组归 text、模型顺序保留。
+    const guomo = result.providerProfiles.find((p) => p.name === '国模分组')
+    expect(guomo).toBeDefined()
+    expect(guomo?.models).toEqual(['shared', 'm-guomo'])
+
+    // 并行性护栏：分组阶段 4 请求、模型阶段 4 请求各自并发在飞（串行实现恒为 1）。
+    expect(api.maxGroupsInFlight()).toBe(4)
+    expect(api.maxModelsInFlight()).toBe(4)
   })
 
   it('throws when not logged in', async () => {

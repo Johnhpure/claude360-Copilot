@@ -1,6 +1,8 @@
 import type { ComponentProps, ReactElement } from 'react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+// P3（07-17）：懒链注册 zh settings ns（副作用 import；见 i18n-settings.ts）。
+import '../i18n-settings'
 import {
   APP_HOME_DIR_NAME,
   DEFAULT_WRITE_INLINE_COMPLETION_BASE_URL,

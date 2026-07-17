@@ -446,7 +446,7 @@ async function startKunChildOnce(
   const runtimeApiKey =
     (activeProvider ? await resolveProfileApiKey(activeProvider) : '') || runtime.apiKey
   let claudeBinary: string | undefined
-  // Kun registers every provider mirrored into serve.providers, not only the
+  // The runtime registers every provider mirrored into serve.providers, not only the
   // default provider. Any supported Agent SDK profile therefore needs the
   // managed executable path before spawn; otherwise background/non-default
   // turns fall back to the platform package that production builds exclude.

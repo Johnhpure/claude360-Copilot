@@ -1,5 +1,7 @@
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+// P3（07-17）：懒链注册 zh settings ns（副作用 import；见 i18n-settings.ts）。
+import '../i18n-settings'
 import type { RuntimeConnectionStatus } from '../agent/types'
 import { useChatStore } from '../store/chat-store'
 import type { InitialSetupMode } from '../store/chat-store-types'

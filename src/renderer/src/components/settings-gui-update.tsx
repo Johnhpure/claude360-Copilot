@@ -104,7 +104,7 @@ export function GuiUpdateControl({
       : null
     tone = 'warn'
   } else if (installing) {
-    title = t('guiUpdateInstalling')
+    title = t('common:guiUpdateInstalling')
     tone = 'warn'
   } else if (downloaded && info?.ok) {
     title = t('guiUpdateDownloaded', { version: info.latestVersion })
@@ -122,8 +122,8 @@ export function GuiUpdateControl({
     tone = 'warn'
   } else if (info?.ok && info.hasUpdate) {
     title = info.manualOnly
-      ? t('guiUpdateAvailableManual', { current: info.currentVersion, latest: info.latestVersion })
-      : t('guiUpdateAvailable', { current: info.currentVersion, latest: info.latestVersion })
+      ? t('common:guiUpdateAvailableManual', { current: info.currentVersion, latest: info.latestVersion })
+      : t('common:guiUpdateAvailable', { current: info.currentVersion, latest: info.latestVersion })
     tone = 'warn'
   } else if (info?.ok) {
     title = t('guiUpdateCurrent', { version: info.currentVersion })
@@ -202,7 +202,7 @@ export function GuiUpdateControl({
             ) : (
               <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />
             )}
-            {t('guiUpdateInstall')}
+            {t('common:guiUpdateInstall')}
           </button>
         ) : null}
         {releaseUrl ? (

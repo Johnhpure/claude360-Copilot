@@ -1,15 +1,16 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import zhCommon from './locales/zh/common.json'
-import zhSettings from './locales/zh/settings.json'
 
-// 首屏 bundle 优化（07-14-renderer-lazy-loading R1）：默认语言 zh 保留静态内嵌
-// （首屏零闪烁），en 资源改为动态 chunk——切换语言前必须先经 ensureI18nResources
-// 加载并 addResourceBundle，再 changeLanguage（避免文案闪 key）。
-// en 加载失败时 fallbackLng=zh 兜底，UI 仍可读。
+// 首屏 bundle 优化（07-14 R1 + 07-17 P3）：默认语言 zh 的 common 静态内嵌（首屏零闪烁）；
+// zh settings（~88KB）拆到 i18n-settings.ts，随首个消费它的懒链（Settings / InitialSetup /
+// Mcp）注册，不进首屏入口 chunk。en 资源改为动态 chunk——切换语言前必须先经
+// ensureI18nResources 加载并 addResourceBundle，再 changeLanguage（避免文案闪 key）。
+// en 加载失败时 fallbackLng=zh 兜底，UI 仍可读。settings ns 已声明但初始为空，
+// 懒链 import './i18n-settings' 后填充；首屏组件不消费 settings ns（见 WorkbenchTopBar）。
 void i18n.use(initReactI18next).init({
   resources: {
-    zh: { common: zhCommon, settings: zhSettings }
+    zh: { common: zhCommon }
   },
   lng: 'zh',
   fallbackLng: 'zh',

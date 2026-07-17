@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 
 /**
  * 首页欢迎区品牌展示（07-05 home-brand-animation）：
- * 以动态文字「Claude360 Copilot」替换原 Logo 图片（KunHeroStage）。
+ * 以动态文字「Claude360 Copilot」替换原 Logo 图片舞台。
  *
  * 动效组合（克制、低干扰，纯 CSS：transform/opacity/background-position）：
  * - 入场：两段文字先后淡入上浮（一次性）；

@@ -710,7 +710,7 @@ function UsageHeroSection({
 }): ReactElement {
   return (
     <div className="flex w-full min-w-0 flex-col items-center text-center">
-      {/* 07-05：品牌欢迎区由 Logo 图片（KunHeroStage）改为动态文字 Claude360 Copilot */}
+      {/* 07-05：品牌欢迎区由 Logo 图片舞台改为动态文字 Claude360 Copilot */}
       <BrandHero />
       {showText ? (
         <>

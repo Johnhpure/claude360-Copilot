@@ -103,9 +103,17 @@ export class Claude360ModelService {
       music: []
     }
     const purposeByGroup = new Map<string, Claude360TokenPurpose>()
-    for (const tool of ['codex', 'image', 'music'] as const) {
+    // 并行拉三个 tool 分组；Promise.all 保序，按固定 ['codex','image','music'] 顺序消费
+    // 结果，使 groupsByPurpose 推入顺序与 purposeByGroup「首次出现优先」语义与串行版字节一致。
+    const tools = ['codex', 'image', 'music'] as const
+    const perTool = await Promise.all(
+      tools.map(async (tool) => ({
+        tool,
+        resp: await this.deps.apiClient.get<unknown>(`/api/cli/groups?tool=${tool}`, token)
+      }))
+    )
+    for (const { tool, resp } of perTool) {
       const purpose = TOOL_TO_PURPOSE[tool]
-      const resp = await this.deps.apiClient.get<unknown>(`/api/cli/groups?tool=${tool}`, token)
       const seen = new Set<string>()
       for (const g of extractGroups(resp)) {
         const name = (g.name ?? '').trim()
@@ -151,17 +159,26 @@ export class Claude360ModelService {
     purposeByGroup: Map<string, Claude360TokenPurpose>
   }> {
     console.info('[kun-gui] Claude360 groups login=true; fetching tool-scoped groups for code/text,image,music')
+    // 分组阶段并行：tool-scoped 三请求（fetchGroupsByPurpose 内部 Promise.all）与不带
+    // tool 的全量 all-groups 请求并发发起。all-groups 允许失败（历史语义：全量拉取失败
+    // 仅回落 tool-scoped），故独立 catch 包装其 settled 结果，不让其 rejection 影响
+    // tool-scoped 的严格失败传播（任一 tool 请求失败仍整体 throw → 上游 keep-stale-cache）。
+    const allGroupsSettled = this.fetchAllGroups(token).then(
+      (all) => ({ ok: true as const, all }),
+      (error) => ({ ok: false as const, error })
+    )
     const { groupsByPurpose, purposeByGroup } = await this.fetchGroupsByPurpose(token)
     logGroupsByPurpose('tool-scoped', groupsByPurpose)
 
+    const allResult = await allGroupsSettled
     let all: Claude360ToolGroupInfo[] = []
-    try {
-      all = await this.fetchAllGroups(token)
+    if (allResult.ok) {
+      all = allResult.all
       console.info(`[kun-gui] Claude360 groups full-list=[${all.map(groupSummary).join(', ')}]`)
-    } catch (error) {
+    } else {
       console.warn(
         '[kun-gui] Claude360 groups full-list fetch failed; using tool-scoped groups only:',
-        error instanceof Error ? error.message : String(error)
+        allResult.error instanceof Error ? allResult.error.message : String(allResult.error)
       )
     }
 
@@ -216,14 +233,22 @@ export class Claude360ModelService {
     const { groupsByPurpose, purposeByGroup } = await this.fetchClaude360Groups(token)
 
     // 2) 每个分组拉模型，标注图片模型。刷新只同步服务端状态，不创建 Key。
+    //    并行发起、按 purposeByGroup 既有插入顺序消费结果——groupInputs / allModels
+    //    的构建顺序必须与串行版字节一致（provider id/指纹依赖此顺序，禁止「先完成先处理」）。
+    const perGroup = await Promise.all(
+      [...purposeByGroup.keys()].map(async (group) => ({
+        group,
+        resp: await this.deps.apiClient.get<ModelsResponse>(
+          `/api/cli/models?group=${encodeURIComponent(group)}`,
+          token
+        )
+      }))
+    )
+
     const groupInputs: Claude360GroupModelsInput[] = []
     const allModels: string[] = []
-    for (const group of purposeByGroup.keys()) {
+    for (const { group, resp } of perGroup) {
       const purpose = purposeByGroup.get(group)
-      const resp = await this.deps.apiClient.get<ModelsResponse>(
-        `/api/cli/models?group=${encodeURIComponent(group)}`,
-        token
-      )
       const models = (resp.models ?? [])
         .map((m) => (m.id ?? '').trim())
         .filter(Boolean)

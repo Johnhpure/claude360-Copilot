@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import i18n, { ensureI18nResources } from './i18n'
+// P3（07-17）：zh settings ns 现由 i18n-settings.ts（懒链）注册，非 i18n.ts 静态内嵌。
+// 测试显式加载它以复现「懒链已挂载」态，使下方 zh settings 可用断言成立。
+import './i18n-settings'
 import enCommon from './locales/en/common.json'
 import zhCommon from './locales/zh/common.json'
 

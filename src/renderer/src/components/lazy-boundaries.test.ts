@@ -7,6 +7,11 @@ import SidebarSource from './chat/Sidebar.tsx?raw'
 import DocumentPaneSource from './write/WriteWorkspaceDocumentPane.tsx?raw'
 import MainSource from '../main.tsx?raw'
 import I18nSource from '../i18n.ts?raw'
+import I18nSettingsSource from '../i18n-settings.ts?raw'
+import SettingsViewSource from './SettingsView.tsx?raw'
+import InitialSetupDialogSource from './InitialSetupDialog.tsx?raw'
+import McpServersEditorSource from './mcp/McpServersEditor.tsx?raw'
+import WorkbenchTopBarSource from './chat/WorkbenchTopBar.tsx?raw'
 import WorkflowEditorViewSource from './workflow/WorkflowEditorView.tsx?raw'
 import WorkflowRunPanelSource from './workflow/WorkflowRunPanel.tsx?raw'
 import WriteRichEditorSource from '../write/tiptap/WriteRichEditor.tsx?raw'
@@ -63,5 +68,21 @@ describe('renderer 首屏懒边界接线（07-14 R2/R3/R4）', () => {
     expect(I18nSource).not.toMatch(/import \w+ from '\.\/locales\/en\//)
     expect(I18nSource).toContain("import('./locales/en/common.json')")
     expect(I18nSource).toContain("import('./locales/en/settings.json')")
+    // P3（07-17）：zh settings 不再静态内嵌入口 i18n.ts（改由 i18n-settings.ts 承载）。
+    expect(I18nSource).not.toMatch(/import \w+ from '\.\/locales\/zh\/settings\.json'/)
+  })
+
+  it('P3：zh settings 命名空间随懒链拆出首屏入口（i18n-settings + 三注册点 + WorkbenchTopBar 脱钩）', () => {
+    // settings 文案的唯一静态宿主是 i18n-settings.ts（懒链专属，不进首屏入口 chunk）。
+    expect(I18nSettingsSource).toMatch(/import zhSettings from '\.\/locales\/zh\/settings\.json'/)
+    expect(I18nSettingsSource).toContain("addResourceBundle('zh', 'settings'")
+    // 三个懒消费点静态 import i18n-settings（注册 ns，防首屏闪 key）。
+    expect(SettingsViewSource).toContain("import '../i18n-settings'")
+    expect(InitialSetupDialogSource).toContain("import '../i18n-settings'")
+    expect(McpServersEditorSource).toContain("import '../../i18n-settings'")
+    // 首屏 Workbench chunk 的 TopBar 不再消费 settings ns（guiUpdate 键已迁 common），
+    // 否则 settings 会被拖回首屏入口 chunk（倒退回 P3 前的状态）。
+    expect(WorkbenchTopBarSource).not.toMatch(/t\(\s*['"]settings:/)
+    expect(WorkbenchTopBarSource).toContain("useTranslation('common')")
   })
 })

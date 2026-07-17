@@ -87,7 +87,7 @@ export const TurnSchema = z.object({
   mode: TurnModeSchema.optional(),
   /**
    * True when no interactive user is attached to this turn (IM bridges,
-   * headless runs). Kun hides `user_input`/`request_user_input` and
+   * headless runs). The runtime hides `user_input`/`request_user_input` and
    * rejects calls to them instead of blocking on a GUI answer.
    */
   disableUserInput: z.boolean().optional(),
@@ -106,7 +106,7 @@ export const StartTurnRequest = z.object({
   /**
    * Optional per-turn mode. Overrides the thread mode for this turn so
    * the GUI can toggle Plan/agent without recreating the thread. In Plan
-   * mode Kun advertises `create_plan` for the whole conversation.
+   * mode the runtime advertises `create_plan` for the whole conversation.
    */
   mode: TurnModeSchema.optional(),
   attachments: z
@@ -121,7 +121,7 @@ export const StartTurnRequest = z.object({
   fileReferences: z.array(UserFileReferenceSchema).default([]),
   workspaceCheckpointId: z.string().min(1).optional(),
   /**
-   * Optional GUI plan context. When set, Kun advertises the
+   * Optional GUI plan context. When set, the runtime advertises the
    * `create_plan` tool for the turn and writes only to the reserved
    * path advertised in the context.
    */

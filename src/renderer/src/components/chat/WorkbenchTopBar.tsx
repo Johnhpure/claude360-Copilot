@@ -76,7 +76,7 @@ export function WorkbenchTopBar({
   onToggleFileTree,
   onOpenSideChat
 }: Props): ReactElement {
-  const { t } = useTranslation(['common', 'settings'])
+  const { t } = useTranslation('common')
   const [editors, setEditors] = useState<EditorInfo[]>([])
   const [selectedEditorId, setSelectedEditorId] = useState(() => readPreferredEditorId() ?? '')
   const [editorMenuOpen, setEditorMenuOpen] = useState(false)
@@ -168,7 +168,7 @@ export function WorkbenchTopBar({
       return t('guiUpdateTopbarInstalling')
     }
     if (guiUpdateAction.downloaded || guiUpdateState.status === 'downloaded') {
-      return t('settings:guiUpdateInstall')
+      return t('guiUpdateInstall')
     }
     if (guiUpdateAction.manualOnly) {
       return t('guiUpdateTopbarManual', { version: guiUpdateAction.latestVersion })
@@ -178,11 +178,11 @@ export function WorkbenchTopBar({
   const guiUpdateTitle = useMemo(() => {
     if (!guiUpdateAction) return ''
     return guiUpdateAction.manualOnly
-      ? t('settings:guiUpdateAvailableManual', {
+      ? t('guiUpdateAvailableManual', {
           current: guiUpdateAction.currentVersion,
           latest: guiUpdateAction.latestVersion
         })
-      : t('settings:guiUpdateAvailable', {
+      : t('guiUpdateAvailable', {
           current: guiUpdateAction.currentVersion,
           latest: guiUpdateAction.latestVersion
         })
