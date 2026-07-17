@@ -1,5 +1,6 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactElement, ReactNode } from 'react'
-import { ChevronRight, Command, PanelLeft, Search, Sparkles, X } from 'lucide-react'
+import { ChevronRight, Command, PanelLeft, Search, X } from 'lucide-react'
+import brandLogoUrl from '../../assets/claude360-copilot-logo.png'
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ')
@@ -72,16 +73,16 @@ export function SidebarFrame({
         </div>
       </div>
 
-      {/* 品牌区：Logo + Claude360 / Copilot Workspace（品牌词不进 i18n） */}
+      {/* 品牌区：真实产品 Logo 图（白底，圆角裁切，勿叠渐变底）+ Claude360 Copilot / Copilot Workspace（品牌词不进 i18n） */}
       <div className="ds-no-drag mb-3 flex shrink-0 items-center gap-3 px-1.5">
         <span
           aria-hidden
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[image:var(--ds-accent-gradient)] text-white shadow-[var(--ds-accent-gradient-glow)]"
+          className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[12px]"
         >
-          <Sparkles className="h-[18px] w-[18px]" strokeWidth={1.9} />
+          <img src={brandLogoUrl} alt="" draggable={false} className="h-full w-full select-none" />
         </span>
         <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold leading-5 text-ds-ink">Claude360</p>
+          <p className="truncate text-[15px] font-semibold leading-5 text-ds-ink">Claude360 Copilot</p>
           <p className="truncate text-[11.5px] leading-4 text-ds-faint">Copilot Workspace</p>
         </div>
       </div>
