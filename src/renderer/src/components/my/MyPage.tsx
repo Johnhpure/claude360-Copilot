@@ -237,9 +237,15 @@ export function MyPage({
           <div data-testid="my-tab-panel-usage" hidden={activeTab !== 'usage'}>
             <MyUsagePanel stats={usageStats} t={t} />
           </div>
-          <div data-testid="my-tab-panel-logs" hidden={activeTab !== 'logs'}>
-            <MyLogsPanel active={activeTab === 'logs'} t={t} />
-          </div>
+        </div>
+        {/* 调用日志面板移出 960 共享容器,单独放宽到 1400(账号卡/用量面板不受影响);
+            mt-4 承接原 gap-4 的垂直节奏,hidden 切换与 active 懒查询逻辑保持不变。 */}
+        <div
+          data-testid="my-tab-panel-logs"
+          hidden={activeTab !== 'logs'}
+          className="mx-auto mt-4 w-full max-w-[1400px]"
+        >
+          <MyLogsPanel active={activeTab === 'logs'} t={t} />
         </div>
       </main>
 

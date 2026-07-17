@@ -128,6 +128,7 @@ describe('Claude360BillingService', () => {
     const service = new Claude360BillingService({
       apiClient: fakeApi(
         {
+          '/api/status': () => ({ quota_per_unit: 500_000, price: 7.3 }),
           '/api/cli/logs': () => ({
             page: 2,
             page_size: 20,
@@ -172,7 +173,7 @@ describe('Claude360BillingService', () => {
       requestId: 'req_1'
     })
 
-    const url = calls[0] ?? ''
+    const url = calls.find((c) => c.startsWith('/api/cli/logs')) ?? ''
     expect(url).toContain('p=2')
     expect(url).toContain('page_size=20')
     expect(url).toContain('type=2')
@@ -199,7 +200,13 @@ describe('Claude360BillingService', () => {
       useTimeSeconds: 3,
       isStream: true,
       firstTokenMs: 800,
-      costDisplay: '¥0.138200'
+      costDisplay: '¥0.138200',
+      // other 只含 frt：缓存/倍率键均缺失 → 详情字段与 billing 全 null。
+      cacheTokens: null,
+      cacheCreationTokens: null,
+      reasoningEffort: null,
+      requestPath: null,
+      billing: null
     })
     expect(pageData.items[1]).toMatchObject({
       createdAt: 0,
@@ -234,9 +241,119 @@ describe('Claude360BillingService', () => {
 
     const pageData = await service.listLogs({ page: 1, pageSize: 20, type: 0 })
     // type=0（全部）与未填筛选一律不携带参数：后端「无参数=不过滤」。
-    expect(calls[0]).toBe('/api/cli/logs?p=1&page_size=20')
-    // other 非法 JSON / frt 非数值 → null，不抛错。
+    expect(calls.find((c) => c.startsWith('/api/cli/logs'))).toBe('/api/cli/logs?p=1&page_size=20')
+    // other 非法 JSON / frt 非数值 → null，不抛错；缓存/billing 亦全 null。
     expect(pageData.items.map((item) => item.firstTokenMs)).toEqual([null, null])
+    expect(pageData.items.map((item) => item.cacheTokens)).toEqual([null, null])
+    expect(pageData.items.map((item) => item.billing)).toEqual([null, null])
+  })
+
+  it('parses other into cache tokens, reasoning, path and billing (5m/1h sum, -1 group fallback)', async () => {
+    const service = new Claude360BillingService({
+      apiClient: fakeApi({
+        '/api/status': () => ({ quota_per_unit: 500_000, price: 5 }),
+        '/api/cli/logs': () => ({
+          page: 1,
+          page_size: 20,
+          total: 1,
+          items: [
+            {
+              type: 2,
+              prompt_tokens: 10_000,
+              completion_tokens: 2_000,
+              other: JSON.stringify({
+                frt: 640,
+                cache_tokens: 1024,
+                cache_creation_tokens: 200,
+                cache_creation_tokens_5m: 30,
+                cache_creation_tokens_1h: 12,
+                reasoning_effort: 'high',
+                request_path: '/v1/messages',
+                model_ratio: 3,
+                completion_ratio: 5,
+                group_ratio: 1.3,
+                user_group_ratio: -1,
+                cache_ratio: 0.5,
+                cache_creation_ratio: 1.25,
+                model_price: 0
+              })
+            }
+          ]
+        })
+      }),
+      secretStore: fakeSecretStore()
+    })
+    const pageData = await service.listLogs({ page: 1, pageSize: 20 })
+    const item = pageData.items[0]
+    expect(item).toMatchObject({
+      firstTokenMs: 640,
+      cacheTokens: 1024,
+      // 5m/1h 存在 → 求和 42，忽略基础 cache_creation_tokens=200。
+      cacheCreationTokens: 42,
+      reasoningEffort: 'high',
+      requestPath: '/v1/messages'
+    })
+    // inputPricePerMCny = 1e6×3/500000×5 = 30；其余按倍率派生（price=5 保证整洁浮点）。
+    expect(item.billing).toEqual({
+      perCall: false,
+      modelPriceCny: null,
+      inputPricePerMCny: 30,
+      outputPricePerMCny: 150,
+      cacheReadPricePerMCny: 15,
+      cacheWritePricePerMCny: 37.5,
+      // user_group_ratio=-1（哨兵）→ 回退 group_ratio=1.3。
+      groupRatio: 1.3
+    })
+  })
+
+  it('builds per-call billing when model_price>0 and prefers a valid user_group_ratio', async () => {
+    const service = new Claude360BillingService({
+      apiClient: fakeApi({
+        '/api/status': () => ({ quota_per_unit: 500_000, price: 5 }),
+        '/api/cli/logs': () => ({
+          page: 1,
+          page_size: 20,
+          total: 1,
+          items: [{ type: 2, other: JSON.stringify({ model_price: 0.02, group_ratio: 1.5, user_group_ratio: 2 }) }]
+        })
+      }),
+      secretStore: fakeSecretStore()
+    })
+    const pageData = await service.listLogs({ page: 1, pageSize: 20 })
+    expect(pageData.items[0].billing).toEqual({
+      perCall: true,
+      modelPriceCny: 0.1, // 0.02 × price(5)
+      inputPricePerMCny: null, // model_ratio 缺失
+      outputPricePerMCny: null,
+      cacheReadPricePerMCny: null,
+      cacheWritePricePerMCny: null,
+      groupRatio: 2 // user_group_ratio 有效 → 优先于 group_ratio
+    })
+  })
+
+  it('keeps billing prices null when status pricing is unavailable but retains ratios', async () => {
+    const service = new Claude360BillingService({
+      apiClient: fakeApi({
+        '/api/status': () => ({ quota_per_unit: 500_000 }), // 无 price → pricing null
+        '/api/cli/logs': () => ({
+          page: 1,
+          page_size: 20,
+          total: 1,
+          items: [{ type: 2, other: JSON.stringify({ model_ratio: 3, completion_ratio: 5, group_ratio: 1.3 }) }]
+        })
+      }),
+      secretStore: fakeSecretStore()
+    })
+    const pageData = await service.listLogs({ page: 1, pageSize: 20 })
+    expect(pageData.items[0].billing).toEqual({
+      perCall: false,
+      modelPriceCny: null,
+      inputPricePerMCny: null,
+      outputPricePerMCny: null,
+      cacheReadPricePerMCny: null,
+      cacheWritePricePerMCny: null,
+      groupRatio: 1.3 // 倍率仍输出，只是价格算不出
+    })
   })
 
   it('normalizes a malformed logs payload to an empty page', async () => {

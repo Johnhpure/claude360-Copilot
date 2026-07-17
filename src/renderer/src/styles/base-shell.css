@@ -738,6 +738,22 @@ textarea {
   font: inherit;
 }
 
+/* datetime-local 内部 shadow DOM 字段（年/月/日/时/分/分隔符）默认不继承外层字体，
+   导致日期段与时间段观感「像两个控件」。统一 font/color 继承 Input 原语（13px + body 字体族），
+   并用 tabular-nums 等宽数字消除数字观感差异；限定 datetime-local 不影响其它 input。 */
+input[type='datetime-local']::-webkit-datetime-edit,
+input[type='datetime-local']::-webkit-datetime-edit-fields-wrapper,
+input[type='datetime-local']::-webkit-datetime-edit-text,
+input[type='datetime-local']::-webkit-datetime-edit-year-field,
+input[type='datetime-local']::-webkit-datetime-edit-month-field,
+input[type='datetime-local']::-webkit-datetime-edit-day-field,
+input[type='datetime-local']::-webkit-datetime-edit-hour-field,
+input[type='datetime-local']::-webkit-datetime-edit-minute-field {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+}
+
 input,
 textarea,
 [contenteditable='true'],

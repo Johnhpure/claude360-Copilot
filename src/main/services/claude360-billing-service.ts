@@ -1,4 +1,5 @@
 import type {
+  Claude360LogBilling,
   Claude360LogItem,
   Claude360LogItemRawResponse,
   Claude360LogsPage,
@@ -161,12 +162,14 @@ export class Claude360BillingService {
     params.set('page_size', String(query.pageSize))
     appendLogsFilterParams(params, query)
     if (query.requestId) params.set('request_id', query.requestId)
-    const r = await this.deps.apiClient.get<Claude360LogsPageRawResponse>(
-      `/api/cli/logs?${params.toString()}`,
-      token
-    )
+    // 计费过程单价需 /api/status 价格；与列表并行拉取，失败→null 吞掉（独立错误域，
+    // 不影响列表，与 getLogsStat 同模式），仅令 billing 各 *Cny 为 null。
+    const [pricing, r] = await Promise.all([
+      this.loadTokenCostPricing(),
+      this.deps.apiClient.get<Claude360LogsPageRawResponse>(`/api/cli/logs?${params.toString()}`, token)
+    ])
     return {
-      items: (Array.isArray(r.items) ? r.items : []).map(mapLogItem),
+      items: (Array.isArray(r.items) ? r.items : []).map((raw) => mapLogItem(raw, pricing)),
       total: r.total ?? 0,
       page: r.page ?? query.page,
       pageSize: r.page_size ?? query.pageSize
@@ -218,7 +221,8 @@ function appendLogsFilterParams(params: URLSearchParams, query: Claude360LogsQue
 }
 
 /** `/api/cli/logs` 单条原始响应 → 展示模型；数值/字符串逐字段缺省兜底。 */
-function mapLogItem(raw: Claude360LogItemRawResponse): Claude360LogItem {
+function mapLogItem(raw: Claude360LogItemRawResponse, pricing: TokenCostPricing | null): Claude360LogItem {
+  const other = parseLogOther(raw.other)
   return {
     createdAt: raw.created_at ?? 0,
     type: raw.type ?? 0,
@@ -233,26 +237,127 @@ function mapLogItem(raw: Claude360LogItemRawResponse): Claude360LogItem {
     completionTokens: raw.completion_tokens ?? 0,
     useTimeSeconds: raw.use_time ?? 0,
     isStream: raw.is_stream === true,
-    firstTokenMs: parseFirstTokenMs(raw.other),
-    costDisplay: raw.cost_display ?? ''
+    firstTokenMs: other.frt,
+    costDisplay: raw.cost_display ?? '',
+    cacheTokens: other.cacheTokens,
+    cacheCreationTokens: other.cacheCreationTokens,
+    reasoningEffort: other.reasoningEffort,
+    requestPath: other.requestPath,
+    billing: buildBilling(other, pricing)
+  }
+}
+
+/** parseLogOther 解析出的结构化 other（逐键类型校验，缺失/非法一律 null）。 */
+type ParsedLogOther = {
+  frt: number | null
+  cacheTokens: number | null
+  cacheCreationTokens: number | null
+  reasoningEffort: string | null
+  requestPath: string | null
+  modelRatio: number | null
+  completionRatio: number | null
+  groupRatio: number | null
+  userGroupRatio: number | null
+  cacheRatio: number | null
+  cacheCreationRatio: number | null
+  modelPrice: number | null
+}
+
+const EMPTY_LOG_OTHER: ParsedLogOther = {
+  frt: null,
+  cacheTokens: null,
+  cacheCreationTokens: null,
+  reasoningEffort: null,
+  requestPath: null,
+  modelRatio: null,
+  completionRatio: null,
+  groupRatio: null,
+  userGroupRatio: null,
+  cacheRatio: null,
+  cacheCreationRatio: null,
+  modelPrice: null
+}
+
+/**
+ * other 是后端内部 JSON 串（frt 首字毫秒、缓存 tokens、倍率、reasoning、路径等），
+ * 格式不受本端控制：一次 JSON.parse + try/catch，逐键做类型校验，任何异常/缺失都归 null，
+ * renderer 因此永远不依赖该内部格式。frt 语义与旧 parseFirstTokenMs 一致（有限非负数）。
+ */
+function parseLogOther(other: string | undefined): ParsedLogOther {
+  if (!other) return EMPTY_LOG_OTHER
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(other)
+  } catch {
+    return EMPTY_LOG_OTHER
+  }
+  if (typeof parsed !== 'object' || parsed == null) return EMPTY_LOG_OTHER
+  const map = parsed as Record<string, unknown>
+  // 缓存写总量：有 5m/1h 拆分时求和（缺失段按 0），否则取 cache_creation_tokens。
+  const creation5m = finiteNonNegativeNumber(map.cache_creation_tokens_5m)
+  const creation1h = finiteNonNegativeNumber(map.cache_creation_tokens_1h)
+  const cacheCreationTokens =
+    creation5m != null || creation1h != null
+      ? (creation5m ?? 0) + (creation1h ?? 0)
+      : finiteNonNegativeNumber(map.cache_creation_tokens)
+  return {
+    frt: finiteNonNegativeNumber(map.frt),
+    cacheTokens: finiteNonNegativeNumber(map.cache_tokens),
+    cacheCreationTokens,
+    reasoningEffort: nonEmptyString(map.reasoning_effort),
+    requestPath: nonEmptyString(map.request_path),
+    modelRatio: finiteNonNegativeNumber(map.model_ratio),
+    completionRatio: finiteNonNegativeNumber(map.completion_ratio),
+    groupRatio: finiteNonNegativeNumber(map.group_ratio),
+    // user_group_ratio == -1 是「无专属倍率」哨兵值，保留原值交由 buildBilling 回退。
+    userGroupRatio: finiteNumber(map.user_group_ratio),
+    cacheRatio: finiteNonNegativeNumber(map.cache_ratio),
+    cacheCreationRatio: finiteNonNegativeNumber(map.cache_creation_ratio),
+    modelPrice: finiteNonNegativeNumber(map.model_price)
   }
 }
 
 /**
- * other 是后端内部 JSON 串（newapi 把 frt=首字毫秒写在其中），格式不受本端控制：
- * 解析必须 try/catch 且只认有限非负数，任何异常都归 null（UI 显示「—」），
- * renderer 因此永远不依赖该内部格式。
+ * 由 other 倍率键 + /api/status 价格现算计费过程。倍率键全部缺失 → null（非调用类日志无计费）；
+ * pricing 缺失时各 *Cny 为 null（渲染层隐藏价格行）但 groupRatio 仍输出。
+ * 单价口径：1M tokens 单价(¥) = 1e6 × model_ratio / quotaPerUnit × price（与 stat quotaCny 同口径）。
  */
-function parseFirstTokenMs(other: string | undefined): number | null {
-  if (!other) return null
-  try {
-    const parsed: unknown = JSON.parse(other)
-    if (typeof parsed !== 'object' || parsed == null) return null
-    const frt = (parsed as { frt?: unknown }).frt
-    return typeof frt === 'number' && Number.isFinite(frt) && frt >= 0 ? frt : null
-  } catch {
-    return null
+function buildBilling(other: ParsedLogOther, pricing: TokenCostPricing | null): Claude360LogBilling | null {
+  const hasAnyRatio =
+    other.modelRatio != null ||
+    other.completionRatio != null ||
+    other.groupRatio != null ||
+    other.userGroupRatio != null ||
+    other.cacheRatio != null ||
+    other.cacheCreationRatio != null ||
+    other.modelPrice != null
+  if (!hasAnyRatio) return null
+
+  const perCall = other.modelPrice != null && other.modelPrice > 0
+  const groupRatio =
+    other.userGroupRatio != null && other.userGroupRatio !== -1 ? other.userGroupRatio : other.groupRatio
+  const inputPricePerMCny =
+    pricing != null && other.modelRatio != null
+      ? (1e6 * other.modelRatio) / pricing.quotaPerUnit * pricing.price
+      : null
+  return {
+    perCall,
+    modelPriceCny: pricing != null && perCall && other.modelPrice != null ? other.modelPrice * pricing.price : null,
+    inputPricePerMCny,
+    outputPricePerMCny:
+      inputPricePerMCny != null && other.completionRatio != null ? inputPricePerMCny * other.completionRatio : null,
+    cacheReadPricePerMCny:
+      inputPricePerMCny != null && other.cacheRatio != null ? inputPricePerMCny * other.cacheRatio : null,
+    cacheWritePricePerMCny:
+      inputPricePerMCny != null && other.cacheCreationRatio != null
+        ? inputPricePerMCny * other.cacheCreationRatio
+        : null,
+    groupRatio
   }
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null
 }
 
 function tokenStatCostCny(row: Claude360TokenStatRawResponse, pricing: TokenCostPricing | null): number | null {

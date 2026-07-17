@@ -224,7 +224,32 @@ export type Claude360LogsQuery = {
   requestId?: string
 }
 
-/** 单条日志展示模型。other 内部 JSON 只在 main 解析出 frt，不透传原文。 */
+/**
+ * 计费过程（详情区「计费过程」区块的结构化数据）。
+ * 非后端字段：main 侧按 other 倍率键 + /api/status 价格现算。
+ * 单价均为「人民币 / 每百万 tokens」口径；pricing 缺失时对应价格为 null（渲染层隐藏该行，不造假）。
+ */
+export type Claude360LogBilling = {
+  /** model_price > 0 即按次计费（此时展示模型价格，不出 token 单价公式）。 */
+  perCall: boolean
+  /** 按次价格（人民币）；非按次或 pricing 缺失为 null。 */
+  modelPriceCny: number | null
+  /** 输入价格（¥/1M tokens）；pricing 缺失为 null。 */
+  inputPricePerMCny: number | null
+  /** 输出价格（¥/1M tokens）= 输入价格 × completion_ratio。 */
+  outputPricePerMCny: number | null
+  /** 缓存读取价格（¥/1M tokens）= 输入价格 × cache_ratio。 */
+  cacheReadPricePerMCny: number | null
+  /** 缓存写入价格（¥/1M tokens）= 输入价格 × cache_creation_ratio。 */
+  cacheWritePricePerMCny: number | null
+  /** 有效分组倍率：user_group_ratio 有效且 ≠ -1 时取之，否则回退 group_ratio。 */
+  groupRatio: number | null
+}
+
+/**
+ * 单条日志展示模型。other 内部 JSON 在 main 解析：frt 首字毫秒、缓存 tokens、
+ * reasoning_effort、request_path，以及倍率键现算的 billing；均不透传 other 原文。
+ */
 export type Claude360LogItem = {
   /** unix 秒。 */
   createdAt: number
@@ -246,6 +271,16 @@ export type Claude360LogItem = {
   firstTokenMs: number | null
   /** 后端 "¥%.6f" 人民币展示串；缺省 ''。 */
   costDisplay: string
+  /** 缓存读 tokens（other.cache_tokens）；缺失为 null。 */
+  cacheTokens: number | null
+  /** 缓存写 tokens 总量（_5m/_1h 任一存在则求和，否则 cache_creation_tokens）；缺失为 null。 */
+  cacheCreationTokens: number | null
+  /** 推理强度（other.reasoning_effort，high/medium/low）；缺失为 null。 */
+  reasoningEffort: string | null
+  /** 请求路径（other.request_path）；缺失为 null。 */
+  requestPath: string | null
+  /** 计费过程；倍率键全缺失时为 null。 */
+  billing: Claude360LogBilling | null
 }
 
 export type Claude360LogsPage = {

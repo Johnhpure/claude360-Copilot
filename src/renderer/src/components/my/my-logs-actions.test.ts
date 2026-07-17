@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Claude360LogBilling, Claude360LogItem } from '@shared/claude360'
 import type { BrowserStorageLike } from '../../lib/browser-storage'
 import {
   DEFAULT_LOGS_PAGE_SIZE,
@@ -9,6 +10,7 @@ import {
   defaultLogColumnPrefs,
   defaultLogsDraft,
   durationTone,
+  formatBillingProcess,
   formatDuration,
   formatLogTime,
   isCallLogType,
@@ -19,6 +21,7 @@ import {
   presetRange,
   saveColumnPrefs,
   timestampToDatetimeLocal,
+  type BillingProcessLabels,
   type LogsFilterDraft
 } from './my-logs-actions'
 
@@ -260,5 +263,113 @@ describe('column prefs persistence', () => {
     }
     expect(loadColumnPrefs(throwing)).toEqual(defaultLogColumnPrefs())
     expect(() => saveColumnPrefs(defaultLogColumnPrefs(), throwing)).not.toThrow()
+  })
+})
+
+describe('formatBillingProcess', () => {
+  // 原子文案：node 单测注入英文短词，断言不依赖 i18n 运行时。
+  const L: BillingProcessLabels = {
+    inputPrice: 'Input price',
+    outputPrice: 'Output price',
+    cacheReadPrice: 'Cache read price',
+    cacheWritePrice: 'Cache write price',
+    modelPrice: 'Model price',
+    groupRatio: 'Group ratio',
+    perMillion: '1M tokens',
+    input: 'Input',
+    cache: 'Cache',
+    output: 'Output',
+    disclaimer: 'For reference only; the actual charge prevails.'
+  }
+
+  function billingFixture(overrides: Partial<Claude360LogBilling> = {}): Claude360LogBilling {
+    return {
+      perCall: false,
+      modelPriceCny: null,
+      inputPricePerMCny: 30,
+      outputPricePerMCny: 150,
+      cacheReadPricePerMCny: 15,
+      cacheWritePricePerMCny: 37.5,
+      groupRatio: 1.3,
+      ...overrides
+    }
+  }
+
+  function itemFixture(
+    billing: Claude360LogBilling | null,
+    tokens: Partial<Pick<Claude360LogItem, 'promptTokens' | 'completionTokens' | 'cacheTokens' | 'cacheCreationTokens'>> = {}
+  ): Pick<Claude360LogItem, 'billing' | 'promptTokens' | 'completionTokens' | 'cacheTokens' | 'cacheCreationTokens'> {
+    return {
+      billing,
+      promptTokens: tokens.promptTokens ?? 10_000,
+      completionTokens: tokens.completionTokens ?? 2_000,
+      cacheTokens: tokens.cacheTokens ?? 1_024,
+      cacheCreationTokens: tokens.cacheCreationTokens ?? 42
+    }
+  }
+
+  it('returns an empty array when billing is null (block hidden)', () => {
+    expect(formatBillingProcess(itemFixture(null), L)).toEqual([])
+  })
+
+  it('lists unit prices, group ratio, formula and a trailing disclaimer for a normal call', () => {
+    const lines = formatBillingProcess(itemFixture(billingFixture()), L)
+    // 单价行按值输出（含缓存读/写，因对应 tokens>0）。
+    expect(lines).toContain('Input price ¥30.0000 / 1M tokens')
+    expect(lines).toContain('Output price ¥150.0000 / 1M tokens')
+    expect(lines).toContain('Cache read price ¥15.0000 / 1M tokens')
+    expect(lines).toContain('Cache write price ¥37.5000 / 1M tokens')
+    expect(lines).toContain('Group ratio 1.3000x')
+    // normalInput = 10000 − 1024 − 42 = 8934；公式自算总价 ¥0.758394。
+    const formula = lines.find((l) => l.includes(' = ¥'))
+    expect(formula).toBe(
+      '(Input 8,934 × ¥30.0000 / 1M tokens + Cache 1,024 × ¥15.0000 / 1M tokens + Output 2,000 × ¥150.0000 / 1M tokens) × Group ratio 1.3000x = ¥0.758394'
+    )
+    // 免责声明恒在块尾。
+    expect(lines[lines.length - 1]).toBe(L.disclaimer)
+  })
+
+  it('omits cache lines and cache term when there are no cache tokens', () => {
+    const lines = formatBillingProcess(
+      itemFixture(billingFixture(), { promptTokens: 5_000, completionTokens: 500, cacheTokens: 0, cacheCreationTokens: 0 }),
+      L
+    )
+    expect(lines.some((l) => l.startsWith('Cache read price'))).toBe(false)
+    expect(lines.some((l) => l.startsWith('Cache write price'))).toBe(false)
+    const formula = lines.find((l) => l.includes(' = ¥'))
+    // 无缓存 → 只有输入(5000)+输出(500)两段，(0.15+0.075)×1.3 = ¥0.292500。
+    expect(formula).toBe(
+      '(Input 5,000 × ¥30.0000 / 1M tokens + Output 500 × ¥150.0000 / 1M tokens) × Group ratio 1.3000x = ¥0.292500'
+    )
+    expect(lines[lines.length - 1]).toBe(L.disclaimer)
+  })
+
+  it('shows model price without a token formula for per-call billing', () => {
+    const lines = formatBillingProcess(
+      itemFixture(billingFixture({ perCall: true, modelPriceCny: 0.1, inputPricePerMCny: null, outputPricePerMCny: null, cacheReadPricePerMCny: null, cacheWritePricePerMCny: null, groupRatio: 2 })),
+      L
+    )
+    expect(lines[0]).toBe('Model price ¥0.100000')
+    expect(lines).toContain('Group ratio 2.0000x')
+    // 按次计费不出 token 公式行。
+    expect(lines.some((l) => l.includes(' = ¥'))).toBe(false)
+    expect(lines[lines.length - 1]).toBe(L.disclaimer)
+  })
+
+  it('drops price rows and the formula when pricing is missing but keeps the group ratio', () => {
+    const lines = formatBillingProcess(
+      itemFixture(
+        billingFixture({
+          inputPricePerMCny: null,
+          outputPricePerMCny: null,
+          cacheReadPricePerMCny: null,
+          cacheWritePricePerMCny: null,
+          groupRatio: 1.3
+        })
+      ),
+      L
+    )
+    // 单价缺失 → 无价格行、无公式行，仅剩分组倍率 + 免责。
+    expect(lines).toEqual(['Group ratio 1.3000x', L.disclaimer])
   })
 })

@@ -3,7 +3,7 @@
 // 与 my-page-actions.ts 同思路：筛选草稿 → 查询参数、时间/用时格式化、类型徽章
 // 映射、页码序列、列显隐持久化全部拆成纯函数，node 环境直接单测；
 // MyLogsPanel 组件只做编排与渲染，不承载业务规则。
-import type { Claude360LogsQuery } from '@shared/claude360'
+import type { Claude360LogBilling, Claude360LogItem, Claude360LogsQuery } from '@shared/claude360'
 import { browserStorage, type BrowserStorageLike } from '../../lib/browser-storage'
 
 // ── 时间预设与筛选草稿 ──
@@ -164,6 +164,118 @@ export function formatDuration(
 /** 用时快慢配色：≤10s 视为正常（success），更慢给 warning（确认稿口径）。 */
 export function durationTone(seconds: number): 'success' | 'warning' {
   return seconds <= 10 ? 'success' : 'warning'
+}
+
+// ── 计费过程（详情区多行价格明细） ──
+
+/**
+ * formatBillingProcess 的原子文案（注入式，便于 node 单测不依赖 i18n 运行时）。
+ * 公式行由这些词拼接，不依赖 t() 插值能力。
+ */
+export type BillingProcessLabels = {
+  inputPrice: string
+  outputPrice: string
+  cacheReadPrice: string
+  cacheWritePrice: string
+  modelPrice: string
+  groupRatio: string
+  /** 每百万 tokens 单位后缀（如「1M tokens」）。 */
+  perMillion: string
+  input: string
+  cache: string
+  output: string
+  disclaimer: string
+}
+
+const MILLION = 1_000_000
+
+/** 单价（¥/1M）：≥1 用 4 位小数，更小用 6 位（对齐 newapi 前端 digitsLarge:4/digitsSmall:6）。 */
+function formatCnyRate(value: number): string {
+  return value >= 1 ? value.toFixed(4) : value.toFixed(6)
+}
+
+/** 倍率展示：4 位小数 + x（对齐 newapi 前端 effectiveGR.toFixed(4)+'x'）。 */
+function formatRatio(value: number): string {
+  return `${value.toFixed(4)}x`
+}
+
+/**
+ * 计费过程 → 多行文本（string[]，空数组=整块隐藏）。数据取 main 现算的 billing：
+ * 单价行按值非 null 输出（缓存行额外要求对应 tokens>0，无缓存不显示缓存价以减噪）；
+ * 按次计费(perCall)只出「模型价格」+分组倍率，不出 token 公式；
+ * 常规计费在输入单价齐备且至少一段 tokens>0 时追加公式行（总价展示层自算 ¥%.6f，
+ * 与后端 quota 算法同构）；尾行免责声明恒随非空块出现，兜底取整差异。
+ */
+export function formatBillingProcess(
+  item: Pick<Claude360LogItem, 'billing' | 'promptTokens' | 'completionTokens' | 'cacheTokens' | 'cacheCreationTokens'>,
+  labels: BillingProcessLabels
+): string[] {
+  const billing = item.billing
+  if (billing == null) return []
+  const lines: string[] = []
+
+  if (billing.perCall) {
+    if (billing.modelPriceCny != null) {
+      lines.push(`${labels.modelPrice} ¥${formatCnyRate(billing.modelPriceCny)}`)
+    }
+  } else {
+    if (billing.inputPricePerMCny != null) {
+      lines.push(`${labels.inputPrice} ¥${formatCnyRate(billing.inputPricePerMCny)} / ${labels.perMillion}`)
+    }
+    if (billing.outputPricePerMCny != null) {
+      lines.push(`${labels.outputPrice} ¥${formatCnyRate(billing.outputPricePerMCny)} / ${labels.perMillion}`)
+    }
+    if (billing.cacheReadPricePerMCny != null && (item.cacheTokens ?? 0) > 0) {
+      lines.push(`${labels.cacheReadPrice} ¥${formatCnyRate(billing.cacheReadPricePerMCny)} / ${labels.perMillion}`)
+    }
+    if (billing.cacheWritePricePerMCny != null && (item.cacheCreationTokens ?? 0) > 0) {
+      lines.push(`${labels.cacheWritePrice} ¥${formatCnyRate(billing.cacheWritePricePerMCny)} / ${labels.perMillion}`)
+    }
+  }
+
+  if (billing.groupRatio != null) {
+    lines.push(`${labels.groupRatio} ${formatRatio(billing.groupRatio)}`)
+  }
+
+  if (!billing.perCall && billing.inputPricePerMCny != null) {
+    const formula = buildBillingFormula(item, billing, labels)
+    if (formula != null) lines.push(formula)
+  }
+
+  if (lines.length === 0) return []
+  lines.push(labels.disclaimer)
+  return lines
+}
+
+/**
+ * token 计费公式行：「Σ 各段 tokens/1M × 单价 [× 分组倍率] = ¥总价」。
+ * normalInput = max(0, prompt − 缓存读 − 缓存写)；tokens 为 0 的段不进公式；
+ * 无任何段可算返回 null（不出公式行）。
+ */
+function buildBillingFormula(
+  item: Pick<Claude360LogItem, 'promptTokens' | 'completionTokens' | 'cacheTokens' | 'cacheCreationTokens'>,
+  billing: Claude360LogBilling,
+  labels: BillingProcessLabels
+): string | null {
+  const cacheTokens = item.cacheTokens ?? 0
+  const cacheCreationTokens = item.cacheCreationTokens ?? 0
+  const normalInput = Math.max(0, item.promptTokens - cacheTokens - cacheCreationTokens)
+  const terms: string[] = []
+  let total = 0
+  const pushTerm = (atom: string, count: number, price: number | null): void => {
+    if (count <= 0 || price == null) return
+    terms.push(`${atom} ${count.toLocaleString()} × ¥${formatCnyRate(price)} / ${labels.perMillion}`)
+    total += (count / MILLION) * price
+  }
+  pushTerm(labels.input, normalInput, billing.inputPricePerMCny)
+  pushTerm(labels.cache, cacheTokens, billing.cacheReadPricePerMCny)
+  pushTerm(labels.output, item.completionTokens, billing.outputPricePerMCny)
+  if (terms.length === 0) return null
+  const groupRatio = billing.groupRatio
+  if (groupRatio != null) total *= groupRatio
+  const head = terms.length > 1 ? `(${terms.join(' + ')})` : terms[0]
+  const groupPart = groupRatio != null ? ` × ${labels.groupRatio} ${formatRatio(groupRatio)}` : ''
+  return `${head}${groupPart} = ¥${total.toFixed(6)}`
 }
 
 // ── 日志类型徽章 ──

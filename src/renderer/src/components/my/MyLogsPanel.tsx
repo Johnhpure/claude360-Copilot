@@ -25,6 +25,7 @@ import {
   datetimeLocalToTimestamp,
   defaultLogsDraft,
   durationTone,
+  formatBillingProcess,
   formatDuration,
   formatLogTime,
   isCallLogType,
@@ -35,6 +36,7 @@ import {
   presetRange,
   saveColumnPrefs,
   timestampToDatetimeLocal,
+  type BillingProcessLabels,
   type LogColumnKey,
   type LogColumnPrefs,
   type LogTypeTone,
@@ -43,6 +45,33 @@ import {
 } from './my-logs-actions'
 
 type Translate = (key: string, params?: Record<string, unknown>) => string
+
+/** t → formatBillingProcess 的原子文案（集中在一处，供详情渲染与整体复制复用）。 */
+function billingLabelsFromT(t: Translate): BillingProcessLabels {
+  return {
+    inputPrice: t('myLogsDetailInputPrice'),
+    outputPrice: t('myLogsDetailOutputPrice'),
+    cacheReadPrice: t('myLogsDetailCacheReadPrice'),
+    cacheWritePrice: t('myLogsDetailCacheWritePrice'),
+    modelPrice: t('myLogsDetailModelPrice'),
+    groupRatio: t('myLogsDetailGroupRatio'),
+    perMillion: t('myLogsDetailPerMillion'),
+    input: t('myLogsDetailBillInput'),
+    cache: t('myLogsDetailBillCache'),
+    output: t('myLogsDetailBillOutput'),
+    disclaimer: t('myLogsDetailDisclaimer')
+  }
+}
+
+/** 缓存 Tokens 摘要：「读 X · 写 Y」（千分位与表格 tokens 列一致）；两者皆 0 返回 ''。 */
+function formatCacheSummary(item: Claude360LogItem, t: Translate): string {
+  const read = item.cacheTokens ?? 0
+  const write = item.cacheCreationTokens ?? 0
+  const parts: string[] = []
+  if (read > 0) parts.push(`${t('myLogsDetailCacheRead')} ${read.toLocaleString()}`)
+  if (write > 0) parts.push(`${t('myLogsDetailCacheWrite')} ${write.toLocaleString()}`)
+  return parts.join(' · ')
+}
 
 // 「我的」页 · 调用日志面板(07-17 my-newapi-call-logs design §5.2,方案 B)。
 // 结构对照确认稿:标题行(列设置 Popover)→ 时间预设 chips → 筛选网格 →
@@ -153,6 +182,8 @@ export type MyLogsTableProps = {
   expandedRows: ReadonlySet<number>
   onToggleRow: (index: number) => void
   onCopyDetail: (item: Claude360LogItem) => void
+  /** 复制任意文本(详情区 Request ID 行内复制按钮用,仅复制该值)。 */
+  onCopyText: (text: string) => void
   t: Translate
 }
 
@@ -162,13 +193,15 @@ export function MyLogsTable({
   expandedRows,
   onToggleRow,
   onCopyDetail,
+  onCopyText,
   t
 }: MyLogsTableProps): ReactElement {
   const cols = visibleColumns(columns)
   return (
-    // min-w 兜底:窄窗口横向滚动而不是挤压 11 列(prd 验收 6)。
+    // min-w 兜底:窄窗口横向滚动而不是挤压 11 列(prd 验收 6);面板已移出 960 容器,
+    // 放宽到 1024 让各列有更充裕的呼吸空间。
     <div className="mt-3.5 overflow-x-auto" style={{ scrollbarGutter: 'stable' }}>
-      <table className="w-full min-w-[860px] border-collapse text-[12.5px]">
+      <table className="w-full min-w-[1024px] border-collapse text-[12.5px]">
         <thead>
           <tr className="border-b border-ds-border text-[11.5px] uppercase tracking-wide text-ds-faint">
             {cols.map((col) => (
@@ -192,6 +225,7 @@ export function MyLogsTable({
               expanded={expandedRows.has(index)}
               onToggleRow={onToggleRow}
               onCopyDetail={onCopyDetail}
+              onCopyText={onCopyText}
               t={t}
             />
           ))}
@@ -208,6 +242,7 @@ function MyLogsRow({
   expanded,
   onToggleRow,
   onCopyDetail,
+  onCopyText,
   t
 }: {
   item: Claude360LogItem
@@ -216,12 +251,15 @@ function MyLogsRow({
   expanded: boolean
   onToggleRow: (index: number) => void
   onCopyDetail: (item: Claude360LogItem) => void
+  onCopyText: (text: string) => void
   t: Translate
 }): ReactElement {
   // 展开行:底色提亮且本行下边框透明(分隔感交给 detail-box,确认稿口径)。
   const cellClass = `py-1.5 pl-2.5 align-middle first:pl-0 border-b ${
     expanded ? 'border-transparent' : 'border-ds-border-muted'
   }`
+  const cacheSummary = formatCacheSummary(item, t)
+  const billingLines = formatBillingProcess(item, billingLabelsFromT(t))
   return (
     <Fragment>
       <tr className={expanded ? 'bg-ds-hover' : 'hover:bg-ds-hover'}>
@@ -234,15 +272,55 @@ function MyLogsRow({
       {expanded ? (
         <tr>
           <td colSpan={cols.length} className="pb-2.5 pl-3.5">
-            <div className="flex flex-col gap-1.5 rounded-[var(--radius-md)] border border-ds-border-muted bg-ds-main px-3.5 py-2.5 text-[12px] text-ds-muted">
-              <DetailKv label={t('myLogsDetailContent')}>
-                {item.content ? item.content : '—'}
-              </DetailKv>
+            {/* 长内容(计费过程/超长 content)在 detail-box 内滚动,不撑坏表格行(design D3)。 */}
+            <div className="flex max-h-[300px] flex-col gap-1.5 overflow-y-auto rounded-[var(--radius-md)] border border-ds-border-muted bg-ds-main px-3.5 py-2.5 text-[12px] text-ds-muted">
+              {/* 1. Request ID(行内独立复制小按钮,仅复制该值) */}
               {item.requestId ? (
-                <DetailKv label={t('myLogsColRequestId')} mono>
+                <DetailKv
+                  label={t('myLogsColRequestId')}
+                  mono
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => onCopyText(item.requestId)}
+                      aria-label={t('myLogsDetailCopyRequestId')}
+                      title={t('myLogsDetailCopyRequestId')}
+                      className="shrink-0 rounded-[var(--radius-sm)] p-1 text-ds-faint transition-colors duration-[var(--motion-fast)] hover:bg-ds-hover hover:text-ds-ink"
+                    >
+                      <Copy className="h-3 w-3" strokeWidth={1.75} aria-hidden />
+                    </button>
+                  }
+                >
                   {item.requestId}
                 </DetailKv>
               ) : null}
+              {/* 2. 缓存 Tokens(读/写皆无则整行隐藏) */}
+              {cacheSummary ? <DetailKv label={t('myLogsDetailCache')}>{cacheSummary}</DetailKv> : null}
+              {/* 3. 日志详情(content 空即隐藏,不再显示占位「—」) */}
+              {item.content ? <DetailKv label={t('myLogsDetailContent')}>{item.content}</DetailKv> : null}
+              {/* 4. 计费过程(多行块;倍率键全缺失或无价格时 billingLines 为空,整块隐藏) */}
+              {billingLines.length > 0 ? (
+                <DetailKv label={t('myLogsDetailBilling')}>
+                  <span className="flex flex-col gap-0.5">
+                    {billingLines.map((line, i) => (
+                      <span key={i}>{line}</span>
+                    ))}
+                  </span>
+                </DetailKv>
+              ) : null}
+              {/* 5. Reasoning Effort(缺失即隐藏,复用徽章样式) */}
+              {item.reasoningEffort ? (
+                <DetailKv label={t('myLogsDetailReasoning')}>
+                  <span className={`${BADGE_BASE} bg-ds-subtle uppercase text-ds-muted`}>{item.reasoningEffort}</span>
+                </DetailKv>
+              ) : null}
+              {/* 6. 请求路径(缺失即隐藏) */}
+              {item.requestPath ? (
+                <DetailKv label={t('myLogsDetailPath')} mono>
+                  {item.requestPath}
+                </DetailKv>
+              ) : null}
+              {/* 7. 首字耗时(保持现状) */}
               {isCallLogType(item.type) ? (
                 <DetailKv label={t('myLogsDetailFirstToken')}>
                   {item.isStream && item.firstTokenMs != null
@@ -270,19 +348,22 @@ function MyLogsRow({
 function DetailKv({
   label,
   mono = false,
+  action,
   children
 }: {
   label: string
   mono?: boolean
+  action?: ReactNode
   children: ReactNode
 }): ReactElement {
   return (
     <div className="flex gap-2.5">
-      <span className="w-[72px] shrink-0 text-ds-faint">{label}</span>
+      <span className="w-[96px] shrink-0 text-ds-faint">{label}</span>
       {/* 详情正文允许选中复制(select-text 抵消外层 select-none 类祖先)。 */}
       <span className={`min-w-0 flex-1 select-text break-all ${mono ? 'font-mono text-[11.5px]' : ''}`}>
         {children}
       </span>
+      {action ?? null}
     </div>
   )
 }
@@ -311,13 +392,13 @@ function renderLogsCell(
     case 'token':
       return (
         <td className={cellClass}>
-          {item.tokenName ? <CellPill text={item.tokenName} maxWidthClass="max-w-[104px]" strong /> : <Dash />}
+          {item.tokenName ? <CellPill text={item.tokenName} maxWidthClass="max-w-[140px]" strong /> : <Dash />}
         </td>
       )
     case 'group':
       return (
         <td className={cellClass}>
-          {item.group ? <CellPill text={item.group} maxWidthClass="max-w-[88px]" /> : <Dash />}
+          {item.group ? <CellPill text={item.group} maxWidthClass="max-w-[112px]" /> : <Dash />}
         </td>
       )
     case 'type': {
@@ -332,7 +413,7 @@ function renderLogsCell(
       return (
         <td className={cellClass}>
           {callRow && item.modelName ? (
-            <CellPill text={item.modelName} maxWidthClass="max-w-[138px]" strong />
+            <CellPill text={item.modelName} maxWidthClass="max-w-[200px]" strong />
           ) : (
             <Dash />
           )}
@@ -399,7 +480,7 @@ function renderLogsCell(
         <td className={cellClass}>
           {item.requestId ? (
             <span
-              className="block max-w-[120px] truncate font-mono text-[11px] text-ds-faint"
+              className="block max-w-[160px] truncate font-mono text-[11px] text-ds-faint"
               title={item.requestId}
             >
               {item.requestId}
@@ -638,12 +719,9 @@ export function MyLogsPanel({ active, t }: { active: boolean; t: Translate }): R
     })
   }, [])
 
-  const handleCopyDetail = useCallback(
-    async (item: Claude360LogItem) => {
+  const copyText = useCallback(
+    async (text: string) => {
       // spec(electron-browser-api-restrictions):文本剪贴板可直接用 navigator.clipboard。
-      const text = [item.content, item.requestId ? `${t('myLogsColRequestId')}: ${item.requestId}` : '']
-        .filter(Boolean)
-        .join('\n')
       try {
         await navigator.clipboard.writeText(text)
         toast.success(t('myLogsCopySuccess'))
@@ -652,6 +730,23 @@ export function MyLogsPanel({ active, t }: { active: boolean; t: Translate }): R
       }
     },
     [t]
+  )
+
+  const handleCopyDetail = useCallback(
+    (item: Claude360LogItem) => {
+      // 整体复制:按详情区行序拼接可用字段(缺失项跳过),计费过程多行原样并入。
+      const parts: string[] = []
+      if (item.requestId) parts.push(`${t('myLogsColRequestId')}: ${item.requestId}`)
+      const cacheSummary = formatCacheSummary(item, t)
+      if (cacheSummary) parts.push(`${t('myLogsDetailCache')}: ${cacheSummary}`)
+      if (item.content) parts.push(`${t('myLogsDetailContent')}: ${item.content}`)
+      const billingLines = formatBillingProcess(item, billingLabelsFromT(t))
+      if (billingLines.length > 0) parts.push(`${t('myLogsDetailBilling')}:\n${billingLines.join('\n')}`)
+      if (item.reasoningEffort) parts.push(`${t('myLogsDetailReasoning')}: ${item.reasoningEffort}`)
+      if (item.requestPath) parts.push(`${t('myLogsDetailPath')}: ${item.requestPath}`)
+      void copyText(parts.join('\n'))
+    },
+    [copyText, t]
   )
 
   const typeOptions = useMemo<SelectOption[]>(
@@ -907,7 +1002,8 @@ export function MyLogsPanel({ active, t }: { active: boolean; t: Translate }): R
               columns={columns}
               expandedRows={expandedRows}
               onToggleRow={toggleRow}
-              onCopyDetail={(item) => void handleCopyDetail(item)}
+              onCopyDetail={handleCopyDetail}
+              onCopyText={(text) => void copyText(text)}
               t={t}
             />
             <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2.5 text-[12px] text-ds-faint">

@@ -80,7 +80,25 @@ const labels: Record<string, string> = {
   myLogsDetailContent: 'Content',
   myLogsDetailFirstToken: 'First token',
   myLogsDetailFirstTokenNone: '— (no stream)',
-  myLogsDetailCopy: 'Copy details'
+  myLogsDetailCopy: 'Copy details',
+  myLogsDetailCache: 'Cache tokens',
+  myLogsDetailCacheRead: 'Read',
+  myLogsDetailCacheWrite: 'Write',
+  myLogsDetailBilling: 'Billing',
+  myLogsDetailReasoning: 'Reasoning',
+  myLogsDetailPath: 'Request path',
+  myLogsDetailCopyRequestId: 'Copy Request ID',
+  myLogsDetailInputPrice: 'Input price',
+  myLogsDetailOutputPrice: 'Output price',
+  myLogsDetailCacheReadPrice: 'Cache read price',
+  myLogsDetailCacheWritePrice: 'Cache write price',
+  myLogsDetailModelPrice: 'Model price',
+  myLogsDetailGroupRatio: 'Group ratio',
+  myLogsDetailPerMillion: '1M tokens',
+  myLogsDetailBillInput: 'Input',
+  myLogsDetailBillCache: 'Cache',
+  myLogsDetailBillOutput: 'Output',
+  myLogsDetailDisclaimer: 'For reference only; the actual charge prevails.'
 }
 
 function t(key: string): string {
@@ -147,6 +165,12 @@ function logItemFixture(overrides: Partial<Claude360LogItem> = {}): Claude360Log
     isStream: true,
     firstTokenMs: 800,
     costDisplay: '¥0.138200',
+    // 详情补齐字段:默认 null,由具体用例局部覆盖构造启用态。
+    cacheTokens: null,
+    cacheCreationTokens: null,
+    reasoningEffort: null,
+    requestPath: null,
+    billing: null,
     ...overrides
   }
 }
@@ -572,6 +596,7 @@ describe('MyLogsTable', () => {
         expandedRows,
         onToggleRow: noop,
         onCopyDetail: noop,
+        onCopyText: noop,
         t
       })
     )
@@ -673,6 +698,77 @@ describe('MyLogsTable', () => {
     expect(html).toContain('Collapse detail')
     // colspan = 可见列数(8 固定 + 分组/用时/IP;Request ID 默认隐藏)。
     expect(html).toContain('colSpan="11"')
+  })
+
+  it('renders the enriched detail: request-id copy, cache tokens, billing block, reasoning and path', () => {
+    const html = tableHtml(
+      [
+        logItemFixture({
+          content: '',
+          cacheTokens: 1024,
+          cacheCreationTokens: 42,
+          reasoningEffort: 'high',
+          requestPath: '/v1/messages',
+          billing: {
+            perCall: false,
+            modelPriceCny: null,
+            inputPricePerMCny: 30,
+            outputPricePerMCny: 150,
+            cacheReadPricePerMCny: 15,
+            cacheWritePricePerMCny: 37.5,
+            groupRatio: 1.3
+          }
+        })
+      ],
+      defaultLogColumnPrefs(),
+      new Set([0])
+    )
+    // Request ID 行 + 行内复制按钮。
+    expect(html).toContain('req_1c8a4f92db306e71')
+    expect(html).toContain('Copy Request ID')
+    // 缓存 Tokens「读 X · 写 Y」千分位。
+    expect(html).toContain('Cache tokens')
+    expect(html).toContain('Read 1,024')
+    expect(html).toContain('Write 42')
+    // 计费过程多行块 + 公式 + 免责。
+    expect(html).toContain('Billing')
+    expect(html).toContain('Input price ¥30.0000 / 1M tokens')
+    expect(html).toContain('Group ratio 1.3000x')
+    expect(html).toContain('For reference only; the actual charge prevails.')
+    // Reasoning / 请求路径。
+    expect(html).toContain('>high<')
+    expect(html).toContain('Request path')
+    expect(html).toContain('/v1/messages')
+    // content 为空 → 日志详情行隐藏(不再显示占位「—」)。
+    expect(html).not.toContain('>Content<')
+  })
+
+  it('hides every detail row whose data is missing (no undefined/null placeholders)', () => {
+    const html = tableHtml(
+      [
+        logItemFixture({
+          content: '',
+          requestId: '',
+          cacheTokens: null,
+          cacheCreationTokens: null,
+          reasoningEffort: null,
+          requestPath: null,
+          billing: null
+        })
+      ],
+      defaultLogColumnPrefs(),
+      new Set([0])
+    )
+    expect(html).not.toContain('Cache tokens')
+    expect(html).not.toContain('>Billing<')
+    expect(html).not.toContain('Reasoning')
+    expect(html).not.toContain('Request path')
+    expect(html).not.toContain('>Content<')
+    expect(html).not.toContain('Copy Request ID')
+    expect(html).not.toContain('undefined')
+    // 首字耗时行仍在(type=2 调用类),整体复制按钮仍在。
+    expect(html).toContain('First token')
+    expect(html).toContain('Copy details')
   })
 })
 
