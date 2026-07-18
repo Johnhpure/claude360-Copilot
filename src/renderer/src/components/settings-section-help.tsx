@@ -1,7 +1,8 @@
-import { useState, type ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { AlertCircle, CheckCircle2, Download } from 'lucide-react'
 import type { DiagnosticsExportResult } from '@shared/diagnostics'
 import { Button } from './ui'
+import brandLogoUrl from '../assets/claude360-copilot-logo.png'
 
 export type DiagnosticsExportUiState =
   | { status: 'idle' }
@@ -32,9 +33,24 @@ export function HelpSettingsSection({
 }): ReactElement {
   const [isExporting, setIsExporting] = useState(false)
   const [result, setResult] = useState<DiagnosticsExportUiState>({ status: 'idle' })
+  const [appVersion, setAppVersion] = useState('')
   const exporter = typeof window !== 'undefined' && typeof window.kunGui?.exportDiagnostics === 'function'
     ? () => window.kunGui.exportDiagnostics()
     : undefined
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.kunGui?.getAppVersion !== 'function') return
+    let disposed = false
+    void window.kunGui
+      .getAppVersion()
+      .then((version) => {
+        if (!disposed && typeof version === 'string') setAppVersion(version)
+      })
+      .catch(() => {})
+    return () => {
+      disposed = true
+    }
+  }, [])
 
   const handleExport = async (): Promise<void> => {
     if (isExporting) return
@@ -51,6 +67,24 @@ export function HelpSettingsSection({
         <h2 id="help-center-title" className="text-[18px] font-semibold text-ds-ink">
           {t('helpCenter')}
         </h2>
+      </div>
+      <div className="pb-5">
+        <div className="text-[14px] font-semibold text-ds-ink">{t('aboutTitle')}</div>
+        <div className="mt-3 flex items-start gap-4">
+          <span className="h-12 w-12 shrink-0 overflow-hidden rounded-xl">
+            <img src={brandLogoUrl} alt="" draggable={false} className="h-full w-full select-none" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <span className="text-[15px] font-semibold text-ds-ink">Claude360 Copilot</span>
+              {appVersion ? (
+                <span className="text-[12.5px] text-ds-faint">v{appVersion}</span>
+              ) : null}
+            </div>
+            <p className="mt-2 max-w-2xl text-[13px] leading-5 text-ds-muted">{t('aboutIntro')}</p>
+            <p className="mt-2 max-w-2xl text-[13px] leading-5 text-ds-muted">{t('aboutFeatures')}</p>
+          </div>
+        </div>
       </div>
       <div className="flex flex-col gap-4 border-y border-ds-border py-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">

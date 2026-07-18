@@ -63,4 +63,28 @@ describe('HelpSettingsSection', () => {
     expect(zhSettings.helpCenter).toBe('帮助中心')
     expect(enSettings.helpCenter).toBe('Help Center')
   })
+
+  it('renders an About block with logo, product name, and localized introduction', () => {
+    vi.stubGlobal('window', {
+      kunGui: { exportDiagnostics: vi.fn() }
+    })
+    const t = (key: string): string => key
+    const section = renderToStaticMarkup(createElement(HelpSettingsSection, { t }))
+
+    expect(section).toContain('aboutTitle')
+    expect(section).toContain('Claude360 Copilot')
+    expect(section).toContain('aboutIntro')
+    expect(section).toContain('aboutFeatures')
+    expect(section).toContain('<img')
+
+    // The introduction copy must exist symmetrically and describe the real product.
+    for (const key of ['aboutTitle', 'aboutIntro', 'aboutFeatures'] as const) {
+      expect(typeof zhSettings[key]).toBe('string')
+      expect(typeof enSettings[key]).toBe('string')
+    }
+    expect(zhSettings.aboutTitle).toBe('关于')
+    expect(zhSettings.aboutIntro).toContain('Claude360 Copilot')
+    expect(zhSettings.aboutIntro).toContain('桌面工作台')
+    expect(enSettings.aboutIntro).toContain('desktop workbench')
+  })
 })
