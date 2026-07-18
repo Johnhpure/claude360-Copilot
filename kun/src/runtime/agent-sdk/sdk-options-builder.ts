@@ -44,6 +44,32 @@ export const DEFAULT_SDK_BUILTIN_TOOLS: readonly string[] = [
 export const DEFAULT_SDK_DISALLOWED_TOOLS: readonly string[] = ['AskUserQuestion']
 
 /**
+ * SDK built-in tools that execute commands or mutate files. On a Plan-mode turn
+ * the native loop hard-blocks the equivalent lowercase tools via the capability
+ * registry; the SDK path mirrors that here through canUseTool (we deliberately
+ * do NOT switch the SDK to permissionMode 'plan', which would also block the
+ * bridged `create_plan`). Read-only builtins (Read/Glob/Grep/WebSearch/WebFetch/
+ * TodoWrite) stay available so the model can still investigate before planning.
+ */
+export const SDK_PLAN_BLOCKED_BUILTIN_TOOLS: ReadonlySet<string> = new Set([
+  'Write',
+  'Edit',
+  'MultiEdit',
+  'Bash'
+])
+
+/**
+ * Whether a tool is an SDK execution/mutation builtin that Plan mode blocks.
+ * Pure membership predicate (independent of turn state) so the caller can gate
+ * an expensive plan-context lookup behind it, and so the rule is unit-testable.
+ * Read-only builtins (Read/Glob/Grep/WebSearch/WebFetch/TodoWrite) and bridged
+ * kun tools are never in the set.
+ */
+export function isSdkPlanBlockableBuiltin(toolName: string): boolean {
+  return SDK_PLAN_BLOCKED_BUILTIN_TOOLS.has(toolName)
+}
+
+/**
  * Env vars that, if present in the spawned Claude Code process, would override
  * the subscription OAuth token (auth precedence: ANTHROPIC_API_KEY >
  * ANTHROPIC_AUTH_TOKEN > apiKeyHelper > CLAUDE_CODE_OAUTH_TOKEN). They MUST be

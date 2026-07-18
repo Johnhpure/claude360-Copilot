@@ -2253,13 +2253,18 @@ function FloatingComposerComponent({
                       <Plus className="h-5 w-5" strokeWidth={1.8} />
                     </button>
                     {mode === 'plan' ? (
-                      <span
-                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-ds-hover px-2.5 text-[13px] font-medium text-ds-muted"
-                        title={t('slashCommandPlanTitle')}
+                      <button
+                        type="button"
+                        disabled={!canTogglePlanMode}
+                        onClick={handlePlanToolbarClick}
+                        className="ds-no-drag group inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-ds-hover px-2.5 text-[13px] font-medium text-ds-muted transition hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-60"
+                        title={t('composerPlanModeRestrictionHint')}
+                        aria-label={t('removePlan')}
                       >
-                        <ListTodo className="h-3.5 w-3.5" strokeWidth={1.9} />
+                        <ListTodo className="h-3.5 w-3.5 group-hover:hidden" strokeWidth={1.9} />
+                        <X className="hidden h-3.5 w-3.5 group-hover:block" strokeWidth={2} />
                         <span>{t('slashCommandPlanTitle')}</span>
-                      </span>
+                      </button>
                     ) : null}
                     {activeThreadGoal?.status === 'active' ? (
                       <span

@@ -867,6 +867,7 @@ type ProcessDetail =
   | { kind: 'reasoning'; text: string }
   | { kind: 'assistant'; text: string }
   | { kind: 'tool'; text: string; isPatch: boolean; isError: boolean; filePath?: string }
+  | { kind: 'rejection'; reason: 'plan_mode' | 'policy'; toolName?: string }
   | { kind: 'approval' }
   | { kind: 'user_input' }
   | { kind: 'background_shell' }
@@ -939,6 +940,21 @@ function readMetaString(meta: Record<string, unknown> | undefined, key: string):
   if (!meta) return undefined
   const value = meta[key]
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+/**
+ * Read the structured `meta.rejection` a recoverable tool_dispatch_rejected
+ * carries (set in kun-mapper). Returns null for normal tool blocks so the raw
+ * detail path is unaffected.
+ */
+function toolRejectionMeta(block: ChatBlock): { reason: 'plan_mode' | 'policy'; toolName?: string } | null {
+  if (block.kind !== 'tool') return null
+  const rejection = block.meta?.rejection
+  if (!rejection || typeof rejection !== 'object') return null
+  const candidate = rejection as Record<string, unknown>
+  const reason = candidate.reason === 'plan_mode' ? 'plan_mode' : 'policy'
+  const toolName = typeof candidate.toolName === 'string' && candidate.toolName.trim() ? candidate.toolName.trim() : undefined
+  return { reason, ...(toolName ? { toolName } : {}) }
 }
 
 function readMetaStringArray(meta: Record<string, unknown> | undefined, key: string): string[] {
@@ -1066,6 +1082,12 @@ function computeToolBlockSummary(
   const rawSummary = block.summary?.trim() ?? ''
   const toolName = toolNameForBlock(block)
   const label = builtInToolLabel(toolName, t) || humanizeToolName(toolName) || formatToolTitle(block, t)
+  // A recoverable rejection reads as "<tool> · <short reason>" in the collapsed
+  // row; the expandable body carries the full localized explanation.
+  const rejection = toolRejectionMeta(block)
+  if (rejection) {
+    return `${label} · ${t('toolRejectedShort')}`
+  }
   const sourceText = [rawSummary, block.detail ?? ''].filter(Boolean).join('\n')
   const filePath = toolFilePath(block)
   const pattern =
@@ -1147,6 +1169,10 @@ function computeProcessDetail(block: ChatBlock, summaryText?: string): ProcessDe
     return text.trim() ? { kind: 'assistant', text } : { kind: 'none' }
   }
   if (block.kind === 'tool') {
+    const rejection = toolRejectionMeta(block)
+    if (rejection) {
+      return { kind: 'rejection', reason: rejection.reason, ...(rejection.toolName ? { toolName: rejection.toolName } : {}) }
+    }
     const detailText = block.detail?.trim() ?? ''
     if (!detailText) return { kind: 'none' }
     if (summaryText && normalizeProcessText(detailText) === normalizeProcessText(summaryText)) {
@@ -1195,6 +1221,7 @@ function ProcessEntryDetail({
   detail: ProcessDetail
   processing: boolean
 }): ReactElement | null {
+  const { t } = useTranslation('common')
   if (detail.kind === 'reasoning') {
     const streamReason = block.id === 'live-reasoning' && processing
     return (
@@ -1239,6 +1266,21 @@ function ProcessEntryDetail({
   }
   if (detail.kind === 'text') {
     return <p className="whitespace-pre-wrap text-[13.5px] leading-6 text-ds-muted">{detail.text}</p>
+  }
+  if (detail.kind === 'rejection') {
+    const toolLabel = detail.toolName
+      ? builtInToolLabel(detail.toolName, t) || humanizeToolName(detail.toolName)
+      : ''
+    const body =
+      detail.reason === 'plan_mode'
+        ? t('toolRejectedPlanModeBody', { tool: toolLabel })
+        : t('toolRejectedPolicyBody', { tool: toolLabel })
+    return (
+      <div className="rounded-[10px] border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] leading-6 text-ds-muted">
+        <p className="mb-1 font-medium text-ds-ink">{t('toolRejectedPlanModeTitle')}</p>
+        <p className="whitespace-pre-wrap">{body}</p>
+      </div>
+    )
   }
   if (detail.kind === 'approval' && block.kind === 'approval') {
     return <MessageBubble block={block} nested />

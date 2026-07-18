@@ -1127,3 +1127,56 @@ describe('turn settlement mapping (#reply-invisible)', () => {
     expect(calls).toEqual([undefined, { aborted: true }])
   })
 })
+
+describe('tool_dispatch_rejected mapping', () => {
+  const rejectionItem = (reason: 'plan_mode' | 'policy'): CoreTurnItemJson => ({
+    id: 'item_rej_1',
+    turnId: 'turn_1',
+    threadId: 'thr_1',
+    role: 'tool',
+    status: 'failed',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    kind: 'tool_result',
+    toolName: 'bash',
+    callId: 'call_rej_1',
+    isError: true,
+    output: {
+      code: 'tool_dispatch_rejected',
+      reason,
+      error: 'tool bash is not advertised by active tool policy',
+      guidance: '`bash` is not available in Plan mode. Call `create_plan` ...'
+    }
+  })
+
+  it('does not leak the raw error/guidance JSON into the tool block detail', () => {
+    const block = chatBlockFromItem(rejectionItem('plan_mode'))
+    if (!block || block.kind !== 'tool') throw new Error('expected tool block')
+    expect(block.detail ?? '').not.toContain('not advertised')
+    expect(block.detail ?? '').not.toContain('guidance')
+    expect(block.detail ?? '').not.toContain('create_plan')
+    expect(block.meta?.rejection).toMatchObject({ reason: 'plan_mode', toolName: 'bash' })
+    expect(block.status).toBe('error')
+  })
+
+  it('classifies a non-plan rejection as policy', () => {
+    const block = chatBlockFromItem(rejectionItem('policy'))
+    if (!block || block.kind !== 'tool') throw new Error('expected tool block')
+    expect(block.meta?.rejection).toMatchObject({ reason: 'policy' })
+  })
+
+  it('suppresses the duplicate error system block for a dispatch rejection', () => {
+    const errorItem: CoreTurnItemJson = {
+      id: 'item_rej_err',
+      turnId: 'turn_1',
+      threadId: 'thr_1',
+      role: 'system',
+      status: 'completed',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      kind: 'error',
+      code: 'tool_dispatch_rejected',
+      severity: 'info',
+      message: 'Tool call bash was rejected: not advertised'
+    } as CoreTurnItemJson
+    expect(chatBlockFromItem(errorItem)).toBeNull()
+  })
+})

@@ -498,6 +498,33 @@ function isPlanOutput(output: unknown): boolean {
   )
 }
 
+/** Structured, UI-renderable form of a recoverable tool-dispatch rejection. */
+export type ToolRejectionMeta = {
+  /** Why the tool was refused: Plan mode's read-only phase, or another policy. */
+  reason: 'plan_mode' | 'policy'
+  /** The tool the model tried to call (may be humanized for display). */
+  toolName?: string
+}
+
+/**
+ * Recognize a recoverable `tool_dispatch_rejected` tool_result. The runtime
+ * returns `{ code, reason, error, guidance }` where `error`/`guidance` are
+ * model-facing text; the renderer must NOT dump that raw object at the user, so
+ * we extract a small structured shape and let the timeline show localized copy.
+ */
+function extractToolRejection(item: CoreTurnItemJson): ToolRejectionMeta | null {
+  if (item.kind !== 'tool_result' || !item.isError) return null
+  const output = item.output
+  if (!output || typeof output !== 'object') return null
+  const candidate = output as Record<string, unknown>
+  if (candidate.code !== 'tool_dispatch_rejected') return null
+  const reason = candidate.reason === 'plan_mode' ? 'plan_mode' : 'policy'
+  return {
+    reason,
+    ...(item.toolName?.trim() ? { toolName: item.toolName.trim() } : {})
+  }
+}
+
 function extractPlanMetadata(item: CoreTurnItemJson): Record<string, unknown> | null {
   const source = item.kind === 'tool_result' ? item.output : item.arguments
   if (!source || typeof source !== 'object') return null
@@ -522,7 +549,15 @@ function extractPlanMetadata(item: CoreTurnItemJson): Record<string, unknown> | 
 }
 
 function toolBlockFromItem(item: CoreTurnItemJson, child?: CoreChildRuntimeMetadataJson): ToolBlock {
-  const detail = item.kind === 'tool_result' ? outputText(item.output) : outputText(item.arguments)
+  const rejection = extractToolRejection(item)
+  // A recoverable rejection carries model-facing error/guidance text; never dump
+  // it at the user. Drop the raw detail and let the timeline render localized
+  // copy from `meta.rejection`.
+  const detail = rejection
+    ? undefined
+    : item.kind === 'tool_result'
+      ? outputText(item.output)
+      : outputText(item.arguments)
   const isPlan = isPlanItem(item)
   const summary =
     item.summary?.trim() ||
@@ -534,6 +569,7 @@ function toolBlockFromItem(item: CoreTurnItemJson, child?: CoreChildRuntimeMetad
     ...(item.callId ? { callId: item.callId } : {}),
     ...(item.toolName ? { toolName: item.toolName } : {})
   }
+  if (rejection) meta.rejection = rejection
   applyRuntimeDisclosureMeta(meta, item, child)
   const sources = extractToolSources(item)
   if (sources) meta.sources = sources
@@ -854,6 +890,10 @@ function errorSeverity(
   if (explicit === 'info' || explicit === 'warning' || explicit === 'error') return explicit
   if (code === 'budget_warning' || code === 'compaction_summary_fallback') return 'warning'
   if (code === 'tool_catalog_changed' || code === 'tool_storm_suppressed') return 'info'
+  // A recoverable Plan-mode/policy tool rejection is diagnostic only — the
+  // model-facing tool_result is the single user-visible surface (see
+  // toolBlockFromItem). Keep it out of the red error tier.
+  if (code === 'tool_dispatch_rejected') return 'info'
   return 'error'
 }
 
@@ -947,6 +987,10 @@ export function chatBlockFromItem(item: CoreTurnItemJson, child?: CoreChildRunti
     case 'review':
       return reviewBlockFromItem(item)
     case 'error':
+      // `tool_dispatch_rejected` is surfaced to the user through its friendly
+      // tool_result block (toolBlockFromItem); suppress the duplicate system
+      // block so a recoverable Plan-mode rejection never reads as a hard error.
+      if (item.code === 'tool_dispatch_rejected') return null
       return systemErrorBlockFromItem(item)
     default:
       return null
@@ -1026,6 +1070,9 @@ function emitItem(
       sink.onReview?.(reviewFromItem(item))
       return
     case 'error':
+      // See chatBlockFromItem: a recoverable tool_dispatch_rejected is shown via
+      // its tool_result block, not as a runtime error, so it isn't double-surfaced.
+      if (item.code === 'tool_dispatch_rejected') return
       sink.onRuntimeError?.(runtimeErrorFromItem(item))
       return
   }

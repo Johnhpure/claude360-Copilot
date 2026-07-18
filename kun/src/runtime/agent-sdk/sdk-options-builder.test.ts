@@ -6,6 +6,7 @@ import {
   buildClaudeSystemPrompt,
   buildScopedEnv,
   isAnthropicModel,
+  isSdkPlanBlockableBuiltin,
   mapApprovalPolicyToPermissionMode,
   resolveSdkModel
 } from './sdk-options-builder.js'
@@ -155,5 +156,19 @@ describe('assembleSdkOptions', () => {
     const withExtras = assembleSdkOptions({ ...base, model: 'claude-opus-4-8', resume: 'sess_1' })
     expect(withExtras.model).toBe('claude-opus-4-8')
     expect(withExtras.resume).toBe('sess_1')
+  })
+})
+
+describe('isSdkPlanBlockableBuiltin', () => {
+  test('execution/mutation builtins are plan-blockable', () => {
+    for (const tool of ['Bash', 'Write', 'Edit', 'MultiEdit']) {
+      expect(isSdkPlanBlockableBuiltin(tool)).toBe(true)
+    }
+  })
+
+  test('read-only builtins and bridged tools are never blocked', () => {
+    for (const tool of ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'mcp__kun__create_plan']) {
+      expect(isSdkPlanBlockableBuiltin(tool)).toBe(false)
+    }
   })
 })

@@ -1169,7 +1169,7 @@ describe('FloatingComposer capability controls', () => {
     expect(html).not.toContain('<input')
   })
 
-  it('shows a plan badge in the input toolbar when plan mode is enabled', () => {
+  it('shows an interactive plan badge that exits plan mode when plan mode is enabled', () => {
     const html = renderToStaticMarkup(
       createElement(FloatingComposer, {
         input: 'plan this',
@@ -1191,8 +1191,11 @@ describe('FloatingComposer capability controls', () => {
         webAccessAvailable: false
       })
     )
-    expect(html).toContain('title="Plan"')
+    // The badge keeps the "Plan" label but is now a button that exits plan mode,
+    // carrying the restriction hint so the user understands why tools are limited.
     expect(html).toContain('>Plan</span>')
+    expect(html).toContain('aria-label="Remove plan mode"')
+    expect(html).toContain('Plan mode: only analyzes and drafts a plan')
   })
 
   it('renders image attachment thumbnails when a local preview is available', () => {

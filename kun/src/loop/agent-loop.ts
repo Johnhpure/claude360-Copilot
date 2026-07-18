@@ -235,6 +235,20 @@ export const PLAN_MODE_INSTRUCTION = [
   'After saving, give the user a short summary of the plan and what to review.'
 ].join('\n')
 
+/**
+ * Model-facing guidance returned when a tool is rejected because Plan mode
+ * only allows read-only investigation plus `create_plan`. Shared with the
+ * Agent SDK runtime so both engines reject execution/mutation tools with the
+ * same instruction (DRY). `{tool}` is interpolated with the rejected tool name.
+ */
+export const PLAN_MODE_REJECTION_GUIDANCE_TEMPLATE =
+  '`{tool}` is not available in Plan mode. Do NOT try to write deliverable files now. Call `create_plan` and put a COMPLETE implementation plan in its `markdown` argument — concrete steps, the files to create with their intended contents, and how to verify. Do NOT copy this message into the plan; write the actual plan. If the request is still ambiguous, ask the user a clarifying question and wait instead.'
+
+/** Interpolate the rejected tool name into the Plan-mode guidance template. */
+export function planModeRejectionGuidance(toolName: string): string {
+  return PLAN_MODE_REJECTION_GUIDANCE_TEMPLATE.replace('{tool}', toolName)
+}
+
 /** Read-only tools allowed during the investigation phase of a Plan-mode
  * turn (step 0, before `create_plan` has been called). Matches the
  * PLAN_MODE_INSTRUCTION guidance. `bash` is intentionally excluded —
@@ -2377,16 +2391,21 @@ export class AgentLoop {
           const message = error instanceof Error ? error.message : String(error)
           const planActive =
             input.context.threadMode === 'plan' || Boolean(input.context.guiPlan)
+          const reason = planActive ? 'plan_mode' : 'policy'
           const guidance = planActive
-            ? `\`${input.call.toolName}\` is not available in Plan mode. Do NOT try to write deliverable files now. Call \`create_plan\` and put a COMPLETE implementation plan in its \`markdown\` argument — concrete steps, the files to create with their intended contents, and how to verify. Do NOT copy this message into the plan; write the actual plan. If the request is still ambiguous, ask the user a clarifying question and wait instead.`
+            ? planModeRejectionGuidance(input.call.toolName)
             : 'Use only tools advertised in the current turn context.'
+          // A recoverable Plan-mode/policy rejection is fed back to the model as a
+          // tool_result (below) — the single user-visible surface after the
+          // renderer humanizes it. Record the diagnostic event at `info` so it
+          // does NOT also render as a red error banner (no double surfacing).
           await this.opts.events.record({
             kind: 'error',
             threadId: input.threadId,
             turnId: input.turnId,
             message: `Tool call ${input.call.toolName} was rejected: ${message}`,
             code: 'tool_dispatch_rejected',
-            severity: 'warning'
+            severity: 'info'
           })
           return {
             item: makeToolResultItem({
@@ -2398,6 +2417,7 @@ export class AgentLoop {
               toolKind: input.call.toolKind ?? 'tool_call',
               output: {
                 code: 'tool_dispatch_rejected',
+                reason,
                 error: message,
                 guidance
               },

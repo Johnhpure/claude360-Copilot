@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildRuntimeContextInstruction,
   isStalePlanContext,
+  planModeRejectionGuidance,
   resolvePlanModeToolSpecs,
   shouldInjectInitialRuntimeContext,
   turnHasUnverifiedSourceChanges
@@ -336,5 +337,19 @@ describe('shouldInjectInitialRuntimeContext', () => {
         currentTurnItem
       ]
     })).toBe(false)
+  })
+})
+
+describe('planModeRejectionGuidance', () => {
+  it('interpolates the rejected tool name and steers the model to create_plan', () => {
+    const guidance = planModeRejectionGuidance('bash')
+    expect(guidance).toContain('`bash` is not available in Plan mode')
+    expect(guidance).toContain('create_plan')
+    // The template placeholder must be fully replaced (no literal {tool} leaks).
+    expect(guidance).not.toContain('{tool}')
+  })
+
+  it('works for the SDK path uppercase builtins too', () => {
+    expect(planModeRejectionGuidance('Bash')).toContain('`Bash` is not available in Plan mode')
   })
 })

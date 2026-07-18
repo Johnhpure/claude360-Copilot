@@ -4,7 +4,11 @@
  * keeping the orchestration (and its tests) free of both.
  */
 import { AgentSdkRuntime, type SdkRuntimeDeps, type SdkTurnContext } from './agent-sdk-runtime.js'
-import { resolveSdkModel, type ToolApprovalDecision } from './sdk-options-builder.js'
+import {
+  resolveSdkModel,
+  isSdkPlanBlockableBuiltin,
+  type ToolApprovalDecision
+} from './sdk-options-builder.js'
 import type { BridgeableTool, KunToolResult } from './sdk-tool-bridge.js'
 import type { SdkApi } from './sdk-protocol.js'
 import type { RuntimeEventRecorder } from '../../services/runtime-event-recorder.js'
@@ -23,7 +27,8 @@ import {
   goalContinuationInstruction,
   todoContinuationInstruction,
   memoryInstructions,
-  isStalePlanContext
+  isStalePlanContext,
+  planModeRejectionGuidance
 } from '../../loop/agent-loop.js'
 import type { GuiPlanContext } from '../../ports/tool-host.js'
 import type { ThreadRecord } from '../../contracts/threads.js'
@@ -370,11 +375,23 @@ export function createAgentSdkRuntime(deps: AgentSdkRuntimeFactoryDeps): AgentSd
       }
     },
 
-    // MVP permission posture: honor 'never' (block all); otherwise allow. Routing
-    // 'always'/'on-request' to the GUI approval panel is a follow-up.
-    async decideToolApproval(): Promise<ToolApprovalDecision> {
+    // MVP permission posture: honor 'never' (block all); in Plan mode, deny the
+    // SDK's execution/mutation builtins (Bash/Write/Edit/MultiEdit) so the SDK
+    // path matches the native loop's Plan gating — read-only builtins, bridged
+    // kun tools, and `create_plan` still pass. Routing 'always'/'on-request' to
+    // the GUI approval panel is a follow-up.
+    async decideToolApproval(threadId, turnId, toolName): Promise<ToolApprovalDecision> {
       if (deps.defaultApprovalPolicy === 'never') {
         return { allow: false, message: 'tools are disabled for this turn (policy: never)' }
+      }
+      // Gate the plan-context lookup behind the cheap membership check so normal
+      // (read-only / bridged / non-plan) calls skip the threadStore round-trip.
+      if (isSdkPlanBlockableBuiltin(toolName)) {
+        const thread = await deps.threadStore.get(threadId)
+        const planMode = thread ? resolveTurnPlanContext(thread, turnId).planMode : false
+        if (planMode) {
+          return { allow: false, message: planModeRejectionGuidance(toolName) }
+        }
       }
       return { allow: true }
     },
