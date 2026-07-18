@@ -142,6 +142,20 @@ export function waitForGate(
   })
 }
 
+/**
+ * Pure Plan-mode denial rule for the SDK path: deny an execution/mutation
+ * builtin on a plan turn with the shared model-facing guidance, otherwise no
+ * opinion (null → caller allows). Exported so the decision matrix is
+ * unit-testable without a thread-store harness.
+ */
+export function planDenialDecision(
+  toolName: string,
+  planMode: boolean
+): ToolApprovalDecision | null {
+  if (!planMode || !isSdkPlanBlockableBuiltin(toolName)) return null
+  return { allow: false, message: planModeRejectionGuidance(toolName) }
+}
+
 export function createAgentSdkRuntime(deps: AgentSdkRuntimeFactoryDeps): AgentSdkRuntime {
   // Last SDK session id per thread, recorded for diagnostics only. We do NOT
   // resume from it: kun owns the canonical history and replays it as a transcript
@@ -389,9 +403,8 @@ export function createAgentSdkRuntime(deps: AgentSdkRuntimeFactoryDeps): AgentSd
       if (isSdkPlanBlockableBuiltin(toolName)) {
         const thread = await deps.threadStore.get(threadId)
         const planMode = thread ? resolveTurnPlanContext(thread, turnId).planMode : false
-        if (planMode) {
-          return { allow: false, message: planModeRejectionGuidance(toolName) }
-        }
+        const denial = planDenialDecision(toolName, planMode)
+        if (denial) return denial
       }
       return { allow: true }
     },

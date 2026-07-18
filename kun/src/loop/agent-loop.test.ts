@@ -2,7 +2,9 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   buildRuntimeContextInstruction,
+  dispatchRejectionParts,
   isStalePlanContext,
+  matchPlanModeRejectionGuidance,
   planModeRejectionGuidance,
   resolvePlanModeToolSpecs,
   shouldInjectInitialRuntimeContext,
@@ -351,5 +353,35 @@ describe('planModeRejectionGuidance', () => {
 
   it('works for the SDK path uppercase builtins too', () => {
     expect(planModeRejectionGuidance('Bash')).toContain('`Bash` is not available in Plan mode')
+  })
+})
+
+describe('matchPlanModeRejectionGuidance', () => {
+  it('recovers the tool name from a guidance string (both casings)', () => {
+    expect(matchPlanModeRejectionGuidance(planModeRejectionGuidance('Bash'))).toEqual({ toolName: 'Bash' })
+    expect(matchPlanModeRejectionGuidance(planModeRejectionGuidance('bash'))).toEqual({ toolName: 'bash' })
+  })
+
+  it('rejects non-guidance strings (normal tool errors stay untouched)', () => {
+    expect(matchPlanModeRejectionGuidance('command failed: exit 1')).toBeNull()
+    expect(matchPlanModeRejectionGuidance('`Bash` failed to run')).toBeNull()
+    expect(matchPlanModeRejectionGuidance('')).toBeNull()
+  })
+})
+
+describe('dispatchRejectionParts', () => {
+  it('plan-active: info severity, plan_mode reason, create_plan guidance', () => {
+    const parts = dispatchRejectionParts('bash', true)
+    expect(parts.severity).toBe('info')
+    expect(parts.reason).toBe('plan_mode')
+    expect(parts.guidance).toContain('`bash` is not available in Plan mode')
+    expect(parts.guidance).toContain('create_plan')
+  })
+
+  it('not plan-active: info severity, policy reason, advertised-tools guidance', () => {
+    const parts = dispatchRejectionParts('bash', false)
+    expect(parts.severity).toBe('info')
+    expect(parts.reason).toBe('policy')
+    expect(parts.guidance).toBe('Use only tools advertised in the current turn context.')
   })
 })

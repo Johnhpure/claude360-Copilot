@@ -1324,6 +1324,11 @@ export async function dispatchKunRuntimeEvent(
       return
     }
     case 'error':
+      // Parity with the error-item paths: a recoverable tool_dispatch_rejected
+      // is user-surfaced ONLY via its friendly tool_result block. Dropping the
+      // live diagnostic event here prevents the second system block the store's
+      // onRuntimeError would otherwise insert (it does not filter by severity).
+      if (event.code === 'tool_dispatch_rejected') return
       if (event.code === 'compaction_summary_fallback') {
         const status = runtimeStatusFromEvent(event)
         if (status) sink.onRuntimeStatus?.(status)

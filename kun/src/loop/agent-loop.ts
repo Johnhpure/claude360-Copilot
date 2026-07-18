@@ -249,6 +249,39 @@ export function planModeRejectionGuidance(toolName: string): string {
   return PLAN_MODE_REJECTION_GUIDANCE_TEMPLATE.replace('{tool}', toolName)
 }
 
+/**
+ * Recognize a Plan-mode rejection guidance string and recover the tool name.
+ * The Agent SDK path can only deny a tool via a plain message (the SDK itself
+ * synthesizes the error tool_result from it), so the event mapper uses this to
+ * re-wrap that string into the structured `tool_dispatch_rejected` contract the
+ * renderer understands. Anchored to the template's stable prefix — both ends
+ * ship together, so this is a contract, not a heuristic.
+ */
+export function matchPlanModeRejectionGuidance(text: string): { toolName: string } | null {
+  const match = /^`([^`]+)` is not available in Plan mode\./.exec(text.trim())
+  return match ? { toolName: match[1] } : null
+}
+
+/**
+ * Model-facing parts of a recoverable tool-dispatch rejection. Pure so the
+ * severity/reason/guidance matrix is unit-testable without the loop harness:
+ * the diagnostic event is `info` (the friendly tool_result is the single
+ * user-visible surface), and `reason` is the machine field the renderer
+ * branches on.
+ */
+export function dispatchRejectionParts(
+  toolName: string,
+  planActive: boolean
+): { severity: 'info'; reason: 'plan_mode' | 'policy'; guidance: string } {
+  return {
+    severity: 'info',
+    reason: planActive ? 'plan_mode' : 'policy',
+    guidance: planActive
+      ? planModeRejectionGuidance(toolName)
+      : 'Use only tools advertised in the current turn context.'
+  }
+}
+
 /** Read-only tools allowed during the investigation phase of a Plan-mode
  * turn (step 0, before `create_plan` has been called). Matches the
  * PLAN_MODE_INSTRUCTION guidance. `bash` is intentionally excluded —
@@ -2391,10 +2424,10 @@ export class AgentLoop {
           const message = error instanceof Error ? error.message : String(error)
           const planActive =
             input.context.threadMode === 'plan' || Boolean(input.context.guiPlan)
-          const reason = planActive ? 'plan_mode' : 'policy'
-          const guidance = planActive
-            ? planModeRejectionGuidance(input.call.toolName)
-            : 'Use only tools advertised in the current turn context.'
+          const { severity, reason, guidance } = dispatchRejectionParts(
+            input.call.toolName,
+            planActive
+          )
           // A recoverable Plan-mode/policy rejection is fed back to the model as a
           // tool_result (below) — the single user-visible surface after the
           // renderer humanizes it. Record the diagnostic event at `info` so it
@@ -2405,7 +2438,7 @@ export class AgentLoop {
             turnId: input.turnId,
             message: `Tool call ${input.call.toolName} was rejected: ${message}`,
             code: 'tool_dispatch_rejected',
-            severity: 'info'
+            severity
           })
           return {
             item: makeToolResultItem({

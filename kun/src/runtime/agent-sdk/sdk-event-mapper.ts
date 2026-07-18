@@ -22,6 +22,7 @@
  */
 import type { RuntimeEventDraft } from '../../services/runtime-event-recorder.js'
 import type { UsageSnapshot } from '../../contracts/usage.js'
+import { matchPlanModeRejectionGuidance } from '../../loop/agent-loop.js'
 import {
   makeAssistantTextItem,
   makeAssistantReasoningItem,
@@ -345,6 +346,16 @@ export class SdkEventMapper {
     const itemId = `item_toolresult_${this.ctx.turnId}_${block.tool_use_id}`
     // Recover the tool name/kind from the matching tool_use we saw earlier.
     const toolName = this.toolNames.get(block.tool_use_id) ?? 'tool'
+    const output = normalizeToolResultContent(block.content)
+    // A kun canUseTool deny can only carry a plain message — the SDK itself
+    // synthesizes this error tool_result from it. Re-wrap a Plan-mode denial
+    // into the structured `tool_dispatch_rejected` contract so the renderer
+    // shows the localized friendly copy instead of the model-facing guidance
+    // (parity with the native loop's rejection output).
+    const planRejection =
+      block.is_error === true && typeof output === 'string'
+        ? matchPlanModeRejectionGuidance(output)
+        : null
     return {
       kind: 'tool_call_finished',
       threadId: this.ctx.threadId,
@@ -357,7 +368,14 @@ export class SdkEventMapper {
         callId: block.tool_use_id,
         toolName,
         toolKind: toolKindFor(toolName),
-        output: normalizeToolResultContent(block.content),
+        output: planRejection
+          ? {
+              code: 'tool_dispatch_rejected',
+              reason: 'plan_mode',
+              error: `${planRejection.toolName} is blocked in Plan mode`,
+              guidance: output
+            }
+          : output,
         isError: block.is_error === true,
         status: block.is_error === true ? 'failed' : 'completed'
       })

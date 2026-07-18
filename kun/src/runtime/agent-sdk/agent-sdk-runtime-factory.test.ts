@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createAgentSdkRuntime, resolveTurnPlanContext, waitForGate } from './agent-sdk-runtime-factory.js'
+import { createAgentSdkRuntime, planDenialDecision, resolveTurnPlanContext, waitForGate } from './agent-sdk-runtime-factory.js'
 import type { ThreadRecord } from '../../contracts/threads.js'
 import type { UserInputGate, UserInputRequest, UserInputResolution } from '../../ports/user-input-gate.js'
 
@@ -139,5 +139,31 @@ describe('createAgentSdkRuntime handlesProvider', () => {
     expect(r.handlesProvider(undefined)).toBe(true) // default turn → SDK (the reported 401 case)
     expect(r.handlesProvider('claude-subscription')).toBe(true)
     expect(r.handlesProvider('deepseek')).toBe(false) // an explicit HTTP provider stays HTTP
+  })
+})
+
+describe('planDenialDecision', () => {
+  test('plan turn: denies execution/mutation builtins with create_plan guidance', () => {
+    for (const tool of ['Bash', 'Write', 'Edit', 'MultiEdit']) {
+      const denial = planDenialDecision(tool, true)
+      expect(denial).not.toBeNull()
+      expect(denial?.allow).toBe(false)
+      if (denial && denial.allow === false) {
+        expect(denial.message).toContain(`\`${tool}\` is not available in Plan mode`)
+        expect(denial.message).toContain('create_plan')
+      }
+    }
+  })
+
+  test('plan turn: read-only builtins and bridged tools pass (no opinion)', () => {
+    for (const tool of ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'mcp__kun__create_plan']) {
+      expect(planDenialDecision(tool, true)).toBeNull()
+    }
+  })
+
+  test('agent turn: everything passes, including Bash', () => {
+    for (const tool of ['Bash', 'Write', 'Edit', 'MultiEdit', 'Read']) {
+      expect(planDenialDecision(tool, false)).toBeNull()
+    }
   })
 })

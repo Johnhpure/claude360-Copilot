@@ -1086,7 +1086,7 @@ function computeToolBlockSummary(
   // row; the expandable body carries the full localized explanation.
   const rejection = toolRejectionMeta(block)
   if (rejection) {
-    return `${label} · ${t('toolRejectedShort')}`
+    return `${label} · ${t(rejection.reason === 'plan_mode' ? 'toolRejectedShort' : 'toolRejectedPolicyShort')}`
   }
   const sourceText = [rawSummary, block.detail ?? ''].filter(Boolean).join('\n')
   const filePath = toolFilePath(block)
@@ -1271,13 +1271,15 @@ function ProcessEntryDetail({
     const toolLabel = detail.toolName
       ? builtInToolLabel(detail.toolName, t) || humanizeToolName(detail.toolName)
       : ''
-    const body =
-      detail.reason === 'plan_mode'
-        ? t('toolRejectedPlanModeBody', { tool: toolLabel })
-        : t('toolRejectedPolicyBody', { tool: toolLabel })
+    const planMode = detail.reason === 'plan_mode'
+    const body = planMode
+      ? t('toolRejectedPlanModeBody', { tool: toolLabel })
+      : t('toolRejectedPolicyBody', { tool: toolLabel })
     return (
       <div className="rounded-[10px] border border-ds-border bg-ds-card px-3 py-2.5 text-[13px] leading-6 text-ds-muted">
-        <p className="mb-1 font-medium text-ds-ink">{t('toolRejectedPlanModeTitle')}</p>
+        <p className="mb-1 font-medium text-ds-ink">
+          {t(planMode ? 'toolRejectedPlanModeTitle' : 'toolRejectedPolicyTitle')}
+        </p>
         <p className="whitespace-pre-wrap">{body}</p>
       </div>
     )

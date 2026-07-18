@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { SdkEventMapper, mapSdkUsage } from './sdk-event-mapper.js'
 import type { SdkEventMapperContext } from './sdk-event-mapper.js'
 import type { SdkMessage } from './sdk-protocol.js'
+import { planModeRejectionGuidance } from '../../loop/agent-loop.js'
 
 function makeMapper(): SdkEventMapper {
   let n = 0
@@ -216,5 +217,79 @@ describe('mapSdkUsage', () => {
     expect(usage.promptTokens).toBe(0)
     expect(usage.cacheHitRate).toBeNull()
     expect(usage.costUsd).toBeUndefined()
+  })
+})
+
+describe('plan-mode denial rewrap', () => {
+  test('rewraps a canUseTool plan denial into the tool_dispatch_rejected contract', () => {
+    const m = makeMapper()
+    m.map({
+      type: 'assistant',
+      parent_tool_use_id: null,
+      message: { role: 'assistant', content: [{ type: 'tool_use', id: 'tb', name: 'Bash', input: {} }] }
+    } as SdkMessage)
+    const guidance = planModeRejectionGuidance('Bash')
+    const events = m.map({
+      type: 'user',
+      parent_tool_use_id: null,
+      message: {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'tb', is_error: true, content: guidance }]
+      }
+    } as SdkMessage)
+
+    expect(events[0]).toMatchObject({
+      kind: 'tool_call_finished',
+      item: {
+        kind: 'tool_result',
+        toolName: 'Bash',
+        isError: true,
+        output: {
+          code: 'tool_dispatch_rejected',
+          reason: 'plan_mode',
+          guidance
+        }
+      }
+    })
+  })
+
+  test('a normal error tool_result stays a plain string (no rewrap)', () => {
+    const m = makeMapper()
+    m.map({
+      type: 'assistant',
+      parent_tool_use_id: null,
+      message: { role: 'assistant', content: [{ type: 'tool_use', id: 'te', name: 'Bash', input: {} }] }
+    } as SdkMessage)
+    const events = m.map({
+      type: 'user',
+      parent_tool_use_id: null,
+      message: {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'te', is_error: true, content: 'command failed: exit 1' }]
+      }
+    } as SdkMessage)
+
+    expect(events[0]).toMatchObject({
+      kind: 'tool_call_finished',
+      item: { isError: true, output: 'command failed: exit 1' }
+    })
+  })
+
+  test('a successful tool_result matching nothing keeps passthrough semantics', () => {
+    const m = makeMapper()
+    m.map({
+      type: 'assistant',
+      parent_tool_use_id: null,
+      message: { role: 'assistant', content: [{ type: 'tool_use', id: 'ok', name: 'Read', input: {} }] }
+    } as SdkMessage)
+    const events = m.map({
+      type: 'user',
+      parent_tool_use_id: null,
+      message: {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'ok', content: 'file body' }]
+      }
+    } as SdkMessage)
+    expect(events[0]).toMatchObject({ item: { isError: false, output: 'file body' } })
   })
 })

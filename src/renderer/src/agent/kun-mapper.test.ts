@@ -1180,3 +1180,52 @@ describe('tool_dispatch_rejected mapping', () => {
     expect(chatBlockFromItem(errorItem)).toBeNull()
   })
 })
+
+describe('live tool_dispatch_rejected runtime event suppression', () => {
+  it('drops the top-level error EVENT so no second system block appears live', async () => {
+    const calls: unknown[] = []
+    const sink: ThreadEventSink = {
+      ...makeSink(),
+      onRuntimeError: (payload) => {
+        calls.push(payload)
+      }
+    }
+    await dispatchKunRuntimeEvent(
+      {
+        kind: 'error',
+        seq: 1,
+        threadId: 'thr_1',
+        turnId: 'turn_1',
+        code: 'tool_dispatch_rejected',
+        severity: 'info',
+        message: 'Tool call bash was rejected: tool bash is not advertised by active tool policy'
+      } as CoreRuntimeEventJson,
+      sink,
+      async () => undefined
+    )
+    expect(calls).toEqual([])
+  })
+
+  it('still surfaces ordinary error events through onRuntimeError', async () => {
+    const calls: unknown[] = []
+    const sink: ThreadEventSink = {
+      ...makeSink(),
+      onRuntimeError: (payload) => {
+        calls.push(payload)
+      }
+    }
+    await dispatchKunRuntimeEvent(
+      {
+        kind: 'error',
+        seq: 2,
+        threadId: 'thr_1',
+        turnId: 'turn_1',
+        code: 'model_fetch_failed',
+        message: 'model request failed: fetch failed'
+      } as CoreRuntimeEventJson,
+      sink,
+      async () => undefined
+    )
+    expect(calls).toHaveLength(1)
+  })
+})
