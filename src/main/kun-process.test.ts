@@ -161,6 +161,34 @@ afterEach(async () => {
 })
 
 describe('startKunChild', () => {
+  // 07-19-startup-perf-optimization P2：冷启动会话（本文件 worker 内首次 spawn 前）
+  // hasKunChildEverSpawned 必为 false，spawn 成功后置位且停止后不复位。
+  // 注意：本用例必须是文件内第一个真正 spawn 的用例（依赖模块级布尔初始态）。
+  it('flips hasKunChildEverSpawned only after the first successful spawn', async () => {
+    const script = writeScript(
+      'ever-spawned-child.js',
+      [
+        "const http = require('node:http')",
+        "const port = 18899",
+        "const server = http.createServer((req, res) => {",
+        "  res.setHeader('content-type', 'application/json')",
+        "  res.end(JSON.stringify({ service: 'kun', mode: 'serve', status: 'ok' }))",
+        "})",
+        "server.listen(port, '127.0.0.1', () => {",
+        "  process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port }) + '\\n')",
+        "})",
+        "setInterval(() => {}, 1_000)"
+      ].join('\n')
+    )
+    const module = await import('./kun-process')
+    expect(module.hasKunChildEverSpawned()).toBe(false)
+    await expect(module.startKunChild(createSettings(script))).resolves.toBeUndefined()
+    expect(module.hasKunChildEverSpawned()).toBe(true)
+    await module.stopKunChildAndWait()
+    // 停止后仍保持置位：非冷启动路径回落完整预探测。
+    expect(module.hasKunChildEverSpawned()).toBe(true)
+  })
+
   it('waits for the explicit Kun ready marker before resolving', async () => {
     const script = writeScript(
       'ready-child.js',

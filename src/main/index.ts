@@ -153,7 +153,7 @@ import {
 } from './weixin-bridge-runtime'
 import { webhookUrl } from './claw-runtime-helpers'
 import { createTelegramRuntime, type TelegramRuntime, verifyTelegramBotToken } from './telegram-runtime'
-import { isKunHealthResponseBody } from './kun-health'
+import { isKunHealthResponseBody, resolvePreSpawnProbeTimeoutMs } from './kun-health'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 // Windows 通知 / 任务栏分组使用新的 Claude360 Copilot 应用身份。
@@ -1256,7 +1256,13 @@ async function ensureKunRuntime(settings: AppSettingsV1): Promise<AppSettingsV1>
     perfLastAt = at
   }
 
-  const healthy = await waitForKunHealth(settings, 2_000)
+  // 冷启动短探测（07-19-startup-perf-optimization P2）：本会话从未 spawn 过且
+  // 当前无子进程时端口大概率是死的，200ms 足够兜住外部 `kun serve`；否则维持 2s。
+  const probeTimeoutMs = resolvePreSpawnProbeTimeoutMs({
+    everSpawned: kunRuntimeAdapter.hasEverSpawnedChild(),
+    childRunning: kunRuntimeAdapter.isChildRunning()
+  })
+  const healthy = await waitForKunHealth(settings, probeTimeoutMs)
   perfMark(healthy ? 'health-probe:healthy' : 'health-probe:offline')
   if (healthy) {
     // 外部/已预热 kun：无 spawn 阶段，直接记录 health-ok（missing 列表会体现跳过 spawn）。
@@ -2032,7 +2038,9 @@ app.whenReady().then(async () => {
     }
   })
 
-  registerAppIpcHandlers({
+  // 07-19-startup-perf-optimization P3：持有返回句柄，供 ready-to-show 后的
+  // 模型缓存预热调用（triggerClaude360ModelSync 内部有 TTL + in-flight 去重）。
+  const appIpcHandle = registerAppIpcHandlers({
     store,
     getMainWindow: () => mainWindow,
     applySettingsPatch,
@@ -2228,6 +2236,23 @@ app.whenReady().then(async () => {
     },
     fallbackMs: 3000
   })
+
+  // 模型缓存启动预热（07-19-startup-perf-optimization P3 / R4）：ready-to-show 后
+  // ~1500ms 再触发，错开 kun spawn 的启动窗口；unref 不阻止进程退出。
+  // fire-and-forget：同步失败在门控内部吞掉保留旧缓存，此处仅兜底记警告；
+  // TTL + in-flight 去重天然防止与用户开选择器的请求重复落网。
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.once('ready-to-show', () => {
+      const modelPrewarmTimer = setTimeout(() => {
+        appIpcHandle.triggerClaude360ModelSync('startup-prewarm').catch((error) => {
+          logWarn('claude360-models', 'startup model cache prewarm failed', {
+            message: error instanceof Error ? error.message : String(error)
+          })
+        })
+      }, 1_500)
+      modelPrewarmTimer.unref()
+    })
+  }
 
   app.on('second-instance', (_event, argv) => {
     revealMainWindow()

@@ -77,6 +77,10 @@ let childLogCapture: KunChildLogCapture | null = null
 let lastResolvedBinary: string | null = null
 let kunStartPromise: Promise<void> | null = null
 let childStderrTail = ''
+// 会话级事实（07-19-startup-perf-optimization P2）：本进程是否曾成功 spawn 过
+// 子进程。用于 ensureKunRuntime 冷启动判定——从未 spawn 过则缩短 spawn 前的
+// 死端口预探测。模块级布尔，仅置位不复位（重启/二次 ensure 天然回落长探测）。
+let everSpawnedChild = false
 /** Children killed on purpose (stop/quit/settings restart) — their exit is not a crash. */
 const intentionalStops = new WeakSet<ChildProcess>()
 /** Children that completed the ready handshake — only their exits count as runtime crashes. */
@@ -343,6 +347,11 @@ export function isKunChildRunning(): boolean {
   return child !== null && child.exitCode === null && child.signalCode === null
 }
 
+/** 本会话是否曾成功 spawn 过 kun 子进程（07-19-startup-perf-optimization P2）。 */
+export function hasKunChildEverSpawned(): boolean {
+  return everSpawnedChild
+}
+
 function isCurrentKunChildPid(pid: number): boolean {
   return Boolean(child?.pid === pid && isKunChildRunning())
 }
@@ -499,6 +508,8 @@ async function startKunChildOnce(
     detached: false
   })
   const startedChild = child
+  // spawn 已发起即置位：后续 ensure 走完整预探测（07-19-startup-perf-optimization P2）。
+  everSpawnedChild = true
   childPort = runtime.port
   const startedLogCapture = createKunChildLogCapture(startedChild.pid)
   childLogCapture = startedLogCapture

@@ -753,6 +753,15 @@ export function Workbench(): ReactElement {
     console.info(`[kun-gui] model picker opened feature=${feature} group=${providerId}`)
     void useChatStore.getState().loadComposerModels()
   }, [])
+  // 后台模型刷新事件（07-19-startup-perf-optimization P1）：main 侧
+  // stale-while-revalidate 完成且数据有变化时广播，此处强制重载选择器列表
+  // （reloadComposerModels 内部处理与 in-flight 去重的时序）。
+  useEffect(() => {
+    if (typeof window.kunGui?.onClaude360ModelsUpdated !== 'function') return
+    return window.kunGui.onClaude360ModelsUpdated(() => {
+      void useChatStore.getState().reloadComposerModels()
+    })
+  }, [])
   const stageInsetClass = 'ds-stage-inset'
   const keyboardShortcuts = useKeyboardShortcutSettings()
   const shortcutPlatform = typeof window === 'undefined' ? undefined : window.kunGui?.platform

@@ -11,6 +11,7 @@ import {
   resolveKunExecutable
 } from '../resolve-kun-binary'
 import {
+  hasKunChildEverSpawned,
   isKunChildRunning,
   reclaimKunPort,
   resolveAvailableKunPort,
@@ -52,6 +53,11 @@ export const kunRuntimeAdapter = {
 
   isChildRunning(): boolean {
     return isKunChildRunning()
+  },
+
+  /** 本会话是否曾 spawn 过子进程——冷启动短探测判定用（07-19-startup-perf-optimization P2）。 */
+  hasEverSpawnedChild(): boolean {
+    return hasKunChildEverSpawned()
   },
 
   getBaseUrl(settings: AppSettingsV1): string {

@@ -514,7 +514,13 @@ function runDesktopCommand(
   }
 }
 
-export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): void {
+/** registerAppIpcHandlers 返回的宿主侧句柄（07-19-startup-perf-optimization P3）。 */
+export type AppIpcHandlersHandle = {
+  /** 触发一次 TTL 门控的 Claude360 模型同步（启动预热用；失败在内部吞掉）。 */
+  triggerClaude360ModelSync: (reason: string) => Promise<void>
+}
+
+export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): AppIpcHandlersHandle {
   const {
     store,
     getMainWindow,
@@ -577,6 +583,12 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     console.info(`[kun-gui] Claude360 model sync start reason=${reason}`)
     const result = await claude360ModelService.refreshGroupsAndModels()
     const loaded = await store.load()
+    // 刷新前数据指纹（07-19-startup-perf-optimization P1）：groups+models 序列化，
+    // 用于判断后台 stale-while-revalidate 刷新是否真的带来数据变化。
+    const previousModelFingerprint = JSON.stringify({
+      groups: loaded.claude360.modelCache?.groups ?? [],
+      models: loaded.claude360.modelCache?.models ?? []
+    })
     // 架构收口：只替换 Claude360 自动生成 provider，保留用户/迁移遗留的自定义 provider。
     const mergedProviders = mergeClaude360ProviderProfiles(
       (loaded.provider?.providers as ModelProviderProfileV1[] | undefined) ?? [],
@@ -611,6 +623,21 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     )
     // 成功才刷新 TTL 时间戳（含 manual-refresh 路径：手动刷新后 60s 内视为新鲜）。
     lastClaude360ModelSyncAt = Date.now()
+    // 后台刷新完成通知（07-19-startup-perf-optimization P1）：数据指纹有变化才
+    // 广播，renderer 收到后重载选择器列表；无变化不打扰（AC2）。无 payload——
+    // renderer 统一走 loadComposerModels 重读落盘数据。
+    const nextModelFingerprint = JSON.stringify({
+      groups: result.modelCache.groups,
+      models: result.modelCache.models
+    })
+    if (nextModelFingerprint !== previousModelFingerprint) {
+      // 后台刷新可能在窗口销毁（退出中）后才完成：destroyed 窗口 send 会抛
+      // "Object has been destroyed"，虽被上层 catch 但会误记为同步失败——显式跳过。
+      const mainWindow = getMainWindow()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('claude360:models:updated')
+      }
+    }
     return result
   }
 
@@ -1109,7 +1136,17 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     // Code/写作选择器读落盘 provider profiles；进入前先走 TTL 门控同步，
     // 保证后台上架的新模型（如 Codex 分组 gpt-5.6-*）无需手动刷新即可见。
     // 同步失败在门控内部吞掉并保留旧缓存，此处继续返回旧落盘数据。
-    await maybeSyncClaude360Models('code-picker')
+    //
+    // stale-while-revalidate（07-19-startup-perf-optimization P1）：已登录且落盘
+    // 缓存完整时不等网络——后台 fire-and-forget 刷新，立即返回缓存组装结果；
+    // 刷新完成且数据有变化经 claude360:models:updated 通知 renderer 重载。
+    // 缓存不完整（首次登录/空缓存）保持阻塞同步，避免返回空列表（R2）。
+    const loaded = await store.load()
+    if (loaded.claude360?.loggedIn && !shouldRefreshClaude360ModelsForCode(loaded)) {
+      void maybeSyncClaude360Models('code-picker-background')
+    } else {
+      await maybeSyncClaude360Models('code-picker')
+    }
     return fetchUpstreamModels()
   })
 
@@ -2051,4 +2088,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       }
     })
   }
+
+  // 启动预热接线（07-19-startup-perf-optimization P3）：maybeSyncClaude360Models
+  // 是本函数闭包态（TTL/in-flight 去重都在闭包内），经返回值暴露给 index.ts，
+  // 供 ready-to-show 后的预热定时器调用；不动服务层。
+  return { triggerClaude360ModelSync: maybeSyncClaude360Models }
 }

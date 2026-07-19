@@ -207,6 +207,8 @@ export type ChatState = {
   setComposerModel: (modelId: string, providerId?: string) => void
   setComposerAgentId: (agentId: string) => void
   loadComposerModels: () => Promise<void>
+  /** 后台模型刷新事件驱动的强制重载（07-19-startup-perf-optimization P1）。 */
+  reloadComposerModels: () => Promise<void>
   setRoute: (r: AppRoute) => void
   openWrite: () => Promise<void>
   openCode: () => Promise<void>

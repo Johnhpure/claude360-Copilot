@@ -515,6 +515,48 @@ describe('chat-store app actions composer model loading', () => {
     expect(state.composerModel).toBe('')
     expect(localStorage.getItem(COMPOSER_MODEL_STORAGE_KEY)).toBe('MiniMax-M2')
   })
+
+  // 07-19-startup-perf-optimization P1：后台刷新事件驱动的强制重载。
+  // loadComposerModels 有 in-flight 去重（进行中直接复用旧 promise），
+  // reloadComposerModels 必须先等旧 promise 落定再发起一次新的加载。
+  it('reloadComposerModels waits for the in-flight load and then fetches again', async () => {
+    const { actions, state } = buildHarness({ ok: true, modelIds: ['gpt-5.5'] })
+    // 复现 in-flight 场景：把 fetch 换成手动放行的 deferred。
+    let releaseFirst: (() => void) | undefined
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve })
+    const fetchMock = window.kunGui.fetchUpstreamModels as ReturnType<typeof vi.fn>
+    fetchMock.mockImplementationOnce(async () => {
+      await firstGate
+      return { ok: true, modelIds: ['gpt-5.5'] }
+    })
+    // reloadComposerModels 经 get().loadComposerModels() 调用自身动作，
+    // 生产环境两者同在 store 状态上；测试 harness 需手动合入。
+    Object.assign(state, actions)
+
+    const first = actions.loadComposerModels()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    const reload = actions.reloadComposerModels()
+    // 旧 promise 未落定前不得发起第二次加载（去重会直接返回旧 promise）。
+    await Promise.resolve()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    releaseFirst?.()
+    await first
+    await reload
+    // 旧加载落定后 reload 发起了一次全新加载。
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('reloadComposerModels performs a plain load when nothing is in flight', async () => {
+    const { actions, state } = buildHarness({ ok: true, modelIds: ['gpt-5.5'] })
+    Object.assign(state, actions)
+
+    await actions.reloadComposerModels()
+
+    expect(window.kunGui.fetchUpstreamModels).toHaveBeenCalledTimes(1)
+    expect(state.composerPickList).toContain('gpt-5.5')
+  })
 })
 
 // R1（07-14-renderer-lazy-loading）：en 语言包为动态 chunk，

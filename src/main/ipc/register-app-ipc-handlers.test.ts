@@ -1195,6 +1195,106 @@ describe('claude360 token/model/billing IPC handlers', () => {
     )
   })
 
+  // 07-19-startup-perf-optimization P1（AC1）：已登录 + 缓存完整时 handler 不等
+  // 网络——远端刷新挂起中也应立即返回缓存组装结果。
+  it('upstream:models returns cached data immediately without awaiting a slow sync when the cache is complete', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const store = { load: vi.fn(async () => loggedInSettingsWithCodexCache()) }
+    let releaseRefresh: (() => void) | undefined
+    const refreshGate = new Promise<void>((resolve) => { releaseRefresh = resolve })
+    const refreshGroupsAndModels = vi.fn(async () => {
+      await refreshGate
+      return codexRefreshResult()
+    })
+    const fetchUpstreamModels = vi.fn(async () => ({ ok: true as const, modelIds: ['gpt-5.5'] }))
+
+    registerAppIpcHandlers(
+      registerOptions({
+        store: store as never,
+        fetchUpstreamModels,
+        claude360ModelService: { refreshGroupsAndModels } as never
+      })
+    )
+
+    // 慢网络（refresh 永挂）下 handler 仍立即完成并返回旧缓存数据。
+    await expect(handlers.get('upstream:models')?.({})).resolves.toMatchObject({
+      ok: true,
+      modelIds: ['gpt-5.5']
+    })
+    expect(fetchUpstreamModels).toHaveBeenCalledTimes(1)
+    // 后台刷新已被 fire-and-forget 触发但尚未完成。
+    expect(refreshGroupsAndModels).toHaveBeenCalledTimes(1)
+    releaseRefresh?.()
+    await new Promise((resolve) => setImmediate(resolve))
+  })
+
+  // 07-19-startup-perf-optimization P1（AC2）：后台刷新数据有变化才广播
+  // claude360:models:updated；数据未变不发事件。
+  it('broadcasts claude360:models:updated only when the refreshed model data actually changed', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const store = { load: vi.fn(async () => loggedInSettingsWithCodexCache()) }
+    // 第一次刷新返回新增模型（指纹变化），第二次返回与缓存一致的数据（无变化）。
+    const refreshGroupsAndModels = vi
+      .fn()
+      .mockResolvedValueOnce(codexRefreshResult())
+      .mockResolvedValueOnce({
+        ...codexRefreshResult(),
+        modelCache: { groups: ['Codex'], models: ['gpt-5.5'] }
+      })
+    const send = vi.fn()
+    const fetchUpstreamModels = vi.fn(async () => ({ ok: true as const, modelIds: ['gpt-5.5'] }))
+
+    vi.useFakeTimers()
+    try {
+      registerAppIpcHandlers(
+        registerOptions({
+          store: store as never,
+          getMainWindow: () => ({ isDestroyed: () => false, webContents: { send } }) as never,
+          fetchUpstreamModels,
+          claude360ModelService: { refreshGroupsAndModels } as never
+        })
+      )
+
+      const handler = handlers.get('upstream:models')
+      await handler?.({})
+      expect(send).toHaveBeenCalledTimes(1)
+      expect(send).toHaveBeenCalledWith('claude360:models:updated')
+
+      // TTL 过期后再次刷新：数据与缓存指纹一致 → 不发事件。
+      vi.advanceTimersByTime(61_000)
+      await handler?.({})
+      expect(refreshGroupsAndModels).toHaveBeenCalledTimes(2)
+      expect(send).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // 07-19-startup-perf-optimization P3：返回句柄暴露 triggerClaude360ModelSync，
+  // reason 透传到同步日志（启动预热接线）。
+  it('returns a triggerClaude360ModelSync handle that forwards the reason into the TTL-gated sync', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const store = { load: vi.fn(async () => loggedInSettingsWithCodexCache()) }
+    const refreshGroupsAndModels = vi.fn(async () => codexRefreshResult())
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+
+    try {
+      const handle = registerAppIpcHandlers(
+        registerOptions({
+          store: store as never,
+          claude360ModelService: { refreshGroupsAndModels } as never
+        })
+      )
+
+      expect(typeof handle.triggerClaude360ModelSync).toBe('function')
+      await handle.triggerClaude360ModelSync('startup-prewarm')
+      expect(refreshGroupsAndModels).toHaveBeenCalledTimes(1)
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('reason=startup-prewarm'))
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
   it('claude360:sync-account triggers a model sync after a successful account sync', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const store = { load: vi.fn(async () => loggedInSettingsWithCodexCache()) }

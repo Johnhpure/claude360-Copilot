@@ -286,6 +286,12 @@ const api = {
     ipcRenderer.on('speech:local-whisper:progress', wrapped)
     return () => ipcRenderer.removeListener('speech:local-whisper:progress', wrapped)
   },
+  // Claude360 模型缓存后台刷新事件桥（07-19-startup-perf-optimization P1）。
+  onClaude360ModelsUpdated: (handler) => {
+    const wrapped = (): void => handler()
+    ipcRenderer.on('claude360:models:updated', wrapped)
+    return () => ipcRenderer.removeListener('claude360:models:updated', wrapped)
+  },
   listWriteInlineCompletionDebugEntries: () =>
     ipcRenderer.invoke('write:inline-completion-debug:list'),
   clearWriteInlineCompletionDebugEntries: () =>

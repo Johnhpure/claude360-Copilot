@@ -52,6 +52,7 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
   | 'setComposerModel'
   | 'setComposerAgentId'
   | 'loadComposerModels'
+  | 'reloadComposerModels'
   | 'setRoute'
   | 'openWrite'
   | 'openSettings'
@@ -209,6 +210,15 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
       })
       setComposerModelLoadPromise(task)
       return task
+    },
+
+    // 强制重载（07-19-startup-perf-optimization P1）：main 侧后台刷新完成事件的
+    // 处理入口。与 loadComposerModels 的 in-flight 去重相容——若有进行中的加载
+    // 先等它落定（其结果可能仍是旧数据），再发起一次新的加载读最新落盘数据。
+    reloadComposerModels: async () => {
+      const inFlight = getComposerModelLoadPromise()
+      if (inFlight) await inFlight.catch(() => undefined)
+      await get().loadComposerModels()
     },
 
     setRoute: (route) => set({ route }),

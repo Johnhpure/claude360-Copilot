@@ -591,6 +591,11 @@ export type KunGuiApi = {
   }) => Promise<LocalWhisperDownloadSourceStatusResult>
   deleteLocalWhisperModel: (modelId?: LocalWhisperModelId) => Promise<LocalWhisperModelDeleteResult>
   onLocalWhisperModelProgress: (handler: (payload: LocalWhisperModelProgress) => void) => () => void
+  /**
+   * Claude360 模型缓存后台刷新完成且数据有变化时触发（07-19-startup-perf-optimization P1）。
+   * 无 payload：renderer 收到后重新 loadComposerModels 读最新落盘数据。
+   */
+  onClaude360ModelsUpdated: (handler: () => void) => () => void
   listWriteInlineCompletionDebugEntries: () => Promise<WriteInlineCompletionDebugEntry[]>
   clearWriteInlineCompletionDebugEntries: () => Promise<boolean>
   exportWriteDocument: (payload: WriteExportPayload) => Promise<WriteExportResult>
