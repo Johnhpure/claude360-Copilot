@@ -18,7 +18,11 @@
   KunStopProcessesFromInstallDir:
     IntOp $KunInstallerStopAttempt $KunInstallerStopAttempt + 1
     DetailPrint "Checking for running ${PRODUCT_NAME} processes under $INSTDIR."
-    nsExec::Exec `"$PowerShellPath" -NoProfile -ExecutionPolicy Bypass -Command "$$ErrorActionPreference='SilentlyContinue';$$r=[IO.Path]::GetFullPath($$env:KUN_INSTALLER_APP_ROOT).TrimEnd('\')+'\';$$s=[int]$$env:KUN_INSTALLER_SELF_PID;$$u=$$env:KUN_INSTALLER_UNINSTALL_EXE;function p{@(gcim Win32_Process|?{if(!$$_.ExecutablePath){$$false}else{$$x=[IO.Path]::GetFullPath($$_.ExecutablePath);$$n=[IO.Path]::GetFileName($$x);$$_.ProcessId -ne $$s -and $$x.StartsWith($$r,'OrdinalIgnoreCase') -and !$$n.Equals($$u,'OrdinalIgnoreCase') -and !$$n.Equals('old-uninstaller.exe','OrdinalIgnoreCase')}})};$$a=p;if($$a.Count -eq 0){exit 1};$$a|%{& $$env:SystemRoot\System32\taskkill.exe /PID $$_.ProcessId /T /F|Out-Null};Start-Sleep -Milliseconds 500;if((p).Count -gt 0){exit 0}else{exit 1}"`
+    ; taskkill 不带 /T（07-20-installer-treekill-fix）：应用内更新时本安装器是主程序的
+    ; 子进程（electron-updater spawn detached），/T 树杀会连带杀死安装器自身导致
+    ; 安装中途退出。目录内进程已按 ExecutablePath 逐个枚举命中，无需 /T；
+    ; Windows 杀父不连子，主程序被杀后安装器成孤儿继续安装。
+    nsExec::Exec `"$PowerShellPath" -NoProfile -ExecutionPolicy Bypass -Command "$$ErrorActionPreference='SilentlyContinue';$$r=[IO.Path]::GetFullPath($$env:KUN_INSTALLER_APP_ROOT).TrimEnd('\')+'\';$$s=[int]$$env:KUN_INSTALLER_SELF_PID;$$u=$$env:KUN_INSTALLER_UNINSTALL_EXE;function p{@(gcim Win32_Process|?{if(!$$_.ExecutablePath){$$false}else{$$x=[IO.Path]::GetFullPath($$_.ExecutablePath);$$n=[IO.Path]::GetFileName($$x);$$_.ProcessId -ne $$s -and $$x.StartsWith($$r,'OrdinalIgnoreCase') -and !$$n.Equals($$u,'OrdinalIgnoreCase') -and !$$n.Equals('old-uninstaller.exe','OrdinalIgnoreCase')}})};$$a=p;if($$a.Count -eq 0){exit 1};$$a|%{& $$env:SystemRoot\System32\taskkill.exe /PID $$_.ProcessId /F|Out-Null};Start-Sleep -Milliseconds 500;if((p).Count -gt 0){exit 0}else{exit 1}"`
     Pop $KunInstallerStopResult
 
     ${if} $KunInstallerStopResult != 0
