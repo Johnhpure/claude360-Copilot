@@ -329,11 +329,11 @@ function sameAssistantSnapshot(
 #### 2.5 第二次暂停：跑 store/helper 测试
 
 在继续之前必须：
-- [ ] 四条创建路径（普通/conversation/worktree/首条发送）共用 resolver
-- [ ] 无效 ID fail closed，不静默创建通用 thread
-- [ ] 返回 agentId 错配时清理、不激活、不发送
-- [ ] 空 thread A/B/通用矩阵不交叉复用
-- [ ] 对应 `chat-store-*.test.ts` 通过
+- [x] 四条创建路径（普通/conversation/worktree/首条发送）共用 resolver
+- [x] 无效 ID fail closed，不静默创建通用 thread
+- [x] 返回 agentId 错配时清理、不激活、不发送
+- [x] 空 thread A/B/通用矩阵不交叉复用
+- [x] 对应 `chat-store-*.test.ts` 通过
 
 ---
 

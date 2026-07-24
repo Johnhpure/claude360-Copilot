@@ -2805,5 +2805,7 @@
   "assistantRiskDataAnalysis": "关键数字、公式和业务口径仍需复核",
   "assistantNameContractReview": "合同审阅助手",
   "assistantDescriptionContractReview": "初筛合同条款、风险、疑问和修改建议",
-  "assistantRiskContractReview": "仅供业务初筛，不构成法律意见"
+  "assistantRiskContractReview": "仅供业务初筛，不构成法律意见",
+  "assistantUnavailableForNewThread": "所选助手（{{assistantId}}）当前不可用于新会话，请重新选择助手后重试。",
+  "assistantThreadPersonaMismatch": "新会话未按所选助手创建，已放弃该会话，请重试。"
 }

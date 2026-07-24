@@ -56,32 +56,32 @@ graph LR
     - 断言 persona 不含明显动态占位插值、安装语义或额外权限承诺。
     - _Exit gate: 纯函数测试通过；`git diff` 不含 AppSettings、IPC、thread contract 或稳定 prefix 改动。_
 
-- [ ] 2. 收口 thread 创建与空 thread 复用（PR-2，P0，1.5–2 天）
-  - [ ] 2.1 提取统一创建字段 helper
+- [x] 2. 收口 thread 创建与空 thread 复用（PR-2，P0，1.5–2 天）
+  - [x] 2.1 提取统一创建字段 helper
     - 优先新增在 `src/renderer/src/store/chat-store-thread-action-helpers.ts` 或相邻无 React helper；避免另建大 service 层。
     - 输入为 settings 与 selection ID，内部调用 resolver，输出可直接展开到现有 `AgentProvider.createThread` 的 `agentId/providerId/model/systemPrompt` 字段。
     - create 返回后校验 requested/actual `agentId`：通用要求空值，专用助手要求精确相等；不一致时 best-effort 删除新空 thread 并返回错误。
     - provider/model/systemPrompt 是否由 backend 原样快照由现有 contract/store 测试证明；不扩展 HTTP body。
     - _Requirements: FR-2, FR-4, NFR-1_
-  - [ ] 2.2 改造 `createThread` 的三条显式创建分支
+  - [x] 2.2 改造 `createThread` 的三条显式创建分支
     - 修改：`src/renderer/src/store/chat-store-thread-actions.ts`。
     - 普通 workspace、`conversation: true`、worktree pool 三条路径都读取相同 selection、调用相同 resolver/helper，删除重复的 profile 查找和静默降级逻辑。
     - selection 优先级固定为：显式 `options.agentId` → active thread 的 `agentId` → 无 active thread 时的 `composerAgentId`；ID 无效则不创建、不激活，并保留原 thread/草稿/附件。
     - worktree 创建失败或 persona 校验失败时沿用现有资源清理策略，不留下被错误激活的 thread。
     - _Requirements: 3.3A–C, FR-4, FR-5_
-  - [ ] 2.3 修复无 active thread 的首条发送
+  - [x] 2.3 修复无 active thread 的首条发送
     - 修改：`sendMessage` 自动创建分支，确保它不再绕过 `composerAgentId`。
     - 发送前 force-refresh settings 并重新解析待选自定义助手，防止菜单选择后 profile 已被删除/禁用。
     - 新 thread 通过 persona 校验后才写入 `activeThreadId` 并发送 turn；解析/创建/校验失败时完整回滚 optimistic user block，不发送到通用 thread。
     - 继续保持 Claude360 key ensure、checkpoint、模型选择和自动标题的原有顺序语义；不要借机重写整个发送函数。
     - _Requirements: 3.3A, 3.3E, FR-4, FR-5_
-  - [ ] 2.4 让空 thread 复用比较助手身份
+  - [x] 2.4 让空 thread 复用比较助手身份
     - 扩展 `findReusableEmptyThreadId` 的参数或 predicate，比较 requested persona 与 candidate thread 的创建时快照。
     - 通用只能复用无 `agentId` 的空 thread；A 只能复用 A；A/B/通用全矩阵不得交叉复用。
     - `agentId` 相同后还必须比较 persona `systemPrompt`，并比较显式 `providerId/model`；profile 或内置 persona 已更新时不得复用旧空 thread。
     - 保留 workspace、自动标题、无用户消息、Code thread、`forceNew` 和 worktree 的既有条件。
     - _Requirements: 3.3B, FR-4_
-  - [ ] 2.5 扩充 store/helper 回归测试
+  - [x] 2.5 扩充 store/helper 回归测试
     - 修改：`chat-store-thread-actions.test.ts`、`chat-store-runtime-helpers.test.ts`，必要时补 `chat-store-thread-action-helpers.test.ts`。
     - 覆盖普通、conversation、worktree、首条发送自动创建四条路径的 general/builtin/custom 字段。
     - 覆盖无效 ID fail closed、settings 在发送前失效、返回 `agentId` 错配、清理失败不继续发送、optimistic block 回滚。

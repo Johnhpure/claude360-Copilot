@@ -10,6 +10,7 @@ import {
 } from '@shared/background-shell-notice'
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { shouldAutoTitleThread } from '../lib/thread-title'
+import type { ResolvedAssistant } from '../features/assistants'
 import type { ChatState } from './chat-store-types'
 
 type ThreadDetailProviderLike = {
@@ -277,10 +278,42 @@ export function clearedThreadSelection(): Pick<
   }
 }
 
+/**
+ * Whether an existing thread's create-time persona snapshot matches the
+ * resolved assistant, i.e. the thread may be reused for that selection.
+ *
+ * The general assistant only matches threads without an `agentId` and without
+ * a persona `systemPrompt`; builtin/custom assistants require the exact
+ * `agentId` plus an identical persona `systemPrompt` (so an updated persona
+ * never reuses a stale empty thread), and — when the assistant explicitly
+ * pins them — matching `providerId` / `model`. Both sides are compared
+ * trimmed because the backend trims persona fields at snapshot time.
+ */
+export function threadMatchesAssistantSnapshot(
+  thread: Pick<NormalizedThread, 'agentId' | 'systemPrompt' | 'providerId' | 'model'>,
+  resolved: ResolvedAssistant
+): boolean {
+  const threadAgentId = thread.agentId?.trim() ?? ''
+  const requestedAgentId = resolved.threadFields.agentId?.trim() ?? ''
+  if (threadAgentId !== requestedAgentId) return false
+  if (!requestedAgentId) {
+    return !thread.systemPrompt?.trim()
+  }
+  if ((thread.systemPrompt?.trim() ?? '') !== (resolved.threadFields.systemPrompt?.trim() ?? '')) {
+    return false
+  }
+  const requestedProviderId = resolved.threadFields.providerId?.trim() ?? ''
+  if (requestedProviderId && (thread.providerId?.trim() ?? '') !== requestedProviderId) return false
+  const requestedModel = resolved.threadFields.model?.trim() ?? ''
+  if (requestedModel && thread.model.trim() !== requestedModel) return false
+  return true
+}
+
 export async function findReusableEmptyThreadId(
   state: ChatState,
   provider: ThreadDetailProviderLike,
   workspaceRoot: string,
+  resolvedAssistant: ResolvedAssistant,
   isReusableThread: (thread: NormalizedThread) => boolean = () => true
 ): Promise<string | null> {
   const normalizedWorkspace = normalizeWorkspaceRoot(workspaceRoot)
@@ -292,6 +325,7 @@ export async function findReusableEmptyThreadId(
   if (
     activeThread &&
     isReusableThread(activeThread) &&
+    threadMatchesAssistantSnapshot(activeThread, resolvedAssistant) &&
     shouldAutoTitleThread(activeThread) &&
     normalizeWorkspaceRoot(activeThread.workspace) === normalizedWorkspace &&
     !threadHasUserMessage(state.blocks)
@@ -304,6 +338,7 @@ export async function findReusableEmptyThreadId(
       (thread) =>
         thread.id !== activeThread?.id &&
         isReusableThread(thread) &&
+        threadMatchesAssistantSnapshot(thread, resolvedAssistant) &&
         shouldAutoTitleThread(thread) &&
         normalizeWorkspaceRoot(thread.workspace) === normalizedWorkspace
     )

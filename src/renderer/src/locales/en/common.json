@@ -2805,5 +2805,7 @@
   "assistantRiskDataAnalysis": "Verify key numbers, formulas, and business definitions",
   "assistantNameContractReview": "Contract Review Assistant",
   "assistantDescriptionContractReview": "Screen contract clauses, risks, questions, and suggested revisions",
-  "assistantRiskContractReview": "For business screening only; not legal advice"
+  "assistantRiskContractReview": "For business screening only; not legal advice",
+  "assistantUnavailableForNewThread": "The selected assistant ({{assistantId}}) is not available for a new chat. Choose another assistant and try again.",
+  "assistantThreadPersonaMismatch": "The new chat was not created with the selected assistant and has been discarded. Please try again."
 }

@@ -99,11 +99,16 @@ import {
   watchTurnCompletionNotification
 } from './chat-store-runtime'
 import {
+  assistantResolveErrorMessage,
   composerSelectionForThread,
+  createThreadWithAssistant,
   ensureRuntimeProviderForSend,
   fallbackComposerProviderIdForSend,
-  subscribeThreadEventsWithRecovery
+  resolveThreadAssistant,
+  subscribeThreadEventsWithRecovery,
+  threadAssistantSelectionId
 } from './chat-store-thread-action-helpers'
+import { isAssistantResolveError } from '../features/assistants'
 
 type SseAbortRef = { current: AbortController | null }
 
@@ -132,6 +137,20 @@ export function createThreadActions(
         ? get().threads.find((thread) => thread.id === get().activeThreadId)
         : null
 
+      // Assistant persona: one selection + one resolver shared by all three
+      // explicit create paths (plain workspace / conversation / worktree pool).
+      // An invalid selection fails closed before any thread is created.
+      const assistantSelectionId = threadAssistantSelectionId({
+        explicitAgentId: options.agentId,
+        activeThread,
+        composerAgentId: get().composerAgentId
+      })
+      const resolvedAssistant = resolveThreadAssistant(settings, assistantSelectionId)
+      if (isAssistantResolveError(resolvedAssistant)) {
+        set({ error: assistantResolveErrorMessage(resolvedAssistant) })
+        return
+      }
+
       // 对话会话:不绑定项目文件夹,在 conversationWorkspaceRoot 下自动创建
       // 一个时间戳子目录作为工作目录(主进程负责实际建目录)。
       if (options.conversation) {
@@ -146,25 +165,11 @@ export function createThreadActions(
           set({ error: created.error || i18n.t('common:worktreeAcquireFailed') })
           return
         }
-        const pickedAgentId = options.agentId?.trim() || get().composerAgentId?.trim() || ''
-        const personaProfile = pickedAgentId
-          ? settings.agents?.kun?.subagents?.profiles?.find(
-            (profile) => profile.id === pickedAgentId &&
-              profile.enabled &&
-              (profile.mode === 'primary' || profile.mode === 'all')
-          )
-          : undefined
-        const t = await p.createThread({
+        const t = await createThreadWithAssistant(p, {
           workspace: created.path,
           title: getDefaultThreadTitle(),
-          mode: 'agent',
-          ...(personaProfile ? {
-            agentId: personaProfile.id,
-            ...(personaProfile.providerId ? { providerId: personaProfile.providerId } : {}),
-            ...(personaProfile.model ? { model: personaProfile.model } : {}),
-            ...(personaProfile.systemPrompt ? { systemPrompt: personaProfile.systemPrompt } : {})
-          } : {})
-        })
+          mode: 'agent'
+        }, resolvedAssistant)
         set((s) => ({
           activeThreadId: t.id,
           threads: s.threads.some((thread) => thread.id === t.id) ? s.threads : [t, ...s.threads]
@@ -194,6 +199,7 @@ export function createThreadActions(
             get(),
             p,
             workspaceRoot,
+            resolvedAssistant,
             (thread) => isCodeThread(thread, get().clawChannels)
           )
       if (reusableThreadId) {
@@ -232,28 +238,16 @@ export function createThreadActions(
           return
         }
       }
-      // Primary-agent persona snapshot: bind this thread to the picked
-      // subagent profile and freeze its providerId / model / systemPrompt
-      // at create time so later agent edits don't drift the thread.
-      const pickedAgentId = options.agentId?.trim() || get().composerAgentId?.trim() || ''
-      const personaProfile = pickedAgentId
-        ? settings.agents?.kun?.subagents?.profiles?.find(
-            (profile) => profile.id === pickedAgentId &&
-              profile.enabled &&
-              (profile.mode === 'primary' || profile.mode === 'all')
-          )
-        : undefined
-      const t = await p.createThread({
+      // Primary-agent persona snapshot: bind this thread to the resolved
+      // assistant and freeze its agentId / providerId / model / systemPrompt
+      // at create time so later agent edits don't drift the thread. The
+      // helper verifies the returned identity and deletes the thread on
+      // mismatch, so a wrong-persona thread is never activated below.
+      const t = await createThreadWithAssistant(p, {
         workspace: workspaceRoot,
         title: getDefaultThreadTitle(),
-        mode: 'agent',
-        ...(personaProfile ? {
-          agentId: personaProfile.id,
-          ...(personaProfile.providerId ? { providerId: personaProfile.providerId } : {}),
-          ...(personaProfile.model ? { model: personaProfile.model } : {}),
-          ...(personaProfile.systemPrompt ? { systemPrompt: personaProfile.systemPrompt } : {})
-        } : {})
-      })
+        mode: 'agent'
+      }, resolvedAssistant)
       // Register + activate optimistically before refreshing. A freshly created
       // Kun thread may not be listed until the first message is written.
       // Setting it active first lets refreshThreads preserve it in the sidebar.
@@ -840,10 +834,23 @@ export function createThreadActions(
     }
     if (!activeThreadId) {
       try {
-        const settings = await rendererRuntimeClient.getSettings()
+        // First send with no active thread: `composerAgentId` is the assistant
+        // selection. Force-refresh settings when a specific assistant is picked
+        // so a profile deleted / disabled / turned subagent-only after the menu
+        // selection fails closed here instead of silently sending a turn on a
+        // general thread.
+        const assistantSelectionId = get().composerAgentId?.trim() ?? ''
+        const settings = await rendererRuntimeClient.getSettings(
+          assistantSelectionId ? { forceRefresh: true } : undefined
+        )
         const workspaceRoot = normalizeWorkspaceRoot(settings.workspaceRoot)
         if (!workspaceRoot) {
           rollbackOptimisticSend({ error: i18n.t('common:workspaceRequiredToCreateThread') })
+          return false
+        }
+        const resolvedAssistant = resolveThreadAssistant(settings, assistantSelectionId)
+        if (isAssistantResolveError(resolvedAssistant)) {
+          rollbackOptimisticSend({ error: assistantResolveErrorMessage(resolvedAssistant) })
           return false
         }
         const codeWorkspaceRoots = rememberCodeWorkspaceRoots(get().codeWorkspaceRoots, [workspaceRoot])
@@ -852,6 +859,7 @@ export function createThreadActions(
           get(),
           p,
           workspaceRoot,
+          resolvedAssistant,
           (thread) => isCodeThread(thread, get().clawChannels)
         )
         const reusableThread = reusableThreadId
@@ -862,13 +870,13 @@ export function createThreadActions(
           reusableThreadId != null && shouldAutoTitleThread(reusableThread)
         const createdThread =
           reusableThreadId == null
-            ? await p.createThread({
+            ? await createThreadWithAssistant(p, {
                 workspace: workspaceRoot,
                 title: generatedTitle,
                 // Provisional first-message title; let the backend LLM titler upgrade it.
                 titleAuto: true,
                 mode: mode ?? 'agent'
-              })
+              }, resolvedAssistant)
             : null
         const threadId = reusableThreadId ?? createdThread?.id ?? null
         if (!threadId) {
@@ -1153,10 +1161,19 @@ export function createThreadActions(
         }
         const codeWorkspaceRoots = rememberCodeWorkspaceRoots(get().codeWorkspaceRoots, [workspaceRoot])
         set({ codeWorkspaceRoots })
+        // Review is a dedicated flow that always runs on the general assistant;
+        // scoping reuse to the general persona keeps a review from landing in
+        // an empty thread bound to another assistant.
+        const generalAssistant = resolveThreadAssistant(settings, '')
+        if (isAssistantResolveError(generalAssistant)) {
+          set({ error: assistantResolveErrorMessage(generalAssistant) })
+          return false
+        }
         const reusableThreadId = await findReusableEmptyThreadId(
           get(),
           p,
           workspaceRoot,
+          generalAssistant,
           (thread) => isCodeThread(thread, get().clawChannels)
         )
         const createdThread =
