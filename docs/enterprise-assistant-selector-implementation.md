@@ -533,19 +533,19 @@ docs/evals/official-document/
 
 #### 6.1 自动化
 
-- [ ] 新增/修改的 Vitest 全部通过
-- [ ] `pnpm typecheck` 通过
-- [ ] `pnpm build` 通过（Kun build + app build）
-- [ ] 无新增 TypeScript 错误或 lint 警告
+- [x] 新增/修改的 Vitest 全部通过
+- [x] `pnpm typecheck` 通过
+- [x] `pnpm build` 通过（Kun build + app build）
+- [x] 无新增 TypeScript 错误或 lint 警告
 
 #### 6.2 协议回归
 
-- [ ] 稳定 Claude360 Copilot/Kun 前缀字节不变
-- [ ] 内置 persona 只通过 create body 的 `systemPrompt` 进入 thread
-- [ ] 助手目录名称、locale、fixture 不进入模型请求
-- [ ] 无新增或修改 HTTP route、SSE event
-- [ ] approval/user-input/usage/workspace 契约不变
-- [ ] provider cache telemetry 字段（`prompt_cache_hit_tokens`、`prompt_cache_miss_tokens`）保持真实计数
+- [x] 稳定 Claude360 Copilot/Kun 前缀字节不变（全部助手提交对 `kun/` 零 diff）
+- [x] 内置 persona 只通过 create body 的 `systemPrompt` 进入 thread（createThreadWithAssistant 仅展开现有字段，helper 测试覆盖）
+- [x] 助手目录名称、locale、fixture 不进入模型请求（目录/locale/fixture 均为 renderer 静态资产，无请求路径引用）
+- [x] 无新增或修改 HTTP route、SSE event（`kun/src/server/`、`src/renderer/src/agent/` 零 diff）
+- [x] approval/user-input/usage/workspace 契约不变（对应契约文件零 diff）
+- [x] provider cache telemetry 字段（`prompt_cache_hit_tokens`、`prompt_cache_miss_tokens`）保持真实计数（usage 解析代码零 diff）
 
 #### 6.3 桌面手动验证清单
 
@@ -559,9 +559,9 @@ docs/evals/official-document/
 
 #### 6.4 代码 Check
 
-- [ ] `git diff` 不包含 AppSettings/IPC/thread contract/稳定 prefix 改动
-- [ ] 无新增 localStorage/registry/settings sidecar
-- [ ] React 组件只调用 action，resolver 和 thread 决策在纯函数/helper/store
+- [x] `git diff` 不包含 AppSettings/IPC/thread contract/稳定 prefix 改动
+- [x] 无新增 localStorage/registry/settings sidecar
+- [x] React 组件只调用 action，resolver 和 thread 决策在纯函数/helper/store
 
 ---
 

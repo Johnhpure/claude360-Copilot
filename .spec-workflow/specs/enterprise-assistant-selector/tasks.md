@@ -167,11 +167,11 @@ graph LR
     - _Exit gate: ≥22 fixture 全部无硬失败；失败历史和修订可审计。_
 
 - [ ] 6. 完成协议、缓存和真实桌面验收（PR-6，P0，1 天）
-  - [ ] 6.1 运行自动化与构建
+  - [x] 6.1 运行自动化与构建
     - 运行新增/受影响 Vitest、renderer/main typecheck、design-token 检查、Kun build 和 app build；失败必须修复或明确阻塞，不能隐藏。
     - 检查 `git diff`，确认无无关用户工作被回退。
     - _Requirements: MVP-10_
-  - [ ] 6.2 证明协议与稳定前缀未变
+  - [x] 6.2 证明协议与稳定前缀未变
     - 对比改动前后通用 thread 的稳定 Claude360 Copilot/Kun prefix fingerprint/fixture，要求字节不变。
     - 证明内置 persona 只通过现有 create body 的 `systemPrompt` 进入新 thread，目录名称、说明、评测资产不进入请求。
     - 证明未新增或修改 thread HTTP route、SSE normalized event、approval/user-input/usage/workspace 契约。
