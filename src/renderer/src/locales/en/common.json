@@ -2809,5 +2809,12 @@
   "assistantUnavailableForNewThread": "The selected assistant ({{assistantId}}) is not available for a new chat. Choose another assistant and try again.",
   "assistantThreadPersonaMismatch": "The new chat was not created with the selected assistant and has been discarded. Please try again.",
   "assistantSwitchBlockedBusy": "A task is still running. Wait for it to finish or interrupt it before switching assistants.",
-  "assistantSwitchBlockedPending": "Handle the pending approval or input request before switching assistants."
+  "assistantSwitchBlockedPending": "Handle the pending approval or input request before switching assistants.",
+  "assistantPickerLabel": "Assistant",
+  "assistantGeneralDescription": "General Q&A and tasks in the current workspace",
+  "assistantBuiltinGroup": "Built-in assistants",
+  "assistantMyGroup": "My assistants",
+  "assistantManageMy": "Manage my assistants",
+  "assistantMyGroupLoadFailed": "Failed to load your assistants",
+  "assistantMyGroupRetry": "Retry"
 }

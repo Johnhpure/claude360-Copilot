@@ -118,32 +118,32 @@ graph LR
     - 覆盖 fork 继承 persona 后无需额外元数据仍能正确显示；证明未修改 fork/delete 路径。
     - _Exit gate: UI 可见名称总能从 active thread 或明确待选状态推导，不存在第二份持久化身份。_
 
-- [ ] 4. 将 picker 移到权限旁并完成产品化交互（PR-4，P0，1–1.5 天）
-  - [ ] 4.1 调整 composer 布局和可见性
+- [x] 4. 将 picker 移到权限旁并完成产品化交互（PR-4，P0，1–1.5 天）
+  - [x] 4.1 调整 composer 布局和可见性
     - 修改：`src/renderer/src/components/chat/FloatingComposer.tsx`。
     - 将 `FloatingComposerAgentPicker` 从右侧模型选择器后移到左侧工具区，紧跟 `FloatingComposerExecutionPicker`；顺序固定为“权限 → 助手”。
     - 仅在 `!compact && route === 'chat'` 且当前 surface 支持 primary persona 时显示；Write、Claw、compact side composer 不显示。
     - picker 始终渲染，即使没有自定义 profile，因为通用助手和 6 个内置助手总是可选。
     - _Requirements: 3.1, FR-3_
-  - [ ] 4.2 重写 picker 展示与选择事件
+  - [x] 4.2 重写 picker 展示与选择事件
     - 修改：`FloatingComposerAgentPicker.tsx`，可保留文件名。
     - 按钮显示 active thread 助手或无 thread 待选助手的完整/截断名称；窄宽度仅图标时 title/aria-label 仍含完整名称。
     - 菜单顺序：通用助手 → 内置助手 →（有数据时）我的助手 → 管理我的助手。
     - 每项显示名称、简短用途和选中态，不以 provider/model 为主信息；选择只调用 `selectAssistant`，不拼 persona、不直接调用 HTTP。
     - settings 加载失败时内置助手仍可用；“我的助手”显示可重试错误，不把失败伪装为空列表。
     - _Requirements: 3.2, FR-3, FR-6_
-  - [ ] 4.3 完成 popover 与可访问性
+  - [x] 4.3 完成 popover 与可访问性
     - 复用权限菜单的 portal、viewport clamp、上下翻转、scroll/resize 重定位模式，替换旧 `absolute right-0` 越界实现。
     - 按钮提供 `aria-haspopup`、`aria-expanded` 和当前助手名；菜单使用 `menu/menuitemradio` 或等价语义及 `aria-checked`。
     - 支持 ArrowUp/ArrowDown、Home/End、Enter/Space、Escape、Tab 和外部点击；选中态不能只依赖颜色。
     - busy/pending 状态禁用时仍提供原因 tooltip/accessible description。
     - _Requirements: FR-7_
-  - [ ] 4.4 完成中英文文案
+  - [x] 4.4 完成中英文文案
     - 修改现有 `locales/en/common.json`、`locales/zh/common.json`。
     - 增加通用助手、内置助手、我的助手、管理我的助手、6 个名称/描述、切换成功/失败/运行中禁止切换等文案。
     - 删除该 surface 的 `Agent persona`、`Default (runtime)`、`Applies to the next new chat` 和 `No agents available`；不得新增“安装”“助手库”“专家库”。
     - _Requirements: 1, 3.2, FR-7_
-  - [ ] 4.5 补组件与布局测试
+  - [x] 4.5 补组件与布局测试
     - 扩展 `FloatingComposer.test.ts`；若 picker 交互复杂，新增 `FloatingComposerAgentPicker.test.tsx`。
     - 断言权限后紧邻助手、模型旁不再有 picker、普通 chat 显示、compact/Write/Claw 不显示。
     - 覆盖分组、选中项、名称回退、settings 加载错误、键盘、Escape、outside click、portal placement 和 compact accessible name。

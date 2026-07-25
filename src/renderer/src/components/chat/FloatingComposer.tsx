@@ -2285,6 +2285,9 @@ function FloatingComposerComponent({
                     onChange={onExecutionSettingsChange}
                   />
                 ) : null}
+                {/* 助手选择器固定紧跟权限右侧（req. 3.1）；通用+内置助手始终可选，
+                    因此不再因"没有自定义 profile"而隐藏。 */}
+                <FloatingComposerAgentPicker />
               </div>
             ) : null}
             <div
@@ -2387,9 +2390,6 @@ function FloatingComposerComponent({
                   onConfigureProviders={onConfigureProviders}
                   onMenuOpen={onModelPickerOpen}
                 />
-              )}
-              {hideModelPicker ? null : (
-                <FloatingComposerAgentPicker compact={compact} disabled={!canChangeModel} />
               )}
               {showVoiceDictation ? (
                 <button

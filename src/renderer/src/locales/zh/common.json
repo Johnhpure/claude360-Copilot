@@ -2809,5 +2809,12 @@
   "assistantUnavailableForNewThread": "所选助手（{{assistantId}}）当前不可用于新会话，请重新选择助手后重试。",
   "assistantThreadPersonaMismatch": "新会话未按所选助手创建，已放弃该会话，请重试。",
   "assistantSwitchBlockedBusy": "当前任务运行中，请等待完成或中断后再切换助手。",
-  "assistantSwitchBlockedPending": "请先处理待审批或待输入请求，再切换助手。"
+  "assistantSwitchBlockedPending": "请先处理待审批或待输入请求，再切换助手。",
+  "assistantPickerLabel": "助手",
+  "assistantGeneralDescription": "通用问答与当前工作区任务",
+  "assistantBuiltinGroup": "内置助手",
+  "assistantMyGroup": "我的助手",
+  "assistantManageMy": "管理我的助手",
+  "assistantMyGroupLoadFailed": "我的助手加载失败",
+  "assistantMyGroupRetry": "重试"
 }

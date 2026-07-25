@@ -463,13 +463,13 @@ export function displayNameForAssistantId(
 
 #### 4.5 第四次暂停：跑组件测试
 
-- [ ] 权限后紧邻助手、模型旁不再有 picker
-- [ ] 普通 chat 显示、compact/Write/Claw 不显示
-- [ ] 通用/内置/我的助手分组正确
-- [ ] 选中项标记正确
-- [ ] settings 加载失败时内置仍可用，我的助手显示错误
-- [ ] 键盘、Escape、外部点击、portal placement
-- [ ] 无 Agent persona / Default runtime / 安装 / 助手库 文案
+- [x] 权限后紧邻助手、模型旁不再有 picker
+- [x] 普通 chat 显示、compact/Write/Claw 不显示
+- [x] 通用/内置/我的助手分组正确
+- [x] 选中项标记正确
+- [x] settings 加载失败时内置仍可用，我的助手显示错误
+- [x] 键盘、Escape、外部点击、portal placement
+- [x] 无 Agent persona / Default runtime / 安装 / 助手库 文案
 
 ---
 

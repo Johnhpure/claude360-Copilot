@@ -1463,3 +1463,73 @@ describe('FloatingComposer capability controls', () => {
     expect(html).toContain('lucide-loader-circle')
   })
 })
+
+describe('FloatingComposer assistant picker placement (PR-4)', () => {
+  // Note: `route` comes from the chat store, and zustand v5 SSR rendering
+  // reads the store's *initial* state ('chat'), so route variants cannot be
+  // exercised here. The `compact` prop drives the same `showIntentToolbar`
+  // gate (`!compact && route === 'chat'`), which is covered below.
+  function renderComposer(extraProps: Record<string, unknown> = {}): string {
+    useChatStore.setState({
+      activeThreadId: 'thr_1',
+      activeThreadGoal: null,
+      workspaceRoot: '/workspace/deepseek-gui'
+    })
+    return renderToStaticMarkup(
+      createElement(FloatingComposer, {
+        input: 'hello',
+        setInput: () => undefined,
+        mode: 'agent',
+        setMode: () => undefined,
+        busy: false,
+        runtimeReady: true,
+        hasActiveThread: true,
+        composerModel: 'deepseek-v4-pro',
+        composerPickList: ['deepseek-v4-pro'],
+        composerModelGroups: [DEEPSEEK_PROVIDER_GROUP],
+        onComposerModelChange: () => undefined,
+        queuedMessages: [],
+        onRemoveQueuedMessage: () => undefined,
+        onSend: () => undefined,
+        onInterrupt: () => undefined,
+        attachmentUploadEnabled: false,
+        webAccessAvailable: false,
+        executionSettings: {
+          approvalPolicy: 'auto',
+          sandboxMode: 'danger-full-access'
+        },
+        onExecutionSettingsChange: () => undefined,
+        ...extraProps
+      })
+    )
+  }
+
+  it('renders the assistant picker immediately after the permission picker', () => {
+    const html = renderComposer()
+    const permissionIndex = html.indexOf('aria-label="Tool permission"')
+    const assistantIndex = html.indexOf('aria-label="Assistant:')
+    expect(permissionIndex).toBeGreaterThan(-1)
+    expect(assistantIndex).toBeGreaterThan(permissionIndex)
+  })
+
+  it('renders exactly one assistant picker and none beside the model picker', () => {
+    const html = renderComposer()
+    expect(html.split('aria-label="Assistant:').length - 1).toBe(1)
+    // The assistant control precedes the model picker markup instead of
+    // trailing it on the right side as before.
+    const assistantIndex = html.indexOf('aria-label="Assistant:')
+    const modelIndex = html.indexOf('Model and reasoning settings')
+    expect(modelIndex).toBeGreaterThan(-1)
+    expect(assistantIndex).toBeLessThan(modelIndex)
+  })
+
+  it('keeps the assistant picker visible even when no custom profile exists', () => {
+    const html = renderComposer()
+    expect(html).toContain('aria-label="Assistant: General Assistant"')
+  })
+
+  it('hides the assistant picker on compact side composers', () => {
+    const html = renderComposer({ variant: 'compact' })
+    expect(html).not.toContain('aria-label="Assistant:')
+  })
+})
