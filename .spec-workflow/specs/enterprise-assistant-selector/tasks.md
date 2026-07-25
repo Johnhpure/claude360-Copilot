@@ -150,12 +150,12 @@ graph LR
     - _Exit gate: 原对话页最多 3 次点击完成选择；不跳页、不自动发送、无安装心智。_
 
 - [ ] 5. 建立公文助手评测资产（PR-5，P1，可与 PR-2～4 并行，1–1.5 天）
-  - [ ] 5.1 建立 fixture、rubric 与 runbook
+  - [x] 5.1 建立 fixture、rubric 与 runbook
     - 新增：`docs/evals/official-document/fixtures.json`、`rubric.md`、`runbook.md`、`results/.gitkeep`。
     - 使用合成组织、姓名和数据；每个 fixture 记录文种、模式、输入/附件、must mention、must not claim、缺失事实和硬失败标签。
     - 5 个文种各至少 3 例，并补跨文种/提示注入/事实伪造/高风险动作场景，总数不少于 22。
     - _Requirements: 4.5_
-  - [ ] 5.2 增加确定性检查
+  - [x] 5.2 增加确定性检查
     - 用 Vitest 或仓库现有脚本校验 fixture schema、ID 唯一、覆盖数量、合成数据约束和 persona 必备章节/禁止项。
     - CI 不调用在线模型，不把随机输出作为普通单元测试，也不伪造 usage/cache/cost。
     - _Requirements: 4.5, NFR-3_
