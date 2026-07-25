@@ -88,31 +88,31 @@ graph LR
     - 覆盖空 thread A/B/通用矩阵和当前 active/candidate 两种命中路径。
     - _Exit gate: 四条创建路径共用 resolver；不存在找不到 profile 就静默创建通用 thread 的代码路径。_
 
-- [ ] 3. 实现助手显示与原位切换 action（PR-3，P0，1 天）
-  - [ ] 3.1 实现显示名称纯函数
+- [x] 3. 实现助手显示与原位切换 action（PR-3，P0，1 天）
+  - [x] 3.1 实现显示名称纯函数
     - 新增：`src/renderer/src/features/assistants/assistant-display-name.ts` 及测试。
     - `thread.agentId` 为空显示“通用助手”；命中内置 ID 时按当前 locale key 显示；其他 ID 优先当前自定义 profile 名称，缺失时显示稳定 ID。
     - 无 active thread 时显示 `composerAgentId` 的待选名称；待选项失效时显示可诊断状态并要求重选，不能假装成通用助手。
     - 不保存创建时名称，不新增 localStorage/registry/settings sidecar。
     - _Requirements: 3.4, FR-3, NFR-1_
-  - [ ] 3.2 新增 `selectAssistant(selectionId)` store action
+  - [x] 3.2 新增 `selectAssistant(selectionId)` store action
     - 修改：`chat-store-types.ts`、`chat-store-app-actions.ts` 或最贴近 thread 生命周期的现有 action module；React 组件只调用 action。
     - 无 active thread：校验 selection 后更新 `composerAgentId`，不创建 thread。
     - active thread 的 `agentId` 与 selection 相同：no-op，只清错误/关闭菜单。
     - 不同助手：在同 workspace 调用统一创建路径并强制新建；成功后激活新空 thread并同步 `composerAgentId`，不自动发送。
     - 创建/校验失败时不改变 active thread、待选值、Workbench draft、附件或文件引用。
     - _Requirements: 3.3A–D, FR-4, FR-5_
-  - [ ] 3.3 明确运行中与等待交互门禁
+  - [x] 3.3 明确运行中与等待交互门禁
     - `busy === true` 或当前 blocks 存在 pending approval/user_input 时禁止切换，并展示现有风格的明确原因。
     - 不自动 interrupt、deny approval、cancel user input 或离开当前 thread；用户先处理/中断后再切换。
     - 门禁使用现有 `threadHasPendingRuntimeWork`/block helper，不在组件复制状态判断。
     - _Requirements: 3.3D, FR-6_
-  - [ ] 3.4 同步已选 thread 与 composer 的后续新建默认值
+  - [x] 3.4 同步已选 thread 与 composer 的后续新建默认值
     - `selectThread` 成功后，将 `composerAgentId` 同步为该 thread 的 `agentId ?? ''`，使按钮与 active thread 一致，且“新对话”默认沿用当前助手。
     - 选择 archived、fork 或 side-derived primary thread 时仍以 thread 字段为准；不解析/重写其 systemPrompt。
     - Write、Claw、SDD 等专用创建流程不读取该选择；现有 fork/side/delete/archive/resume/compact 代码无需增加助手同步逻辑。
     - _Requirements: 3.4, FR-4, NFR-1_
-  - [ ] 3.5 补 action 与历史兼容测试
+  - [x] 3.5 补 action 与历史兼容测试
     - 覆盖 no thread、same assistant、different assistant、busy、pending approval、pending user input、create 失败和 agentId 错配。
     - 覆盖历史内置 ID、自定义 profile 仍存在/已删除/已禁用的显示；删除后稳定 ID 可见且 thread persona 不变。
     - 覆盖 fork 继承 persona 后无需额外元数据仍能正确显示；证明未修改 fork/delete 路径。

@@ -384,9 +384,9 @@ export function displayNameForAssistantId(
 
 #### 3.4 第三次暂停：跑 action 测试
 
-- [ ] 无 thread、相同助手、不同助手、busy 状态切换正确
-- [ ] 历史内置 ID、自定义 profile 删除/禁用后显示正确
-- [ ] fork 继承 persona 后无需额外元数据仍能正确显示
+- [x] 无 thread、相同助手、不同助手、busy 状态切换正确
+- [x] 历史内置 ID、自定义 profile 删除/禁用后显示正确
+- [x] fork 继承 persona 后无需额外元数据仍能正确显示
 
 ---
 

@@ -2807,5 +2807,7 @@
   "assistantDescriptionContractReview": "初筛合同条款、风险、疑问和修改建议",
   "assistantRiskContractReview": "仅供业务初筛，不构成法律意见",
   "assistantUnavailableForNewThread": "所选助手（{{assistantId}}）当前不可用于新会话，请重新选择助手后重试。",
-  "assistantThreadPersonaMismatch": "新会话未按所选助手创建，已放弃该会话，请重试。"
+  "assistantThreadPersonaMismatch": "新会话未按所选助手创建，已放弃该会话，请重试。",
+  "assistantSwitchBlockedBusy": "当前任务运行中，请等待完成或中断后再切换助手。",
+  "assistantSwitchBlockedPending": "请先处理待审批或待输入请求，再切换助手。"
 }

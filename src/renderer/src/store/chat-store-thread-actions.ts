@@ -123,7 +123,7 @@ const checkpointGitUnavailableWorkspaces = new Set<string>()
 
 export function createThreadActions(
   { set, get, sseAbortRef }: StoreActionContext
-): Pick<ChatState, 'createThread' | 'createConversation' | 'recoverActiveTurn' | 'selectThread' | 'subscribeThreadEventsLive' | 'drainQueuedMessages' | 'removeQueuedMessage' | 'sendMessage' | 'reviewActiveThread'> {
+): Pick<ChatState, 'createThread' | 'createConversation' | 'selectAssistant' | 'recoverActiveTurn' | 'selectThread' | 'subscribeThreadEventsLive' | 'drainQueuedMessages' | 'removeQueuedMessage' | 'sendMessage' | 'reviewActiveThread'> {
   return {
   createThread: async (options = {}) => {
     if (get().runtimeConnection !== 'ready') {
@@ -285,6 +285,61 @@ export function createThreadActions(
     await get().createThread({ conversation: true })
   },
 
+  selectAssistant: async (selectionId) => {
+    if (get().runtimeConnection !== 'ready') {
+      set({ error: i18n.t('common:runtimeActionNeedsConnection') })
+      return false
+    }
+    const trimmedSelection = selectionId.trim()
+    // Gate: never leave a running turn or a pending approval / user-input by
+    // switching threads; the user finishes or interrupts first (req. 3.3D).
+    if (get().busy) {
+      set({ error: i18n.t('common:assistantSwitchBlockedBusy') })
+      return false
+    }
+    if (threadHasPendingRuntimeWork(get().blocks)) {
+      set({ error: i18n.t('common:assistantSwitchBlockedPending') })
+      return false
+    }
+    const activeThread = get().activeThreadId
+      ? get().threads.find((thread) => thread.id === get().activeThreadId) ?? null
+      : null
+    // Same assistant as the active thread: nothing to create or validate —
+    // the thread keeps running on its create-time persona snapshot.
+    if (activeThread && (activeThread.agentId?.trim() ?? '') === trimmedSelection) {
+      set({ error: null })
+      return true
+    }
+    // Validate against fresh settings so a profile deleted/disabled since the
+    // menu was rendered fails closed instead of being stored or created.
+    const settings = await rendererRuntimeClient.getSettings(
+      trimmedSelection ? { forceRefresh: true } : undefined
+    )
+    const resolvedAssistant = resolveThreadAssistant(settings, trimmedSelection)
+    if (isAssistantResolveError(resolvedAssistant)) {
+      set({ error: assistantResolveErrorMessage(resolvedAssistant) })
+      return false
+    }
+    // No active thread: only stage the pending selection; the thread is
+    // created on the first send (or an explicit create).
+    if (!activeThread) {
+      set({ composerAgentId: trimmedSelection, error: null })
+      return true
+    }
+    // Different assistant: start a sibling thread in the same workspace via
+    // the shared create path. `forceNew` guarantees no empty-thread reuse and
+    // createThread verifies the returned persona identity. On failure it
+    // keeps the original thread active and surfaces its own error, so drafts,
+    // attachments and the previous selection stay untouched.
+    const previousActiveThreadId = get().activeThreadId
+    await get().createThread({ forceNew: true, agentId: trimmedSelection })
+    if (get().activeThreadId === previousActiveThreadId) {
+      return false
+    }
+    set({ composerAgentId: trimmedSelection })
+    return true
+  },
+
   recoverActiveTurn: async () => {
     const state = get()
     if (!state.activeThreadId) return false
@@ -441,6 +496,10 @@ export function createThreadActions(
         inspectorSelectedId: null,
         queuedMessages: [],
         composerMode,
+        // Keep the pending assistant selection in lockstep with the active
+        // thread so the picker reflects the thread's create-time persona and
+        // "new chat" defaults to the same assistant (requirement 3.4).
+        composerAgentId: threadSnap?.agentId?.trim() ?? '',
         ...(composerSelection
           ? {
               composerModel: composerSelection.model,

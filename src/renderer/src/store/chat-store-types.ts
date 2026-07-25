@@ -206,6 +206,16 @@ export type ChatState = {
   setComposerMode: (mode: 'plan' | 'agent') => void
   setComposerModel: (modelId: string, providerId?: string) => void
   setComposerAgentId: (agentId: string) => void
+  /**
+   * Select the assistant for the conversation surface (requirement 3.3A–D).
+   * No active thread: validates the selection and stores it as the pending
+   * `composerAgentId`. Active thread on the same assistant: no-op. Active
+   * thread on a different assistant: force-creates and activates a sibling
+   * thread in the same workspace (never mutating the old thread), keeping
+   * drafts/attachments untouched on failure. Switching is refused while a
+   * turn runs or an approval/user-input is pending.
+   */
+  selectAssistant: (selectionId: string) => Promise<boolean>
   loadComposerModels: () => Promise<void>
   /** 后台模型刷新事件驱动的强制重载（07-19-startup-perf-optimization P1）。 */
   reloadComposerModels: () => Promise<void>
