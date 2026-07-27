@@ -286,10 +286,10 @@ export function createThreadActions(
   },
 
   selectAssistant: async (selectionId) => {
-    if (get().runtimeConnection !== 'ready') {
-      set({ error: i18n.t('common:runtimeActionNeedsConnection') })
-      return false
-    }
+    // No upfront runtime gate: staging a pending selection (no active thread)
+    // and the same-assistant no-op are pure local state and must work while
+    // the runtime is starting up. The different-assistant branch goes through
+    // createThread, which enforces the runtime-connection check itself.
     const trimmedSelection = selectionId.trim()
     // Gate: never leave a running turn or a pending approval / user-input by
     // switching threads; the user finishes or interrupts first (req. 3.3D).

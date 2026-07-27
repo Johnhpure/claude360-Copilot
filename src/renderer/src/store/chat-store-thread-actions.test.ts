@@ -1301,3 +1301,40 @@ describe('chat-store-thread-actions selectThread syncs composerAgentId (PR-3)', 
     expect(state.composerAgentId).toBe('')
   })
 })
+
+describe('chat-store-thread-actions selectAssistant offline staging', () => {
+  beforeEach(() => {
+    rendererRuntimeClient.invalidateSettings()
+    registryMock.getProvider.mockReset()
+  })
+
+  afterEach(() => {
+    rendererRuntimeClient.invalidateSettings()
+    vi.unstubAllGlobals()
+  })
+
+  it('stages the pending selection while the runtime is not ready yet', async () => {
+    vi.stubGlobal('window', {
+      kunGui: {
+        getSettings: vi.fn(async () => ({
+          workspaceRoot: '/workspace/deepseek-gui',
+          codePromptPrefix: '',
+          agents: { kun: { providerId: '', model: '', subagents: { enabled: true, profiles: [] } } }
+        })),
+        logError: vi.fn(async () => undefined)
+      }
+    })
+    registryMock.getProvider.mockReturnValue({})
+    const { actions, state } = buildHarness()
+    state.runtimeConnection = 'checking'
+    state.busy = false
+    state.activeThreadId = null
+    state.threads = []
+    state.composerAgentId = ''
+
+    await expect(actions.selectAssistant('builtin.official-document')).resolves.toBe(true)
+
+    expect(state.composerAgentId).toBe('builtin.official-document')
+    expect(state.error).toBeNull()
+  })
+})
