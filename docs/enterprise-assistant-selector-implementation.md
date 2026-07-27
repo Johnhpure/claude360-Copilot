@@ -609,3 +609,15 @@ MVP 明确**不包含**：
 ```
 
 每个步骤完成后跑相关测试，再进入下一步。
+
+---
+
+## 7. 修订：侧栏助手清单页（2026-07-27）
+
+应产品决定新增第二入口（原"不建侧栏入口"限制放宽；安装/商城心智仍然禁止）：
+
+- 左侧栏新增恒可见「助手」入口（`SidebarCommandRow`），路由 `assistants` 加入 `AppRoute` 与 `PRIMARY_VISIBLE_ROUTES`。
+- `components/assistants/AssistantsView.tsx`：卡片清单页（通用 / 6 个内置 / 我的助手），卡片展示名称、介绍与内置风险提示；悬停或键盘聚焦显示「召唤」，使用中的专用助手卡片显示「移除」。
+- 召唤 = `selectAssistant(id)` 成功后 `setRoute('chat')`；移除 = `selectAssistant('')`。busy/待审批门禁、无效助手 fail-closed、失败保护全部由既有 action 提供，页面不引入第二套 persona 状态。
+- settings 加载失败时内置助手照常可召唤，「我的助手」显示可重试错误。
+- 测试：`AssistantsView.test.ts`（卡片构建 + 渲染矩阵）、`Sidebar.test.ts`（入口可见）、`feature-visibility.test.ts`。

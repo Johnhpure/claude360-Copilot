@@ -2816,5 +2816,10 @@
   "assistantMyGroup": "My assistants",
   "assistantManageMy": "Manage my assistants",
   "assistantMyGroupLoadFailed": "Failed to load your assistants",
-  "assistantMyGroupRetry": "Retry"
+  "assistantMyGroupRetry": "Retry",
+  "assistantsNavLabel": "Assistants",
+  "assistantsPageSubtitle": "Browse and summon the assistant that fits your work. Summoning returns to the chat with that assistant; removing it restores the general mode.",
+  "assistantSummon": "Summon",
+  "assistantInUse": "In use",
+  "assistantDismiss": "Remove"
 }

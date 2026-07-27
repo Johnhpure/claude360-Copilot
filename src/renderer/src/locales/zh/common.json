@@ -2816,5 +2816,10 @@
   "assistantMyGroup": "我的助手",
   "assistantManageMy": "管理我的助手",
   "assistantMyGroupLoadFailed": "我的助手加载失败",
-  "assistantMyGroupRetry": "重试"
+  "assistantMyGroupRetry": "重试",
+  "assistantsNavLabel": "助手",
+  "assistantsPageSubtitle": "浏览并召唤适合当前工作的助手；召唤后回到对话页即以该助手开始新对话，移除后恢复通用模式。",
+  "assistantSummon": "召唤",
+  "assistantInUse": "使用中",
+  "assistantDismiss": "移除"
 }

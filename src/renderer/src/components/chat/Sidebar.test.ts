@@ -77,6 +77,7 @@ function renderSidebar(overrides?: Partial<Parameters<typeof Sidebar>[0]>): stri
       onOpenRequirementDraft: vi.fn(),
       onOpenSettings: vi.fn(),
       onOpenPlugins: vi.fn(),
+      onOpenAssistants: vi.fn(),
       onOpenMy: vi.fn(),
       myActive: false,
       onOpenCanvas: vi.fn(),
@@ -103,6 +104,11 @@ describe('Sidebar 第一阶段入口可见性(plan-04 Task5)', () => {
   it('展示「我的」入口', () => {
     const html = renderSidebar()
     expect(html).toContain('myPage')
+  })
+
+  it('展示「助手」清单页入口', () => {
+    const html = renderSidebar()
+    expect(html).toContain('assistantsNavLabel')
   })
 
   it('展示新增的生图(Canvas)/音乐(Music)入口', () => {

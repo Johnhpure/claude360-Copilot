@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import { lazy, memo, Suspense, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  Bot,
   Clock3,
   FileQuestion,
   ImagePlus,
@@ -49,7 +50,7 @@ const ConnectPhoneSidebarPanel = lazy(() =>
 type Props = {
   threads: NormalizedThread[]
   activeThreadId: string | null
-  activeView: 'chat' | 'write' | 'claw' | 'schedule' | 'workflow' | 'subagents'
+  activeView: 'chat' | 'write' | 'claw' | 'schedule' | 'workflow' | 'subagents' | 'assistants'
   connectPhoneSidebarOpen: boolean
   pluginsActive: boolean
   runtimeReady: boolean
@@ -68,6 +69,7 @@ type Props = {
   onOpenRequirementDraft: (draft: SddDraft) => void
   onOpenSettings: (section?: SettingsRouteSection) => void
   onOpenPlugins: () => void
+  onOpenAssistants: () => void
   onOpenMy: () => void
   myActive: boolean
   onOpenCanvas: () => void
@@ -113,6 +115,7 @@ function SidebarComponent({
   onOpenRequirementDraft,
   onOpenSettings,
   onOpenPlugins,
+  onOpenAssistants,
   onOpenMy,
   myActive,
   onOpenCanvas,
@@ -268,6 +271,17 @@ function SidebarComponent({
         {/* 区3 当前操作：与一级入口分隔隔离，按 activeFeature 显示矩阵渲染
             （claw/schedule/workflow 下矩阵为空，不渲染）。 */}
         <SidebarContextActions actions={contextActions} />
+
+        {/* 助手清单页入口：卡片式浏览与「召唤」，与 composer 内的助手选择器
+            共用同一 selectAssistant 语义（恒可见）。 */}
+        {isPrimaryRouteVisible('assistants') ? (
+          <SidebarCommandRow
+            icon={<Bot className="h-4 w-4" strokeWidth={1.75} />}
+            label={t('assistantsNavLabel')}
+            onClick={onOpenAssistants}
+            active={activeView === 'assistants'}
+          />
+        ) : null}
 
         {/* 隐藏≠删除:第一阶段不暴露插件/定时任务/Workflow 入口,
             但保留 onOpenPlugins/onScheduleOpen/onWorkflowOpen 等 handler 与 props。 */}

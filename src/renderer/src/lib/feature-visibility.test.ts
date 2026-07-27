@@ -14,12 +14,13 @@ describe('feature-visibility 第一阶段可见性策略', () => {
     expect(isPrimaryRouteVisible('workflow')).toBe(false)
   })
 
-  it('保留第一阶段可见入口:chat/write/my/canvas/music', () => {
+  it('保留第一阶段可见入口:chat/write/my/canvas/music/assistants', () => {
     expect(isPrimaryRouteVisible('chat')).toBe(true)
     expect(isPrimaryRouteVisible('write')).toBe(true)
     expect(isPrimaryRouteVisible('my')).toBe(true)
     expect(isPrimaryRouteVisible('canvas')).toBe(true)
     expect(isPrimaryRouteVisible('music')).toBe(true)
+    expect(isPrimaryRouteVisible('assistants')).toBe(true)
   })
 
   it('可见集合常量与断言函数一致(集中定义,避免各处硬编码)', () => {

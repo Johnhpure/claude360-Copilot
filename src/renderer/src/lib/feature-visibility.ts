@@ -12,10 +12,11 @@ import type { AppRoute } from '../store/chat-store-types'
  * - my:     我的(账号/密钥/额度)
  * - canvas: 生图工作台(plan-06 交付页面)
  * - music:  音乐工作台(plan-05 交付页面)
+ * - assistants: 助手清单页(侧栏入口,卡片式召唤)
  *
  * `settings` 不在本集合内:它由页面底部固定入口进入,不属于「主入口」门控范围。
  */
-export const PRIMARY_VISIBLE_ROUTES = ['chat', 'write', 'my', 'canvas', 'music'] as const
+export const PRIMARY_VISIBLE_ROUTES = ['chat', 'write', 'my', 'canvas', 'music', 'assistants'] as const
 
 export type PrimaryVisibleRoute = (typeof PRIMARY_VISIBLE_ROUTES)[number]
 

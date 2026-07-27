@@ -1,6 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs'
-import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { officialDocumentPersona } from './personas/official-document'
 
 /**
@@ -9,7 +7,10 @@ import { officialDocumentPersona } from './personas/official-document'
  * process documented in docs/evals/official-document/runbook.md.
  */
 
-const EVAL_DIR = resolve(process.cwd(), 'docs/evals/official-document')
+// 动态变量 specifier 绕过 tsconfig.web 的浏览器模块解析（仓库既有测试惯例，
+// 见 AnimatedWorkLogo.test.ts）；运行时 vitest 跑在 node 环境，导入总是成功。
+const nodeFsPromises = 'node:fs/promises'
+const EVAL_DIR_URL = new URL('../../../../../docs/evals/official-document/', import.meta.url)
 
 const DOCUMENT_TYPES = ['notice', 'request', 'report', 'letter', 'minutes', 'cross-type'] as const
 const MODES = ['draft', 'transform', 'rewrite', 'check', 'compare'] as const
@@ -35,15 +36,28 @@ type EvalFixture = {
   }
 }
 
-const rawFixtures = readFileSync(resolve(EVAL_DIR, 'fixtures.json'), 'utf8')
-const fixtures = JSON.parse(rawFixtures) as EvalFixture[]
+let rawFixtures = ''
+let fixtures: EvalFixture[] = []
+const assetExists: Record<string, boolean> = {}
+
+beforeAll(async () => {
+  const { readFile, access } = await import(/* @vite-ignore */ nodeFsPromises)
+  rawFixtures = await readFile(new URL('fixtures.json', EVAL_DIR_URL), 'utf8')
+  fixtures = JSON.parse(rawFixtures) as EvalFixture[]
+  for (const name of ['fixtures.json', 'rubric.md', 'runbook.md', 'results/.gitkeep']) {
+    assetExists[name] = await access(new URL(name, EVAL_DIR_URL)).then(
+      () => true,
+      () => false
+    )
+  }
+})
 
 describe('official-document eval assets exist', () => {
   it('ships fixtures, rubric, runbook, and the results directory', () => {
-    expect(existsSync(resolve(EVAL_DIR, 'fixtures.json'))).toBe(true)
-    expect(existsSync(resolve(EVAL_DIR, 'rubric.md'))).toBe(true)
-    expect(existsSync(resolve(EVAL_DIR, 'runbook.md'))).toBe(true)
-    expect(existsSync(resolve(EVAL_DIR, 'results/.gitkeep'))).toBe(true)
+    expect(assetExists['fixtures.json']).toBe(true)
+    expect(assetExists['rubric.md']).toBe(true)
+    expect(assetExists['runbook.md']).toBe(true)
+    expect(assetExists['results/.gitkeep']).toBe(true)
   })
 })
 

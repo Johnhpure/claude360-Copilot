@@ -58,6 +58,7 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
   | 'openSettings'
   | 'openPlugins'
   | 'openClaw'
+  | 'openAssistants'
   | 'openSchedule'
   | 'openWorkflow'
   | 'openInitialSetup'
@@ -239,6 +240,10 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
         route: 'plugins',
         pluginHostRoute: host ?? (state.route === 'claw' ? 'claw' : 'chat')
       })),
+
+    openAssistants: () => {
+      set({ route: 'assistants' })
+    },
 
     openClaw: () => {
       set({ route: 'claw' })

@@ -191,6 +191,13 @@ graph LR
     - 问题主要来自内容质量时优先迭代 persona/fixture，不提前建设助手商城、多运行时或复杂持久化。
     - _Exit gate: requirements 第 7 节全部有代码、测试或真实桌面证据。_
 
+- [x] 7. 侧栏助手清单页（修订新增，2026-07-27）
+  - [x] 7.1 `AppRoute` 增加 `assistants`、store 增加 `openAssistants`、主 Sidebar 增加恒可见「助手」入口（`SidebarCommandRow` + `PRIMARY_VISIBLE_ROUTES`）
+  - [x] 7.2 新增 `components/assistants/AssistantsView`：通用/内置/我的助手三组卡片，含名称、介绍、内置风险提示；悬停或聚焦显示「召唤」，使用中的专用助手卡片显示「移除」
+  - [x] 7.3 召唤/移除全部复用 `selectAssistant`（busy/pending 门禁、fail-closed、失败保护一并生效）；召唤成功后返回对话页开聊，移除即切回通用助手；不新增第二套 persona 状态或 HTTP/IPC
+  - [x] 7.4 中英文文案与测试：卡片构建纯函数、召唤/移除/禁用/加载失败渲染、侧栏入口可见性、`feature-visibility` 断言
+    - _Exit gate: 清单页仅浏览+召唤，无详情页/搜索/安装/商城；与 composer 选择器显示同一身份真相。_
+
 ---
 
 ## PR 评审清单

@@ -96,7 +96,7 @@ export type SettingsRouteSection =
   | 'updates'
   | 'terminal'
   | 'help'
-export type AppRoute = 'chat' | 'write' | 'settings' | 'plugins' | 'claw' | 'schedule' | 'workflow' | 'my' | 'music' | 'canvas'
+export type AppRoute = 'chat' | 'write' | 'settings' | 'plugins' | 'claw' | 'schedule' | 'workflow' | 'my' | 'music' | 'canvas' | 'assistants'
 export type PluginHostRoute = 'chat' | 'claw'
 
 /**
@@ -228,6 +228,8 @@ export type ChatState = {
   openSettings: (section?: SettingsRouteSection) => void
   openPlugins: (host?: PluginHostRoute) => void
   openClaw: () => void
+  /** 打开侧栏「助手」清单页（route: 'assistants'）。 */
+  openAssistants: () => void
   openSchedule: () => void
   openWorkflow: () => void
   refreshClawChannels: () => Promise<void>

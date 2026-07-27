@@ -150,6 +150,9 @@ const WorkflowView = lazy(() =>
 const MyPage = lazy(() =>
   import('./my/MyPage').then((module) => ({ default: module.MyPage }))
 )
+const AssistantsView = lazy(() =>
+  import('./assistants/AssistantsView').then((module) => ({ default: module.AssistantsView }))
+)
 const MusicWorkbench = lazy(() =>
   import('./music/MusicWorkbench').then((module) => ({ default: module.MusicWorkbench }))
 )
@@ -562,6 +565,7 @@ export function Workbench(): ReactElement {
     openPlugins,
     openClaw,
     openSchedule,
+    openAssistants,
     openWorkflow,
     chooseWorkspace,
     clawChannels,
@@ -626,6 +630,7 @@ export function Workbench(): ReactElement {
       openPlugins: s.openPlugins,
       openClaw: s.openClaw,
       openSchedule: s.openSchedule,
+      openAssistants: s.openAssistants,
       openWorkflow: s.openWorkflow,
       chooseWorkspace: s.chooseWorkspace,
       clawChannels: s.clawChannels,
@@ -2506,6 +2511,11 @@ export function Workbench(): ReactElement {
     openSchedule()
   })
 
+  const openAssistantsView = useStableCallback((): void => {
+    setConnectPhoneSidebarOpen(false)
+    openAssistants()
+  })
+
   const openWorkflowView = useStableCallback((): void => {
     setConnectPhoneSidebarOpen(false)
     openWorkflow()
@@ -2517,13 +2527,15 @@ export function Workbench(): ReactElement {
     setConnectPhoneSidebarOpen((open) => !open)
   })
 
-  const sidebarView: 'chat' | 'write' | 'claw' | 'schedule' | 'workflow' | 'subagents' =
+  const sidebarView: 'chat' | 'write' | 'claw' | 'schedule' | 'workflow' | 'subagents' | 'assistants' =
     route === 'claw' || (route === 'plugins' && pluginHostRoute === 'claw')
       ? 'claw'
       : route === 'schedule'
         ? 'schedule'
       : route === 'workflow'
         ? 'workflow'
+      : route === 'assistants'
+        ? 'assistants'
       : route === 'write'
         ? 'write'
         : 'chat'
@@ -2951,6 +2963,7 @@ export function Workbench(): ReactElement {
               onOpenRequirementDraft={handleOpenRequirementDraft}
               onOpenSettings={openSettings}
               onOpenPlugins={openPluginsView}
+              onOpenAssistants={openAssistantsView}
               onOpenMy={openMyView}
               myActive={route === 'my'}
               onOpenCanvas={openCanvasView}
@@ -3001,6 +3014,13 @@ export function Workbench(): ReactElement {
               leftSidebarCollapsed={leftSidebarCollapsed}
               onToggleLeftSidebar={toggleLeftSidebar}
               onOpenThread={openThread}
+            />
+          </Suspense>
+        ) : route === 'assistants' ? (
+          <Suspense fallback={<div className="h-full bg-ds-main" />}>
+            <AssistantsView
+              leftSidebarCollapsed={leftSidebarCollapsed}
+              onToggleLeftSidebar={toggleLeftSidebar}
             />
           </Suspense>
         ) : route === 'my' ? (
