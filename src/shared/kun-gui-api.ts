@@ -87,6 +87,8 @@ import type {
 } from './gui-update'
 import type {
   ClipboardImageReadResult,
+  LocalOfficeTextReadResult,
+  LocalOfficeTextTarget,
   LocalPdfTextReadResult,
   LocalPdfTextTarget,
   WorkspaceClipboardImageSavePayload,
@@ -538,6 +540,7 @@ export type KunGuiApi = {
   readWorkspaceImage: (options: WorkspaceFileTarget) => Promise<WorkspaceImageReadResult>
   readWorkspacePdf: (options: WorkspaceFileTarget) => Promise<WorkspacePdfReadResult>
   readLocalPdfText: (options: LocalPdfTextTarget) => Promise<LocalPdfTextReadResult>
+  readLocalOfficeText: (options: LocalOfficeTextTarget) => Promise<LocalOfficeTextReadResult>
   saveWorkspaceFileAs: (payload: WorkspaceFileSaveAsPayload) => Promise<WorkspaceFileSaveAsResult>
   writeWorkspaceFile: (payload: WorkspaceFileWritePayload) => Promise<WorkspaceFileWriteResult>
   createWorkspaceFile: (payload: WorkspaceFileCreatePayload) => Promise<WorkspaceFileCreateResult>

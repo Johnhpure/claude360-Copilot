@@ -185,10 +185,16 @@ export type ChatState = {
   composerPickList: string[]
   composerModelGroups: ModelProviderModelGroup[]
   /**
-   * Optional subagent profile id selected as the persona for the next new
-   * thread / next-turn override. Empty = use the runtime default.
+   * 当前选择的人设助手（内置 persona），'' = 不使用助手（默认）。
+   * 纯前端状态（localStorage 持久化），与设置中的 AI 助手（subagent
+   * profiles）无关，也不绑定线程——发送消息时按轮注入 persona 提示词。
    */
-  composerAgentId: string
+  personaAssistantId: string
+  /**
+   * 待填入对话输入框的草稿文本（一次性）。助手详情弹窗点击示例问题时写入，
+   * Workbench 监听到后填入 composer 并随即清空。'' = 无待填内容。
+   */
+  composerPrefill: string
   disabledSkillIds: string[]
   queuedMessages: QueuedUserMessage[]
   watchTurnCompletion: Record<string, boolean>
@@ -205,15 +211,9 @@ export type ChatState = {
   setError: (message: string | null) => void
   setComposerMode: (mode: 'plan' | 'agent') => void
   setComposerModel: (modelId: string, providerId?: string) => void
-  setComposerAgentId: (agentId: string) => void
   /**
-   * Select the assistant for the conversation surface (requirement 3.3A–D).
-   * No active thread: validates the selection and stores it as the pending
-   * `composerAgentId`. Active thread on the same assistant: no-op. Active
-   * thread on a different assistant: force-creates and activates a sibling
-   * thread in the same workspace (never mutating the old thread), keeping
-   * drafts/attachments untouched on failure. Switching is refused while a
-   * turn runs or an approval/user-input is pending.
+   * 选择/移除人设助手：校验后写入 `personaAssistantId` 并持久化。
+   * 不创建线程、不受运行状态限制，下一条消息即以新人设生效。
    */
   selectAssistant: (selectionId: string) => Promise<boolean>
   loadComposerModels: () => Promise<void>
@@ -230,6 +230,13 @@ export type ChatState = {
   openClaw: () => void
   /** 打开侧栏「助手」清单页（route: 'assistants'）。 */
   openAssistants: () => void
+  /**
+   * 召唤助手并把一条示例问题填入对话输入框：selectAssistant + 写入
+   * composerPrefill + 跳到对话页。失败时停留并由 error 提示。
+   */
+  summonAssistantWithPrompt: (selectionId: string, prompt: string) => Promise<void>
+  /** 读走并清空 composerPrefill（Workbench 填入 composer 后调用）。 */
+  consumeComposerPrefill: () => void
   openSchedule: () => void
   openWorkflow: () => void
   refreshClawChannels: () => Promise<void>
@@ -268,12 +275,6 @@ export type ChatState = {
     /** When true, checkout the selected branch into an isolated worktree. */
     useWorktreePool?: boolean
     worktreeBranch?: string
-    /**
-     * Optional subagent profile id to bind the new thread to. When set
-     * and the profile mode is 'primary' or 'all', the agent's
-     * providerId / model / systemPrompt are snapshotted onto the thread.
-     */
-    agentId?: string
     /**
      * 创建一条不绑定项目文件夹的对话会话:在 conversationWorkspaceRoot 下
      * 自动创建一个时间戳子目录作为工作目录。

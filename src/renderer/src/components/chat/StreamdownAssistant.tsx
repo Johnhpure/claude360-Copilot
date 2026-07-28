@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Streamdown, type StreamdownProps } from 'streamdown'
 import remarkGfm from 'remark-gfm'
 import { harden } from 'rehype-harden'
+import { createMathPlugin } from '@streamdown/math'
 import 'streamdown/styles.css'
+import 'katex/dist/katex.min.css'
+import { normalizeMathDelimiters } from './normalize-math-delimiters'
 import { parseFileReferenceHref, rehypeFileReferences } from '../../lib/file-references'
 import { useValidatedFileReference } from '../../lib/file-reference-validation'
 import { openWorkspacePathInEditor } from '../../lib/open-workspace-path'
@@ -110,6 +113,14 @@ const components = {
   a: StreamdownLink
 } satisfies StreamdownProps['components']
 
+// KaTeX math via Streamdown's opt-in plugin. singleDollarTextMath:true so inline
+// `$...$` renders too — the default only accepts block `$$...$$`, which alone
+// leaves most model-emitted inline formulas as raw text. `\(...\)` / `\[...\]`
+// are normalized to dollar syntax before rendering (remark-math ignores them).
+// katex.min.css is imported at module top; without it formulas render scrambled.
+const mathPlugin = createMathPlugin({ singleDollarTextMath: true })
+const plugins = { math: mathPlugin } satisfies StreamdownProps['plugins']
+
 type StreamdownLinkProps = ComponentPropsWithRef<'a'> & { node?: unknown }
 
 function StreamdownLink({
@@ -193,7 +204,8 @@ type Props = {
 }
 
 export function StreamdownAssistant({ text, streaming, className }: Props): ReactElement {
-  const pacedText = useTypewriterText(text, streaming)
+  const normalized = normalizeMathDelimiters(text)
+  const pacedText = useTypewriterText(normalized, streaming)
 
   return (
     <AssistantStreamingContext.Provider value={streaming}>
@@ -210,6 +222,7 @@ export function StreamdownAssistant({ text, streaming, className }: Props): Reac
         animated={false}
         remarkPlugins={[remarkGfm]}
         rehypePlugins={rehypePlugins}
+        plugins={plugins}
         components={components}
       >
         {pacedText}

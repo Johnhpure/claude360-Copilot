@@ -425,6 +425,25 @@ function isPdfAttachmentFile(file: File): boolean {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
 }
 
+const OFFICE_ATTACHMENT_EXTENSIONS = ['.docx', '.xlsx', '.xls', '.pptx']
+
+function isOfficeAttachmentFile(file: File): boolean {
+  const name = file.name.toLowerCase()
+  return OFFICE_ATTACHMENT_EXTENSIONS.some((ext) => name.endsWith(ext))
+}
+
+function officeMimeType(fileName: string): string {
+  const name = fileName.toLowerCase()
+  if (name.endsWith('.docx'))
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  if (name.endsWith('.xlsx'))
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  if (name.endsWith('.xls')) return 'application/vnd.ms-excel'
+  if (name.endsWith('.pptx'))
+    return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  return 'application/octet-stream'
+}
+
 function stripTransientAttachmentFields(attachments: AttachmentReference[]): AttachmentReference[] {
   return attachments.map(({ documentText: _documentText, ...attachment }) => attachment)
 }
@@ -693,6 +712,18 @@ export function Workbench(): ReactElement {
   /* Code 空态快捷任务卡填充模板后聚焦 composer 用的命令句柄
      （07-13 启动工作台联动，仅主聊天 composer 持有）。 */
   const composerRef = useRef<FloatingComposerHandle | null>(null)
+  // 助手详情弹窗「点示例直接提问」链路：summonAssistantWithPrompt 写入的一次性
+  // 草稿被这里读走填入 composer，随后清空，避免重复注入。
+  const composerPrefill = useChatStore((s) => s.composerPrefill)
+  const consumeComposerPrefill = useChatStore((s) => s.consumeComposerPrefill)
+  useEffect(() => {
+    if (!composerPrefill) return
+    setInput((current) =>
+      current.trim() ? `${current.trim()}\n\n${composerPrefill}` : composerPrefill
+    )
+    composerRef.current?.focus()
+    consumeComposerPrefill()
+  }, [composerPrefill, consumeComposerPrefill])
   const [useWorktreePool, setUseWorktreePool] = useState(false)
   const [worktreeBranch, setWorktreeBranch] = useState('')
   const [composerReasoningEffort, setComposerReasoningEffort] =
@@ -1350,6 +1381,27 @@ export function Workbench(): ReactElement {
             kind: 'document',
             name: file.name || fileNameFromPath(result.path),
             mimeType: 'application/pdf',
+            byteSize: result.size,
+            pageCount: result.pageCount,
+            truncated: result.truncated,
+            textPreview: documentText.slice(0, 240),
+            documentText
+          })
+          continue
+        }
+        if (isOfficeAttachmentFile(file)) {
+          if (!localFilePath || typeof window.kunGui?.readLocalOfficeText !== 'function') {
+            throw new Error(t('composerOfficeAttachmentUnavailable'))
+          }
+          const result = await window.kunGui.readLocalOfficeText({ path: localFilePath })
+          if (!result.ok) throw new Error(result.message)
+          const documentText = result.text.trim()
+          if (!documentText) throw new Error(t('composerOfficeAttachmentNoText'))
+          uploaded.push({
+            id: `doc_${result.mtimeMs}_${index}_${file.name || 'office'}`,
+            kind: 'document',
+            name: file.name || fileNameFromPath(result.path),
+            mimeType: officeMimeType(file.name || result.path),
             byteSize: result.size,
             pageCount: result.pageCount,
             truncated: result.truncated,

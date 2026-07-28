@@ -354,6 +354,7 @@ describe('Kun built-in tools', () => {
     })
     expect(Object.keys(toolRecord).sort()).toEqual([
       'bash',
+      'create_document',
       'edit',
       'find',
       'grep',
@@ -386,6 +387,7 @@ describe('Kun built-in tools', () => {
     const allDefinitions = createAllToolDefinitions()
     const expectedAllToolNames = [
       'bash',
+      'create_document',
       'edit',
       'find',
       'grep',

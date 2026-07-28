@@ -3,6 +3,7 @@ import {
   readStoredComposerMode
 } from './chat-store-helpers'
 import { defaultConversationWorkspaceRoot } from '../lib/workspace-path'
+import { readStoredPersonaAssistantId } from '../features/assistants'
 
 export function createInitialChatStoreState(workingDirectoryLabel: string) {
   return {
@@ -46,7 +47,8 @@ export function createInitialChatStoreState(workingDirectoryLabel: string) {
     composerMode: readStoredComposerMode(),
     composerModel: '',
     composerProviderId: '',
-    composerAgentId: '',
+    personaAssistantId: readStoredPersonaAssistantId(),
+    composerPrefill: '',
     composerPickList: mergeComposerPickList(false, []),
     composerModelGroups: [],
     disabledSkillIds: [],

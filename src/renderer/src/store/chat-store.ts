@@ -65,7 +65,6 @@ import {
   clearedThreadSelection,
   collectAssistantTextForTurn,
   findLatestUserBlockId,
-  findReusableEmptyThreadId,
   threadBelongsToWorkspace
 } from './chat-store-runtime-helpers'
 import {

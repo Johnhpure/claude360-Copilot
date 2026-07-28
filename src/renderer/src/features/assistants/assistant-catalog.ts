@@ -1,10 +1,14 @@
 import type { BuiltinAssistantDefinition } from './assistant-types'
+import { briefingPublicityPersona } from './personas/briefing-publicity'
 import { contractReviewPersona } from './personas/contract-review'
 import { dataAnalysisPersona } from './personas/data-analysis'
 import { meetingNotesPersona } from './personas/meeting-notes'
 import { officialDocumentPersona } from './personas/official-document'
+import { partyBuildingPersona } from './personas/party-building'
 import { reportSummaryPersona } from './personas/report-summary'
 import { researchPersona } from './personas/research'
+import { rulesRegulationsPersona } from './personas/rules-regulations'
+import { speechWritingPersona } from './personas/speech-writing'
 
 export type BuiltinAssistantCatalog = {
   items: readonly BuiltinAssistantDefinition[]
@@ -25,6 +29,18 @@ const RAW_BUILTIN_ASSISTANTS: readonly BuiltinAssistantDefinition[] = [
     nameKey: 'assistantNameOfficialDocument',
     descriptionKey: 'assistantDescriptionOfficialDocument',
     riskNoteKey: 'assistantRiskOfficialDocument',
+    capabilityKey: 'assistantCapabilityOfficialDocument',
+    strengthKeys: [
+      'assistantStrengthOfficialDocument1',
+      'assistantStrengthOfficialDocument2',
+      'assistantStrengthOfficialDocument3',
+      'assistantStrengthOfficialDocument4'
+    ],
+    exampleKeys: [
+      'assistantExampleOfficialDocument1',
+      'assistantExampleOfficialDocument2',
+      'assistantExampleOfficialDocument3'
+    ],
     systemPrompt: officialDocumentPersona
   },
   {
@@ -34,6 +50,18 @@ const RAW_BUILTIN_ASSISTANTS: readonly BuiltinAssistantDefinition[] = [
     nameKey: 'assistantNameMeetingNotes',
     descriptionKey: 'assistantDescriptionMeetingNotes',
     riskNoteKey: 'assistantRiskMeetingNotes',
+    capabilityKey: 'assistantCapabilityMeetingNotes',
+    strengthKeys: [
+      'assistantStrengthMeetingNotes1',
+      'assistantStrengthMeetingNotes2',
+      'assistantStrengthMeetingNotes3',
+      'assistantStrengthMeetingNotes4'
+    ],
+    exampleKeys: [
+      'assistantExampleMeetingNotes1',
+      'assistantExampleMeetingNotes2',
+      'assistantExampleMeetingNotes3'
+    ],
     systemPrompt: meetingNotesPersona
   },
   {
@@ -43,6 +71,18 @@ const RAW_BUILTIN_ASSISTANTS: readonly BuiltinAssistantDefinition[] = [
     nameKey: 'assistantNameReportSummary',
     descriptionKey: 'assistantDescriptionReportSummary',
     riskNoteKey: 'assistantRiskReportSummary',
+    capabilityKey: 'assistantCapabilityReportSummary',
+    strengthKeys: [
+      'assistantStrengthReportSummary1',
+      'assistantStrengthReportSummary2',
+      'assistantStrengthReportSummary3',
+      'assistantStrengthReportSummary4'
+    ],
+    exampleKeys: [
+      'assistantExampleReportSummary1',
+      'assistantExampleReportSummary2',
+      'assistantExampleReportSummary3'
+    ],
     systemPrompt: reportSummaryPersona
   },
   {
@@ -52,6 +92,18 @@ const RAW_BUILTIN_ASSISTANTS: readonly BuiltinAssistantDefinition[] = [
     nameKey: 'assistantNameResearch',
     descriptionKey: 'assistantDescriptionResearch',
     riskNoteKey: 'assistantRiskResearch',
+    capabilityKey: 'assistantCapabilityResearch',
+    strengthKeys: [
+      'assistantStrengthResearch1',
+      'assistantStrengthResearch2',
+      'assistantStrengthResearch3',
+      'assistantStrengthResearch4'
+    ],
+    exampleKeys: [
+      'assistantExampleResearch1',
+      'assistantExampleResearch2',
+      'assistantExampleResearch3'
+    ],
     systemPrompt: researchPersona
   },
   {
@@ -61,6 +113,18 @@ const RAW_BUILTIN_ASSISTANTS: readonly BuiltinAssistantDefinition[] = [
     nameKey: 'assistantNameDataAnalysis',
     descriptionKey: 'assistantDescriptionDataAnalysis',
     riskNoteKey: 'assistantRiskDataAnalysis',
+    capabilityKey: 'assistantCapabilityDataAnalysis',
+    strengthKeys: [
+      'assistantStrengthDataAnalysis1',
+      'assistantStrengthDataAnalysis2',
+      'assistantStrengthDataAnalysis3',
+      'assistantStrengthDataAnalysis4'
+    ],
+    exampleKeys: [
+      'assistantExampleDataAnalysis1',
+      'assistantExampleDataAnalysis2',
+      'assistantExampleDataAnalysis3'
+    ],
     systemPrompt: dataAnalysisPersona
   },
   {
@@ -70,7 +134,103 @@ const RAW_BUILTIN_ASSISTANTS: readonly BuiltinAssistantDefinition[] = [
     nameKey: 'assistantNameContractReview',
     descriptionKey: 'assistantDescriptionContractReview',
     riskNoteKey: 'assistantRiskContractReview',
+    capabilityKey: 'assistantCapabilityContractReview',
+    strengthKeys: [
+      'assistantStrengthContractReview1',
+      'assistantStrengthContractReview2',
+      'assistantStrengthContractReview3',
+      'assistantStrengthContractReview4'
+    ],
+    exampleKeys: [
+      'assistantExampleContractReview1',
+      'assistantExampleContractReview2',
+      'assistantExampleContractReview3'
+    ],
     systemPrompt: contractReviewPersona
+  },
+  {
+    id: 'builtin.speech-writing',
+    version: 1,
+    order: 70,
+    nameKey: 'assistantNameSpeechWriting',
+    descriptionKey: 'assistantDescriptionSpeechWriting',
+    riskNoteKey: 'assistantRiskSpeechWriting',
+    capabilityKey: 'assistantCapabilitySpeechWriting',
+    strengthKeys: [
+      'assistantStrengthSpeechWriting1',
+      'assistantStrengthSpeechWriting2',
+      'assistantStrengthSpeechWriting3',
+      'assistantStrengthSpeechWriting4'
+    ],
+    exampleKeys: [
+      'assistantExampleSpeechWriting1',
+      'assistantExampleSpeechWriting2',
+      'assistantExampleSpeechWriting3'
+    ],
+    systemPrompt: speechWritingPersona
+  },
+  {
+    id: 'builtin.rules-regulations',
+    version: 1,
+    order: 80,
+    nameKey: 'assistantNameRulesRegulations',
+    descriptionKey: 'assistantDescriptionRulesRegulations',
+    riskNoteKey: 'assistantRiskRulesRegulations',
+    capabilityKey: 'assistantCapabilityRulesRegulations',
+    strengthKeys: [
+      'assistantStrengthRulesRegulations1',
+      'assistantStrengthRulesRegulations2',
+      'assistantStrengthRulesRegulations3',
+      'assistantStrengthRulesRegulations4'
+    ],
+    exampleKeys: [
+      'assistantExampleRulesRegulations1',
+      'assistantExampleRulesRegulations2',
+      'assistantExampleRulesRegulations3'
+    ],
+    systemPrompt: rulesRegulationsPersona
+  },
+  {
+    id: 'builtin.briefing-publicity',
+    version: 1,
+    order: 90,
+    nameKey: 'assistantNameBriefingPublicity',
+    descriptionKey: 'assistantDescriptionBriefingPublicity',
+    riskNoteKey: 'assistantRiskBriefingPublicity',
+    capabilityKey: 'assistantCapabilityBriefingPublicity',
+    strengthKeys: [
+      'assistantStrengthBriefingPublicity1',
+      'assistantStrengthBriefingPublicity2',
+      'assistantStrengthBriefingPublicity3',
+      'assistantStrengthBriefingPublicity4'
+    ],
+    exampleKeys: [
+      'assistantExampleBriefingPublicity1',
+      'assistantExampleBriefingPublicity2',
+      'assistantExampleBriefingPublicity3'
+    ],
+    systemPrompt: briefingPublicityPersona
+  },
+  {
+    id: 'builtin.party-building',
+    version: 1,
+    order: 100,
+    nameKey: 'assistantNamePartyBuilding',
+    descriptionKey: 'assistantDescriptionPartyBuilding',
+    riskNoteKey: 'assistantRiskPartyBuilding',
+    capabilityKey: 'assistantCapabilityPartyBuilding',
+    strengthKeys: [
+      'assistantStrengthPartyBuilding1',
+      'assistantStrengthPartyBuilding2',
+      'assistantStrengthPartyBuilding3',
+      'assistantStrengthPartyBuilding4'
+    ],
+    exampleKeys: [
+      'assistantExamplePartyBuilding1',
+      'assistantExamplePartyBuilding2',
+      'assistantExamplePartyBuilding3'
+    ],
+    systemPrompt: partyBuildingPersona
   }
 ]
 
@@ -94,6 +254,15 @@ function validateDefinition(
   if (!definition.nameKey.trim()) errors.push(`nameKey must not be empty: ${id}`)
   if (!definition.descriptionKey.trim()) errors.push(`descriptionKey must not be empty: ${id}`)
   if (!definition.riskNoteKey.trim()) errors.push(`riskNoteKey must not be empty: ${id}`)
+  if (!definition.capabilityKey.trim()) errors.push(`capabilityKey must not be empty: ${id}`)
+  if (definition.strengthKeys.length === 0) errors.push(`strengthKeys must not be empty: ${id}`)
+  if (definition.strengthKeys.some((key) => !key.trim())) {
+    errors.push(`strengthKeys must not contain blanks: ${id}`)
+  }
+  if (definition.exampleKeys.length === 0) errors.push(`exampleKeys must not be empty: ${id}`)
+  if (definition.exampleKeys.some((key) => !key.trim())) {
+    errors.push(`exampleKeys must not contain blanks: ${id}`)
+  }
   if (!definition.systemPrompt.trim()) errors.push(`systemPrompt must not be empty: ${id}`)
   return errors
 }

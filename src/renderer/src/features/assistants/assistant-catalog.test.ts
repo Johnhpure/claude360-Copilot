@@ -15,7 +15,11 @@ const EXPECTED_IDS = [
   'builtin.report-summary',
   'builtin.research',
   'builtin.data-analysis',
-  'builtin.contract-review'
+  'builtin.contract-review',
+  'builtin.speech-writing',
+  'builtin.rules-regulations',
+  'builtin.briefing-publicity',
+  'builtin.party-building'
 ] as const
 
 function copyDefinition(
@@ -25,9 +29,11 @@ function copyDefinition(
 }
 
 describe('builtin assistant catalog', () => {
-  it('publishes exactly six stable assistants in deterministic order', () => {
+  it('publishes exactly ten stable assistants in deterministic order', () => {
     expect(builtinAssistants.map((item) => item.id)).toEqual(EXPECTED_IDS)
-    expect(builtinAssistants.map((item) => item.order)).toEqual([10, 20, 30, 40, 50, 60])
+    expect(builtinAssistants.map((item) => item.order)).toEqual([
+      10, 20, 30, 40, 50, 60, 70, 80, 90, 100
+    ])
     expect(builtinAssistants.every((item) => item.version === 1)).toBe(true)
     expect(new Set(builtinAssistants.map((item) => item.id)).size).toBe(EXPECTED_IDS.length)
     expect(Object.isFrozen(builtinAssistants)).toBe(true)
@@ -44,8 +50,11 @@ describe('builtin assistant catalog', () => {
         expect(enMessages[key], `missing en locale key ${key}`).toEqual(expect.any(String))
       }
     }
-    expect(zhMessages.assistantNameGeneral).toEqual(expect.any(String))
-    expect(enMessages.assistantNameGeneral).toEqual(expect.any(String))
+    // 「通用助手」概念已删除：默认态是不使用任何助手（assistantNone）。
+    expect(zhMessages.assistantNameGeneral).toBeUndefined()
+    expect(enMessages.assistantNameGeneral).toBeUndefined()
+    expect(zhMessages.assistantNone).toEqual(expect.any(String))
+    expect(enMessages.assistantNone).toEqual(expect.any(String))
   })
 
   it('fails fast for malformed definitions in strict mode', () => {

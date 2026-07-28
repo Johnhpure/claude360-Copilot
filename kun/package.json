@@ -71,7 +71,10 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.10.0",
     "diff": "^8.0.4",
+    "docx": "^9.7.1",
+    "exceljs": "^4.4.0",
     "jimp": "^1.6.0",
+    "pptxgenjs": "^4.0.1",
     "proxy-agent": "^8.0.2",
     "zod": "^4.4.3"
   },

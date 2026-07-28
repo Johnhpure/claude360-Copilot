@@ -44,6 +44,7 @@ function buildHarness(): {
     error: 'previous error',
     lastSeq: 0,
     loadComposerModels: vi.fn(async () => undefined),
+    personaAssistantId: '',
     queuedMessages: [],
     recoverActiveTurn: vi.fn(async () => true),
     refreshThreads: vi.fn(async () => undefined),
@@ -674,32 +675,26 @@ describe('chat-store-thread-actions createThread conversation mode', () => {
   })
 })
 
-describe('chat-store-thread-actions assistant persona (PR-2)', () => {
+describe('chat-store-thread-actions persona assistant', () => {
   const OFFICIAL_DOC = 'builtin.official-document'
   const officialDocPersona = builtinAssistantById.get(OFFICIAL_DOC)?.systemPrompt ?? ''
 
-  const writerProfile = {
-    id: 'custom-writer',
-    enabled: true,
-    name: 'Writer',
-    mode: 'primary' as const,
-    toolPolicy: 'inherit' as const,
-    providerId: 'deepseek',
-    model: 'deepseek-v4-pro',
-    systemPrompt: 'You are a careful writer.'
-  }
-
-  function settingsPayload(profiles: unknown[] = [writerProfile]) {
+  function settingsPayload() {
     return {
       workspaceRoot: '/workspace/deepseek-gui',
       conversationWorkspaceRoot: '~/conversations',
       codePromptPrefix: '',
-      agents: { kun: { providerId: '', model: '', subagents: { enabled: true, profiles } } }
+      agents: { kun: { providerId: '', model: '' } }
     }
   }
 
   function stubKunGui(overrides: Record<string, unknown> = {}) {
     vi.stubGlobal('window', {
+      localStorage: {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+        removeItem: vi.fn()
+      },
       kunGui: {
         getSettings: vi.fn(async () => settingsPayload()),
         saveSettingsSilent: vi.fn(async () => ({})),
@@ -711,17 +706,16 @@ describe('chat-store-thread-actions assistant persona (PR-2)', () => {
     return (window as unknown as { kunGui: Record<string, ReturnType<typeof vi.fn>> }).kunGui
   }
 
-  function personaEchoProvider(overrides: Record<string, unknown> = {}) {
+  function plainProvider(overrides: Record<string, unknown> = {}) {
     return {
       connect: vi.fn(async () => undefined),
-      createThread: vi.fn(async (input: { workspace?: string; agentId?: string }) => ({
+      createThread: vi.fn(async (input: { workspace?: string }) => ({
         id: 'thr_new',
         title: '',
         updatedAt: '2026-07-24T00:00:00.000Z',
         model: 'deepseek-v4-pro',
         mode: 'agent',
-        workspace: input.workspace,
-        ...(input.agentId ? { agentId: input.agentId } : {})
+        workspace: input.workspace
       })),
       deleteThread: vi.fn(async () => undefined),
       getThreadDetail: vi.fn(async () => ({ blocks: [], latestSeq: 0, threadStatus: 'idle' })),
@@ -759,582 +753,153 @@ describe('chat-store-thread-actions assistant persona (PR-2)', () => {
     vi.unstubAllGlobals()
   })
 
-  it('creates a conversation thread with the builtin persona picked via composerAgentId', async () => {
-    const provider = personaEchoProvider()
-    registryMock.getProvider.mockReturnValue(provider)
-    stubKunGui({
-      createConversationWorkspace: vi.fn(async () => ({ ok: true, path: '/conv/20260724' }))
-    })
-    const { actions, state } = buildHarness()
-    state.activeThreadId = null
-    state.threads = []
-    state.composerAgentId = OFFICIAL_DOC
-    state.selectThread = vi.fn(async () => undefined) as never
-
-    await actions.createThread({ conversation: true })
-
-    expect(provider.createThread).toHaveBeenCalledWith(expect.objectContaining({
-      workspace: '/conv/20260724',
-      agentId: OFFICIAL_DOC,
-      systemPrompt: officialDocPersona
-    }))
-    expect(state.activeThreadId).toBe('thr_new')
-  })
-
-  it('honors an explicit empty agentId as the general assistant without falling back', async () => {
-    const provider = personaEchoProvider()
-    registryMock.getProvider.mockReturnValue(provider)
-    stubKunGui({
-      createConversationWorkspace: vi.fn(async () => ({ ok: true, path: '/conv/20260724' }))
-    })
-    const { actions, state } = buildHarness()
-    state.threads = [{ ...thread('thr_existing'), agentId: OFFICIAL_DOC }]
-    state.composerAgentId = OFFICIAL_DOC
-    state.selectThread = vi.fn(async () => undefined) as never
-
-    await actions.createThread({ conversation: true, agentId: '' })
-
-    const input = provider.createThread.mock.calls[0][0] as Record<string, unknown>
-    expect(input.agentId).toBeUndefined()
-    expect(input.systemPrompt).toBeUndefined()
-    expect(state.activeThreadId).toBe('thr_new')
-  })
-
-  it('snapshots an eligible custom profile on the plain workspace path', async () => {
-    const provider = personaEchoProvider()
-    registryMock.getProvider.mockReturnValue(provider)
+  it('selectAssistant stores the selection as pure local state, even mid-turn or offline', async () => {
     stubKunGui()
+    registryMock.getProvider.mockReturnValue(plainProvider())
     const { actions, state } = buildHarness()
-    state.activeThreadId = null
-    state.threads = []
-    state.composerAgentId = 'custom-writer'
-    state.selectThread = vi.fn(async () => undefined) as never
+    state.busy = true
+    state.runtimeConnection = 'checking'
+    state.personaAssistantId = ''
 
-    await actions.createThread({ forceNew: true })
+    await expect(actions.selectAssistant(OFFICIAL_DOC)).resolves.toBe(true)
 
-    expect(provider.createThread).toHaveBeenCalledWith(expect.objectContaining({
-      workspace: '/workspace/deepseek-gui',
-      agentId: 'custom-writer',
-      providerId: 'deepseek',
-      model: 'deepseek-v4-pro',
-      systemPrompt: 'You are a careful writer.'
-    }))
-    expect(state.activeThreadId).toBe('thr_new')
+    expect(state.personaAssistantId).toBe(OFFICIAL_DOC)
+    expect(state.error).toBeNull()
+    expect(window.localStorage.setItem).toHaveBeenCalledWith(
+      'c360.personaAssistantId',
+      OFFICIAL_DOC
+    )
   })
 
-  it('prefers the active thread agentId over the composer pending selection', async () => {
-    const provider = personaEchoProvider({
-      createThread: vi.fn(async (input: { workspace?: string; agentId?: string }) => ({
-        id: 'thr_new',
-        title: '',
-        updatedAt: '2026-07-24T00:00:00.000Z',
-        model: 'deepseek-v4-pro',
-        mode: 'agent',
-        workspace: input.workspace,
-        ...(input.agentId ? { agentId: input.agentId } : {})
-      }))
-    })
-    registryMock.getProvider.mockReturnValue(provider)
+  it('selectAssistant("") clears the selection back to the default (no assistant)', async () => {
     stubKunGui()
+    registryMock.getProvider.mockReturnValue(plainProvider())
     const { actions, state } = buildHarness()
-    state.threads = [{ ...thread('thr_existing'), agentId: 'custom-writer' }]
-    state.composerAgentId = OFFICIAL_DOC
-    state.selectThread = vi.fn(async () => undefined) as never
+    state.busy = false
+    state.personaAssistantId = OFFICIAL_DOC
 
-    await actions.createThread({ forceNew: true })
+    await expect(actions.selectAssistant('')).resolves.toBe(true)
 
-    expect(provider.createThread).toHaveBeenCalledWith(expect.objectContaining({
-      agentId: 'custom-writer',
-      systemPrompt: 'You are a careful writer.'
-    }))
+    expect(state.personaAssistantId).toBe('')
+    expect(window.localStorage.removeItem).toHaveBeenCalledWith('c360.personaAssistantId')
   })
 
-  it('fails closed without creating a thread when the selection is invalid', async () => {
-    const provider = personaEchoProvider()
-    registryMock.getProvider.mockReturnValue(provider)
+  it('selectAssistant fails closed for an unknown id without touching the current selection', async () => {
     stubKunGui()
+    registryMock.getProvider.mockReturnValue(plainProvider())
     const { actions, state } = buildHarness()
-    state.activeThreadId = null
-    state.threads = []
-    state.composerAgentId = 'ghost-profile'
+    state.busy = false
+    state.personaAssistantId = OFFICIAL_DOC
 
-    await actions.createThread({ forceNew: true })
+    await expect(actions.selectAssistant('ghost-profile')).resolves.toBe(false)
 
-    expect(provider.createThread).not.toHaveBeenCalled()
-    expect(state.activeThreadId).toBeNull()
+    expect(state.personaAssistantId).toBe(OFFICIAL_DOC)
     expect(state.error).toContain('ghost-profile')
   })
 
-  it('deletes and does not activate a thread whose returned agentId mismatches', async () => {
-    const provider = personaEchoProvider({
-      createThread: vi.fn(async (input: { workspace?: string }) => ({
-        id: 'thr_wrong',
-        title: '',
-        updatedAt: '2026-07-24T00:00:00.000Z',
-        model: 'deepseek-v4-pro',
-        mode: 'agent',
-        workspace: input.workspace
-      }))
-    })
-    registryMock.getProvider.mockReturnValue(provider)
+  it('selectAssistant never creates a thread — switching keeps the active conversation', async () => {
     stubKunGui()
-    const selectThread = vi.fn(async () => undefined)
-    const { actions, state } = buildHarness()
-    state.activeThreadId = null
-    state.threads = []
-    state.composerAgentId = OFFICIAL_DOC
-    state.selectThread = selectThread as never
-
-    await actions.createThread({ forceNew: true })
-
-    expect(provider.deleteThread).toHaveBeenCalledWith('thr_wrong')
-    expect(state.activeThreadId).toBeNull()
-    expect(selectThread).not.toHaveBeenCalled()
-    expect(state.error).toBeTruthy()
-  })
-
-  it('applies the persona to a worktree pool thread bound to the acquired worktree', async () => {
-    const provider = personaEchoProvider()
+    const provider = plainProvider()
     registryMock.getProvider.mockReturnValue(provider)
-    stubKunGui({
-      checkoutGitBranchWorktree: vi.fn(async () => ({
-        ok: true,
-        sourceRepositoryRoot: '/workspace/deepseek-gui',
-        worktreePath: '/workspace/.worktrees/main',
-        currentBranch: 'main'
-      }))
-    })
-    const { actions, state } = buildHarness()
-    state.activeThreadId = null
-    state.threads = []
-    state.composerAgentId = OFFICIAL_DOC
-    state.selectThread = vi.fn(async () => undefined) as never
-
-    await actions.createThread({
-      useWorktreePool: true,
-      worktreeBranch: 'main',
-      workspaceRoot: '/workspace/deepseek-gui'
-    })
-
-    expect(provider.createThread).toHaveBeenCalledWith(expect.objectContaining({
-      workspace: '/workspace/.worktrees/main',
-      agentId: OFFICIAL_DOC,
-      systemPrompt: officialDocPersona
-    }))
-    expect(state.activeThreadId).toBe('thr_new')
-  })
-
-  it('sends the first message onto a new thread bound to the composer-picked builtin assistant', async () => {
-    const provider = personaEchoProvider()
-    registryMock.getProvider.mockReturnValue(provider)
-    stubKunGui()
     const { actions, state } = buildHarness()
     state.busy = false
-    state.activeThreadId = null
-    state.threads = []
-    state.composerAgentId = OFFICIAL_DOC
+    state.personaAssistantId = ''
+
+    await expect(actions.selectAssistant(OFFICIAL_DOC)).resolves.toBe(true)
+
+    expect(provider.createThread).not.toHaveBeenCalled()
+    expect(state.activeThreadId).toBe('thr_existing')
+  })
+
+  it('injects the persona prompt per turn while showing the user text unchanged', async () => {
+    stubKunGui()
+    const provider = plainProvider()
+    registryMock.getProvider.mockReturnValue(provider)
+    const { actions, state } = buildHarness()
+    state.busy = false
+    state.personaAssistantId = OFFICIAL_DOC
 
     await expect(actions.sendMessage('draft a notice', 'agent')).resolves.toBe(true)
 
-    expect(provider.createThread).toHaveBeenCalledWith(expect.objectContaining({
-      agentId: OFFICIAL_DOC,
-      systemPrompt: officialDocPersona
-    }))
-    expect(provider.sendUserMessage).toHaveBeenCalledWith(
-      'thr_new',
-      expect.any(String),
-      expect.anything()
-    )
-    expect(state.activeThreadId).toBe('thr_new')
+    const [, runtimeText, options] = provider.sendUserMessage.mock.calls[0] as unknown as [
+      string,
+      string,
+      { displayText?: string }
+    ]
+    expect(runtimeText).toContain('[Assistant persona instructions]')
+    expect(runtimeText).toContain(officialDocPersona.trim().slice(0, 40))
+    expect(runtimeText.endsWith('draft a notice')).toBe(true)
+    expect(options.displayText).toBe('draft a notice')
   })
 
-  it('re-reads fresh settings on first send and fails closed when the profile was deleted', async () => {
-    const provider = personaEchoProvider()
-    registryMock.getProvider.mockReturnValue(provider)
-    const kunGui = stubKunGui()
-    // Simulate: the profile existed when the user picked it (cached settings)…
-    await rendererRuntimeClient.getSettings()
-    // …but has been deleted by the time the first message is sent.
-    kunGui.getSettings.mockImplementation(async () => settingsPayload([]))
-    const { actions, state } = buildHarness()
-    state.busy = false
-    state.activeThreadId = null
-    state.threads = []
-    state.composerAgentId = 'custom-writer'
-
-    await expect(actions.sendMessage('hello there', 'agent')).resolves.toBe(false)
-
-    expect(provider.createThread).not.toHaveBeenCalled()
-    expect(provider.sendUserMessage).not.toHaveBeenCalled()
-    expect(state.activeThreadId).toBeNull()
-    expect(state.blocks.some((block) => block.kind === 'user')).toBe(false)
-    expect(state.busy).toBe(false)
-    expect(state.error).toContain('custom-writer')
-  })
-
-  it('does not reuse an assistant-bound empty thread for a general first send', async () => {
-    const provider = personaEchoProvider()
-    registryMock.getProvider.mockReturnValue(provider)
+  it('sends the plain user text when no assistant is selected (default)', async () => {
     stubKunGui()
+    const provider = plainProvider()
+    registryMock.getProvider.mockReturnValue(provider)
     const { actions, state } = buildHarness()
     state.busy = false
-    state.activeThreadId = null
-    state.threads = [emptyPersonaThread('thr_persona_empty')]
-    state.composerAgentId = ''
+    state.personaAssistantId = ''
 
     await expect(actions.sendMessage('general question', 'agent')).resolves.toBe(true)
 
-    // The persona thread is filtered out before any emptiness probe.
-    expect(provider.getThreadDetail).not.toHaveBeenCalled()
+    const [, runtimeText] = provider.sendUserMessage.mock.calls[0] as unknown as [string, string]
+    expect(runtimeText).toBe('general question')
+  })
+
+  it('creates first-send threads without any persona fields', async () => {
+    stubKunGui()
+    const provider = plainProvider()
+    registryMock.getProvider.mockReturnValue(provider)
+    const { actions, state } = buildHarness()
+    state.busy = false
+    state.activeThreadId = null
+    state.threads = []
+    state.personaAssistantId = OFFICIAL_DOC
+
+    await expect(actions.sendMessage('draft a notice', 'agent')).resolves.toBe(true)
+
     const input = provider.createThread.mock.calls[0][0] as Record<string, unknown>
     expect(input.agentId).toBeUndefined()
     expect(input.systemPrompt).toBeUndefined()
-    expect(provider.sendUserMessage).toHaveBeenCalledWith('thr_new', expect.any(String), expect.anything())
+    expect(state.activeThreadId).toBe('thr_new')
   })
 
-  it('reuses an empty thread only when its persona snapshot matches the selection', async () => {
-    const provider = personaEchoProvider()
-    registryMock.getProvider.mockReturnValue(provider)
+  it('does not reuse a legacy persona-bound empty thread on first send', async () => {
     stubKunGui()
+    const provider = plainProvider()
+    registryMock.getProvider.mockReturnValue(provider)
     const { actions, state } = buildHarness()
     state.busy = false
     state.activeThreadId = null
     state.threads = [emptyPersonaThread('thr_persona_empty')]
-    state.composerAgentId = OFFICIAL_DOC
+    state.personaAssistantId = ''
 
-    await expect(actions.sendMessage('draft a notice', 'agent')).resolves.toBe(true)
+    await expect(actions.sendMessage('general question', 'agent')).resolves.toBe(true)
 
-    expect(provider.createThread).not.toHaveBeenCalled()
-    expect(provider.sendUserMessage).toHaveBeenCalledWith(
-      'thr_persona_empty',
-      expect.any(String),
-      expect.anything()
-    )
-    expect(state.activeThreadId).toBe('thr_persona_empty')
+    // The legacy persona thread is filtered out before any emptiness probe.
+    expect(provider.getThreadDetail).not.toHaveBeenCalled()
+    expect(provider.sendUserMessage).toHaveBeenCalledWith('thr_new', expect.any(String), expect.anything())
   })
 
-  it('rolls back the optimistic block and cleans up when the created thread mismatches on first send', async () => {
-    const provider = personaEchoProvider({
-      createThread: vi.fn(async (input: { workspace?: string }) => ({
-        id: 'thr_wrong',
-        title: '',
-        updatedAt: '2026-07-24T00:00:00.000Z',
-        model: 'deepseek-v4-pro',
-        mode: 'agent',
-        workspace: input.workspace
-      }))
-    })
-    registryMock.getProvider.mockReturnValue(provider)
-    stubKunGui()
-    const { actions, state } = buildHarness()
-    state.busy = false
-    state.activeThreadId = null
-    state.threads = []
-    state.composerAgentId = OFFICIAL_DOC
-
-    await expect(actions.sendMessage('draft a notice', 'agent')).resolves.toBe(false)
-
-    expect(provider.deleteThread).toHaveBeenCalledWith('thr_wrong')
-    expect(provider.sendUserMessage).not.toHaveBeenCalled()
-    expect(state.activeThreadId).toBeNull()
-    expect(state.blocks.some((block) => block.kind === 'user')).toBe(false)
-    expect(state.busy).toBe(false)
-    expect(state.error).toBeTruthy()
-  })
-})
-
-describe('chat-store-thread-actions selectAssistant (PR-3)', () => {
-  const OFFICIAL_DOC = 'builtin.official-document'
-  const officialDocPersona = builtinAssistantById.get(OFFICIAL_DOC)?.systemPrompt ?? ''
-
-  const writerProfile = {
-    id: 'custom-writer',
-    enabled: true,
-    name: 'Writer',
-    mode: 'primary' as const,
-    toolPolicy: 'inherit' as const,
-    systemPrompt: 'You are a careful writer.'
-  }
-
-  function stubKunGui(profiles: unknown[] = [writerProfile]) {
-    vi.stubGlobal('window', {
-      kunGui: {
-        getSettings: vi.fn(async () => ({
-          workspaceRoot: '/workspace/deepseek-gui',
-          codePromptPrefix: '',
-          agents: { kun: { providerId: '', model: '', subagents: { enabled: true, profiles } } }
-        })),
-        logError: vi.fn(async () => undefined)
-      }
-    })
-  }
-
-  function echoProvider() {
-    return {
-      createThread: vi.fn(async (input: { workspace?: string; agentId?: string }) => ({
-        id: 'thr_sibling',
-        title: '',
-        updatedAt: '2026-07-25T00:00:00.000Z',
-        model: 'deepseek-v4-pro',
-        mode: 'agent',
-        workspace: input.workspace,
-        ...(input.agentId ? { agentId: input.agentId } : {})
-      })),
-      deleteThread: vi.fn(async () => undefined),
+  it('selectThread leaves the persona selection untouched', async () => {
+    registryMock.getProvider.mockReturnValue({
       getThreadDetail: vi.fn(async () => ({ blocks: [], latestSeq: 0, threadStatus: 'idle' })),
       subscribeThreadEvents: vi.fn(async () => undefined)
-    }
-  }
-
-  beforeEach(() => {
-    rendererRuntimeClient.invalidateSettings()
-    registryMock.getProvider.mockReset()
-  })
-
-  afterEach(() => {
-    rendererRuntimeClient.invalidateSettings()
-    vi.unstubAllGlobals()
-  })
-
-  it('refuses to switch while a turn is running', async () => {
-    stubKunGui()
-    registryMock.getProvider.mockReturnValue(echoProvider())
-    const { actions, state } = buildHarness()
-    state.busy = true
-    state.composerAgentId = ''
-
-    await expect(actions.selectAssistant(OFFICIAL_DOC)).resolves.toBe(false)
-
-    expect(state.composerAgentId).toBe('')
-    expect(state.activeThreadId).toBe('thr_existing')
-    expect(state.error).toBeTruthy()
-  })
-
-  it('refuses to switch while an approval or user input is pending', async () => {
-    stubKunGui()
-    registryMock.getProvider.mockReturnValue(echoProvider())
-    const { actions, state } = buildHarness()
-    state.busy = false
-    state.blocks = [
-      { kind: 'user', id: 'u1', createdAt: 't', text: 'do it' },
-      { kind: 'approval', id: 'ap1', createdAt: 't', status: 'pending' }
-    ] as never
-    state.composerAgentId = ''
-
-    await expect(actions.selectAssistant(OFFICIAL_DOC)).resolves.toBe(false)
-
-    expect(state.composerAgentId).toBe('')
-    expect(state.error).toBeTruthy()
-  })
-
-  it('stages the pending selection without creating a thread when none is active', async () => {
-    stubKunGui()
-    const provider = echoProvider()
-    registryMock.getProvider.mockReturnValue(provider)
-    const { actions, state } = buildHarness()
-    state.busy = false
-    state.activeThreadId = null
-    state.threads = []
-    state.composerAgentId = ''
-
-    await expect(actions.selectAssistant(OFFICIAL_DOC)).resolves.toBe(true)
-
-    expect(state.composerAgentId).toBe(OFFICIAL_DOC)
-    expect(provider.createThread).not.toHaveBeenCalled()
-    expect(state.activeThreadId).toBeNull()
-    expect(state.error).toBeNull()
-  })
-
-  it('fails closed and keeps the pending selection when the picked profile is invalid', async () => {
-    stubKunGui([])
-    const provider = echoProvider()
-    registryMock.getProvider.mockReturnValue(provider)
-    const { actions, state } = buildHarness()
-    state.busy = false
-    state.activeThreadId = null
-    state.threads = []
-    state.composerAgentId = OFFICIAL_DOC
-
-    await expect(actions.selectAssistant('custom-writer')).resolves.toBe(false)
-
-    expect(state.composerAgentId).toBe(OFFICIAL_DOC)
-    expect(provider.createThread).not.toHaveBeenCalled()
-    expect(state.error).toContain('custom-writer')
-  })
-
-  it('is a no-op when the active thread already uses the selected assistant', async () => {
-    stubKunGui()
-    const provider = echoProvider()
-    registryMock.getProvider.mockReturnValue(provider)
-    const { actions, state } = buildHarness()
-    state.busy = false
-    state.threads = [{ ...thread('thr_existing'), agentId: OFFICIAL_DOC }]
-    state.composerAgentId = OFFICIAL_DOC
-
-    await expect(actions.selectAssistant(OFFICIAL_DOC)).resolves.toBe(true)
-
-    expect(provider.createThread).not.toHaveBeenCalled()
-    expect(state.activeThreadId).toBe('thr_existing')
-    expect(state.error).toBeNull()
-  })
-
-  it('force-creates and activates a same-workspace sibling thread for a different assistant', async () => {
-    stubKunGui()
-    const provider = echoProvider()
-    registryMock.getProvider.mockReturnValue(provider)
-    const { actions, state } = buildHarness()
-    state.busy = false
-    state.threads = [thread('thr_existing')]
-    state.composerAgentId = ''
-    state.createThread = actions.createThread
-    state.selectThread = vi.fn(async () => undefined) as never
-
-    await expect(actions.selectAssistant(OFFICIAL_DOC)).resolves.toBe(true)
-
-    expect(provider.createThread).toHaveBeenCalledWith(expect.objectContaining({
-      workspace: '/workspace/deepseek-gui',
-      agentId: OFFICIAL_DOC,
-      systemPrompt: officialDocPersona
-    }))
-    expect(state.activeThreadId).toBe('thr_sibling')
-    expect(state.composerAgentId).toBe(OFFICIAL_DOC)
-  })
-
-  it('keeps the original thread and pending selection when the sibling create fails', async () => {
-    stubKunGui()
-    const provider = echoProvider()
-    provider.createThread = vi.fn(async () => {
-      throw new Error('create exploded')
     })
-    registryMock.getProvider.mockReturnValue(provider)
-    const { actions, state } = buildHarness()
-    state.busy = false
-    state.threads = [thread('thr_existing')]
-    state.composerAgentId = ''
-    state.createThread = actions.createThread
-
-    await expect(actions.selectAssistant(OFFICIAL_DOC)).resolves.toBe(false)
-
-    expect(state.activeThreadId).toBe('thr_existing')
-    expect(state.composerAgentId).toBe('')
-    expect(state.error).toBeTruthy()
-  })
-
-  it('keeps the original thread when the sibling thread persona verification fails', async () => {
-    stubKunGui()
-    const provider = echoProvider()
-    provider.createThread = vi.fn(async (input: { workspace?: string }) => ({
-      id: 'thr_wrong',
-      title: '',
-      updatedAt: '2026-07-25T00:00:00.000Z',
-      model: 'deepseek-v4-pro',
-      mode: 'agent',
-      workspace: input.workspace
-    }))
-    registryMock.getProvider.mockReturnValue(provider)
-    const { actions, state } = buildHarness()
-    state.busy = false
-    state.threads = [thread('thr_existing')]
-    state.composerAgentId = ''
-    state.createThread = actions.createThread
-
-    await expect(actions.selectAssistant(OFFICIAL_DOC)).resolves.toBe(false)
-
-    expect(provider.deleteThread).toHaveBeenCalledWith('thr_wrong')
-    expect(state.activeThreadId).toBe('thr_existing')
-    expect(state.composerAgentId).toBe('')
-    expect(state.error).toBeTruthy()
-  })
-})
-
-describe('chat-store-thread-actions selectThread syncs composerAgentId (PR-3)', () => {
-  beforeEach(() => {
-    rendererRuntimeClient.invalidateSettings()
-    registryMock.getProvider.mockReset()
-  })
-
-  afterEach(() => {
-    rendererRuntimeClient.invalidateSettings()
-    vi.unstubAllGlobals()
-  })
-
-  function detailProvider() {
-    return {
-      getThreadDetail: vi.fn(async () => ({ blocks: [], latestSeq: 0, threadStatus: 'idle' })),
-      subscribeThreadEvents: vi.fn(async () => undefined)
-    }
-  }
-
-  it('adopts the selected thread persona as the next-create default', async () => {
-    registryMock.getProvider.mockReturnValue(detailProvider())
     vi.stubGlobal('window', { kunGui: { logError: vi.fn(async () => undefined) } })
     const { actions, state } = buildHarness()
     state.busy = false
-    state.composerAgentId = ''
+    state.personaAssistantId = OFFICIAL_DOC
     state.composerPickList = []
     state.composerModelGroups = []
     state.threads = [
       thread('thr_existing'),
-      { ...thread('thr_persona'), agentId: 'builtin.official-document', status: 'idle' }
+      { ...thread('thr_general'), status: 'idle' }
     ]
-
-    await actions.selectThread('thr_persona')
-
-    expect(state.activeThreadId).toBe('thr_persona')
-    expect(state.composerAgentId).toBe('builtin.official-document')
-  })
-
-  it('resets the pending selection to general when selecting a general thread', async () => {
-    registryMock.getProvider.mockReturnValue(detailProvider())
-    vi.stubGlobal('window', { kunGui: { logError: vi.fn(async () => undefined) } })
-    const { actions, state } = buildHarness()
-    state.busy = false
-    state.composerAgentId = 'builtin.official-document'
-    state.composerPickList = []
-    state.composerModelGroups = []
-    state.threads = [{ ...thread('thr_general'), status: 'idle' }]
-    state.activeThreadId = null
 
     await actions.selectThread('thr_general')
 
     expect(state.activeThreadId).toBe('thr_general')
-    expect(state.composerAgentId).toBe('')
-  })
-})
-
-describe('chat-store-thread-actions selectAssistant offline staging', () => {
-  beforeEach(() => {
-    rendererRuntimeClient.invalidateSettings()
-    registryMock.getProvider.mockReset()
-  })
-
-  afterEach(() => {
-    rendererRuntimeClient.invalidateSettings()
-    vi.unstubAllGlobals()
-  })
-
-  it('stages the pending selection while the runtime is not ready yet', async () => {
-    vi.stubGlobal('window', {
-      kunGui: {
-        getSettings: vi.fn(async () => ({
-          workspaceRoot: '/workspace/deepseek-gui',
-          codePromptPrefix: '',
-          agents: { kun: { providerId: '', model: '', subagents: { enabled: true, profiles: [] } } }
-        })),
-        logError: vi.fn(async () => undefined)
-      }
-    })
-    registryMock.getProvider.mockReturnValue({})
-    const { actions, state } = buildHarness()
-    state.runtimeConnection = 'checking'
-    state.busy = false
-    state.activeThreadId = null
-    state.threads = []
-    state.composerAgentId = ''
-
-    await expect(actions.selectAssistant('builtin.official-document')).resolves.toBe(true)
-
-    expect(state.composerAgentId).toBe('builtin.official-document')
-    expect(state.error).toBeNull()
+    expect(state.personaAssistantId).toBe(OFFICIAL_DOC)
   })
 })

@@ -50,7 +50,6 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
   | 'setError'
   | 'setComposerMode'
   | 'setComposerModel'
-  | 'setComposerAgentId'
   | 'loadComposerModels'
   | 'reloadComposerModels'
   | 'setRoute'
@@ -59,6 +58,8 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
   | 'openPlugins'
   | 'openClaw'
   | 'openAssistants'
+  | 'summonAssistantWithPrompt'
+  | 'consumeComposerPrefill'
   | 'openSchedule'
   | 'openWorkflow'
   | 'openInitialSetup'
@@ -139,10 +140,6 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
         void window.kunGui.saveSettingsSilent({ agents: { kun: { model: trimmed } } })
       }
       // 分组模式：选模型仅切换，不再即时检测 Key；Key 在发送消息时按所选分组检测/创建。
-    },
-
-    setComposerAgentId: (agentId) => {
-      set({ composerAgentId: agentId.trim() })
     },
 
     loadComposerModels: async () => {
@@ -243,6 +240,18 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
 
     openAssistants: () => {
       set({ route: 'assistants' })
+    },
+
+    summonAssistantWithPrompt: async (selectionId, prompt) => {
+      // 召唤成功才写入待填草稿并跳对话页；失败时 selectAssistant 已写 error，
+      // 停留在当前页由提示区展示，不预填也不跳转。
+      const ok = await get().selectAssistant(selectionId)
+      if (!ok) return
+      set({ composerPrefill: prompt, route: 'chat' })
+    },
+
+    consumeComposerPrefill: () => {
+      if (get().composerPrefill) set({ composerPrefill: '' })
     },
 
     openClaw: () => {

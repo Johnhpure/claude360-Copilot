@@ -339,8 +339,15 @@ function imageMimeTypeFromFileName(name: string | undefined): string | undefined
   return undefined
 }
 
-function isPdfFile(file: File): boolean {
+export function isPdfFile(file: File): boolean {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+}
+
+const OFFICE_ATTACHMENT_EXTENSIONS = ['.docx', '.xlsx', '.xls', '.pptx']
+
+export function isOfficeFile(file: File): boolean {
+  const name = file.name.toLowerCase()
+  return OFFICE_ATTACHMENT_EXTENSIONS.some((ext) => name.endsWith(ext))
 }
 
 function comparablePath(path: string | undefined): string {
@@ -1603,8 +1610,11 @@ function FloatingComposerComponent({
   const handleComposerDragOver = (event: ReactDragEvent<HTMLDivElement>): void => {
     const dataTransferTypes = Array.from(event.dataTransfer.types ?? [])
     const canAcceptImages = canPickAttachment && imageTransferHasImages(event.dataTransfer)
-    const canAcceptPdf = canPickAttachment && Array.from(event.dataTransfer.files ?? []).some(isPdfFile)
-    if (!dataTransferTypes.includes('Files') && !canAcceptImages && !canAcceptPdf) return
+    const droppedFiles = Array.from(event.dataTransfer.files ?? [])
+    const canAcceptPdf = canPickAttachment && droppedFiles.some(isPdfFile)
+    const canAcceptOffice = canPickAttachment && droppedFiles.some(isOfficeFile)
+    if (!dataTransferTypes.includes('Files') && !canAcceptImages && !canAcceptPdf && !canAcceptOffice)
+      return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'copy'
   }
@@ -1615,13 +1625,20 @@ function FloatingComposerComponent({
     const isImageLike = (file: File): boolean =>
       isImageMimeType(file.type) || Boolean(imageMimeTypeFromFileName(file.name))
     const pdfFiles = canPickAttachment ? rawFiles.filter(isPdfFile) : []
+    const officeFiles = canPickAttachment ? rawFiles.filter(isOfficeFile) : []
     const pathFiles = canPickLocalFileReference && onAddFileReference
-      ? rawFiles.filter((file) => !isImageLike(file) && !isPdfFile(file))
+      ? rawFiles.filter((file) => !isImageLike(file) && !isPdfFile(file) && !isOfficeFile(file))
       : []
-    if (imageFiles.length === 0 && pdfFiles.length === 0 && pathFiles.length === 0) return
+    if (
+      imageFiles.length === 0 &&
+      pdfFiles.length === 0 &&
+      officeFiles.length === 0 &&
+      pathFiles.length === 0
+    )
+      return
     event.preventDefault()
-    if ((imageFiles.length > 0 || pdfFiles.length > 0) && onPickAttachments) {
-      onPickAttachments([...imageFiles, ...pdfFiles])
+    if ((imageFiles.length > 0 || pdfFiles.length > 0 || officeFiles.length > 0) && onPickAttachments) {
+      onPickAttachments([...imageFiles, ...pdfFiles, ...officeFiles])
     }
     if (pathFiles.length > 0) {
       const paths: string[] = []
@@ -2217,7 +2234,7 @@ function FloatingComposerComponent({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp,application/pdf,.pdf"
+              accept="image/png,image/jpeg,image/webp,application/pdf,.pdf,.docx,.xlsx,.xls,.pptx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.presentationml.presentation"
               multiple
               className="hidden"
               onChange={handleAttachmentInput}
@@ -2285,8 +2302,8 @@ function FloatingComposerComponent({
                     onChange={onExecutionSettingsChange}
                   />
                 ) : null}
-                {/* 助手选择器固定紧跟权限右侧（req. 3.1）；通用+内置助手始终可选，
-                    因此不再因"没有自定义 profile"而隐藏。 */}
+                {/* 人设助手选择器：默认「助手」（不使用），仅内置人设可选；
+                    与设置中的 AI 助手（subagent）无关，切换随时生效。 */}
                 <FloatingComposerAgentPicker />
               </div>
             ) : null}

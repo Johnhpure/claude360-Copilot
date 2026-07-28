@@ -138,6 +138,24 @@ export type LocalPdfTextReadResult =
     }
   | { ok: false; message: string }
 
+export type LocalOfficeTextTarget = {
+  path: string
+}
+
+export type LocalOfficeTextReadResult =
+  | {
+      ok: true
+      path: string
+      size: number
+      mtimeMs: number
+      /** Sheets for spreadsheets, slides for presentations, 0 for Word documents. */
+      pageCount: number
+      text: string
+      hasText: boolean
+      truncated: boolean
+    }
+  | { ok: false; message: string }
+
 export type WorkspaceFileResolveResult =
   | {
       ok: true

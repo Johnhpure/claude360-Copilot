@@ -61,6 +61,7 @@ import {
   gitWorktreeRemoveSchema,
   guiUpdateChannelSchema,
   localPdfTextTargetPayloadSchema,
+  localOfficeTextTargetPayloadSchema,
   logErrorPayloadSchema,
   notificationPayloadSchema,
   openEditorPathPayloadSchema,
@@ -235,6 +236,7 @@ import {
 } from '../services/computer-use-permissions'
 import { importGithubSkillsToRoot } from '../services/github-skill-import-service'
 import { readLocalPdfText } from '../services/write-pdf-text-service'
+import { readLocalOfficeText } from '../services/office-text-service'
 import { saveGuiSkillPackage } from '../services/skill-save-service'
 import { listGuiSkillRoots, listGuiSkills } from '../services/skill-service'
 import { getSharedIpcStats, wrapIpcMainWithStats } from '../perf-ipc-stats'
@@ -1783,6 +1785,11 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       truncated: result.truncated
     }
   })
+  ipcMain.handle('file:read-local-office-text', async (_, payload: unknown) =>
+    readLocalOfficeText(
+      parseIpcPayload('file:read-local-office-text', localOfficeTextTargetPayloadSchema, payload)
+    )
+  )
   ipcMain.handle('file:save-as', async (_, payload: unknown) =>
     saveWorkspaceFileAs(payload, getMainWindow)
   )

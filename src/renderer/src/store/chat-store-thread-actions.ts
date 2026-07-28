@@ -99,16 +99,17 @@ import {
   watchTurnCompletionNotification
 } from './chat-store-runtime'
 import {
-  assistantResolveErrorMessage,
   composerSelectionForThread,
-  createThreadWithAssistant,
   ensureRuntimeProviderForSend,
   fallbackComposerProviderIdForSend,
-  resolveThreadAssistant,
-  subscribeThreadEventsWithRecovery,
-  threadAssistantSelectionId
+  subscribeThreadEventsWithRecovery
 } from './chat-store-thread-action-helpers'
-import { isAssistantResolveError } from '../features/assistants'
+import {
+  buildPersonaRuntimePrompt,
+  isValidPersonaSelectionId,
+  personaPromptForSelection,
+  storePersonaAssistantId
+} from '../features/assistants'
 
 type SseAbortRef = { current: AbortController | null }
 
@@ -137,20 +138,6 @@ export function createThreadActions(
         ? get().threads.find((thread) => thread.id === get().activeThreadId)
         : null
 
-      // Assistant persona: one selection + one resolver shared by all three
-      // explicit create paths (plain workspace / conversation / worktree pool).
-      // An invalid selection fails closed before any thread is created.
-      const assistantSelectionId = threadAssistantSelectionId({
-        explicitAgentId: options.agentId,
-        activeThread,
-        composerAgentId: get().composerAgentId
-      })
-      const resolvedAssistant = resolveThreadAssistant(settings, assistantSelectionId)
-      if (isAssistantResolveError(resolvedAssistant)) {
-        set({ error: assistantResolveErrorMessage(resolvedAssistant) })
-        return
-      }
-
       // 对话会话:不绑定项目文件夹,在 conversationWorkspaceRoot 下自动创建
       // 一个时间戳子目录作为工作目录(主进程负责实际建目录)。
       if (options.conversation) {
@@ -165,11 +152,11 @@ export function createThreadActions(
           set({ error: created.error || i18n.t('common:worktreeAcquireFailed') })
           return
         }
-        const t = await createThreadWithAssistant(p, {
+        const t = await p.createThread({
           workspace: created.path,
           title: getDefaultThreadTitle(),
           mode: 'agent'
-        }, resolvedAssistant)
+        })
         set((s) => ({
           activeThreadId: t.id,
           threads: s.threads.some((thread) => thread.id === t.id) ? s.threads : [t, ...s.threads]
@@ -199,7 +186,6 @@ export function createThreadActions(
             get(),
             p,
             workspaceRoot,
-            resolvedAssistant,
             (thread) => isCodeThread(thread, get().clawChannels)
           )
       if (reusableThreadId) {
@@ -238,16 +224,11 @@ export function createThreadActions(
           return
         }
       }
-      // Primary-agent persona snapshot: bind this thread to the resolved
-      // assistant and freeze its agentId / providerId / model / systemPrompt
-      // at create time so later agent edits don't drift the thread. The
-      // helper verifies the returned identity and deletes the thread on
-      // mismatch, so a wrong-persona thread is never activated below.
-      const t = await createThreadWithAssistant(p, {
+      const t = await p.createThread({
         workspace: workspaceRoot,
         title: getDefaultThreadTitle(),
         mode: 'agent'
-      }, resolvedAssistant)
+      })
       // Register + activate optimistically before refreshing. A freshly created
       // Kun thread may not be listed until the first message is written.
       // Setting it active first lets refreshThreads preserve it in the sidebar.
@@ -286,57 +267,20 @@ export function createThreadActions(
   },
 
   selectAssistant: async (selectionId) => {
-    // No upfront runtime gate: staging a pending selection (no active thread)
-    // and the same-assistant no-op are pure local state and must work while
-    // the runtime is starting up. The different-assistant branch goes through
-    // createThread, which enforces the runtime-connection check itself.
+    // 人设助手是纯前端状态：选择/移除只改 personaAssistantId 并持久化，
+    // 不新建线程、不写线程字段、不受运行状态限制——下一条消息按轮注入
+    // persona 提示词即生效，因此任何时刻都可以切换。
     const trimmedSelection = selectionId.trim()
-    // Gate: never leave a running turn or a pending approval / user-input by
-    // switching threads; the user finishes or interrupts first (req. 3.3D).
-    if (get().busy) {
-      set({ error: i18n.t('common:assistantSwitchBlockedBusy') })
+    if (!isValidPersonaSelectionId(trimmedSelection)) {
+      set({
+        error: i18n.t('common:assistantUnavailableForNewThread', {
+          assistantId: trimmedSelection
+        })
+      })
       return false
     }
-    if (threadHasPendingRuntimeWork(get().blocks)) {
-      set({ error: i18n.t('common:assistantSwitchBlockedPending') })
-      return false
-    }
-    const activeThread = get().activeThreadId
-      ? get().threads.find((thread) => thread.id === get().activeThreadId) ?? null
-      : null
-    // Same assistant as the active thread: nothing to create or validate —
-    // the thread keeps running on its create-time persona snapshot.
-    if (activeThread && (activeThread.agentId?.trim() ?? '') === trimmedSelection) {
-      set({ error: null })
-      return true
-    }
-    // Validate against fresh settings so a profile deleted/disabled since the
-    // menu was rendered fails closed instead of being stored or created.
-    const settings = await rendererRuntimeClient.getSettings(
-      trimmedSelection ? { forceRefresh: true } : undefined
-    )
-    const resolvedAssistant = resolveThreadAssistant(settings, trimmedSelection)
-    if (isAssistantResolveError(resolvedAssistant)) {
-      set({ error: assistantResolveErrorMessage(resolvedAssistant) })
-      return false
-    }
-    // No active thread: only stage the pending selection; the thread is
-    // created on the first send (or an explicit create).
-    if (!activeThread) {
-      set({ composerAgentId: trimmedSelection, error: null })
-      return true
-    }
-    // Different assistant: start a sibling thread in the same workspace via
-    // the shared create path. `forceNew` guarantees no empty-thread reuse and
-    // createThread verifies the returned persona identity. On failure it
-    // keeps the original thread active and surfaces its own error, so drafts,
-    // attachments and the previous selection stay untouched.
-    const previousActiveThreadId = get().activeThreadId
-    await get().createThread({ forceNew: true, agentId: trimmedSelection })
-    if (get().activeThreadId === previousActiveThreadId) {
-      return false
-    }
-    set({ composerAgentId: trimmedSelection })
+    storePersonaAssistantId(trimmedSelection)
+    set({ personaAssistantId: trimmedSelection, error: null })
     return true
   },
 
@@ -496,10 +440,6 @@ export function createThreadActions(
         inspectorSelectedId: null,
         queuedMessages: [],
         composerMode,
-        // Keep the pending assistant selection in lockstep with the active
-        // thread so the picker reflects the thread's create-time persona and
-        // "new chat" defaults to the same assistant (requirement 3.4).
-        composerAgentId: threadSnap?.agentId?.trim() ?? '',
         ...(composerSelection
           ? {
               composerModel: composerSelection.model,
@@ -893,23 +833,10 @@ export function createThreadActions(
     }
     if (!activeThreadId) {
       try {
-        // First send with no active thread: `composerAgentId` is the assistant
-        // selection. Force-refresh settings when a specific assistant is picked
-        // so a profile deleted / disabled / turned subagent-only after the menu
-        // selection fails closed here instead of silently sending a turn on a
-        // general thread.
-        const assistantSelectionId = get().composerAgentId?.trim() ?? ''
-        const settings = await rendererRuntimeClient.getSettings(
-          assistantSelectionId ? { forceRefresh: true } : undefined
-        )
+        const settings = await rendererRuntimeClient.getSettings()
         const workspaceRoot = normalizeWorkspaceRoot(settings.workspaceRoot)
         if (!workspaceRoot) {
           rollbackOptimisticSend({ error: i18n.t('common:workspaceRequiredToCreateThread') })
-          return false
-        }
-        const resolvedAssistant = resolveThreadAssistant(settings, assistantSelectionId)
-        if (isAssistantResolveError(resolvedAssistant)) {
-          rollbackOptimisticSend({ error: assistantResolveErrorMessage(resolvedAssistant) })
           return false
         }
         const codeWorkspaceRoots = rememberCodeWorkspaceRoots(get().codeWorkspaceRoots, [workspaceRoot])
@@ -918,7 +845,6 @@ export function createThreadActions(
           get(),
           p,
           workspaceRoot,
-          resolvedAssistant,
           (thread) => isCodeThread(thread, get().clawChannels)
         )
         const reusableThread = reusableThreadId
@@ -929,13 +855,13 @@ export function createThreadActions(
           reusableThreadId != null && shouldAutoTitleThread(reusableThread)
         const createdThread =
           reusableThreadId == null
-            ? await createThreadWithAssistant(p, {
+            ? await p.createThread({
                 workspace: workspaceRoot,
                 title: generatedTitle,
                 // Provisional first-message title; let the backend LLM titler upgrade it.
                 titleAuto: true,
                 mode: mode ?? 'agent'
-              }, resolvedAssistant)
+              })
             : null
         const threadId = reusableThreadId ?? createdThread?.id ?? null
         if (!threadId) {
@@ -1042,6 +968,14 @@ export function createThreadActions(
         runtimeText = buildClawRuntimePrompt(settings, trimmedText, { channel })
       } else {
         runtimeText = buildCodeRuntimePrompt(settings, trimmedText)
+        // 人设助手按轮注入：仅对话/Code 主界面生效（写作有自己的助手体系，
+        // Claw 走 IM 通道）。displayText 始终是用户原文，注入对 UI 透明。
+        if (get().route !== 'write') {
+          const personaPrompt = personaPromptForSelection(get().personaAssistantId)
+          if (personaPrompt) {
+            runtimeText = buildPersonaRuntimePrompt(personaPrompt, runtimeText)
+          }
+        }
       }
       const runtimeDisplayText = channel ? displayText : (userDisplayText ?? trimmedText)
       const { turnId, userMessageItemId } = await p.sendUserMessage(activeThreadId, runtimeText, {
@@ -1220,19 +1154,10 @@ export function createThreadActions(
         }
         const codeWorkspaceRoots = rememberCodeWorkspaceRoots(get().codeWorkspaceRoots, [workspaceRoot])
         set({ codeWorkspaceRoots })
-        // Review is a dedicated flow that always runs on the general assistant;
-        // scoping reuse to the general persona keeps a review from landing in
-        // an empty thread bound to another assistant.
-        const generalAssistant = resolveThreadAssistant(settings, '')
-        if (isAssistantResolveError(generalAssistant)) {
-          set({ error: assistantResolveErrorMessage(generalAssistant) })
-          return false
-        }
         const reusableThreadId = await findReusableEmptyThreadId(
           get(),
           p,
           workspaceRoot,
-          generalAssistant,
           (thread) => isCodeThread(thread, get().clawChannels)
         )
         const createdThread =

@@ -222,6 +222,8 @@ const api = {
     ipcRenderer.invoke('file:read-workspace-pdf', options),
   readLocalPdfText: (options) =>
     ipcRenderer.invoke('file:read-local-pdf-text', options),
+  readLocalOfficeText: (options) =>
+    ipcRenderer.invoke('file:read-local-office-text', options),
   saveWorkspaceFileAs: (payload) =>
     ipcRenderer.invoke('file:save-as', payload),
   writeWorkspaceFile: (payload) =>

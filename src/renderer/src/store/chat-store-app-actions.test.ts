@@ -559,6 +559,48 @@ describe('chat-store app actions composer model loading', () => {
   })
 })
 
+// 助手详情弹窗「点示例直接提问」链路：summonAssistantWithPrompt + consumeComposerPrefill。
+describe('summonAssistantWithPrompt / consumeComposerPrefill', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', createMemoryStorage())
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('selects the assistant, prefills the composer, and routes to chat on success', async () => {
+    const { actions, state } = buildHarness({ ok: true, modelIds: [] })
+    state.selectAssistant = vi.fn(async () => true)
+
+    await actions.summonAssistantWithPrompt('builtin.official-document', 'Draft a notice')
+
+    expect(state.selectAssistant).toHaveBeenCalledWith('builtin.official-document')
+    expect(state.composerPrefill).toBe('Draft a notice')
+    expect(state.route).toBe('chat')
+  })
+
+  it('does not prefill or route when the assistant selection fails', async () => {
+    const { actions, state } = buildHarness({ ok: true, modelIds: [] })
+    state.route = 'assistants'
+    state.composerPrefill = ''
+    state.selectAssistant = vi.fn(async () => false)
+
+    await actions.summonAssistantWithPrompt('builtin.unknown', 'Draft a notice')
+
+    expect(state.composerPrefill).toBe('')
+    expect(state.route).toBe('assistants')
+  })
+
+  it('consumeComposerPrefill clears a pending draft', () => {
+    const { actions, state } = buildHarness({ ok: true, modelIds: [] })
+    state.composerPrefill = 'Draft a notice'
+
+    actions.consumeComposerPrefill()
+
+    expect(state.composerPrefill).toBe('')
+  })
+})
+
 // R1（07-14-renderer-lazy-loading）：en 语言包为动态 chunk，
 // applyI18nFromSettings 必须先 await ensureI18nResources 再 changeLanguage。
 describe('applyI18nFromSettings resource loading order (R1)', () => {

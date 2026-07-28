@@ -64,7 +64,6 @@ import {
   clearedThreadSelection,
   collectAssistantTextForTurn,
   findLatestUserBlockId,
-  findReusableEmptyThreadId,
   reconcileOptimisticUserBlock,
   settlePendingRuntimeWorkAfterInterrupt,
   threadSnapshotLooksRunning,

@@ -272,17 +272,6 @@ function SidebarComponent({
             （claw/schedule/workflow 下矩阵为空，不渲染）。 */}
         <SidebarContextActions actions={contextActions} />
 
-        {/* 助手清单页入口：卡片式浏览与「召唤」，与 composer 内的助手选择器
-            共用同一 selectAssistant 语义（恒可见）。 */}
-        {isPrimaryRouteVisible('assistants') ? (
-          <SidebarCommandRow
-            icon={<Bot className="h-4 w-4" strokeWidth={1.75} />}
-            label={t('assistantsNavLabel')}
-            onClick={onOpenAssistants}
-            active={activeView === 'assistants'}
-          />
-        ) : null}
-
         {/* 隐藏≠删除:第一阶段不暴露插件/定时任务/Workflow 入口,
             但保留 onOpenPlugins/onScheduleOpen/onWorkflowOpen 等 handler 与 props。 */}
         {isPrimaryRouteVisible('plugins') ? (
@@ -431,6 +420,20 @@ function SidebarComponent({
           />
         </>
       )}
+
+      {/* 助手清单页入口：置于对话/项目列表之下（列表 fill 撑满剩余高度，
+          本行贴近底部 footer 之上）。卡片式浏览与「召唤」，与 composer 内的
+          人设助手选择器共用同一 selectAssistant 语义（恒可见）。 */}
+      {isPrimaryRouteVisible('assistants') ? (
+        <div className="ds-no-drag px-1 pt-1">
+          <SidebarCommandRow
+            icon={<Bot className="h-4 w-4" strokeWidth={1.75} />}
+            label={t('assistantsNavLabel')}
+            onClick={onOpenAssistants}
+            active={activeView === 'assistants'}
+          />
+        </div>
+      ) : null}
 
     </SidebarFrame>
 

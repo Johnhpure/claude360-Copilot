@@ -9,6 +9,8 @@ import {
   handleComposerImagePaste,
   imageFilesFromTransfer,
   imageTransferHasImages,
+  isOfficeFile,
+  isPdfFile,
   parseCompactCommand,
   parseGoalCommand,
   parseNewCommand,
@@ -546,6 +548,41 @@ describe('FloatingComposer model controls', () => {
 
     expect(html).toContain('Set up group')
     expect(html).not.toContain('deepseek-v4-pro')
+  })
+})
+
+describe('FloatingComposer document attachment classification', () => {
+  const asFile = (name: string, type = ''): File => new File([new Uint8Array([1])], name, { type })
+
+  it('recognizes Office files by extension regardless of MIME type', () => {
+    expect(isOfficeFile(asFile('report.docx'))).toBe(true)
+    expect(isOfficeFile(asFile('data.xlsx'))).toBe(true)
+    expect(isOfficeFile(asFile('legacy.xls'))).toBe(true)
+    expect(isOfficeFile(asFile('deck.pptx'))).toBe(true)
+    // Uppercase extensions must still match — file systems are case-insensitive.
+    expect(isOfficeFile(asFile('REPORT.DOCX'))).toBe(true)
+  })
+
+  it('does not misclassify PDFs, images, or plain files as Office', () => {
+    expect(isOfficeFile(asFile('paper.pdf', 'application/pdf'))).toBe(false)
+    expect(isOfficeFile(asFile('shot.png', 'image/png'))).toBe(false)
+    expect(isOfficeFile(asFile('notes.txt', 'text/plain'))).toBe(false)
+    // Legacy binary .doc/.ppt are out of scope for the attachment path.
+    expect(isOfficeFile(asFile('old.doc'))).toBe(false)
+    expect(isOfficeFile(asFile('old.ppt'))).toBe(false)
+  })
+
+  it('keeps Office and PDF classification mutually exclusive', () => {
+    // Regression guard: on drop, files that are neither image nor PDF nor Office
+    // fall through to the workspace-file-reference branch (which cannot preview
+    // binary Office files). Office files must be caught here, not there.
+    const office = asFile('report.xlsx')
+    expect(isOfficeFile(office)).toBe(true)
+    expect(isPdfFile(office)).toBe(false)
+
+    const pdf = asFile('paper.pdf', 'application/pdf')
+    expect(isPdfFile(pdf)).toBe(true)
+    expect(isOfficeFile(pdf)).toBe(false)
   })
 })
 
@@ -1523,9 +1560,11 @@ describe('FloatingComposer assistant picker placement (PR-4)', () => {
     expect(assistantIndex).toBeLessThan(modelIndex)
   })
 
-  it('keeps the assistant picker visible even when no custom profile exists', () => {
+  it('renders the neutral persona picker in its default (no assistant) state', () => {
     const html = renderComposer()
-    expect(html).toContain('aria-label="Assistant: General Assistant"')
+    // 默认不使用任何助手：按钮显示中性的「助手」标签，而非旧的「通用助手」。
+    expect(html).toContain('aria-label="Assistant: Assistant"')
+    expect(html).not.toContain('General Assistant')
   })
 
   it('hides the assistant picker on compact side composers', () => {

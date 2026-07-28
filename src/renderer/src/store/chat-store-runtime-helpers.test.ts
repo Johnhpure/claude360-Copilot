@@ -4,14 +4,13 @@ import {
   isBackgroundShellNoticeUserMessage
 } from '@shared/background-shell-notice'
 import type { ChatBlock, NormalizedThread } from '../agent/types'
-import type { ResolvedAssistant } from '../features/assistants'
 import type { ChatState } from './chat-store-types'
 import {
   findReusableEmptyThreadId,
   isOptimisticUserBlockId,
   latestTurnHasVisibleReply,
   reconcileOptimisticUserBlock,
-  threadMatchesAssistantSnapshot,
+  threadHasPersonaSnapshot,
   upsertUserBlock
 } from './chat-store-runtime-helpers'
 
@@ -124,12 +123,6 @@ describe('latestTurnHasVisibleReply (#reply-invisible)', () => {
   })
 })
 
-function resolved(fields: ResolvedAssistant['threadFields'], kind: ResolvedAssistant['kind'] = 'builtin'): ResolvedAssistant {
-  return { selectionId: fields.agentId ?? '', kind, threadFields: fields }
-}
-
-const generalResolved: ResolvedAssistant = { selectionId: '', kind: 'general', threadFields: {} }
-
 function snapshotThread(overrides: Partial<NormalizedThread> = {}): NormalizedThread {
   return {
     id: 'thr_snapshot',
@@ -142,89 +135,20 @@ function snapshotThread(overrides: Partial<NormalizedThread> = {}): NormalizedTh
   }
 }
 
-describe('threadMatchesAssistantSnapshot', () => {
-  const builtinA = resolved({ agentId: 'builtin.official-document', systemPrompt: 'persona A' })
-  const builtinB = resolved({ agentId: 'builtin.research', systemPrompt: 'persona B' })
-  const customA = resolved(
-    { agentId: 'custom-a', providerId: 'deepseek', model: 'deepseek-v4-pro', systemPrompt: 'custom persona A' },
-    'custom'
-  )
-
-  it('lets the general assistant match only threads without persona snapshot', () => {
-    expect(threadMatchesAssistantSnapshot(snapshotThread(), generalResolved)).toBe(true)
-    expect(
-      threadMatchesAssistantSnapshot(snapshotThread({ agentId: 'builtin.research' }), generalResolved)
-    ).toBe(false)
-    expect(
-      threadMatchesAssistantSnapshot(snapshotThread({ systemPrompt: 'left-over persona' }), generalResolved)
-    ).toBe(false)
+describe('threadHasPersonaSnapshot', () => {
+  it('is false for a plain thread without persona fields', () => {
+    expect(threadHasPersonaSnapshot(snapshotThread())).toBe(false)
+    expect(threadHasPersonaSnapshot(snapshotThread({ agentId: '  ', systemPrompt: '' }))).toBe(false)
   })
 
-  it('never lets a dedicated assistant match a general thread', () => {
-    expect(threadMatchesAssistantSnapshot(snapshotThread(), builtinA)).toBe(false)
-  })
-
-  it('requires the exact agent id across builtin and custom assistants', () => {
-    const threadA = snapshotThread({ agentId: 'builtin.official-document', systemPrompt: 'persona A' })
-    expect(threadMatchesAssistantSnapshot(threadA, builtinA)).toBe(true)
-    expect(threadMatchesAssistantSnapshot(threadA, builtinB)).toBe(false)
-    expect(threadMatchesAssistantSnapshot(threadA, customA)).toBe(false)
-    expect(
-      threadMatchesAssistantSnapshot(
-        snapshotThread({ agentId: 'custom-b', systemPrompt: 'custom persona A' }),
-        customA
-      )
-    ).toBe(false)
-  })
-
-  it('rejects a same-id thread whose persona systemPrompt drifted', () => {
-    expect(
-      threadMatchesAssistantSnapshot(
-        snapshotThread({ agentId: 'builtin.official-document', systemPrompt: 'persona A v0' }),
-        builtinA
-      )
-    ).toBe(false)
-  })
-
-  it('compares systemPrompt trimmed because the backend trims the snapshot', () => {
-    expect(
-      threadMatchesAssistantSnapshot(
-        snapshotThread({ agentId: 'builtin.official-document', systemPrompt: 'persona A' }),
-        resolved({ agentId: 'builtin.official-document', systemPrompt: 'persona A\n' })
-      )
-    ).toBe(true)
-  })
-
-  it('compares providerId and model only when the assistant pins them explicitly', () => {
-    const matching = snapshotThread({
-      agentId: 'custom-a',
-      providerId: 'deepseek',
-      model: 'deepseek-v4-pro',
-      systemPrompt: 'custom persona A'
-    })
-    expect(threadMatchesAssistantSnapshot(matching, customA)).toBe(true)
-    expect(
-      threadMatchesAssistantSnapshot({ ...matching, providerId: 'minimax-token-plan' }, customA)
-    ).toBe(false)
-    expect(threadMatchesAssistantSnapshot({ ...matching, model: 'MiniMax-M2' }, customA)).toBe(false)
-    // A builtin assistant pins neither provider nor model, so the thread's
-    // backend-defaulted values are irrelevant.
-    expect(
-      threadMatchesAssistantSnapshot(
-        snapshotThread({
-          agentId: 'builtin.official-document',
-          providerId: 'any-provider',
-          systemPrompt: 'persona A'
-        }),
-        builtinA
-      )
-    ).toBe(true)
+  it('detects legacy persona-bound threads via agentId or systemPrompt', () => {
+    expect(threadHasPersonaSnapshot(snapshotThread({ agentId: 'builtin.research' }))).toBe(true)
+    expect(threadHasPersonaSnapshot(snapshotThread({ systemPrompt: 'left-over persona' }))).toBe(true)
   })
 })
 
-describe('findReusableEmptyThreadId assistant scoping', () => {
+describe('findReusableEmptyThreadId persona scoping', () => {
   const workspace = '/workspace/deepseek-gui'
-  const builtinA = resolved({ agentId: 'builtin.official-document', systemPrompt: 'persona A' })
 
   function stateWith(threads: NormalizedThread[], activeThreadId: string | null = null): ChatState {
     return { activeThreadId, threads, blocks: [] } as unknown as ChatState
@@ -234,7 +158,7 @@ describe('findReusableEmptyThreadId assistant scoping', () => {
     return { getThreadDetail: vi.fn(async () => ({ blocks: [] })) }
   }
 
-  it('does not let the general assistant reuse an empty thread bound to an assistant', async () => {
+  it('never reuses an empty thread carrying a legacy persona snapshot', async () => {
     const personaThread = snapshotThread({
       id: 'thr_persona',
       agentId: 'builtin.official-document',
@@ -242,31 +166,14 @@ describe('findReusableEmptyThreadId assistant scoping', () => {
       workspace
     })
     expect(
-      await findReusableEmptyThreadId(stateWith([personaThread]), emptyDetailProvider(), workspace, generalResolved)
+      await findReusableEmptyThreadId(stateWith([personaThread]), emptyDetailProvider(), workspace)
     ).toBeNull()
   })
 
-  it('does not let an assistant reuse a general empty thread, even the active one', async () => {
-    const generalThread = snapshotThread({ id: 'thr_general', workspace })
-    expect(
-      await findReusableEmptyThreadId(
-        stateWith([generalThread], 'thr_general'),
-        emptyDetailProvider(),
-        workspace,
-        builtinA
-      )
-    ).toBeNull()
-  })
-
-  it('reuses only an empty thread with the identical persona snapshot', async () => {
-    const matching = snapshotThread({
-      id: 'thr_match',
-      agentId: 'builtin.official-document',
-      systemPrompt: 'persona A',
-      workspace
-    })
-    const otherAssistant = snapshotThread({
-      id: 'thr_other',
+  it('reuses a plain empty thread and skips persona-bound candidates', async () => {
+    const matching = snapshotThread({ id: 'thr_match', workspace })
+    const personaBound = snapshotThread({
+      id: 'thr_persona',
       agentId: 'builtin.research',
       systemPrompt: 'persona B',
       workspace,
@@ -275,10 +182,19 @@ describe('findReusableEmptyThreadId assistant scoping', () => {
     const provider = emptyDetailProvider()
 
     expect(
-      await findReusableEmptyThreadId(stateWith([otherAssistant, matching]), provider, workspace, builtinA)
+      await findReusableEmptyThreadId(stateWith([personaBound, matching]), provider, workspace)
     ).toBe('thr_match')
-    // Only the persona-compatible candidate was even probed for emptiness.
+    // Only the persona-free candidate was even probed for emptiness.
     expect(provider.getThreadDetail).toHaveBeenCalledTimes(1)
     expect(provider.getThreadDetail).toHaveBeenCalledWith('thr_match')
+  })
+
+  it('reuses the active thread directly when it is plain and empty', async () => {
+    const active = snapshotThread({ id: 'thr_active', workspace })
+    const provider = emptyDetailProvider()
+    expect(
+      await findReusableEmptyThreadId(stateWith([active], 'thr_active'), provider, workspace)
+    ).toBe('thr_active')
+    expect(provider.getThreadDetail).not.toHaveBeenCalled()
   })
 })

@@ -1,18 +1,10 @@
 import type { AgentProvider, NormalizedThread, ThreadEventSink } from '../agent/types'
 import { getProvider } from '../agent/registry'
 import { rendererRuntimeClient } from '../agent/runtime-client'
-import i18n from '../i18n'
 import {
   DEFAULT_MODEL_PROVIDER_ID,
   getKunRuntimeSettings
 } from '@shared/app-settings'
-import type { AppSettingsV1 } from '@shared/app-settings'
-import { resolveAssistant } from '../features/assistants'
-import type {
-  AssistantResolveError,
-  AssistantSelectionId,
-  ResolvedAssistant
-} from '../features/assistants'
 import type { ChatState, ChatStoreGet, ChatStoreSet } from './chat-store-types'
 import {
   composerModelSelectable,
@@ -20,77 +12,6 @@ import {
   providerIdMatchesComposerModel,
   readThreadComposerSelection
 } from './chat-store-helpers'
-
-/**
- * Fixed assistant selection precedence shared by every thread create path:
- * explicit `options.agentId` -> active thread's `agentId` -> `composerAgentId`
- * when no thread is active -> general assistant.
- *
- * An explicit empty string means "general assistant" and must not fall through
- * to the next source, so only `undefined` advances the precedence chain.
- */
-export function threadAssistantSelectionId(input: {
-  explicitAgentId?: string
-  activeThread?: Pick<NormalizedThread, 'agentId'> | null
-  composerAgentId?: string
-}): AssistantSelectionId {
-  if (input.explicitAgentId !== undefined) return input.explicitAgentId.trim()
-  if (input.activeThread) return input.activeThread.agentId?.trim() ?? ''
-  return input.composerAgentId?.trim() ?? ''
-}
-
-/**
- * Resolve a selection against the current settings' subagent profiles.
- * Returns the resolver's structured error as-is; callers must fail closed
- * instead of silently downgrading to the general assistant.
- */
-export function resolveThreadAssistant(
-  settings: AppSettingsV1,
-  selectionId: AssistantSelectionId
-): ResolvedAssistant | AssistantResolveError {
-  return resolveAssistant(selectionId, settings.agents?.kun?.subagents?.profiles ?? [])
-}
-
-export function assistantResolveErrorMessage(error: AssistantResolveError): string {
-  return i18n.t('common:assistantUnavailableForNewThread', {
-    assistantId: error.selectionId || error.code
-  })
-}
-
-/**
- * Post-create identity check: the backend must snapshot exactly the requested
- * persona — an empty `agentId` for the general assistant, the precise id for
- * builtin/custom assistants.
- */
-export function threadMatchesRequestedAssistant(
-  thread: Pick<NormalizedThread, 'agentId'>,
-  resolved: ResolvedAssistant
-): boolean {
-  return (thread.agentId?.trim() ?? '') === (resolved.threadFields.agentId?.trim() ?? '')
-}
-
-/**
- * Create a thread with the resolved assistant's persona fields and verify the
- * returned identity. On mismatch the freshly created empty thread is deleted
- * best-effort and an error is thrown, so callers never activate or send into
- * a thread bound to the wrong persona.
- */
-export async function createThreadWithAssistant(
-  provider: Pick<AgentProvider, 'createThread' | 'deleteThread'>,
-  input: { workspace?: string; title?: string; titleAuto?: boolean; mode?: string },
-  resolved: ResolvedAssistant
-): Promise<NormalizedThread> {
-  const thread = await provider.createThread({ ...input, ...resolved.threadFields })
-  if (!threadMatchesRequestedAssistant(thread, resolved)) {
-    try {
-      await provider.deleteThread(thread.id)
-    } catch {
-      /* best-effort cleanup; the mismatch error below is what matters */
-    }
-    throw new Error(i18n.t('common:assistantThreadPersonaMismatch'))
-  }
-  return thread
-}
 
 export function fallbackComposerProviderIdForSend(state: ChatState): string {
   return state.route === 'claw' ? '' : state.composerProviderId.trim()

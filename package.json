@@ -42,11 +42,15 @@
     "@computer-use/nut-js": "^4.2.0",
     "@larksuiteoapi/node-sdk": "^1.64.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@streamdown/math": "1.0.2",
     "@tencent-weixin/openclaw-weixin": "2.4.3",
     "better-sqlite3": "^12.10.0",
     "electron-updater": "^6.8.3",
+    "fast-xml-parser": "^5.10.1",
     "html-to-docx": "^1.8.0",
     "jszip": "3.10.1",
+    "katex": "0.16.46",
+    "mammoth": "^1.12.0",
     "node-pty": "^1.1.0",
     "openclaw": "file:vendor/openclaw-shim",
     "pdfjs-dist": "^5.4.394",
@@ -55,6 +59,7 @@
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -11,6 +11,7 @@ import { createLspLocalTool } from './builtin-lsp-tool.js'
 import { createReadLocalTool } from './builtin-read-tool.js'
 import { createFindLocalTool, createGrepLocalTool, createLsLocalTool } from './builtin-search-tools.js'
 import { createVerifyChangesLocalTool } from './builtin-verify-tool.js'
+import { createOfficeGenLocalTool } from './office-gen-tool.js'
 
 export * from './builtin-tool-types.js'
 export * from './builtin-tool-operations.js'
@@ -19,6 +20,7 @@ export * from './builtin-file-tools.js'
 export * from './builtin-search-tools.js'
 export * from './builtin-bash-tool.js'
 export * from './builtin-verify-tool.js'
+export * from './office-gen-tool.js'
 
 export function createBuiltinLocalTool(
   toolName: BuiltinToolName,
@@ -43,6 +45,8 @@ export function createBuiltinLocalTool(
       return createLspLocalTool()
     case 'verify_changes':
       return createVerifyChangesLocalTool()
+    case 'create_document':
+      return createOfficeGenLocalTool()
   }
 }
 
@@ -64,7 +68,8 @@ export function buildBuiltinLocalTools(options: BuiltinLocalToolsOptions = {}): 
     createFindLocalTool(options.find),
     createLsLocalTool(options.ls),
     createLspLocalTool(),
-    createVerifyChangesLocalTool()
+    createVerifyChangesLocalTool(),
+    createOfficeGenLocalTool()
   ]
 }
 
@@ -110,7 +115,8 @@ export function buildBuiltinLocalToolRecord(
     find: createFindLocalTool(options.find),
     ls: createLsLocalTool(options.ls),
     lsp: createLspLocalTool(),
-    verify_changes: createVerifyChangesLocalTool()
+    verify_changes: createVerifyChangesLocalTool(),
+    create_document: createOfficeGenLocalTool()
   }
 }
 

@@ -99,6 +99,7 @@ export type BuiltinToolName =
   | 'ls'
   | 'lsp'
   | 'verify_changes'
+  | 'create_document'
 export const allBuiltinToolNames: Set<BuiltinToolName> = new Set([
   'read',
   'bash',
@@ -108,7 +109,8 @@ export const allBuiltinToolNames: Set<BuiltinToolName> = new Set([
   'find',
   'ls',
   'lsp',
-  'verify_changes'
+  'verify_changes',
+  'create_document'
 ])
 export type ToolName = BuiltinToolName
 export const allToolNames: Set<ToolName> = allBuiltinToolNames

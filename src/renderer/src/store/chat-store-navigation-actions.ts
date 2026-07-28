@@ -49,7 +49,6 @@ import {
   clearedThreadSelection,
   collectAssistantTextForTurn,
   findLatestUserBlockId,
-  findReusableEmptyThreadId,
   reconcileOptimisticUserBlock,
   threadSnapshotLooksRunning,
   threadBelongsToWorkspace
