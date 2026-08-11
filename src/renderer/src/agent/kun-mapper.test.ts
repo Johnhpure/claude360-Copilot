@@ -628,6 +628,191 @@ describe('tool block merging', () => {
       status: 'success'
     })
   })
+
+  it('drops empty tool arguments instead of surfacing "{}" as the card body', () => {
+    // A no-argument MCP tool (e.g. mcp_gui_schedule_list_workflows) serializes
+    // to "{}", which used to slip past the `detail ? …` guards and render an
+    // empty code block under the running tool row.
+    const block = chatBlockFromItem({
+      id: 'item_call',
+      turnId: 'turn_1',
+      threadId: 'thr_1',
+      role: 'tool',
+      status: 'running',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      kind: 'tool_call',
+      toolName: 'mcp_gui_schedule_list_workflows',
+      callId: 'call_empty',
+      arguments: {}
+    })!
+
+    expect(block).toMatchObject({ kind: 'tool', status: 'running' })
+    expect('detail' in block).toBe(false)
+  })
+
+  it('drops empty tool results the same way', () => {
+    const block = chatBlockFromItem({
+      id: 'item_result',
+      turnId: 'turn_1',
+      threadId: 'thr_1',
+      role: 'tool',
+      status: 'completed',
+      createdAt: '2024-01-01T00:00:01.000Z',
+      kind: 'tool_result',
+      toolName: 'mcp_gui_schedule_list_workflows',
+      callId: 'call_empty',
+      output: []
+    })!
+
+    expect('detail' in block).toBe(false)
+  })
+
+  it('keeps non-empty arguments as the card detail', () => {
+    const block = chatBlockFromItem({
+      id: 'item_call',
+      turnId: 'turn_1',
+      threadId: 'thr_1',
+      role: 'tool',
+      status: 'running',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      kind: 'tool_call',
+      toolName: 'echo',
+      callId: 'call_args',
+      arguments: { text: 'hi' }
+    })!
+
+    expect(block).toMatchObject({ detail: JSON.stringify({ text: 'hi' }, null, 2) })
+  })
+})
+
+describe('subagent lifecycle events on the parent stream', () => {
+  const childEvent = (
+    kind: 'turn_started' | 'turn_completed' | 'turn_failed' | 'turn_aborted',
+    childStatus: 'queued' | 'running' | 'completed' | 'failed' | 'aborted',
+    extra: Record<string, unknown> = {}
+  ): CoreRuntimeEventJson =>
+    ({
+      kind,
+      seq: 30,
+      threadId: 'thr_parent',
+      turnId: 'turn_parent',
+      timestamp: '2026-08-11T03:30:46.513Z',
+      child: {
+        parentThreadId: 'thr_parent',
+        parentTurnId: 'turn_parent',
+        childId: 'child_alhb50',
+        childLabel: '国际经验对标',
+        childProfile: 'general',
+        childStatus,
+        childSeq: 2,
+        ...extra
+      }
+    }) as CoreRuntimeEventJson
+
+  it('routes a completed child to onChildStatus WITHOUT settling the parent turn', async () => {
+    // The regression this guards: `turn_completed` used to call onTurnComplete
+    // unconditionally, so the first of four children finishing cleared the
+    // parent's busy state and dropped the child status the cards needed.
+    let childStatus: unknown = null
+    let turnCompleteCalls = 0
+    const sink: ThreadEventSink = {
+      ...makeSink(),
+      onChildStatus: (ev) => {
+        childStatus = ev
+      },
+      onTurnComplete: () => {
+        turnCompleteCalls += 1
+      }
+    }
+
+    await dispatchKunRuntimeEvent(
+      childEvent('turn_completed', 'completed', { durationMs: 210932, toolInvocations: 27, totalTokens: 41000 }),
+      sink,
+      async () => undefined
+    )
+
+    expect(turnCompleteCalls).toBe(0)
+    expect(childStatus).toMatchObject({
+      childId: 'child_alhb50',
+      childStatus: 'completed',
+      childLabel: '国际经验对标',
+      childProfile: 'general',
+      durationMs: 210932,
+      toolInvocations: 27,
+      totalTokens: 41000
+    })
+  })
+
+  it('surfaces queued and running transitions from turn_started', async () => {
+    const seen: Array<{ childStatus: string; queuedMs?: number }> = []
+    const sink: ThreadEventSink = {
+      ...makeSink(),
+      onChildStatus: (ev) => {
+        seen.push({ childStatus: ev.childStatus, ...(ev.queuedMs !== undefined ? { queuedMs: ev.queuedMs } : {}) })
+      }
+    }
+
+    await dispatchKunRuntimeEvent(childEvent('turn_started', 'queued'), sink, async () => undefined)
+    await dispatchKunRuntimeEvent(
+      childEvent('turn_started', 'running', { queuedMs: 210945 }),
+      sink,
+      async () => undefined
+    )
+
+    expect(seen).toEqual([{ childStatus: 'queued' }, { childStatus: 'running', queuedMs: 210945 }])
+  })
+
+  it('routes a failed child to onChildStatus instead of failing the parent turn', async () => {
+    let childStatus: unknown = null
+    let errors = 0
+    const sink: ThreadEventSink = {
+      ...makeSink(),
+      onChildStatus: (ev) => {
+        childStatus = ev
+      },
+      onError: () => {
+        errors += 1
+      }
+    }
+
+    await dispatchKunRuntimeEvent(childEvent('turn_failed', 'failed'), sink, async () => undefined)
+
+    expect(errors).toBe(0)
+    expect(childStatus).toMatchObject({ childId: 'child_alhb50', childStatus: 'failed' })
+  })
+
+  it('leaves ordinary parent turn_completed / turn_failed behaviour untouched', async () => {
+    let turnCompleteCalls = 0
+    let childStatusCalls = 0
+    let errors = 0
+    const sink: ThreadEventSink = {
+      ...makeSink(),
+      onChildStatus: () => {
+        childStatusCalls += 1
+      },
+      onTurnComplete: () => {
+        turnCompleteCalls += 1
+      },
+      onError: () => {
+        errors += 1
+      }
+    }
+
+    await dispatchKunRuntimeEvent(
+      { kind: 'turn_completed', seq: 40, threadId: 'thr_parent', turnId: 'turn_parent' },
+      sink,
+      async () => undefined
+    )
+    await dispatchKunRuntimeEvent(
+      { kind: 'turn_failed', seq: 41, threadId: 'thr_parent', turnId: 'turn_parent', message: 'boom' },
+      sink,
+      async () => undefined
+    )
+
+    expect(turnCompleteCalls).toBe(1)
+    expect(errors).toBe(1)
+    expect(childStatusCalls).toBe(0)
+  })
 })
 
 describe('streaming runtime status events', () => {

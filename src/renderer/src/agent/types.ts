@@ -353,6 +353,29 @@ export type RuntimeErrorEventPayload = {
   severity?: RuntimeErrorSeverity
 }
 
+/**
+ * A subagent (`delegate_task` child) changed lifecycle state.
+ *
+ * The runtime publishes these onto the PARENT thread's stream as
+ * `turn_started` / `turn_completed` / `turn_failed` / `turn_aborted` events
+ * carrying a `child` block. They describe the child, not the parent turn — the
+ * dispatcher must route them here instead of settling the parent's busy state.
+ */
+export type ChildRunStatusPayload = {
+  childId: string
+  childStatus: 'queued' | 'running' | 'completed' | 'failed' | 'aborted'
+  parentTurnId?: string
+  childLabel?: string
+  childProfile?: string
+  childSeq?: number
+  /** Milliseconds spent waiting for a concurrency slot before starting. */
+  queuedMs?: number
+  durationMs?: number
+  toolInvocations?: number
+  totalTokens?: number
+  createdAt?: string
+}
+
 export type CompactionEventPayload = {
   itemId: string
   summary: string
@@ -434,6 +457,11 @@ export type ThreadEventSink = {
   onUserInputStatus(ev: UserInputStatusPayload): void
   onRuntimeStatus?(ev: RuntimeStatusEventPayload): void
   onRuntimeError?(ev: RuntimeErrorEventPayload): void
+  /**
+   * A delegated subagent moved between queued/running/terminal. Distinct from
+   * `onTurnComplete` — a child finishing must never settle the parent turn.
+   */
+  onChildStatus?(ev: ChildRunStatusPayload): void
   onGoal(ev: { threadId: string; goal: ThreadGoal | null; cleared?: boolean; createdAt?: string }): void
   onTodos?(ev: { threadId: string; todos: ThreadTodoList | null; cleared?: boolean; createdAt?: string }): void
   /** Thread metadata changed out-of-band (e.g. the backend LLM titler upgraded the title). */

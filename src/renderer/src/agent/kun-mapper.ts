@@ -1,5 +1,6 @@
 import type {
   ChatBlock,
+  ChildRunStatusPayload,
   CompactionEventPayload,
   GeneratedFileReference,
   NormalizedThread,
@@ -142,6 +143,11 @@ function toolStatus(item: CoreTurnItemJson): ToolBlock['status'] {
 function outputText(value: unknown): string {
   if (typeof value === 'string') return value
   if (value == null) return ''
+  // A no-argument tool call (`arguments: {}`) or an empty result serializes to
+  // "{}" / "[]" — a truthy string with no information, which slips past every
+  // downstream `detail ? …` guard and renders an empty body in the timeline.
+  // Treat it as absent instead.
+  if (typeof value === 'object' && Object.keys(value as Record<string, unknown>).length === 0) return ''
   try {
     return JSON.stringify(value, null, 2)
   } catch {
@@ -1103,6 +1109,31 @@ function compactionFromEvent(
   }
 }
 
+/**
+ * Extract a subagent lifecycle payload from a parent-thread turn_* event.
+ * Returns null for ordinary parent turns so callers can fall through to the
+ * parent-turn handling. `normalizeChildMetadata` supplies the guard: it only
+ * returns a value when childId/parentThreadId/parentTurnId are all present.
+ */
+function childStatusFromEvent(event: CoreRuntimeEventJson): ChildRunStatusPayload | null {
+  const child = normalizeChildMetadata(event.child)
+  if (!child) return null
+  const raw = event.child as CoreChildRuntimeMetadataJson
+  return {
+    childId: child.childId,
+    childStatus: child.childStatus,
+    ...(child.parentTurnId ? { parentTurnId: child.parentTurnId } : {}),
+    ...(child.childLabel ? { childLabel: child.childLabel } : {}),
+    ...(child.childProfile ? { childProfile: child.childProfile } : {}),
+    ...(typeof child.childSeq === 'number' ? { childSeq: child.childSeq } : {}),
+    ...(typeof raw.queuedMs === 'number' ? { queuedMs: raw.queuedMs } : {}),
+    ...(typeof raw.durationMs === 'number' ? { durationMs: raw.durationMs } : {}),
+    ...(typeof raw.toolInvocations === 'number' ? { toolInvocations: raw.toolInvocations } : {}),
+    ...(typeof raw.totalTokens === 'number' ? { totalTokens: raw.totalTokens } : {}),
+    ...(event.timestamp ? { createdAt: event.timestamp } : {})
+  }
+}
+
 function toolReadyFromEvent(event: CoreRuntimeEventJson): ToolEventPayload | null {
   const callId = typeof event.callId === 'string' && event.callId.trim() ? event.callId.trim() : ''
   const toolName = typeof event.toolName === 'string' && event.toolName.trim() ? event.toolName.trim() : ''
@@ -1311,13 +1342,44 @@ export async function dispatchKunRuntimeEvent(
         ...(event.status !== undefined ? { status: event.status } : {})
       })
       return
-    case 'turn_completed':
+    // A delegated subagent's lifecycle is published onto the PARENT thread as a
+    // turn_* event carrying `child`. Route those to onChildStatus and return:
+    // a child finishing is NOT the parent turn finishing, and letting it fall
+    // through would settle the parent's busy state on the first child to
+    // complete (and drop the child status the timeline cards need).
+    case 'turn_started': {
+      const childStatus = childStatusFromEvent(event)
+      if (childStatus) sink.onChildStatus?.(childStatus)
+      // Parent turn_started carries no renderer-visible state today; the store
+      // drives busy from sendMessage. Keep ignoring it.
+      return
+    }
+    case 'turn_completed': {
+      const childStatus = childStatusFromEvent(event)
+      if (childStatus) {
+        sink.onChildStatus?.(childStatus)
+        return
+      }
       sink.onTurnComplete()
       return
-    case 'turn_aborted':
+    }
+    case 'turn_aborted': {
+      const childStatus = childStatusFromEvent(event)
+      if (childStatus) {
+        sink.onChildStatus?.(childStatus)
+        return
+      }
       sink.onTurnComplete({ aborted: true })
       return
+    }
     case 'turn_failed': {
+      const childStatus = childStatusFromEvent(event)
+      if (childStatus) {
+        // A failed child surfaces on its own card; the parent turn keeps
+        // running (the model still gets the error as a tool result).
+        sink.onChildStatus?.(childStatus)
+        return
+      }
       const payload = runtimeErrorFromEvent(event, 'Claude360 Copilot turn failed')
       sink.onRuntimeError?.(payload)
       sink.onError(errorForRuntimeEvent(payload), { terminal: true })

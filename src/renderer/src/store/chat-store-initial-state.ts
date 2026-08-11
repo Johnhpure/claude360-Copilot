@@ -56,6 +56,7 @@ export function createInitialChatStoreState(workingDirectoryLabel: string) {
     watchTurnCompletion: {},
     unreadThreadIds: {},
     sideConversations: {},
+    childRuns: {},
     sidePanel: { open: false, activeSideId: null },
     clawChannels: [],
     activeClawChannelId: ''

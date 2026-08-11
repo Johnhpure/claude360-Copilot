@@ -48,6 +48,7 @@ function makeSinkHarness(overrides: Partial<ChatState> = {}): {
     watchTurnCompletion: {},
     unreadThreadIds: {},
     queuedMessages: [],
+    childRuns: {},
     threads: []
   } as unknown as ChatState
   state = { ...state, ...overrides }
@@ -62,6 +63,92 @@ function makeSinkHarness(overrides: Partial<ChatState> = {}): {
     get
   }
 }
+
+describe('subagent run state', () => {
+  it('merges child status updates by childId without dropping earlier fields', () => {
+    const { getState, set, get } = makeSinkHarness({ activeThreadId: 'thread-current' })
+    const controller = new AbortController()
+    const sink = buildThreadEventSink(set, get, {
+      threadId: 'thread-current',
+      signal: controller.signal
+    })
+
+    // `running` carries queuedMs; the later `completed` carries durationMs and
+    // toolInvocations. A replace (rather than merge) would lose the wait time.
+    sink.onChildStatus?.({
+      childId: 'child_1',
+      childStatus: 'running',
+      childLabel: '企业平台案例',
+      childProfile: 'general',
+      queuedMs: 210945
+    })
+    sink.onChildStatus?.({
+      childId: 'child_1',
+      childStatus: 'completed',
+      durationMs: 288000,
+      toolInvocations: 40
+    })
+
+    expect(getState().childRuns.child_1).toMatchObject({
+      childId: 'child_1',
+      status: 'completed',
+      label: '企业平台案例',
+      profile: 'general',
+      queuedMs: 210945,
+      durationMs: 288000,
+      toolInvocations: 40
+    })
+  })
+
+  it('keeps sibling children independent and never settles the parent turn', () => {
+    const { getState, set, get } = makeSinkHarness({ activeThreadId: 'thread-current' })
+    const controller = new AbortController()
+    const sink = buildThreadEventSink(set, get, {
+      threadId: 'thread-current',
+      signal: controller.signal
+    })
+
+    sink.onChildStatus?.({ childId: 'child_a', childStatus: 'completed' })
+    sink.onChildStatus?.({ childId: 'child_b', childStatus: 'running' })
+
+    expect(getState().childRuns.child_a?.status).toBe('completed')
+    expect(getState().childRuns.child_b?.status).toBe('running')
+    // The whole point of the separate channel: one child finishing leaves the
+    // parent turn running.
+    expect(getState().busy).toBe(true)
+    expect(getState().currentTurnId).toBe('turn-current')
+  })
+
+  it('survives a store that predates the childRuns slice', () => {
+    // Hot reload (or a rehydrated snapshot from before this field existed)
+    // leaves `childRuns` undefined; a bare index would throw inside set().
+    const { getState, set, get } = makeSinkHarness({
+      activeThreadId: 'thread-current',
+      childRuns: undefined as unknown as Record<string, never>
+    })
+    const controller = new AbortController()
+    const sink = buildThreadEventSink(set, get, {
+      threadId: 'thread-current',
+      signal: controller.signal
+    })
+
+    expect(() => sink.onChildStatus?.({ childId: 'child_1', childStatus: 'running' })).not.toThrow()
+    expect(getState().childRuns.child_1?.status).toBe('running')
+  })
+
+  it('ignores child status from a stream bound to a different active thread', () => {
+    const { getState, set, get } = makeSinkHarness({ activeThreadId: 'thread-new' })
+    const controller = new AbortController()
+    const sink = buildThreadEventSink(set, get, {
+      threadId: 'thread-old',
+      signal: controller.signal
+    })
+
+    sink.onChildStatus?.({ childId: 'child_1', childStatus: 'running' })
+
+    expect(getState().childRuns).toEqual({})
+  })
+})
 
 describe('thread event sink binding', () => {
   it('ignores reasoning deltas from a stream bound to a different active thread', () => {

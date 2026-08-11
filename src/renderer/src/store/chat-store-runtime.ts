@@ -17,7 +17,7 @@ import { describeRuntimeError, formatRuntimeError, getRuntimeErrorCode } from '.
 import { isClawWorkspacePath, isInternalTemporaryWorkspace, normalizeWorkspaceRoot } from '../lib/workspace-path'
 import type { ClawImChannelV1 } from '@shared/app-settings'
 import { isBackgroundShellNoticeUserMessage } from '@shared/background-shell-notice'
-import type { ChatState } from './chat-store-types'
+import type { ChatState, ChildRunState } from './chat-store-types'
 import { isClawThread } from './chat-store-helpers'
 import {
   collectAssistantTextForTurn,
@@ -1237,6 +1237,36 @@ export function buildThreadEventSink(
             : thread
         )
       }))
+    },
+    onChildStatus: (ev) => {
+      if (!isCurrentStream()) return
+      if (!ev.childId) return
+      // The parent turn is still running while children come and go — a child
+      // event is progress, so it counts as liveness for the busy watchdog.
+      resetBusyRecoveryAttempts()
+      set((s) => {
+        // Tolerate a store that predates this slice (hot reload / rehydrate).
+        const existing = s.childRuns ?? {}
+        const previous = existing[ev.childId]
+        // Merge rather than replace: a `completed` event carries durationMs and
+        // toolInvocations, while the earlier `running` event carried queuedMs.
+        // Spreading undefined-free patches keeps both.
+        const next: ChildRunState = {
+          ...previous,
+          childId: ev.childId,
+          status: ev.childStatus,
+          updatedAtMs: Date.now(),
+          ...(ev.parentTurnId ? { parentTurnId: ev.parentTurnId } : {}),
+          ...(ev.childLabel ? { label: ev.childLabel } : {}),
+          ...(ev.childProfile ? { profile: ev.childProfile } : {}),
+          ...(typeof ev.childSeq === 'number' ? { seq: ev.childSeq } : {}),
+          ...(typeof ev.queuedMs === 'number' ? { queuedMs: ev.queuedMs } : {}),
+          ...(typeof ev.durationMs === 'number' ? { durationMs: ev.durationMs } : {}),
+          ...(typeof ev.toolInvocations === 'number' ? { toolInvocations: ev.toolInvocations } : {}),
+          ...(typeof ev.totalTokens === 'number' ? { totalTokens: ev.totalTokens } : {})
+        }
+        return { childRuns: { ...existing, [ev.childId]: next } }
+      })
     },
     onTurnComplete: (info) => {
       if (!isCurrentStream()) return

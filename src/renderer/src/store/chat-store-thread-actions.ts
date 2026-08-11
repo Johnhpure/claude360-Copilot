@@ -439,6 +439,9 @@ export function createThreadActions(
         turnReasoningLastAtByUserId: {},
         inspectorSelectedId: null,
         queuedMessages: [],
+        // Subagent state is per-thread and arrives on the thread's own stream;
+        // carrying it across a switch would show the previous thread's children.
+        childRuns: {},
         composerMode,
         ...(composerSelection
           ? {

@@ -1126,6 +1126,11 @@ function computeToolBlockSummary(
   }
   if (rawSummary) {
     const compact = toolName ? rawSummary.replace(/^([a-z0-9_-]+)\s*:\s*/i, '') : rawSummary
+    // The runtime falls back to the bare tool name when a call has no summary
+    // (`toolBlockFromItem`). `label` is already the humanized form of that same
+    // name, so appending it would print the tool twice —
+    // "Mcp gui schedule list workflows mcp_gui_schedule_list_workflows".
+    if (toolName && compact.trim().toLowerCase() === toolName) return label
     const summary = summarizeProcessText(compact, 72)
     return summary ? `${label} ${summary}` : label
   }

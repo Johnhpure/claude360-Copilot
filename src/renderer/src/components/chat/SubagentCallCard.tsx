@@ -5,6 +5,7 @@ import { Check, ChevronDown, ChevronRight, ExternalLink, Hourglass, Loader2, Tri
 import type { ChatBlock, ToolBlock } from '../../agent/types'
 import { useChatStore } from '../../store/chat-store'
 import { AgentKun } from '../subagents/AgentKun'
+import { useChildLiveProgress } from './use-child-live-progress'
 
 /**
  * "Kun Crew" — the subagent (`delegate_task`) visualization for the chat
@@ -103,11 +104,16 @@ function readChildMeta(block: ChatBlock): ChildMeta {
 }
 
 /**
- * Map the child run + block status to one of five card states. `childStatus`
- * (when present) wins; otherwise fall back to `block.status`.
+ * Map the child run + block status to one of five card states.
+ *
+ * Priority: the live store state (`onChildStatus` off the parent stream) beats
+ * the block's frozen `meta.child`, which beats `block.status`. That order
+ * matters — `block.status` only settles when the parent turn writes the
+ * `tool_result`, which happens after EVERY sibling child has finished, so
+ * without the live layer a completed child shows no change for minutes.
  */
-function resolveStatus(block: ChatBlock, child: ChildMeta): CardStatus {
-  const cs = child.childStatus
+export function resolveStatus(block: ChatBlock, child: ChildMeta, liveStatus?: string): CardStatus {
+  const cs = liveStatus ?? child.childStatus
   if (cs === 'queued') return 'queued'
   if (cs === 'running') return 'running'
   if (cs === 'completed') return 'done'
@@ -124,6 +130,32 @@ function resolveStatus(block: ChatBlock, child: ChildMeta): CardStatus {
 
 function isTerminal(status: CardStatus): boolean {
   return status === 'done' || status === 'failed'
+}
+
+/**
+ * The line under the role name, answering "what is this child doing right now".
+ * Terminal cards return undefined so the task text shows instead.
+ *
+ * Exported for unit tests: the card itself reads live state through a zustand
+ * selector, which resolves to `getInitialState()` under `renderToStaticMarkup`,
+ * so the store-driven branches can only be pinned down at this level.
+ */
+export function describeProgressLine(
+  input: {
+    status: CardStatus
+    elapsed: string
+    steps?: number
+    currentTool?: string
+    sinceLabel?: string
+  },
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string | undefined {
+  if (input.status === 'queued') return t('subagentQueuedFor', { duration: input.elapsed })
+  if (input.status !== 'running' && input.status !== 'awaiting-permission') return undefined
+  if (typeof input.steps !== 'number' || input.steps <= 0) return t('subagentRunningNoStep')
+  return [t('subagentLiveStep', { count: input.steps }), input.currentTool, input.sinceLabel]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 /** Deterministic hue from a string, so same-pose custom agents differ. */
@@ -174,6 +206,10 @@ function mmss(ms: number): string {
 /**
  * Live elapsed ticker. While `running`, ticks `now - createdAt` once a second;
  * on a terminal status it freezes at `durationMs` (or the last tick). Local-only.
+ *
+ * `queued` ticks too: a child can wait minutes for a concurrency slot
+ * (`maxParallel`), and showing a dash there made a real 3m31s wait look like a
+ * dead card.
  */
 function useElapsed(
   status: CardStatus,
@@ -191,9 +227,26 @@ function useElapsed(
     const id = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(id)
   }, [running])
-  if (status === 'queued') return '—'
   if (isTerminal(status) && typeof durationMs === 'number') return mmss(durationMs)
   return mmss(now - start)
+}
+
+/** Coarse "N 秒前 / N 分钟前" for the last observed child activity. */
+function useSinceLabel(
+  lastActivityAtMs: number | undefined,
+  active: boolean,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string | undefined {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!active) return
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [active])
+  if (typeof lastActivityAtMs !== 'number') return undefined
+  const seconds = Math.max(0, Math.floor((now - lastActivityAtMs) / 1000))
+  if (seconds < 60) return t('subagentActivitySeconds', { count: seconds })
+  return t('subagentActivityMinutes', { count: Math.floor(seconds / 60) })
 }
 
 // 五态圆盘底/描边：功能色 color-mix 白底同语义浅化（queued/running=accent、done=success、
@@ -380,7 +433,16 @@ export function SubagentCallCard({
     () => parseDelegateDetail(block.kind === 'tool' ? (block as ToolBlock).detail : undefined),
     [block]
   )
-  const status = resolveStatus(block, child)
+  // `meta.child` is only attached on live child events; for a completed
+  // delegation the reliable source of the child thread id is the tool result
+  // JSON. `delegate_task`'s onStart writes `childId` into the detail the moment
+  // the child is queued, so this resolves well before the child finishes.
+  const childId = child.childId || detail.childId
+  // Optional-chained on purpose: a hot-reloaded or rehydrated store can predate
+  // the `childRuns` slice, and a bare index would throw right here and blank the
+  // whole card — the exact failure this component is meant to prevent.
+  const live = useChatStore((s) => (childId ? s.childRuns?.[childId] : undefined))
+  const status = resolveStatus(block, child, live?.status)
   const animate = !reducedMotion && onScreen && status === 'running'
 
   // Profile id: prefer the live `childProfile` from the runtime metadata (set on
@@ -407,19 +469,29 @@ export function SubagentCallCard({
     .filter((p): p is string => Boolean(p && p.trim()))
   const taskLine = taskParts.join(' · ')
 
-  const elapsed = useElapsed(status, block.createdAt, detail.durationMs)
-  const steps = detail.toolInvocations
+  const elapsed = useElapsed(status, block.createdAt, live?.durationMs ?? detail.durationMs)
+  // While the child runs, step count comes from its own thread; once it's done
+  // the authoritative tally arrives with the result. Same counting rule on both
+  // sides, so the number doesn't jump at the transition.
+  const liveProgress = useChildLiveProgress(childId, status === 'running')
+  const steps = isTerminal(status)
+    ? live?.toolInvocations ?? detail.toolInvocations
+    : liveProgress.steps
+  const sinceLabel = useSinceLabel(liveProgress.lastActivityAtMs, status === 'running', t)
+
+  const progressLine = describeProgressLine(
+    { status, elapsed, steps, currentTool: liveProgress.currentTool, sinceLabel },
+    t
+  )
 
   // Always start collapsed — both while running and after it finishes. The card
   // only opens when the user clicks it (no auto-expand on terminal transition).
-  const hasBody = Boolean(detail.summary?.trim() || detail.error?.trim())
+  // Non-terminal cards are expandable too: the body explains what the child is
+  // waiting on and offers the "open session" route for the full live trace.
+  const hasBody = Boolean(detail.summary?.trim() || detail.error?.trim()) || !isTerminal(status)
   const [userToggled, setUserToggled] = useState<boolean | null>(null)
   const expanded = (userToggled ?? false) && hasBody
 
-  // `meta.child` is only attached on the live child events (which the renderer
-  // currently drops), so for a completed delegation the reliable source of the
-  // child thread id is the tool result JSON (`detail.childId`).
-  const childId = child.childId || detail.childId
   const openChild = (): void => {
     if (!childId) return
     void selectThread(childId).catch(() => undefined)
@@ -467,18 +539,16 @@ export function SubagentCallCard({
             <span className="truncate text-[14px] font-semibold text-ds-ink">{roleName}</span>
             {!compact || !inGroup ? <StatusPill status={status} t={t} /> : null}
           </span>
-          {taskLine ? (
+          {progressLine ? (
+            <span className="mt-0.5 block truncate text-[12.5px] text-accent">{progressLine}</span>
+          ) : taskLine ? (
             <span className="mt-0.5 block truncate text-[12.5px] text-ds-muted">{taskLine}</span>
           ) : null}
         </span>
         <span className="shrink-0 text-right tabular-nums">
           <span className="block text-[13px] font-semibold text-ds-ink">{elapsed}</span>
           <span className="mt-px block text-[10.5px] text-ds-faint">
-            {typeof steps === 'number'
-              ? t('subagentSteps', { count: steps })
-              : status === 'queued' && typeof detail.queuedMs === 'number'
-                ? t('subagentQueuedHint')
-                : ''}
+            {typeof steps === 'number' && steps > 0 ? t('subagentSteps', { count: steps }) : ''}
           </span>
         </span>
         {childId ? (
@@ -519,10 +589,31 @@ export function SubagentCallCard({
             </pre>
           ) : detail.summary?.trim() ? (
             <p className="whitespace-pre-wrap text-[14px] leading-6 text-ds-muted">{detail.summary}</p>
+          ) : !isTerminal(status) ? (
+            // No result yet — say what the child is waiting on rather than
+            // leaving an empty panel that reads as "nothing is happening".
+            <p className="text-[13.5px] leading-6 text-ds-muted">
+              {status === 'queued' ? t('subagentQueuedBody') : t('subagentRunningBody')}
+              {childId ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openChild()
+                  }}
+                  className="ml-1 text-accent underline-offset-2 hover:underline"
+                >
+                  {t('subagentOpenSession')}
+                </button>
+              ) : null}
+            </p>
           ) : null}
 
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             {detail.profile ? <MetaChip title={detail.profile}>{detail.profile}</MetaChip> : null}
+            {typeof live?.queuedMs === 'number' && live.queuedMs >= 1000 ? (
+              <MetaChip>{t('subagentQueuedChip', { duration: mmss(live.queuedMs) })}</MetaChip>
+            ) : null}
             {typeof detail.totalTokens === 'number' && detail.totalTokens > 0 ? (
               <MetaChip>{t('subagentTokensChip', { count: detail.totalTokens })}</MetaChip>
             ) : null}
@@ -575,6 +666,29 @@ export function SubagentGroup({ blocks }: { blocks: ChatBlock[] }): ReactElement
   const { t } = useTranslation('common')
   const [collapsed, setCollapsed] = useState(false)
   const reducedMotion = useReducedMotion()
+  // One subscription for the whole group — the per-card lookup can't use a hook
+  // inside the status loop below.
+  const childRuns = useChatStore((s) => s.childRuns)
+  const [now, setNow] = useState(() => Date.now())
+
+  const statuses = blocks.map((b) => {
+    const meta = readChildMeta(b)
+    const id = meta.childId || parseDelegateDetail(b.kind === 'tool' ? (b as ToolBlock).detail : undefined).childId
+    return resolveStatus(b, meta, id ? childRuns?.[id]?.status : undefined)
+  })
+  const groupRunning = statuses.some((s) => !isTerminal(s))
+  // Wall-clock for the whole fan-out, from the earliest sibling. This is the
+  // number the user actually feels — one child finishing early doesn't stop it.
+  const startedAtMs = blocks.reduce<number | null>((earliest, b) => {
+    const parsed = b.createdAt ? Date.parse(b.createdAt) : NaN
+    if (!Number.isFinite(parsed)) return earliest
+    return earliest === null ? parsed : Math.min(earliest, parsed)
+  }, null)
+  useEffect(() => {
+    if (!groupRunning) return
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [groupRunning])
 
   if (blocks.length === 0) return null
   // N=1: single full card, no swarm header.
@@ -582,17 +696,17 @@ export function SubagentGroup({ blocks }: { blocks: ChatBlock[] }): ReactElement
     return <SubagentCallCard block={blocks[0]} />
   }
 
-  const sorted = [...blocks].sort((a, b) => {
-    const sa = readChildMeta(a).childSeq ?? 0
-    const sb = readChildMeta(b).childSeq ?? 0
+  const order = blocks.map((b, i) => i).sort((a, b) => {
+    const sa = readChildMeta(blocks[a]).childSeq ?? 0
+    const sb = readChildMeta(blocks[b]).childSeq ?? 0
     return sa - sb
   })
+  const sorted = order.map((i) => blocks[i])
 
   let running = 0
   let queued = 0
   let done = 0
-  for (const b of sorted) {
-    const s = resolveStatus(b, readChildMeta(b))
+  for (const s of statuses) {
     if (s === 'running' || s === 'awaiting-permission') running += 1
     else if (s === 'queued') queued += 1
     else if (s === 'done') done += 1
@@ -610,6 +724,9 @@ export function SubagentGroup({ blocks }: { blocks: ChatBlock[] }): ReactElement
   if (running > 0) summaryParts.push(t('subagentSwarmRunning', { count: running }))
   if (queued > 0) summaryParts.push(t('subagentSwarmQueued', { count: queued }))
   if (done > 0) summaryParts.push(t('subagentSwarmDone', { count: done }))
+  if (startedAtMs !== null && groupRunning) {
+    summaryParts.push(t('subagentSwarmElapsed', { duration: mmss(now - startedAtMs) }))
+  }
 
   return (
     <section className="ds-subagent-mount overflow-hidden rounded-[20px] border border-ds-border bg-ds-card shadow-[var(--c360-shadow-sm)]">

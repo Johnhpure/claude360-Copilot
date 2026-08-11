@@ -108,6 +108,29 @@ export type PluginHostRoute = 'chat' | 'claw'
  * MUST NOT mutate any main-thread state (`activeThreadId`, `blocks`,
  * `busy`, etc.) — isolation is structural.
  */
+/**
+ * Live state of one delegated subagent, keyed by `childId`.
+ *
+ * Fed by `ThreadEventSink.onChildStatus` from the parent thread's stream. The
+ * timeline cards read this instead of waiting for the parent turn's
+ * `tool_result` — that only lands once EVERY sibling child has finished, which
+ * is why a completed child used to show no change on screen for minutes.
+ */
+export type ChildRunState = {
+  childId: string
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'aborted'
+  parentTurnId?: string
+  label?: string
+  profile?: string
+  seq?: number
+  queuedMs?: number
+  durationMs?: number
+  toolInvocations?: number
+  totalTokens?: number
+  /** Local clock at the last update — drives "N 秒前" without trusting the host. */
+  updatedAtMs: number
+}
+
 export type SideConversation = {
   threadId: string
   parentThreadId: string
@@ -204,6 +227,8 @@ export type ChatState = {
    * and subscription are never touched by these entries.
    */
   sideConversations: Record<string, SideConversation>
+  /** Live subagent state by childId; reset when the active thread changes. */
+  childRuns: Record<string, ChildRunState>
   sidePanel: SidePanelState
   clawChannels: ClawImChannelV1[]
   activeClawChannelId: string

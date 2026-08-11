@@ -155,6 +155,32 @@ describe('MessageTimeline tool summaries', () => {
       )
     ).toBe('Read background shell 2mcorxhe sleep 15 && echo "Hello from background!"')
   })
+
+  it('does not repeat the tool name when the summary is just the tool name', () => {
+    // The runtime falls back to the bare tool name when a call carries no
+    // summary, and the label is the humanized form of that same name.
+    expect(
+      summarizeToolBlock(
+        toolBlock({
+          summary: 'mcp_gui_schedule_list_workflows',
+          meta: { toolName: 'mcp_gui_schedule_list_workflows' }
+        }),
+        t
+      )
+    ).toBe('Mcp gui schedule list workflows')
+  })
+
+  it('still appends a real summary to the tool label', () => {
+    expect(
+      summarizeToolBlock(
+        toolBlock({
+          summary: 'mcp_gui_schedule_list_workflows: 3 workflows',
+          meta: { toolName: 'mcp_gui_schedule_list_workflows' }
+        }),
+        t
+      )
+    ).toBe('Mcp gui schedule list workflows 3 workflows')
+  })
 })
 
 describe('MessageTimeline Kun runtime metadata smoke', () => {
