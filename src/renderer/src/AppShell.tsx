@@ -7,6 +7,7 @@ import { GuiUpdatePrompt } from './components/GuiUpdatePrompt'
 import { Toaster } from './components/ui'
 import { applyBlurPreference, readBlurPreference } from './lib/blur-preference'
 import { useCrashContextReporter } from './lib/crash-context-reporter'
+import { useAnnotationWatcher } from './features/ppt/use-annotation-watcher'
 import {
   markStartupFirstFrameAfterPaint,
   markStartupInteractive
@@ -64,6 +65,10 @@ export default function AppShell(): React.ReactElement {
   }), [activeThreadId, busy, currentTurnId, route, workspaceRoot])
 
   useCrashContextReporter(crashContext)
+
+  // PPT Master 的浏览器 SVG 编辑器点「应用修改」只写磁盘、不通知 agent，
+  // 用户不手打一句就没人来读。这里替他把那句话发出去。
+  useAnnotationWatcher()
 
   // 启动基线 R5：AppShell 挂载后双 rAF ≈ 首帧真正绘制（返回值即 cleanup）。
   useEffect(() => markStartupFirstFrameAfterPaint(), [])

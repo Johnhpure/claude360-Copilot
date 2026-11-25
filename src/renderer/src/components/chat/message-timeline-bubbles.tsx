@@ -12,6 +12,7 @@ import { parseBackgroundShellCompletionNotice } from '@shared/background-shell-n
 import { isBackgroundShellNoticeBlock } from './message-timeline-turns'
 import { openWorkspacePathInEditor } from '../../lib/open-workspace-path'
 import { DiffView } from '../DiffView'
+import { ArtifactOpenActions } from './ArtifactOpenActions'
 import { AssistantMarkdown } from './AssistantMarkdown'
 import { ImagePreviewLightbox } from './ImagePreviewLightbox'
 import { ModelMetaTag, WritePromptMetaDisclosure } from './message-timeline-cards'
@@ -1373,6 +1374,7 @@ function MessageBubbleImpl({
         <div className="ds-markdown ds-chat-answer min-w-0 max-w-full text-ds-ink">
           <AssistantMarkdown text={block.text} streaming={streaming} />
         </div>
+        {!streaming ? <ArtifactOpenActions text={block.text} /> : null}
         {!streaming ? (
           <div className="mt-1 flex min-h-5 min-w-0 items-center justify-between gap-3 text-[11.5px] text-ds-faint opacity-0 transition duration-[var(--motion-fast)] group-hover/message:opacity-100">
             <span className="min-w-0 truncate">{createdAtLabel ?? ''}</span>

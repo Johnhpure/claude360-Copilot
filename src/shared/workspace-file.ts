@@ -224,6 +224,25 @@ export type WorkspaceFileWatchResult =
     }
   | { ok: false; message: string }
 
+/**
+ * Directory watches report which entries changed instead of shipping content.
+ * Needed for files that do not exist yet when the watch starts — a file watch
+ * requires its target up front.
+ */
+export type WorkspaceDirWatchResult =
+  | { ok: true; watchId: string; path: string; startedAt: string }
+  | { ok: false; message: string }
+
+export type WorkspaceDirChangePayload = {
+  ok: true
+  watchId: string
+  workspaceRoot: string
+  path: string
+  /** Entry names reported by the OS since the last flush; may be empty. */
+  entries: string[]
+  changedAt: string
+}
+
 export type WorkspaceClipboardImageSaveResult =
   | {
       ok: true

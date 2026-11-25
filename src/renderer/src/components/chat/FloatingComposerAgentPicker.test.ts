@@ -21,7 +21,7 @@ function renderView(overrides: Partial<Parameters<typeof AgentPickerView>[0]> = 
 }
 
 describe('buildAssistantMenuItems', () => {
-  it('puts the "no assistant" entry first and lists all six builtins in catalog order', () => {
+  it('puts the "no assistant" entry first and lists all builtins in catalog order', () => {
     const items = buildAssistantMenuItems(translate)
     expect(items.none.id).toBe('')
     expect(items.none.name).toBe('t:assistantNone')
@@ -35,7 +35,8 @@ describe('buildAssistantMenuItems', () => {
       'builtin.speech-writing',
       'builtin.rules-regulations',
       'builtin.briefing-publicity',
-      'builtin.party-building'
+      'builtin.party-building',
+      'builtin.ppt-master'
     ])
   })
 

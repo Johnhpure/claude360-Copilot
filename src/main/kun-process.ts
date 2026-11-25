@@ -70,6 +70,10 @@ import {
   isCodexPluginCacheRoot,
   normalizeSkillRootPath
 } from './services/skill-service'
+import {
+  pptMasterVenvInterpreter,
+  withPptMasterPython
+} from './services/ppt-master-python-env'
 
 let child: ChildProcess | null = null
 let childPort: number | null = null
@@ -490,13 +494,20 @@ async function startKunChildOnce(
       claudeBinary = ensured.path
     }
   }
-  const childEnv: NodeJS.ProcessEnv = {
+  const baseChildEnv: NodeJS.ProcessEnv = {
     ...process.env,
     KUN_RUNTIME_TOKEN: runtime.runtimeToken,
     DEEPSEEK_API_KEY: runtimeApiKey || process.env.DEEPSEEK_API_KEY || '',
     ...(activeProviderKind === 'agent-sdk' ? { KUN_RUNTIME_PROVIDER_KIND: 'agent-sdk' } : {}),
     ...(claudeBinary ? { KUN_CLAUDE_BINARY: claudeBinary } : {})
   }
+  // The PPT Master skill drives ~90 Python scripts through the agent's bash
+  // tool. Prepending the managed venv here means `python3 scripts/foo.py`
+  // resolves to it without the tool layer knowing anything about the skill.
+  const userDataDir = app.getPath('userData')
+  const childEnv = withPptMasterPython(baseChildEnv, userDataDir, {
+    exists: existsSync(pptMasterVenvInterpreter(userDataDir))
+  })
   if (!runAsElectron) childEnv.ELECTRON_RUN_AS_NODE = '1'
   else delete childEnv.ELECTRON_RUN_AS_NODE
   // 崩溃 uptime 基准（07-14-perf-baseline R11）：spawn 时刻的闭包私有记录，
@@ -750,7 +761,10 @@ async function skillCapabilityConfigForRuntime(
       !isCodexPluginCacheRoot(path))
   const roots = uniqueStrings([
     ...manualExisting,
-    ...(await guiSkillRootsForRuntime(settings)).map((root) => root.path)
+    // userData is passed so the app-provisioned PPT Master skill root joins the
+    // scan list; it is not a directory the user registered or can toggle.
+    ...(await guiSkillRootsForRuntime(settings, undefined, app.getPath('userData')))
+      .map((root) => root.path)
   ])
   return {
     ...existing,

@@ -573,6 +573,11 @@ function formatSkillInstruction(skill: LoadedSkill, reason: string): string {
   return [
     `Active Skill: ${skill.name} (${skill.id})`,
     `Activation: ${reason}`,
+    // Packaged skills reference their own scripts and docs by relative path and
+    // have no other way to learn where they were installed. Without this the
+    // model either guesses the root or stalls asking the user for it.
+    `Skill root: ${skill.root} (relative paths in the instructions below resolve against it)`,
+    `Entry file: ${skill.entryPath}`,
     skill.description ? `Description: ${skill.description}` : '',
     skill.allowedTools.length ? `Allowed tools: ${skill.allowedTools.join(', ')}` : '',
     skill.assets.length ? `Assets:\n${skill.assets.map((asset) => `- ${asset}`).join('\n')}` : '',
@@ -682,16 +687,82 @@ function readFrontmatter(content: string): { id?: string; name?: string; descrip
   const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content)
   if (!match) return { description: firstMarkdownParagraph(content) }
   const yaml = match[1] ?? ''
+  const description = frontmatterString(yaml, 'description') ||
+    firstMarkdownParagraph(content.slice(match[0].length))
   return {
     id: frontmatterString(yaml, 'id'),
     name: frontmatterString(yaml, 'name'),
-    description: frontmatterString(yaml, 'description') || firstMarkdownParagraph(content.slice(match[0].length))
+    // Both render sites (catalog line, `Description:` header) are single-line,
+    // so a block scalar's newlines are collapsed here rather than downstream.
+    description: description ? collapseWhitespace(description) : undefined
   }
 }
 
+/**
+ * A YAML block scalar header: `>`, `|`, plus optional indentation and chomping
+ * indicators (`>-`, `|2`, `>2-`). Anything else on the value side is a plain
+ * inline scalar.
+ */
+const BLOCK_SCALAR_HEADER = /^([>|])[+-]?\d*[+-]?$/
+
+/**
+ * Read a top-level frontmatter key. Handles both inline values
+ * (`name: ppt-master`) and block scalars (`description: >` followed by an
+ * indented body) — skills in the wild use the folded form for long
+ * descriptions, and treating it as the literal string ">" left them with a
+ * useless one-character description in the catalog.
+ */
 function frontmatterString(yaml: string, key: string): string | undefined {
-  const match = new RegExp(`^${key}:\\s*(.+?)\\s*$`, 'm').exec(yaml)
-  return match ? stripQuotes(match[1] ?? '').trim() || undefined : undefined
+  const lines = yaml.split(/\r?\n/)
+  const prefix = `${key}:`
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? ''
+    // Only top-level keys: a leading space means this belongs to a nested map.
+    if (!line.startsWith(prefix)) continue
+    const inline = line.slice(prefix.length).trim()
+    const header = BLOCK_SCALAR_HEADER.exec(inline)
+    if (!header) return stripQuotes(inline).trim() || undefined
+    return readBlockScalar(lines, index + 1, header[1] === '|') || undefined
+  }
+  return undefined
+}
+
+/**
+ * Collect the indented body following a block scalar header. Folded (`>`) joins
+ * lines within a paragraph by a space; literal (`|`) keeps the line breaks.
+ * Chomping indicators are ignored — every caller trims anyway.
+ */
+function readBlockScalar(lines: string[], start: number, literal: boolean): string {
+  const body: string[] = []
+  for (let index = start; index < lines.length; index += 1) {
+    const line = lines[index] ?? ''
+    // Blank lines stay in: they separate paragraphs and may sit mid-block.
+    if (line.trim() === '') {
+      body.push('')
+      continue
+    }
+    // Any unindented line is the next top-level key, so the block ends here.
+    if (!/^\s/.test(line)) break
+    body.push(line)
+  }
+  while (body.length > 0 && body[body.length - 1] === '') body.pop()
+  const indents = body.filter((line) => line !== '').map((line) => line.length - line.trimStart().length)
+  if (indents.length === 0) return ''
+  const baseIndent = Math.min(...indents)
+  const stripped = body.map((line) => (line === '' ? '' : line.slice(baseIndent)))
+  if (literal) return stripped.join('\n').trim()
+  // Folded: blank lines are paragraph breaks, everything else joins with a space.
+  return stripped
+    .join('\n')
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.split('\n').map((line) => line.trim()).filter(Boolean).join(' '))
+    .filter(Boolean)
+    .join('\n')
+    .trim()
+}
+
+function collapseWhitespace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim()
 }
 
 function stripQuotes(value: string): string {

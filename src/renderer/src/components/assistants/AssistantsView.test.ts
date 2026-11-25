@@ -30,7 +30,7 @@ function renderCards(
 }
 
 describe('buildAssistantCards', () => {
-  it('lists exactly the ten builtins with risk notes — no general card, no customs', () => {
+  it('lists exactly the eleven builtins with risk notes — no general card, no customs', () => {
     const cards = buildAssistantCards('', translate)
     expect(cards.map((card) => card.id)).toEqual([
       'builtin.official-document',
@@ -42,7 +42,8 @@ describe('buildAssistantCards', () => {
       'builtin.speech-writing',
       'builtin.rules-regulations',
       'builtin.briefing-publicity',
-      'builtin.party-building'
+      'builtin.party-building',
+      'builtin.ppt-master'
     ])
     expect(cards.every((card) => card.riskNote)).toBe(true)
   })
@@ -63,7 +64,7 @@ describe('buildAssistantCards', () => {
 describe('buildAssistantDetails', () => {
   it('resolves capability, strengths, and examples for every builtin', () => {
     const details = buildAssistantDetails('', translate)
-    expect(details).toHaveLength(10)
+    expect(details).toHaveLength(11)
     for (const detail of details) {
       expect(detail.capability).toBeTruthy()
       expect(detail.strengths.length).toBeGreaterThanOrEqual(1)

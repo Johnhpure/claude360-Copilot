@@ -1,0 +1,28 @@
+{
+  "name": "@claude360/ppt-master-skill",
+  "version": "4.8.0",
+  "description": "PPT Master skill payload, redistributed unmodified for on-demand provisioning by Claude360 Copilot.",
+  "license": "MIT",
+  "author": "Hugo He (https://github.com/hugohe3/ppt-master)",
+  "homepage": "https://github.com/hugohe3/ppt-master",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hugohe3/ppt-master.git"
+  },
+  "keywords": [
+    "pptx",
+    "presentation",
+    "powerpoint",
+    "skill",
+    "claude360"
+  ],
+  "files": [
+    "ppt-master"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepare-payload": "node ../../scripts/prepare-ppt-master-package.mjs"
+  }
+}

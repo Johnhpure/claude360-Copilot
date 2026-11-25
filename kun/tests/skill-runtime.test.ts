@@ -140,6 +140,66 @@ describe('SkillRuntime', () => {
     expect(resolution.instructions[0]).toContain('small instructions')
   })
 
+  it('reads folded and literal block scalars in legacy frontmatter', async () => {
+    const foldedRoot = join(root, 'folded')
+    await mkdir(foldedRoot, { recursive: true })
+    await writeFile(join(foldedRoot, 'SKILL.md'), [
+      '---',
+      'name: ppt-master',
+      'description: >',
+      '  AI-driven presentation workflow for generating editable PPTX decks',
+      '  and slides. Use when the user asks to create a presentation.',
+      'metadata:',
+      '  version: "4.8.0"',
+      '---',
+      '',
+      '# PPT Master',
+      '',
+      'Body paragraph that must not become the description.'
+    ].join('\n'), 'utf8')
+    const literalRoot = join(root, 'literal')
+    await mkdir(literalRoot, { recursive: true })
+    await writeFile(join(literalRoot, 'SKILL.md'), [
+      '---',
+      'name: Literal',
+      'description: |',
+      '  first line',
+      '  second line',
+      '---',
+      '',
+      'body'
+    ].join('\n'), 'utf8')
+
+    const runtime = await createRuntime()
+    const skills = runtime.diagnostics().skills
+
+    expect(skills.find((skill) => skill.id === 'folded')?.description).toBe(
+      'AI-driven presentation workflow for generating editable PPTX decks and slides. ' +
+      'Use when the user asks to create a presentation.'
+    )
+    // Literal blocks keep their line structure in YAML, but a description is
+    // rendered on a single line, so it is collapsed rather than left multi-line.
+    expect(skills.find((skill) => skill.id === 'literal')?.description).toBe('first line second line')
+  })
+
+  it('tells the model where an activated skill package lives on disk', async () => {
+    await writeSkill('packaged', {
+      id: 'packaged',
+      name: 'Packaged',
+      triggers: { commands: ['/packaged'] }
+    }, 'Run `python3 scripts/guard.py` from the skill directory.')
+    const runtime = await createRuntime()
+
+    const resolution = await runtime.resolveTurn({ prompt: '/packaged go', workspace: root })
+    const loaded = await runtime.loadSkillById('packaged', root)
+
+    expect(resolution.instructions[0]).toContain(`Skill root: ${join(root, 'packaged')}`)
+    expect(resolution.instructions[0]).toContain(`Entry file: ${join(root, 'packaged', 'SKILL.md')}`)
+    expect(loaded).toMatchObject({
+      instruction: expect.stringContaining(`Skill root: ${join(root, 'packaged')}`)
+    })
+  })
+
   it('renders an always-on catalog of available skills with file paths', async () => {
     await writeSkill('alpha', {
       id: 'alpha',

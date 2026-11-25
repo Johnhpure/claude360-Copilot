@@ -9,6 +9,7 @@ import {
   type CommonSkillDir
 } from '../../shared/skill-dirs'
 import { expandHomePath } from './workspace-service'
+import { pptMasterSkillRoot } from './ppt-master-installer'
 
 export type GuiSkillScope = 'project' | 'global'
 
@@ -70,9 +71,16 @@ type SkillRootCandidate = {
  */
 export async function guiSkillRootsForRuntime(
   settings: AppSettingsV1 | undefined,
-  workspaceRootOverride?: string
+  workspaceRootOverride?: string,
+  /**
+   * userData directory. When given, the app-provisioned PPT Master skill root
+   * is appended so the runtime discovers it without the user registering a
+   * directory by hand.
+   */
+  userDataDir?: string
 ): Promise<GuiSkillRoot[]> {
-  if (!settings && !workspaceRootOverride) return []
+  const managedRoots = userDataDir ? await managedSkillRoots(userDataDir) : []
+  if (!settings && !workspaceRootOverride) return managedRoots
   const disabled = buildDisabledKeySet(settings)
   const candidates = buildSkillRootCandidates(settings, workspaceRootOverride).filter((candidate) => {
     if (isCandidateDisabled(candidate, disabled)) return false
@@ -100,8 +108,19 @@ export async function guiSkillRootsForRuntime(
     ...projectCommon.map(toGuiSkillRoot),
     ...globalCommon.map(toGuiSkillRoot),
     ...pluginRoots,
-    ...extra.map(toGuiSkillRoot)
+    ...extra.map(toGuiSkillRoot),
+    ...managedRoots
   ])
+}
+
+/**
+ * Skill roots the app provisioned itself. These are not user-configurable
+ * directories, so they are appended last and never appear in the settings
+ * root list — the PPT assistant's own panel owns their lifecycle instead.
+ */
+async function managedSkillRoots(userDataDir: string): Promise<GuiSkillRoot[]> {
+  const root = await pptMasterSkillRoot(userDataDir).catch(() => undefined)
+  return root ? [{ path: normalizeSkillRootPath(root), scope: 'global' }] : []
 }
 
 export function guiSkillWorkspaceRootsForRuntime(

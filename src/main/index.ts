@@ -75,6 +75,8 @@ import {
   type AppSettingsV1,
   type WindowCloseAction
 } from '../shared/app-settings'
+import { resolveModelProviderProxyUrl } from '../shared/app-settings-provider'
+import { schedulePptMasterProvisioning } from './services/ppt-master-provision'
 import { Claude360ApiClient } from './services/claude360-api-client'
 import { Claude360AuthService } from './services/claude360-auth-service'
 import { Claude360TokenService } from './services/claude360-token-service'
@@ -2235,6 +2237,24 @@ app.whenReady().then(async () => {
       }
     },
     fallbackMs: 3000
+  })
+
+  // PPT 助手后台预装：skill 包与 Python 环境都要几分钟，放到「召唤时」或
+  // 「发第一条消息时」装会让用户干等，因此启动后静默备好。已就绪则立即返回；
+  // 失败只记日志，助手面板会显示状态并提供重试。设 PPT_MASTER_AUTO_INSTALL=0 可关闭。
+  schedulePptMasterProvisioning({
+    userDataDir: app.getPath('userData'),
+    settings: initial,
+    proxyUrl: resolveModelProviderProxyUrl(initial),
+    restartRuntime: async () => {
+      const settings = await store.load()
+      await restartRuntime(settings)
+    },
+    onState: (state) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('ppt-master:progress', state)
+      }
+    }
   })
 
   // 模型缓存启动预热（07-19-startup-perf-optimization P3 / R4）：ready-to-show 后

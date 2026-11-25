@@ -6,6 +6,7 @@ import {
   resolveExecutable,
   shellConfig,
   shellCommandArgs,
+  SHELL_PATH_PREFIX_ENV,
   shellDisplayName,
   shellRuntimeInfo,
   shellRuntimeInstruction,
@@ -197,7 +198,47 @@ describe('shell runtime metadata', () => {
   })
 
   it('keeps non-PowerShell command arguments unchanged', () => {
-    expect(shellCommandArgs({ shell: '/bin/bash', args: ['-lc'] }, 'echo hi')).toEqual(['-lc', 'echo hi'])
+    expect(shellCommandArgs({ shell: '/bin/bash', args: ['-lc'] }, 'echo hi', {}))
+      .toEqual(['-lc', 'echo hi'])
+  })
+
+  // A login shell runs macOS `path_helper`, which rebuilds PATH with the system
+  // directories first — so a prefix the parent process prepended is demoted and
+  // a managed venv's `python3` loses to /usr/local/bin/python3. Re-applying it
+  // inside the shell is what makes the managed interpreter actually win.
+  it('re-prepends the requested PATH prefix inside a login shell', () => {
+    const args = shellCommandArgs({ shell: '/bin/bash', args: ['-lc'] }, 'python3 x.py', {
+      [SHELL_PATH_PREFIX_ENV]: '/opt/venv/bin'
+    })
+
+    expect(args[0]).toBe('-lc')
+    expect(args[1]).toBe('export PATH=\'/opt/venv/bin\':"$PATH"\npython3 x.py')
+  })
+
+  it('single-quotes a prefix containing spaces so the shell keeps it as one entry', () => {
+    const args = shellCommandArgs({ shell: '/bin/bash', args: ['-lc'] }, 'python3 -V', {
+      [SHELL_PATH_PREFIX_ENV]: '/Users/a/Library/Application Support/App/venv/bin'
+    })
+
+    expect(args[1]).toContain(`export PATH='/Users/a/Library/Application Support/App/venv/bin':"$PATH"`)
+  })
+
+  it('escapes a single quote in the prefix rather than breaking out of the literal', () => {
+    const args = shellCommandArgs({ shell: '/bin/bash', args: ['-lc'] }, 'true', {
+      [SHELL_PATH_PREFIX_ENV]: "/tmp/it's/bin"
+    })
+
+    expect(args[1]).toBe(`export PATH='/tmp/it'\\''s/bin':"$PATH"\ntrue`)
+  })
+
+  it('leaves cmd.exe alone so it never receives POSIX export syntax', () => {
+    const args = shellCommandArgs(
+      { shell: 'C:\\Windows\\System32\\cmd.exe', args: ['/d', '/s', '/c'] },
+      'echo hi',
+      { [SHELL_PATH_PREFIX_ENV]: 'C:\\venv\\Scripts' }
+    )
+
+    expect(args).toEqual(['/d', '/s', '/c', 'echo hi'])
   })
 })
 

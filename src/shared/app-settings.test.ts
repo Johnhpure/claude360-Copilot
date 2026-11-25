@@ -269,12 +269,12 @@ describe('kun defaults', () => {
         defaultSoftThreshold: 96000,
         defaultHardThreshold: 108800,
         summaryMode: 'model',
-        summaryTimeoutMs: 15000,
+        summaryTimeoutMs: 240000,
         summaryMaxTokens: 1200,
         summaryInputMaxBytes: 98304
       },
       runtimeTuning: {
-        streamIdleTimeoutMs: 45000,
+        streamIdleTimeoutMs: 300000,
         toolStorm: {
           enabled: true,
           windowSize: 8,
@@ -653,12 +653,12 @@ describe('mergeKunRuntimeSettings', () => {
 
   it('normalizes the stream idle timeout (0 disables, out-of-range clamps)', () => {
     const current = defaultKunRuntimeSettings()
-    expect(current.runtimeTuning.streamIdleTimeoutMs).toBe(45000)
+    expect(current.runtimeTuning.streamIdleTimeoutMs).toBe(300000)
 
     const set = mergeKunRuntimeSettings(current, {
-      runtimeTuning: { streamIdleTimeoutMs: 300000 }
+      runtimeTuning: { streamIdleTimeoutMs: 120000 }
     })
-    expect(set.runtimeTuning.streamIdleTimeoutMs).toBe(300000)
+    expect(set.runtimeTuning.streamIdleTimeoutMs).toBe(120000)
     // Other knobs are untouched by a timeout-only patch.
     expect(set.runtimeTuning.toolStorm).toEqual(current.runtimeTuning.toolStorm)
 
@@ -672,11 +672,46 @@ describe('mergeKunRuntimeSettings', () => {
     expect(
       mergeKunRuntimeSettings(current, { runtimeTuning: { streamIdleTimeoutMs: -5 } })
         .runtimeTuning.streamIdleTimeoutMs
-    ).toBe(45000)
+    ).toBe(300000)
     expect(
       mergeKunRuntimeSettings(current, { runtimeTuning: { streamIdleTimeoutMs: 999_999_999 } })
         .runtimeTuning.streamIdleTimeoutMs
     ).toBe(3_600_000)
+  })
+
+  it('heals the legacy 45s stream idle default up to the current default', () => {
+    // Installs created under the old default persisted the literal 45000, which
+    // aborts long-reasoning turns. Loading that value self-upgrades to 300000
+    // so an existing install recovers on next launch without a manual edit.
+    const current = defaultKunRuntimeSettings()
+    expect(
+      mergeKunRuntimeSettings(current, { runtimeTuning: { streamIdleTimeoutMs: 45_000 } })
+        .runtimeTuning.streamIdleTimeoutMs
+    ).toBe(300_000)
+  })
+
+  it('heals the legacy 15s compaction summary timeout up to the current default', () => {
+    // Same shape as the stream-idle heal: installs that persisted a superseded
+    // default kept losing compaction summaries mid-turn (ppt-master's stage-1
+    // → stage-2 hand-off was the worst offender — the model dropped that
+    // slice of context and looped re-finding the workflow). Loading an exact
+    // legacy value now self-upgrades to the current default so an existing
+    // install recovers without a manual edit. 60s is on that list because it
+    // was measured failing every compaction of a ppt-master run.
+    const current = defaultKunRuntimeSettings()
+    expect(
+      mergeKunRuntimeSettings(current, { contextCompaction: { summaryTimeoutMs: 15_000 } })
+        .contextCompaction.summaryTimeoutMs
+    ).toBe(240_000)
+    expect(
+      mergeKunRuntimeSettings(current, { contextCompaction: { summaryTimeoutMs: 60_000 } })
+        .contextCompaction.summaryTimeoutMs
+    ).toBe(240_000)
+    // A deliberate non-legacy override still passes through untouched.
+    expect(
+      mergeKunRuntimeSettings(current, { contextCompaction: { summaryTimeoutMs: 20_000 } })
+        .contextCompaction.summaryTimeoutMs
+    ).toBe(20_000)
   })
 
   it('deep-merges image generation settings and normalizes invalid values', () => {

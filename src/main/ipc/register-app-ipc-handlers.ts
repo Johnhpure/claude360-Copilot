@@ -117,6 +117,7 @@ import {
   workspaceFileCreatePayloadSchema,
   workspaceFileSaveAsPayloadSchema,
   workspaceFileTargetPayloadSchema,
+  workspaceDirWatchPayloadSchema,
   workspaceFileWatchPayloadSchema,
   workspaceFileWritePayloadSchema,
   localWhisperDownloadPayloadSchema,
@@ -209,6 +210,7 @@ import {
   readWorkspacePdf,
   renameWorkspaceEntry,
   resolveOpenTargetPath,
+  resolveWorkspaceDirectory,
   resolveWorkspaceFile,
   saveWorkspaceClipboardImage,
   writeWorkspaceFile
@@ -235,6 +237,12 @@ import {
   requestComputerUsePermission
 } from '../services/computer-use-permissions'
 import { importGithubSkillsToRoot } from '../services/github-skill-import-service'
+import {
+  installPptMaster,
+  pptMasterState,
+  repairPptMaster
+} from '../services/ppt-master-service'
+import type { PptMasterActionResult, PptMasterState } from '../../shared/ppt-master'
 import { readLocalPdfText } from '../services/write-pdf-text-service'
 import { readLocalOfficeText } from '../services/office-text-service'
 import { saveGuiSkillPackage } from '../services/skill-save-service'
@@ -265,6 +273,17 @@ type WorkspaceFileWatchRecord = {
   path: string
   workspaceRoot: string
   timer: ReturnType<typeof setTimeout> | null
+  /**
+   * `file` watches re-read the target and ship its content on every change.
+   * `dir` watches only report which entry changed — the renderer decides what
+   * (if anything) is worth reading. Directory watching exists because a file
+   * watch requires the target to already exist, and the PPT annotation log
+   * (`live_preview/annotations.jsonl`) is created only once the user submits
+   * their first annotation.
+   */
+  kind: 'file' | 'dir'
+  /** `dir` only: entry names collected since the last flush. */
+  changedEntries?: Set<string>
 }
 
 type RegisterAppIpcHandlersOptions = {
@@ -748,6 +767,21 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     }
   }
 
+  const emitWorkspaceDirChange = (watchId: string): void => {
+    const record = workspaceFileWatchers.get(watchId)
+    if (!record || record.sender.isDestroyed()) return
+    const entries = [...(record.changedEntries ?? [])]
+    record.changedEntries?.clear()
+    record.sender.send('file:workspace-dir-changed', {
+      ok: true,
+      watchId,
+      workspaceRoot: record.workspaceRoot,
+      path: record.path,
+      entries,
+      changedAt: new Date().toISOString()
+    })
+  }
+
   const scheduleWorkspaceFileChange = (watchId: string): void => {
     const record = workspaceFileWatchers.get(watchId)
     if (!record) return
@@ -756,7 +790,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       const latest = workspaceFileWatchers.get(watchId)
       if (!latest) return
       latest.timer = null
-      void emitWorkspaceFileChange(watchId)
+      if (latest.kind === 'dir') emitWorkspaceDirChange(watchId)
+      else void emitWorkspaceFileChange(watchId)
     }, 90)
   }
 
@@ -1476,6 +1511,45 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     return importGithubSkillsToRoot(request)
   })
 
+  // PPT Master: the skill package (~116MB) and its Python venv are provisioned
+  // on demand into userData, the same way the Agent SDK binary is.
+  const emitPptMasterState = (state: PptMasterState): void => {
+    getMainWindow()?.webContents.send('ppt-master:progress', state)
+  }
+  let pptMasterBusy: Promise<PptMasterActionResult> | null = null
+  const runPptMasterAction = async (
+    action: (input: {
+      userDataDir: string
+      proxyUrl?: string
+      onState?: (state: PptMasterState) => void
+    }) => Promise<PptMasterActionResult>
+  ): Promise<PptMasterActionResult> => {
+    // Downloading ~116MB and building a venv must not run twice concurrently;
+    // a second click joins the in-flight run instead of starting a rival one.
+    if (pptMasterBusy) return pptMasterBusy
+    const proxyUrl = resolveModelProviderProxyUrl(await store.load())
+    const run = action({
+      userDataDir: app.getPath('userData'),
+      ...(proxyUrl ? { proxyUrl } : {}),
+      onState: emitPptMasterState
+    })
+      .then(async (result) => {
+        // Skill roots and the venv PATH are both baked in when the runtime
+        // spawns, so a successful install only takes effect after a restart.
+        if (result.ok) await restartRuntime().catch(() => undefined)
+        return result
+      })
+      .finally(() => {
+        pptMasterBusy = null
+      })
+    pptMasterBusy = run
+    return run
+  }
+
+  ipcMain.handle('ppt-master:status', async () => pptMasterState(app.getPath('userData')))
+  ipcMain.handle('ppt-master:install', async () => runPptMasterAction(installPptMaster))
+  ipcMain.handle('ppt-master:repair', async () => runPptMasterAction(repairPptMaster))
+
   ipcMain.handle('skill:list', async (_, payload: unknown) => {
     const request = parseIpcPayload('skill:list', skillListPayloadSchema, payload)
     const settings = await store.load()
@@ -1859,7 +1933,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         sender: event.sender,
         path: watchedPath,
         workspaceRoot: request.workspaceRoot,
-        timer: null
+        timer: null,
+        kind: 'file'
       })
       event.sender.once('destroyed', () => disposeWorkspaceFileWatchesForSender(event.sender))
       return {
@@ -1869,6 +1944,59 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         content: initialContent,
         size: initialSize,
         truncated: initialTruncated,
+        startedAt: new Date().toISOString()
+      }
+    } catch (error) {
+      return {
+        ok: false as const,
+        message: error instanceof Error ? error.message : String(error)
+      }
+    }
+  })
+  // Directory sibling of `file:watch-workspace`. A file watch needs its target
+  // to exist up front, which does not work for files that appear later — the
+  // PPT annotation log is only created when the user submits their first
+  // annotation. Reports entry names only; the renderer reads what it needs.
+  ipcMain.handle('file:watch-workspace-dir', async (event, payload: unknown) => {
+    const request = parseIpcPayload(
+      'file:watch-workspace-dir',
+      workspaceDirWatchPayloadSchema,
+      payload
+    )
+    let watchedPath: string
+    try {
+      watchedPath = await resolveWorkspaceDirectory(request)
+    } catch (error) {
+      return {
+        ok: false as const,
+        message: error instanceof Error ? error.message : String(error)
+      }
+    }
+
+    const watchId = randomUUID()
+    try {
+      const watcher = watch(watchedPath, { persistent: false }, (_event, filename) => {
+        const record = workspaceFileWatchers.get(watchId)
+        if (record && filename) {
+          record.changedEntries ??= new Set()
+          record.changedEntries.add(String(filename))
+        }
+        scheduleWorkspaceFileChange(watchId)
+      })
+      workspaceFileWatchers.set(watchId, {
+        watcher,
+        sender: event.sender,
+        path: watchedPath,
+        workspaceRoot: request.workspaceRoot,
+        timer: null,
+        kind: 'dir',
+        changedEntries: new Set()
+      })
+      event.sender.once('destroyed', () => disposeWorkspaceFileWatchesForSender(event.sender))
+      return {
+        ok: true as const,
+        watchId,
+        path: watchedPath,
         startedAt: new Date().toISOString()
       }
     } catch (error) {

@@ -19,7 +19,8 @@ const EXPECTED_IDS = [
   'builtin.speech-writing',
   'builtin.rules-regulations',
   'builtin.briefing-publicity',
-  'builtin.party-building'
+  'builtin.party-building',
+  'builtin.ppt-master'
 ] as const
 
 function copyDefinition(
@@ -29,10 +30,10 @@ function copyDefinition(
 }
 
 describe('builtin assistant catalog', () => {
-  it('publishes exactly ten stable assistants in deterministic order', () => {
+  it('publishes exactly eleven stable assistants in deterministic order', () => {
     expect(builtinAssistants.map((item) => item.id)).toEqual(EXPECTED_IDS)
     expect(builtinAssistants.map((item) => item.order)).toEqual([
-      10, 20, 30, 40, 50, 60, 70, 80, 90, 100
+      10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110
     ])
     expect(builtinAssistants.every((item) => item.version === 1)).toBe(true)
     expect(new Set(builtinAssistants.map((item) => item.id)).size).toBe(EXPECTED_IDS.length)

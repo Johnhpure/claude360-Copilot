@@ -784,7 +784,7 @@ describe('syncGuiManagedKunConfig', () => {
         hardThreshold: 990_000
       }
     })
-    expect(parsed.runtime.streamIdleTimeoutMs).toBe(45000)
+    expect(parsed.runtime.streamIdleTimeoutMs).toBe(300000)
     expect(parsed.runtime.toolStorm).toMatchObject({ enabled: true, windowSize: 8, threshold: 3 })
     expect(parsed.runtime.toolArgumentRepair).toMatchObject({ maxStringBytes: 524288 })
     expect(parsed.capabilities.attachments).toMatchObject({ enabled: true })

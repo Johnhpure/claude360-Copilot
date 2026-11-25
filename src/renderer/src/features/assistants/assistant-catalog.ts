@@ -5,6 +5,7 @@ import { dataAnalysisPersona } from './personas/data-analysis'
 import { meetingNotesPersona } from './personas/meeting-notes'
 import { officialDocumentPersona } from './personas/official-document'
 import { partyBuildingPersona } from './personas/party-building'
+import { pptMasterPersona } from './personas/ppt-master'
 import { reportSummaryPersona } from './personas/report-summary'
 import { researchPersona } from './personas/research'
 import { rulesRegulationsPersona } from './personas/rules-regulations'
@@ -231,6 +232,27 @@ const RAW_BUILTIN_ASSISTANTS: readonly BuiltinAssistantDefinition[] = [
       'assistantExamplePartyBuilding3'
     ],
     systemPrompt: partyBuildingPersona
+  },
+  {
+    id: 'builtin.ppt-master',
+    version: 1,
+    order: 110,
+    nameKey: 'assistantNamePptMaster',
+    descriptionKey: 'assistantDescriptionPptMaster',
+    riskNoteKey: 'assistantRiskPptMaster',
+    capabilityKey: 'assistantCapabilityPptMaster',
+    strengthKeys: [
+      'assistantStrengthPptMaster1',
+      'assistantStrengthPptMaster2',
+      'assistantStrengthPptMaster3',
+      'assistantStrengthPptMaster4'
+    ],
+    exampleKeys: [
+      'assistantExamplePptMaster1',
+      'assistantExamplePptMaster2',
+      'assistantExamplePptMaster3'
+    ],
+    systemPrompt: pptMasterPersona
   }
 ]
 

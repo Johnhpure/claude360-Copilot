@@ -51,3 +51,12 @@ TestResults.xml
 
 ### Internal docs
 docs/R2_RELEASE.md
+
+### PPT Master skill payload (12917 files / ~79MB unpacked). Kept out of git
+### for size; it is BUNDLED INTO THE APP at build time from this directory, so
+### it must be staged before `npm run build:*`:
+###     node scripts/prepare-ppt-master-package.mjs --from <ppt-master checkout>
+### electron-builder warns loudly when it is absent (hard-fails when
+### CLAUDE360_REQUIRE_PPT_MASTER=1); a build without it ships no PPT skill.
+packages/ppt-master-skill/ppt-master/
+packages/ppt-master-skill/*.tgz

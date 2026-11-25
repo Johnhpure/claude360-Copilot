@@ -63,6 +63,12 @@ type MarketplaceItem = {
   mcpConfig?: (workspaceRoot: string) => JsonRecord
   oauth?: OAuthConnectorInfo
   skillInstructions?: string
+  /**
+   * Skills the app provisions itself rather than writing a SKILL.md for. These
+   * install through their own IPC so the marketplace and the assistant panel
+   * drive the same state instead of producing two half-installs.
+   */
+  managedInstall?: 'ppt-master'
 }
 
 type JsonRecord = Record<string, unknown>
@@ -760,6 +766,14 @@ const RECOMMENDED_ITEMS: MarketplaceItem[] = [
     group: 'recommended',
     skillInstructions:
       'Use this skill when preparing release notes. Group user-facing changes by outcome, call out migrations or risks, and keep wording concise and scannable.'
+  },
+  {
+    id: 'ppt-master',
+    kind: 'skill',
+    titleKey: 'pluginSkillPptMasterTitle',
+    descriptionKey: 'pluginSkillPptMasterDesc',
+    group: 'recommended',
+    managedInstall: 'ppt-master'
   }
 ]
 
@@ -1067,6 +1081,25 @@ export function PluginMarketplaceView({ leftSidebarCollapsed, onToggleLeftSideba
     try {
       if (item.kind === 'mcp') {
         await installMcpItem(item)
+        return
+      }
+
+      if (item.managedInstall === 'ppt-master') {
+        // Provisioned into userData by the main process (package download +
+        // Python venv), not written into a skill root, so it deliberately skips
+        // the root check below.
+        if (typeof window.kunGui?.pptMasterInstall !== 'function') {
+          setNotice({ tone: 'error', message: t('pluginSkillPptMasterUnavailable') })
+          return
+        }
+        const managed = await window.kunGui.pptMasterInstall()
+        if (!managed.ok) {
+          setNotice({ tone: 'error', message: managed.message })
+          return
+        }
+        markInstalled(storageKey('skill', item.id))
+        await Promise.all([refreshSkillList(), refreshSkillRoots()])
+        setNotice({ tone: 'success', message: t('pluginSkillPptMasterReady') })
         return
       }
 

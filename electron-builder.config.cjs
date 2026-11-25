@@ -89,6 +89,24 @@ if (releaseArtifactVersion && !artifactVersionPattern.test(releaseArtifactVersio
   )
 }
 
+// PPT Master 的 skill 载荷不进 git(12917 个文件),由
+// scripts/prepare-ppt-master-package.mjs 从上游 checkout 铺进 packages/。
+// 缺失时不阻断构建——产物仍可用,只是 PPT 助手会退回 npm 下载通道——
+// 但必须响亮地警告,否则会悄无声息地发出一个没有 PPT 能力的包。
+// 设 CLAUDE360_REQUIRE_PPT_MASTER=1 可把它升级为硬失败(建议 release CI 打开)。
+function pptMasterExtraResources() {
+  const from = join(__dirname, 'packages', 'ppt-master-skill')
+  if (existsSync(join(from, 'ppt-master', 'SKILL.md'))) {
+    return [{ from, to: 'ppt-master-skill', filter: ['ppt-master/**/*'] }]
+  }
+  const message =
+    'PPT Master skill payload not found at packages/ppt-master-skill/ppt-master. ' +
+    'Run: node scripts/prepare-ppt-master-package.mjs --from <ppt-master checkout>'
+  if (envFirst('CLAUDE360_REQUIRE_PPT_MASTER') === '1') throw new Error(message)
+  console.warn(`\n[electron-builder] WARNING: ${message}\n`)
+  return []
+}
+
 module.exports = {
   // appId 已按 Claude360 决策换成全新 id(xyz.claude360.copilot)。
   // 系统会把它当作新应用：macOS 更新、TCC 权限、通知授权，以及 Windows
@@ -156,7 +174,13 @@ module.exports = {
       from: 'resources/whisper',
       to: 'whisper',
       filter: ['**/*']
-    }
+    },
+    // The PPT Master skill (~13k files). Kept out of asar entirely: its own
+    // SKILL.md shells out to scripts/*.py, which cannot run from inside an
+    // archive. `to` must stay in sync with PPT_MASTER_BUNDLE_DIR_NAME, and the
+    // resulting <resources>/ppt-master-skill is the scan root handed to Kun.
+    // Populated by scripts/prepare-ppt-master-package.mjs — see below.
+    ...pptMasterExtraResources()
   ],
   artifactName: `Claude360-Copilot-${artifactVersion}-\${os}-\${arch}.\${ext}`,
   publish: [

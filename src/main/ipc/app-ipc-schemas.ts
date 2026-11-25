@@ -424,7 +424,9 @@ const kunRuntimePatchSchema = z.object({
     defaultSoftThreshold: z.number().int().positive().optional(),
     defaultHardThreshold: z.number().int().positive().optional(),
     summaryMode: kunCompactionSummaryModeSchema.optional(),
-    summaryTimeoutMs: z.number().int().positive().max(120_000).optional(),
+    // Must stay at or above the shared default (240s), otherwise saving
+    // advanced settings rejects the value the app itself ships with.
+    summaryTimeoutMs: z.number().int().positive().max(300_000).optional(),
     summaryMaxTokens: z.number().int().positive().max(16_000).optional(),
     summaryInputMaxBytes: z.number().int().positive().max(8 * 1024 * 1024).optional(),
     summaryModel: optionalModelIdSchema,
@@ -1910,6 +1912,13 @@ export const workspaceEntryDeletePayloadSchema = z
   .strict()
 
 export const workspaceFileWatchPayloadSchema = z
+  .object({
+    path: trimmedString(MAX_PATH_LENGTH),
+    workspaceRoot: trimmedString(MAX_PATH_LENGTH)
+  })
+  .strict()
+
+export const workspaceDirWatchPayloadSchema = z
   .object({
     path: trimmedString(MAX_PATH_LENGTH),
     workspaceRoot: trimmedString(MAX_PATH_LENGTH)

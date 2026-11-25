@@ -389,7 +389,37 @@ export function shellRuntimeInfo(config: ShellConfig = shellConfig()): ShellRunt
   }
 }
 
-export function shellCommandArgs(config: ShellConfig, command: string): string[] {
+/**
+ * Env var holding directories to force to the front of PATH inside the shell.
+ * Colon-separated, same shape as PATH itself.
+ */
+export const SHELL_PATH_PREFIX_ENV = 'KUN_SHELL_PATH_PREFIX'
+
+function posixSingleQuote(value: string): string {
+  return `'${value.split("'").join(`'\\''`)}'`
+}
+
+/**
+ * Re-assert a caller-supplied PATH prefix *inside* the shell.
+ *
+ * POSIX shells are spawned with `-lc`, and a login shell on macOS sources
+ * `/etc/profile`, which runs `path_helper`. That rebuilds PATH with the system
+ * directories first and the inherited entries appended after, so anything the
+ * parent process prepended is silently demoted — a managed virtualenv's
+ * `python3` ends up losing to `/usr/local/bin/python3`. Prepending again here
+ * runs after shell startup, where nothing reorders it a second time.
+ */
+function pathPrefixPreamble(env: NodeJS.ProcessEnv): string {
+  const prefix = env[SHELL_PATH_PREFIX_ENV]?.trim()
+  if (!prefix) return ''
+  return `export PATH=${posixSingleQuote(prefix)}:"$PATH"\n`
+}
+
+export function shellCommandArgs(
+  config: ShellConfig,
+  command: string,
+  env: NodeJS.ProcessEnv = process.env
+): string[] {
   const name = shellDisplayName(config.shell)
   if (name === 'pwsh' || name === 'powershell') {
     const baseArgs = config.args.filter((arg) => arg.toLowerCase() !== '-command')
@@ -397,7 +427,9 @@ export function shellCommandArgs(config: ShellConfig, command: string): string[]
       .toString('base64')
     return [...baseArgs, '-EncodedCommand', encodedCommand]
   }
-  return [...config.args, command]
+  // Gate on `-lc` so the cmd.exe branch never receives POSIX `export` syntax.
+  if (!config.args.includes('-lc')) return [...config.args, command]
+  return [...config.args, `${pathPrefixPreamble(env)}${command}`]
 }
 
 // Factual environment block, not an instruction. Modeled on Codex's

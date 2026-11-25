@@ -2,6 +2,13 @@ import { type ReactElement } from 'react'
 import { Bot, Check, MessageSquareText, Sparkles, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Modal } from '../ui/Modal'
+import { PptMasterEnvPanel } from './PptMasterEnvPanel'
+
+/**
+ * The one assistant whose usability depends on provisioned local state, so it
+ * gets an environment panel the others do not need.
+ */
+const PPT_MASTER_ASSISTANT_ID = 'builtin.ppt-master'
 
 /**
  * 助手详情弹窗：点击助手卡片后展示能力介绍、擅长领域标签与提问示例。
@@ -155,6 +162,8 @@ export function AssistantDetailContent({
               </div>
             </section>
           ) : null}
+
+          {detail.id === PPT_MASTER_ASSISTANT_ID ? <PptMasterEnvPanel /> : null}
 
           {detail.riskNote ? (
             <p className="text-[11.5px] leading-snug text-ds-faint">{detail.riskNote}</p>

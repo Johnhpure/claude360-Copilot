@@ -120,6 +120,17 @@ const api = {
     ipcRenderer.invoke('skill:import-github', { rootPath, url }),
   openSkillRoot: (rootPath) =>
     ipcRenderer.invoke('skill:open-root', rootPath),
+  pptMasterStatus: () => ipcRenderer.invoke('ppt-master:status'),
+  pptMasterInstall: () => ipcRenderer.invoke('ppt-master:install'),
+  pptMasterRepair: () => ipcRenderer.invoke('ppt-master:repair'),
+  onPptMasterProgress: (handler) => {
+    const wrapped = (
+      _: Electron.IpcRendererEvent,
+      payload: Parameters<typeof handler>[0]
+    ) => handler(payload)
+    ipcRenderer.on('ppt-master:progress', wrapped)
+    return () => ipcRenderer.removeListener('ppt-master:progress', wrapped)
+  },
   claude360Session: () => ipcRenderer.invoke('claude360:session'),
   claude360StartDeviceAuth: () => ipcRenderer.invoke('claude360:auth:start-device'),
   claude360PollDeviceAuth: (deviceCode) =>
@@ -253,6 +264,16 @@ const api = {
     ) => handler(payload)
     ipcRenderer.on('file:workspace-changed', wrapped)
     return () => ipcRenderer.removeListener('file:workspace-changed', wrapped)
+  },
+  watchWorkspaceDir: (payload) =>
+    ipcRenderer.invoke('file:watch-workspace-dir', payload),
+  onWorkspaceDirChanged: (handler) => {
+    const wrapped = (
+      _: Electron.IpcRendererEvent,
+      payload: Parameters<typeof handler>[0]
+    ) => handler(payload)
+    ipcRenderer.on('file:workspace-dir-changed', wrapped)
+    return () => ipcRenderer.removeListener('file:workspace-dir-changed', wrapped)
   },
   exportWriteDocument: (payload) =>
     ipcRenderer.invoke('write:export', payload),

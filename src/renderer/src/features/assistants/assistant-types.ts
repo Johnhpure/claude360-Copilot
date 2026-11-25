@@ -24,6 +24,7 @@ export type BuiltinAssistantId =
   | 'builtin.rules-regulations'
   | 'builtin.briefing-publicity'
   | 'builtin.party-building'
+  | 'builtin.ppt-master'
 
 export interface BuiltinAssistantDefinition {
   /** 稳定 ID，必须以 'builtin.' 开头 */

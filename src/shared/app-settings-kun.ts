@@ -291,7 +291,14 @@ export function defaultKunContextCompactionSettings(): KunContextCompactionSetti
     // structured recap of the folded turns instead of a mechanical item list.
     // Falls back to the heuristic summary automatically on timeout/failure.
     summaryMode: 'model',
-    summaryTimeoutMs: 15_000,
+    // 15s, then 60s, both still timed out on every single compaction of a
+    // ppt-master run (6/6 measured) — the compaction turn ships the whole
+    // folded conversation through the main model over a relay provider, so a
+    // minute is simply not enough. Worse, each fallback lands a heuristic
+    // summary that compacts less than the 1.2k-token model summary, so context
+    // returns to the threshold in ~75s and the cycle repeats. 240s matches the
+    // kun-side default so the shared layer no longer overrides it.
+    summaryTimeoutMs: 240_000,
     summaryMaxTokens: 1_200,
     summaryInputMaxBytes: 96 * 1024
   }
@@ -299,7 +306,15 @@ export function defaultKunContextCompactionSettings(): KunContextCompactionSetti
 
 export function defaultKunRuntimeTuningSettings(): KunRuntimeTuningSettingsV1 {
   return {
-    streamIdleTimeoutMs: 45_000,
+    // Max silent gap between streamed chunks before a turn fails with
+    // `stream_idle_timeout`. The old 45s default killed legitimate work: on
+    // heavy authoring steps (e.g. the ppt-master skill planning 10+ SVG pages
+    // of coordinates, or writing a large stage recommendation) a reasoning
+    // model can stay silent for minutes before emitting its next chunk, and a
+    // 45s guard aborts the turn mid-thought — observed as the run "stopping"
+    // with no artifacts. 5 minutes tolerates deep reasoning while still
+    // catching a genuinely dead stream; `0` disables the guard entirely.
+    streamIdleTimeoutMs: 300_000,
     toolStorm: {
       enabled: true,
       windowSize: 8,
@@ -770,6 +785,16 @@ function normalizeKunContextCompactionSettings(
     ? defaultSoftThreshold
     : defaults.defaultHardThreshold
   const requestedHardThreshold = boundedPositiveInt(input?.defaultHardThreshold, defaultHardThreshold)
+  // Heal superseded defaults the same way as LEGACY_STREAM_IDLE_TIMEOUT_MS:
+  // installs that persisted an old value would otherwise keep timing out the
+  // compaction summary mid-turn (ppt-master's stage-1→stage-2 hand-off is the
+  // worst offender). See defaults for the full rationale.
+  const persistedSummaryTimeout = input?.summaryTimeoutMs
+  const summaryTimeoutInput =
+    typeof persistedSummaryTimeout === 'number' &&
+    LEGACY_COMPACTION_SUMMARY_TIMEOUT_MS_VALUES.includes(persistedSummaryTimeout)
+      ? defaults.summaryTimeoutMs
+      : persistedSummaryTimeout
   return {
     defaultSoftThreshold,
     defaultHardThreshold: Math.max(defaultSoftThreshold, requestedHardThreshold),
@@ -778,7 +803,10 @@ function normalizeKunContextCompactionSettings(
     // longer a user-selectable mode, so any stored value coerces to 'model' —
     // this self-heals stale 'heuristic' configs from the removed UI toggle.
     summaryMode: 'model',
-    summaryTimeoutMs: boundedPositiveInt(input?.summaryTimeoutMs, defaults.summaryTimeoutMs, 120_000),
+    // Cap must stay above the default, otherwise a persisted copy of the
+    // default gets clamped back down on reload and the effective timeout
+    // silently depends on whether the user ever saved advanced settings.
+    summaryTimeoutMs: boundedPositiveInt(summaryTimeoutInput, defaults.summaryTimeoutMs, 300_000),
     summaryMaxTokens: boundedPositiveInt(input?.summaryMaxTokens, defaults.summaryMaxTokens, 16_000),
     summaryInputMaxBytes: boundedPositiveInt(input?.summaryInputMaxBytes, defaults.summaryInputMaxBytes, 8 * 1024 * 1024),
     ...(typeof input?.summaryModel === 'string' && input.summaryModel.trim() ? { summaryModel: input.summaryModel.trim() } : {}),
@@ -786,13 +814,43 @@ function normalizeKunContextCompactionSettings(
   }
 }
 
+/**
+ * The original stream-idle default. It was too aggressive: a reasoning model
+ * can stay silent for minutes on a heavy authoring step (e.g. the ppt-master
+ * skill planning 10+ SVG pages), and a 45s guard aborts the turn mid-thought —
+ * the run "stops" with no artifacts. Settings persisted while this was the
+ * default carry the literal 45000; treat that exact value as "not customised"
+ * and heal it to the current default so an existing install self-upgrades on
+ * next load. A deliberate lower value is not offered in the UI, so bumping the
+ * exact legacy default is safe; explicit 0 (disabled) and any other value are
+ * left untouched.
+ */
+const LEGACY_STREAM_IDLE_TIMEOUT_MS = 45_000
+
+/**
+ * Superseded compaction-summary defaults. 15s was too aggressive on long
+ * authoring turns (ppt-master's stage-1 confirmation returns and immediately
+ * launches a big stack of reads + writes for stage-2 — compaction fires, its
+ * summary times out, that whole slice of context is dropped, and the model
+ * loops re-finding the workflow file, looking to the user like "stage 1
+ * confirmed but nothing happens next"). 60s was measured to fail exactly the
+ * same way — 6/6 compactions on one ppt-master run — so it joins the list.
+ * Match the LEGACY_STREAM_IDLE_TIMEOUT_MS treatment: an exact superseded
+ * default coerces to the current one; any other value (a deliberate override)
+ * is left alone.
+ */
+const LEGACY_COMPACTION_SUMMARY_TIMEOUT_MS_VALUES: readonly number[] = [15_000, 60_000]
+
 function normalizeKunRuntimeTuningSettings(
   input: Partial<KunRuntimeTuningSettingsV1> | undefined
 ): KunRuntimeTuningSettingsV1 {
   const defaults = defaultKunRuntimeTuningSettings()
+  const persistedIdle = input?.streamIdleTimeoutMs
+  const idleInput =
+    persistedIdle === LEGACY_STREAM_IDLE_TIMEOUT_MS ? defaults.streamIdleTimeoutMs : persistedIdle
   return {
     streamIdleTimeoutMs: boundedNonNegativeInt(
-      input?.streamIdleTimeoutMs,
+      idleInput,
       defaults.streamIdleTimeoutMs,
       3_600_000
     ),

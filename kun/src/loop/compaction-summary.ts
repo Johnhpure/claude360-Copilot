@@ -5,7 +5,16 @@ import type { ModelClient } from '../ports/model-client.js'
 import { trimTrailingToolCalls } from './context-compactor.js'
 import type { ContextCompactionConfig } from './model-context-profile.js'
 
-export const DEFAULT_COMPACTION_SUMMARY_TIMEOUT_MS = 15_000
+// 60s was still 100% fallback in practice: the compaction turn feeds the whole
+// folded conversation (hundreds of thousands of tokens at threshold) through
+// the main model over a relay provider, and that request simply cannot return
+// in a minute. Measured on a ppt-master run: 6/6 compactions timed out, 360s
+// burned on requests that were never going to land, and every one of them
+// degraded to the heuristic summary — which compacts less aggressively than
+// the 1.2k-token model summary, so context climbed back to the threshold in
+// ~75s and the next compaction fired. Giving the summary enough time to
+// actually finish is what breaks that loop.
+export const DEFAULT_COMPACTION_SUMMARY_TIMEOUT_MS = 240_000
 export const DEFAULT_COMPACTION_SUMMARY_MAX_TOKENS = 2_048
 /** @deprecated The compaction-mode path feeds real conversation messages, not a byte-capped transcript. Kept for config back-compat. */
 export const DEFAULT_COMPACTION_SUMMARY_INPUT_MAX_BYTES = 96 * 1024

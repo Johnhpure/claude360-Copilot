@@ -422,7 +422,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
     defaultSoftThreshold: 16000,
     defaultHardThreshold: 24000,
     summaryMode: 'model',
-    summaryTimeoutMs: 15000,
+    summaryTimeoutMs: 240000,
     summaryMaxTokens: 1200,
     summaryInputMaxBytes: 98304
   }
@@ -432,7 +432,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
     fallbackHardThreshold: contextCompaction.defaultHardThreshold
   })
   const runtimeTuning = kun.runtimeTuning ?? {
-    streamIdleTimeoutMs: 45000,
+    streamIdleTimeoutMs: 300000,
     toolStorm: {
       enabled: true,
       windowSize: 8,

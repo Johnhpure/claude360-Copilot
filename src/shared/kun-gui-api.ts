@@ -17,6 +17,7 @@ import type {
   WorkflowRuntimeStatus
 } from './app-settings'
 import type { EditorListResult, EditorOpenResult, OpenEditorPathOptions } from './editor'
+import type { PptMasterActionResult, PptMasterState } from './ppt-master'
 import type {
   Claude360DeviceAuthPollResult,
   Claude360DeviceAuthStartResult,
@@ -106,6 +107,8 @@ import type {
   WorkspaceEntryRenameResult,
   WorkspaceEntryDeletePayload,
   WorkspaceEntryDeleteResult,
+  WorkspaceDirChangePayload,
+  WorkspaceDirWatchResult,
   WorkspaceFileChangePayload,
   WorkspaceFileCreatePayload,
   WorkspaceFileCreateResult,
@@ -428,6 +431,14 @@ export type KunGuiApi = {
   ) => Promise<SkillSaveResult>
   importSkillsFromGitHub: (rootPath: string, url: string) => Promise<SkillGithubImportResult>
   openSkillRoot: (rootPath: string) => Promise<PathOpenResult>
+  /** Combined state of the PPT Master skill package and its managed Python env. */
+  pptMasterStatus: () => Promise<PptMasterState>
+  /** Provision whatever is missing, then restart the runtime so it takes effect. */
+  pptMasterInstall: () => Promise<PptMasterActionResult>
+  /** Rebuild the managed venv from scratch, then reinstall. */
+  pptMasterRepair: () => Promise<PptMasterActionResult>
+  /** Subscribe to install progress; returns an unsubscribe fn. */
+  onPptMasterProgress: (handler: (state: PptMasterState) => void) => () => void
   claude360Session: () => Promise<Claude360SessionResult>
   claude360StartDeviceAuth: () => Promise<Claude360DeviceAuthStartResult>
   claude360PollDeviceAuth: (deviceCode: string) => Promise<Claude360DeviceAuthPollResult>
@@ -561,6 +572,9 @@ export type KunGuiApi = {
   watchWorkspaceFile: (payload: WorkspaceFileWatchPayload) => Promise<WorkspaceFileWatchResult>
   unwatchWorkspaceFile: (watchId: string) => Promise<boolean>
   onWorkspaceFileChanged: (handler: (payload: WorkspaceFileChangePayload) => void) => () => void
+  /** Directory sibling of {@link watchWorkspaceFile}; released via `unwatchWorkspaceFile`. */
+  watchWorkspaceDir: (payload: WorkspaceFileWatchPayload) => Promise<WorkspaceDirWatchResult>
+  onWorkspaceDirChanged: (handler: (payload: WorkspaceDirChangePayload) => void) => () => void
   requestWriteInlineCompletion: (
     payload: WriteInlineCompletionRequest
   ) => Promise<WriteInlineCompletionResult>
