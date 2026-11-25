@@ -22,6 +22,11 @@ release.local.env
 *.key
 *.mobileprovision
 
+### Generated output
+projects/
+.playwright-mcp/
+.tmp/
+
 ### AL ###
 #Template for AL projects for Dynamics 365 Business Central
 #launch.json folder
